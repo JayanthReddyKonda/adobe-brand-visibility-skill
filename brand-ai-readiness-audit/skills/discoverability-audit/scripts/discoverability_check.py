@@ -70,7 +70,10 @@ def parse_domain(site):
 
 
 def parse_robots(body):
-    agents, current, sitemaps = {}, None, []
+    """Parse robots.txt into UA-grouped rule lists (RFC 9309-style groups)."""
+    groups = []          # list of {"agents": [...], "rules": [(k, v), ...]}
+    sitemaps = []
+    current = None
     for line in body.splitlines():
         line = line.split("#")[0].strip()
         if not line or ":" not in line:
@@ -78,13 +81,46 @@ def parse_robots(body):
         k, v = line.split(":", 1)
         k, v = k.strip().lower(), v.strip()
         if k == "user-agent":
-            current = v.lower()
-            agents.setdefault(current, [])
+            if current is None or current["rules"]:
+                current = {"agents": [], "rules": []}
+                groups.append(current)
+            current["agents"].append(v.lower())
         elif k == "sitemap":
             sitemaps.append(v)
         elif k in ("allow", "disallow") and current is not None:
-            agents[current].append((k, v))
-    return agents, sitemaps
+            current["rules"].append((k, v))
+    return groups, sitemaps
+
+
+def _pattern_matches(pattern, path):
+    """RFC 9309 path matching: '*' wildcard, '$' anchor, longest-match."""
+    pat = re.escape(pattern).replace(r"\*", ".*")
+    if pat.endswith(r"\$"):
+        pat = pat[:-2] + "$"
+    return re.match(pat, path) is not None
+
+
+def robots_access(groups, ua, path="/"):
+    """Decide allow/deny for a user-agent + path. Returns the deciding rule
+    ('allow'/'disallow', value) or ('allow', None) when no rule applies.
+    Longest matching rule wins; 'allow' wins ties (per RFC 9309)."""
+    ua = ua.lower()
+    rules = []
+    for g in groups:
+        if "*" in g["agents"] or ua in g["agents"]:
+            rules.extend(g["rules"])
+    best = ("allow", None, -1)
+    for k, v in rules:
+        if not v:
+            continue
+        if _pattern_matches(v, path):
+            specificity = len(v)
+            # 'allow' wins equal-length ties
+            if k == "allow" and specificity == best[2]:
+                best = (k, v, specificity)
+            elif specificity > best[2]:
+                best = (k, v, specificity)
+    return best[0], best[1]
 
 
 def audit(base, domain):
@@ -104,25 +140,50 @@ def audit(base, domain):
                                   verification=f"Re-request {base}/ and confirm HTTP 200.")))
         return {"status": "ok", "findings": findings, "recommendations": recommendations}
 
-    # robots.txt: per-bot access (L1). Absence of a rule = allowed; we only
-    # report explicit blanket blocks.
+    # robots.txt: per-bot access with real path matching (RFC 9309-style).
+    # Absence of a rule = allowed; only explicit blanket denials are reported.
     r_status, r_body, _ = fetch(base + "/robots.txt")
-    robots_map, sitemaps = {}, []
+    groups, sitemaps = [], []
     if r_status == 200 and r_body:
-        robots_map, sitemaps = parse_robots(r_body)
+        groups, sitemaps = parse_robots(r_body)
     blocked = [b for b in AI_BOTS
-               if any(k == "disallow" and v == "/" for k, v in robots_map.get(b.lower(), []))]
+               if robots_access(groups, b, "/")[0] == "disallow"]
     if blocked:
         sev = "critical" if any(x in blocked for x in ("GPTBot", "OAI-SearchBot", "ClaudeBot", "PerplexityBot")) else "medium"
         findings.append(dict(
             category="access", title="robots.txt blocks AI crawler user-agents", severity=sev,
             confidence="high",
-            root_cause="Explicit robots.txt Disallow rules exclude AI retrieval systems from public content.",
+            root_cause="robots.txt matching rules exclude AI retrieval systems from the site root.",
             impact="AI assistants that respect robots.txt cannot retrieve or cite the site's content for these user-agents.",
-            evidence=f"robots.txt contains 'Disallow: /' for: {', '.join(blocked)}.",
+            evidence=f"robots.txt (HTTP {r_status}) longest-match Deny rules apply to '/' for: {', '.join(blocked)}.",
             suggested_action=dict(summary="Remove blanket Disallow rules for AI retrieval user-agents on public content.",
                                   priority=sev,
-                                  verification="Re-fetch robots.txt and confirm these user-agents are no longer fully disallowed.")))
+                                  verification="Re-fetch robots.txt and confirm these user-agents are no longer denied at '/'.")))
+
+    # Multi-UA probe: distinguish "whole site blocks this client" from
+    # "AI crawler is selectively blocked". Only acts on divergence.
+    bot_probe = {}
+    for bot in ("GPTBot", "ClaudeBot", "PerplexityBot"):
+        req = urllib.request.Request(base + "/", headers={"User-Agent": f"Mozilla/5.0 (compatible; {bot}/1.0)"})
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                bot_probe[bot] = resp.status
+        except urllib.error.HTTPError as e:
+            bot_probe[bot] = e.code
+        except Exception:
+            bot_probe[bot] = None
+    divergent = [f"{b}: HTTP {s}" for b, s in bot_probe.items()
+                 if s is not None and s >= 403 and status < 400]
+    if divergent:
+        findings.append(dict(
+            category="access", title="AI crawler user-agents receive different treatment than browser requests",
+            severity="high", confidence="medium",
+            root_cause="The server responds differently to AI-crawler User-Agent strings than to browser requests (WAF/bot filtering or UA rules).",
+            impact="AI retrieval systems may be blocked even where robots.txt permits access; content is unreachable to those systems regardless of directives.",
+            evidence=f"Browser request: HTTP {status}; bot-UA requests: {'; '.join(divergent)}.",
+            suggested_action=dict(summary="Review WAF/bot-mitigation rules to permit verified AI retrieval crawlers on public content.",
+                                  priority="high",
+                                  verification="Re-issue requests with the listed user-agents and confirm HTTP 200.")))
 
     if not sitemaps and r_status == 200:
         s_status, _, _ = fetch(base + "/sitemap.xml")
@@ -153,15 +214,28 @@ def audit(base, domain):
     if parser.canonical:
         canon = urljoin(base + "/", parser.canonical)
         if canon.rstrip("/") != base.rstrip("/"):
-            findings.append(dict(
-                category="discovery", title="Homepage canonical points elsewhere", severity="medium",
-                confidence="high",
-                root_cause="The canonical URL declared on the homepage targets a different address.",
-                impact="Retrieval systems may consolidate this page under the canonical target.",
-                evidence=f"<link rel='canonical' href='{parser.canonical}'> on {base}/ resolves to {canon}.",
-                suggested_action=dict(summary="Self-canonicalize if this is the primary domain.",
-                                      priority="medium",
-                                      verification=f"Re-fetch and confirm canonical matches {base}/.")))
+            # Canonical is a hint, not a verdict. Only a finding when
+            # corroborated by sitemap disagreement; otherwise informational.
+            sitemap_mentions_canon = False
+            if sitemaps:
+                s_status, s_body, _ = fetch(sitemaps[0])
+                if s_status == 200 and s_body and canon in s_body:
+                    sitemap_mentions_canon = True
+            if sitemap_mentions_canon:
+                findings.append(dict(
+                    category="discovery", title="Consistent canonical target differs from requested host",
+                    severity="medium", confidence="high",
+                    root_cause="The site consolidates onto a different canonical host (declared in markup and confirmed by the sitemap).",
+                    impact=f"Retrieval systems may index {canon} instead of {base}/; audits and citations must reference the canonical host.",
+                    evidence=f"<link rel='canonical' href='{parser.canonical}'> on {base}/ resolves to {canon}; sitemap {sitemaps[0]} lists {canon}.",
+                    suggested_action=dict(summary="Use the canonical host consistently in all references and re-audit against it.",
+                                          priority="medium",
+                                          verification=f"Confirm internal links and sitemap all use {canon}.")))
+            else:
+                recommendations.append(dict(
+                    title="Verify homepage canonical target",
+                    rationale=f"<link rel='canonical'> on {base}/ points to {canon}. A differing canonical can be intentional (e.g. www vs apex); no corroborating signal was found, so no defect is asserted.",
+                    suggested_action=f"Confirm {canon} is the intended primary host and that redirects, sitemap, and internal links agree with it."))
 
     # Rendering risk: precise about what was verified (initial HTML only).
     words = len(" ".join(parser.text).split())

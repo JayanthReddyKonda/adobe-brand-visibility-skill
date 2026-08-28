@@ -101,37 +101,10 @@ def audit_engagement(html_str, url_or_domain):
                     "priority": "medium"
                 }
             })
-    else:
-        # H1 quality: does it communicate substance (information scent)?
-        primary_h1 = h1_tags[0]
-        if len(primary_h1.split()) < 3:
-            findings.append({
-                "id": "ENG-H1-VAGUE",
-                "title": "H1 heading carries little information scent",
-                "severity": "low",
-                "evidence": f"The page's <h1> is '{primary_h1}' ({len(primary_h1.split())} words). Short, generic headings do not tell visitors or AI summarizers what the organization actually offers.",
-                "suggested_action": {
-                    "summary": "Rewrite the <h1> to state the offer concretely, e.g. '<Brand>: freshly roasted specialty coffee delivered monthly'.",
-                    "priority": "low"
-                }
-            })
-
     # Note: multiple H1 elements are valid HTML5 and are NOT reported as a
-    # defect; only their combined semantic clarity would matter, which
-    # requires human/LLM judgment beyond deterministic scope.
-
-    # 2. Heading Hierarchy & Information Scent
-    if len(h2_tags) == 0 and len(parser.paragraphs) > 3:
-        findings.append({
-            "id": "ENG-H2-MISSING",
-            "title": "Poor information scent: Absence of structured H2 subheadings",
-            "severity": "medium",
-            "evidence": "Page contains multiple body paragraphs without <h2> subheadings, creating a wall-of-text that degrades scannability.",
-            "suggested_action": {
-                "summary": "Organize features, use-cases, and proof points under descriptive <h2> headings.",
-                "priority": "medium"
-            }
-        })
+    # defect. Heading *quality* (information scent) requires semantic
+    # judgment relative to page intent, which is deferred to the agent
+    # reasoning layer rather than guessed by word-count heuristics.
 
     # 3. Navigation — the real question is whether key destinations can be
     #    discovered, not whether a literal <nav> tag exists. Header/footer

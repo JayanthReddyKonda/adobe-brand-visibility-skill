@@ -175,19 +175,27 @@ def compose_audit(site, include_proactive=True):
     if include_proactive:
         all_recommendations.extend(proactive_checks(domain, base_url))
     # Deduplicate by evidence prefix, highest severity first.
+    # Fingerprint dedup: same logical check re-run across pages (or re-emitted
+    # by two specialists) shares a normalized title; distinct checks keep
+    # distinct titles. Far more robust than prefix-matching free-text evidence.
+    def fingerprint(item):
+        title = " ".join(str(item.get("title", "")).lower().split())
+        return title
+
     final_findings = []
-    seen_evidence = set()
+    seen = set()
     sorted_raw = sorted(raw_findings, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium"), 99))
 
     for item in sorted_raw:
         sev = str(item.get("severity", "medium")).lower()
         if sev not in SEVERITY_ORDER:
             sev = "medium"
-        evidence = str(item.get("evidence", "")).strip() or "Observed during automated site audit."
-        evidence_key = evidence[:120]
-        if evidence_key in seen_evidence:
+        fp = fingerprint(item)
+        if fp and fp in seen:
             continue
-        seen_evidence.add(evidence_key)
+        if fp:
+            seen.add(fp)
+        evidence = str(item.get("evidence", "")).strip() or "Observed during automated site audit."
         action = item.get("suggested_action", {})
         finding_entry = {
             "id": f"F-{len(final_findings) + 1:03d}",

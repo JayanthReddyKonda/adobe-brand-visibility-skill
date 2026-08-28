@@ -78,19 +78,10 @@ def audit_freshness(html_str, url_or_domain):
         try:
             latest_c_year = max(int(y) for y in copyright_matches if 1990 <= int(y) <= CURRENT_YEAR + 1)
             result["copyright_year"] = latest_c_year
-            if latest_c_year < CURRENT_YEAR - 1:
-                # A copyright year alone is not proof of stale *content*;
-                # it is a weak maintenance signal.
-                findings.append({
-                    "id": "FC-COPYRIGHT-STALE",
-                    "title": "Copyright year suggests minimal maintenance",
-                    "severity": "low",
-                    "evidence": f"Footer copyright shows '{latest_c_year}' while current year is {CURRENT_YEAR}. This is a weak signal on its own and does not prove content is stale, but it may read as an abandoned site.",
-                    "suggested_action": {
-                        "summary": f"Update the copyright year to {CURRENT_YEAR} (ideally render it dynamically). Verify volatile facts (pricing, dates, availability) are current.",
-                        "priority": "low"
-                    }
-                })
+            # A copyright year alone is NOT a freshness finding (Google's
+            # sitemap guidance: lastmod/years are not proof of content
+            # staleness). The year is retained only for cross-page
+            # contradiction detection below.
         except ValueError:
             pass
 
