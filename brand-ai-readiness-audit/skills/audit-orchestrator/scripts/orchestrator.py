@@ -300,12 +300,20 @@ def proactive_checks(domain, base_url):
     """
     recommendations = []
 
+    # /llms.txt: an optional community proposal. Google does NOT use it for AI
+    # Overviews / AI Mode, so its absence is deliberately NOT reported as a
+    # defect and is never recommended by default. Only surfaced as an optional
+    # experiment for non-Google consumers, and only when the file is absent.
     llms_status = check_url_status(f"{base_url}/llms.txt")
     if llms_status == 404:
         recommendations.append({
-            "title": "Add an /llms.txt file to guide AI assistants",
-            "rationale": f"GET {base_url}/llms.txt returned HTTP 404. An llms.txt file gives AI assistants a curated map of key content.",
-            "suggested_action": "Publish /llms.txt listing canonical URLs and short descriptions of key pages."
+            "title": "Optional experiment: publish an /llms.txt index",
+            "rationale": f"GET {base_url}/llms.txt returned HTTP 404. llms.txt is a voluntary community "
+                         "proposal, not a Google requirement (Google states no additional machine-readable "
+                         "files are needed for AI Overviews / AI Mode). Consider it only if you target "
+                         "non-Google LLM consumers; it has no effect on Google visibility.",
+            "suggested_action": "Publish /llms.txt only as an optional experiment for non-Google AI consumers; "
+                                "do not treat its absence as a defect."
         })
 
     sitemap_status = check_url_status(f"{base_url}/sitemap.xml")

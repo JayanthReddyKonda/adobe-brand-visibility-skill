@@ -15,6 +15,19 @@ UA = {"User-Agent": "Mozilla/5.0 (compatible; BrandReadinessBot/1.0)"}
 AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot",
            "PerplexityBot", "Google-Extended", "Applebot-Extended", "CCBot", "anthropic-ai"]
 
+# Per-bot role: "retrieval" crawlers affect whether the site is cited in an
+# AI search product; "training" tokens affect only model training/grounding.
+# They are deliberately tracked separately - blocking a training token must
+# never be conflated with blocking retrieval access (and vice versa).
+CRAWLER_SEMANTICS = {
+    "OAI-SearchBot": "retrieval", "Claude-SearchBot": "retrieval",
+    "PerplexityBot": "retrieval", "ChatGPT-User": "user_fetch",
+    "anthropic-ai": "retrieval",
+    "GPTBot": "training", "ClaudeBot": "training",
+    "Google-Extended": "training", "Applebot-Extended": "training",
+    "CCBot": "training",
+}
+
 
 def fetch(url, timeout=10):
     req = urllib.request.Request(url, headers=UA)
@@ -266,6 +279,15 @@ def audit(base, domain, inv=None):
                                   verification="Re-fetch raw HTML and confirm primary copy appears in the response body.")))
 
     internal = [l for l in parser.links if l.startswith("/") or domain in l]
+    # Per-platform crawler matrix: each bot's access + role semantics.
+    # Distance between "blocked for retrieval" and "blocked for training" is
+    # always preserved - a training opt-out is not a visibility defect.
+    crawler_matrix = {}
+    for bot in AI_BOTS:
+        rule, matched = robots_access(groups, bot, "/") if r_status == 200 else ("allow", None)
+        role = CRAWLER_SEMANTICS.get(bot, "unknown")
+        crawler_matrix[bot] = {"role": role, "disallowed": rule == "disallow",
+                               "deciding_rule": matched}
     evidence.append(dict(url=base + "/", http_status=status, words=words,
                          internal_links=len(internal), robots_status=r_status,
                          sitemaps=sitemaps))
@@ -273,6 +295,7 @@ def audit(base, domain, inv=None):
             "evidence": evidence,
             "coverage": {"homepage_checked": True, "robots_checked": r_status == 200,
                          "sitemap_declared": bool(sitemaps),
+                         "crawler_matrix": crawler_matrix,
                          "source": "shared-inventory" if inv is not None else "independent-fetch"},
             "limitations": ([] if r_status == 200 else
                             ["robots.txt not retrievable (HTTP %s); access rules unverified" % r_status])}
