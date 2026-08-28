@@ -27,27 +27,47 @@ The central entrypoint skill of the Brand AI-Readiness Audit Marketplace. It com
 
 ## Procedure
 
-1. **Target Normalization**: Clean and validate the target domain/URL across platforms.
-2. **Execute Specialist Skills**:
-   - Invoke [`crawl-render-audit`](../crawl-render-audit/SKILL.md) to inspect bot access, SSR/CSR rendering gaps, and Schema.org JSON-LD.
-   - Invoke [`freshness-corroboration`](../freshness-corroboration/SKILL.md) to check timestamps, staleness, and entity `sameAs` corroboration.
-   - Invoke [`engagement-audit`](../engagement-audit/SKILL.md) to evaluate above-the-fold value props, heading structure, and summary readability.
-3. **Reconcile & Deduplicate**:
-   - Merge overlapping findings across skills according to [Composition Guidelines](references/COMPOSITION_GUIDELINES.md).
-   - Reassign sequential IDs (`F-001`, `F-002`, ...).
-4. **Calibrate Severity & Prioritize Actions**:
-   - Map defects to `critical`, `high`, `medium`, `low` based on impact on AI citation and user engagement.
-   - Ensure every finding includes concrete `evidence` and a mechanism-sound `suggested_action`.
-5. **Synthesize Proactive Opportunities**:
-   - Add high-value proactive suggestions (e.g., adding `llms.txt`, knowledge graph entity disambiguation) even if no explicit fatal defect was detected.
-6. **Emit & Validate JSON Report**:
-   - Generate the final JSON report matching the [Report Schema](references/REPORT_SCHEMA.md).
-   - Verify compliance using the bundled validator script.
-   - **Deliver ONLY the JSON report to the user** — output the raw JSON and nothing else: no prose, no commentary, no markdown code fence, no summaries, no file-saving message. Do not write a file unless the user explicitly asks.
+This is a **mandatory, ordered workflow**. You MUST load and run ALL THREE specialist skills before composing the report. Do not skip any specialist, do not reorder them, and do not emit the report until every checklist item below is complete and its findings have been collected.
+
+> Progressive disclosure: agents do not auto-load every skill. The specialists below are NOT loaded into your context automatically — you must explicitly load each one's `SKILL.md` and run its bundled script as instructed. Verify each by running it and capturing its findings.
+
+### Mandatory checklist (do all, in order)
+
+- [ ] **Step 1 — Normalize target**: Clean and validate the target domain/URL. Determine the canonical `base_url`.
+- [ ] **Step 2 — Load & run `crawl-render-audit`** (MANDATORY):
+  - Load its instructions: read [`../crawl-render-audit/SKILL.md`](../crawl-render-audit/SKILL.md).
+  - Execute its bundled script to inspect bot access, SSR/CSR rendering gaps, machine-readable content, and Schema.org JSON-LD:
+    ```bash
+    python3 skills/crawl-render-audit/scripts/crawl_render_check.py --site <base_url>
+    ```
+  - Collect all findings it returns. If it returns none, record that as a result (do not skip).
+- [ ] **Step 3 — Load & run `freshness-corroboration`** (MANDATORY):
+  - Load its instructions: read [`../freshness-corroboration/SKILL.md`](../freshness-corroboration/SKILL.md).
+  - Execute its bundled script to check timestamps, staleness, cross-page consistency, and `sameAs` entity grounding:
+    ```bash
+    python3 skills/freshness-corroboration/scripts/freshness_check.py --site <base_url>
+    ```
+  - Collect all findings it returns. If it returns none, record that as a result (do not skip).
+- [ ] **Step 4 — Load & run `engagement-audit`** (MANDATORY):
+  - Load its instructions: read [`../engagement-audit/SKILL.md`](../engagement-audit/SKILL.md).
+  - Execute its bundled script to evaluate above-the-fold orientation, heading hierarchy, information scent, and navigation:
+    ```bash
+    python3 skills/engagement-audit/scripts/engagement_check.py --site <base_url>
+    ```
+  - Collect all findings it returns. If it returns none, record that as a result (do not skip).
+- [ ] **Step 5 — Proactive checks**: Run `proactive_checks` (llms.txt, sitemap) against the live site unless disabled.
+- [ ] **Step 6 — Reconcile & deduplicate**: Merge overlapping findings across the three specialists according to [Composition Guidelines](references/COMPOSITION_GUIDELINES.md). Reassign sequential IDs (`F-001`, `F-002`, ...). Note any case where a specialist returned no findings so the report reflects a genuinely clean result, never fabricated findings.
+- [ ] **Step 7 — Calibrate severity & prioritize**: Map defects to `critical`/`high`/`medium`/`low` based on impact on AI citation and user engagement. Ensure every finding includes concrete `evidence` and a mechanism-sound `suggested_action`.
+- [ ] **Step 8 — Validation gate (MANDATORY, do not skip)**: Before emitting, validate the assembled report against the schema:
+  ```bash
+  python3 skills/audit-orchestrator/scripts/validate_report.py <report_file>
+  ```
+  If validation fails, fix the report and re-validate. Only proceed when it passes.
+- [ ] **Step 9 — Emit**: Output ONLY the validated JSON report (see Output rule below).
 
 ## Output
 
-Return ONLY a JSON report matching the required schema (no additional text before or after):
+Return ONLY a JSON report matching the required schema (no additional text before or after). The report must reflect output from ALL the mandatory specialist skills above; a finding of zero problems is a valid, truthful result only if every specialist genuinely returned nothing.
 
 ```json
 {
