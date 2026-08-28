@@ -1,90 +1,68 @@
 # Brand AI-Readiness Audit Marketplace
 
-A modular, multi-skill AI agent marketplace built in the standard [agentskills.io](https://agentskills.io) format for **Adobe University Hackathon 2026**.
+[agentskills.io](https://agentskills.io)-compliant multi-skill marketplace built for **Adobe University Hackathon 2026 — Round 3**. It audits any website for:
 
-This marketplace automatically audits any website for both **off-site AI discoverability** (how search assistants like ChatGPT, Claude, Gemini, and Perplexity crawl, extract, corroborate, and cite brand facts) and **on-site engagement** (how human visitors orient, navigate, and convert once they land), producing an evidence-backed audit report with prioritized recommendations and proactive improvements.
+- **AI Discoverability** — how assistants (ChatGPT, Claude, Gemini, Perplexity) crawl, extract, corroborate, and cite brand facts.
+- **On-Site Engagement** — how visitors orient, navigate, and convert after landing.
 
-The final audit report is **presented to the user as raw JSON and nothing else** — no prose, no commentary, no file. A file is only written when explicitly requested.
+The entrypoint skill emits a single, schema-compliant JSON report — **presented to the user as raw JSON and nothing else**. A file is written only on explicit request.
 
----
-
-## Marketplace Structure
+## Structure
 
 ```text
 brand-ai-readiness-audit/
-├── marketplace.json                        # Marketplace manifest listing all skills & designating entrypoint
-├── README.md                               # Marketplace documentation and architecture guide
+├── marketplace.json                      # Manifest: skills + designated entrypoint
+├── README.md
 └── skills/
-    ├── audit-orchestrator/                 # [ENTRYPOINT] Composes specialist skills & emits final report
-    │   ├── SKILL.md                        # Orchestration procedure, reconciliation, and output formatting
-    │   ├── scripts/
-    │   │   ├── orchestrator.py             # CLI runner to execute sub-audits, aggregate & emit report
-    │   │   └── validate_report.py          # Strict JSON schema validator for audit reports
-    │   └── references/
-    │       ├── REPORT_SCHEMA.json          # Formal JSON schema definition for final report
-    │       ├── REPORT_SCHEMA.md            # Detailed schema specification and field rules
-    │       └── COMPOSITION_GUIDELINES.md   # Rules for deduplication, priority scoring & proactive actions
-    │
-    ├── crawl-render-audit/                 # [SPECIALIST] Crawlability, JS rendering & structured data
-    │   ├── SKILL.md                        # Crawl barriers, bot access, SSR/CSR gaps & JSON-LD schemas
-    │   ├── scripts/
-    │   │   └── crawl_render_check.py       # Diagnostic script inspecting robots.txt, HTML/DOM, and JSON-LD
-    │   └── references/
-    │       ├── CRAWL_RENDER_CHECKLIST.md   # Step-by-step checklist for crawl & render failure modes
-    │       ├── STRUCTURED_DATA_SPECS.md    # Schema.org best practices (Organization, Product, FAQ, Article)
-    │       └── AI_BOT_POLICIES.md          # User-agents & crawler policies (GPTBot, ClaudeBot, etc.)
-    │
-    ├── freshness-corroboration/            # [SPECIALIST] Temporal signals, fact consistency & entity grounding
-    │   ├── SKILL.md                        # Staleness audit, cross-page consistency, Wikidata / sameAs links
-    │   ├── scripts/
-    │   │   └── freshness_check.py          # Script checking copyright years, modified dates, and entity links
-    │   └── references/
-    │       ├── FRESHNESS_CHECKLIST.md      # Temporal decay, update cadence, and stale claims detection
-    │       └── ENTITY_CORROBORATION.md     # Knowledge graph grounding, NAP consistency & disambiguation
-    │
-    └── engagement-audit/                   # [SPECIALIST] On-site orientation, information scent & summaries
-        ├── SKILL.md                        # Above-the-fold clarity, heading structure, and summary readiness
-        ├── scripts/
-        │   └── engagement_check.py         # Script evaluating heading hierarchy, navigation & text density
-        └── references/
-            ├── ENGAGEMENT_RUBRIC.md        # Orientation, bounce prevention, and navigation heuristics
-            └── AI_SNIPPET_GUIDELINES.md    # Assistant and email AI summary extractability rules
+    ├── audit-orchestrator/               # [ENTRYPOINT] Composes specialists, reconciles & emits report
+    │   ├── SKILL.md
+    │   ├── scripts/{orchestrator.py, validate_report.py}
+    │   └── references/{REPORT_SCHEMA.json, REPORT_SCHEMA.md, COMPOSITION_GUIDELINES.md}
+    ├── crawl-render-audit/               # [SPECIALIST] Bot access, SSR/CSR gaps, Schema.org JSON-LD
+    │   ├── SKILL.md
+    │   ├── scripts/crawl_render_check.py
+    │   └── references/{CRAWL_RENDER_CHECKLIST.md, STRUCTURED_DATA_SPECS.md, AI_BOT_POLICIES.md}
+    ├── freshness-corroboration/          # [SPECIALIST] Staleness, consistency, sameAs entity grounding
+    │   ├── SKILL.md
+    │   ├── scripts/freshness_check.py
+    │   └── references/{FRESHNESS_CHECKLIST.md, ENTITY_CORROBORATION.md}
+    └── engagement-audit/                 # [SPECIALIST] Heading hierarchy, navigation, AI-summary readiness
+        ├── SKILL.md
+        ├── scripts/engagement_check.py
+        └── references/{ENGAGEMENT_RUBRIC.md, AI_SNIPPET_GUIDELINES.md}
 ```
 
----
+## Skills
 
-## Skills Breakdown & Separation of Concerns
+| Skill | Role |
+|---|---|
+| `audit-orchestrator` *(entrypoint)* | Runs the full lifecycle: loads **all three** specialists (mandatory checklist), deduplicates overlapping findings, calibrates severity, adds proactive opportunities, validates, and emits the report. Bundles the CLI runner and schema validator. |
+| `crawl-render-audit` | Machine readability: `robots.txt` AI-bot directives (`GPTBot`, `ClaudeBot`, …), client-side-rendering gaps, facts locked in images, JSON-LD structured data. |
+| `freshness-corroboration` | Temporal trust: stale dates/copyrights, cross-page contradictions, missing `sameAs` corroboration (Wikidata, social profiles). |
+| `engagement-audit` | Visitor orientation & extractability: above-the-fold value proposition, `H1`–`H3` hierarchy, navigation health, AI-summarizer signal-to-noise. |
 
-### 1. `audit-orchestrator` (Entrypoint)
-- **Role**: Coordinates the entire audit lifecycle. Receives the target domain/URL, invokes specialist skills, reconciles findings, deduplicates overlapping signals, computes composite severity counts, generates proactive enhancements beyond raw defects, and outputs the final JSON report.
-- **Tools**: Bundled with `orchestrator.py` (CLI runner) and `validate_report.py` (strict schema validator).
+## Usage
 
-### 2. `crawl-render-audit` (Discoverability Specialist)
-- **Role**: Audits technical access and machine readability. Evaluates `robots.txt` directives for AI bots (e.g., `GPTBot`, `ClaudeBot`, `PerplexityBot`), checks for SSR vs CSR rendering gaps (ensuring core text exists in raw HTML), detects facts trapped in un-annotated images or non-text elements, and verifies Schema.org JSON-LD structured data.
+```bash
+# Full composed audit — report printed to stdout as JSON
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site example.com
 
-### 3. `freshness-corroboration` (Trust & Accuracy Specialist)
-- **Role**: Audits temporal freshness and factual trustworthiness. Identifies stale dates, outdated copyright notices, contradictory claims across pages, and lack of external entity corroboration (such as missing `sameAs` links to Wikidata, Crunchbase, or official social profiles).
+# Optional: write the report to a file
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site example.com --output report.json
 
-### 4. `engagement-audit` (On-Site & Summary Specialist)
-- **Role**: Audits visitor experience and AI summary extractability. Assesses above-the-fold value proposition clarity, heading hierarchy (`H1` to `H3` logical flow), navigation health, and signal-to-noise ratio for AI summarizers (such as email and assistant briefers).
+# Validate a report against the schema
+python3 skills/audit-orchestrator/scripts/validate_report.py report.json
+```
 
----
+In a compatible agent client, prompt naturally — e.g. *"Audit https://example.com for AI discoverability and engagement"* — and the entrypoint skill activates via description matching and returns the JSON report as its only output.
 
-## Audit Report Schema
-
-The entrypoint skill outputs a JSON report conforming to the required schema:
+## Report Format
 
 ```json
 {
   "site": "example.com",
   "audited_at": "2026-09-20T14:32:00Z",
-  "summary": {
-    "total_findings": 4,
-    "critical": 1,
-    "high": 2,
-    "medium": 1,
-    "low": 0
-  },
+  "summary": { "total_findings": 4, "critical": 1, "high": 2, "medium": 1, "low": 0 },
   "findings": [
     {
       "id": "F-001",
@@ -92,7 +70,7 @@ The entrypoint skill outputs a JSON report conforming to the required schema:
       "severity": "critical",
       "evidence": "robots.txt explicitly disallows GPTBot and ClaudeBot across all paths.",
       "suggested_action": {
-        "summary": "Update robots.txt to permit indexing by verified AI search bots.",
+        "summary": "Update robots.txt to permit verified AI search bots.",
         "priority": "critical"
       }
     }
@@ -100,11 +78,10 @@ The entrypoint skill outputs a JSON report conforming to the required schema:
 }
 ```
 
----
+## Design Principles
 
-## Guardrails & Principles
-
-- **Read-Only / Recommend-Only**: Never alters live websites or executes destructive actions.
-- **Robots.txt & Sandbox Safe**: Strictly respects crawler policies and operates cleanly in offline or sandboxed environments.
-- **Progressive Disclosure**: Keeps main `SKILL.md` files compact and declarative, delegating detailed reference criteria to `references/` and deterministic checks to `scripts/`.
-- **Zero-Dependency Python Core**: All bundled scripts rely on standard Python 3 libraries (`urllib`, `html.parser`, `json`, `re`, `xml.etree.ElementTree`) for maximum cross-environment portability.
+- **Read-only**: audits never modify live sites or take destructive actions.
+- **Evidence-backed**: every finding cites verifiable evidence; nothing is synthesized — clean sites yield zero findings.
+- **Deterministic composition**: the orchestrator must load and run all specialist skills and pass schema validation before emitting.
+- **Zero-dependency core**: standard-library Python 3 only (`urllib`, `html.parser`, `json`, `re`, `xml.etree`) for cross-platform portability.
+- **Progressive disclosure**: compact declarative `SKILL.md` files; deep criteria in `references/`, deterministic checks in `scripts/`.
