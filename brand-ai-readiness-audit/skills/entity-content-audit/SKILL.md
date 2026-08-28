@@ -30,10 +30,10 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[`references/CHECK_CONTRACTS.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/entity-content-audit/references/CHECK_CONTRACTS.md)**: Check contracts, decision thresholds, and attribute coverage tables.
-- **[`references/structured-data-validation.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/entity-content-audit/references/structured-data-validation.md)**: Schema.org `@graph` architecture for Organization, Product, Offer, and BreadcrumbList.
-- **[`../audit-orchestrator/references/entity-types/organization.yaml`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/audit-orchestrator/references/entity-types/organization.yaml)**: Organization entity schema definition.
-- **[`../audit-orchestrator/references/entity-types/product.yaml`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/audit-orchestrator/references/entity-types/product.yaml)**: Product and Offer entity schema definition.
+- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Check contracts, decision thresholds, and attribute coverage tables.
+- **[references/structured-data-validation.md](references/structured-data-validation.md)**: Schema.org `@graph` architecture for Organization, Product, Offer, and BreadcrumbList.
+- **[references/organization.yaml](references/organization.yaml)**: Organization entity schema definition.
+- **[references/product.yaml](references/product.yaml)**: Product and Offer entity schema definition.
 
 ---
 
@@ -42,13 +42,14 @@ Before drawing conclusions, the Agent should consult the following domain refere
 Execute the deterministic entity and answerability script with `--format json`:
 
 ```bash
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 scripts/entity_content_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json
+python3 scripts/entity_content_check.py --site https://example.com --format json
 ```
+
 
 ---
 

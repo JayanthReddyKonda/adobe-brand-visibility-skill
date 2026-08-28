@@ -29,25 +29,29 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[`references/CHECK_CONTRACTS.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/fact-consistency-audit/references/CHECK_CONTRACTS.md)**: Scoping rules and contradiction detection contracts.
-- **[`references/fact-normalization.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/fact-consistency-audit/references/fact-normalization.md)**: Normalization rules for prices, taglines, specs, and contacts.
-- **[`references/temporal-freshness.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/fact-consistency-audit/references/temporal-freshness.md)**: Currency signals, timestamp hierarchy, and lifecycle drift.
-- **[`../audit-orchestrator/references/false-positive-cases/multi-tier-pricing.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/audit-orchestrator/references/false-positive-cases/multi-tier-pricing.md)**: Decision table distinguishing tier pricing from authentic contradictions.
+- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Scoping rules and contradiction detection contracts.
+- **[references/fact-normalization.md](references/fact-normalization.md)**: Normalization rules for prices, taglines, specs, and contacts.
+- **[references/temporal-freshness.md](references/temporal-freshness.md)**: Currency signals, timestamp hierarchy, and lifecycle drift.
+- **[references/multi-tier-pricing.md](references/multi-tier-pricing.md)**: Decision table distinguishing tier pricing from authentic contradictions.
+- **[references/ENTITY_CORROBORATION.md](references/ENTITY_CORROBORATION.md)**: Cross-page entity resolution and identity corroboration rules.
+- **[references/FRESHNESS_CHECKLIST.md](references/FRESHNESS_CHECKLIST.md)**: Temporal freshness checklist and stale content detection thresholds.
 
 ---
+
 
 ## Mandatory Execution Command
 
 Execute the fact ledger and consistency script with `--format json`:
 
 ```bash
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 scripts/fact_consistency_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json
+python3 scripts/fact_consistency_check.py --site https://example.com --format json
 ```
+
 
 ---
 

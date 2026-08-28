@@ -56,19 +56,24 @@ def deduplicate_recommendations(rec_list):
         if not isinstance(r, dict):
             continue
         title = r.get("title", "").strip()
-        cat = r.get("category", "general")
-        key = (cat.lower(), " ".join(title.lower().split()))
+        summary = r.get("summary") or r.get("suggested_action") or r.get("rationale") or "Implement proactive site improvement."
+        priority = str(r.get("priority", "low")).lower()
+        if priority not in ("critical", "high", "medium", "low"):
+            priority = "low"
+        key = " ".join(title.lower().split())
         if key in seen:
-            existing = seen[key]
-            if r.get("rationale") and r["rationale"] not in existing.get("rationale", ""):
-                existing["rationale"] += " " + r["rationale"]
             continue
-        seen[key] = dict(r)
-        deduped.append(seen[key])
+        item = {
+            "title": title,
+            "summary": summary,
+            "priority": priority
+        }
+        seen[key] = item
+        deduped.append(item)
     return deduped
 
 
-def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=None, eng_res=None, rep_res=None):
+def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=None, eng_res=None, rep_res=None, start_time=None):
     domain = site_input.strip().split("://")[-1].split("/")[0]
     raw_findings = []
     specialists = {}
@@ -108,59 +113,82 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
         specialists["assistant-representation-audit"] = {"label": "Observed assistant representation cross-check", "status": st}
         if rep_res.get("error"):
             specialists["assistant-representation-audit"]["error"] = rep_res["error"]
+        if rep_res.get("coverage"):
+            all_coverage["assistant-representation-audit"] = rep_res["coverage"]
+        all_limitations.extend(f"assistant-representation-audit: {l}" for l in rep_res.get("limitations", []))
         raw_findings.extend(rep_res.get("findings", []))
         all_recommendations.extend(rep_res.get("recommendations", []))
     else:
         specialists["assistant-representation-audit"] = {
             "label": "Observed assistant representation cross-check",
             "status": "not_run",
-            "reason": "Optional representation layer disabled"
+            "reason": "Optional representation layer disabled (run with --with-representation to enable)"
         }
 
-    # Inventory coverage
-    if inv:
-        pages = inv.get("pages", [])
-        html_pages = [p for p in pages if p.get("resource_type") == "html" or p.get("page_type") == "homepage"]
+    # Extract inventory stats
+    if inv is not None:
+        html_pages = [p for p in inv.get("pages", []) if p.get("resource_type") == "html" or p.get("page_type")]
         all_coverage["site_inventory"] = {
-            "homepage_reachable": True,
             "html_pages_sampled": len(html_pages),
-            "sitemaps_found": len((inv.get("infrastructure") or {}).get("sitemaps_discovered", [])),
-            "sitemaps_processed": (inv.get("infrastructure") or {}).get("sitemaps_processed", 0),
-            "urls_discovered": (inv.get("infrastructure") or {}).get("urls_extracted", 0),
+            "sitemaps_processed": inv.get("infrastructure", {}).get("sitemaps_processed", 0),
+            "urls_discovered": inv.get("infrastructure", {}).get("urls_extracted", 0),
             "page_types": {t: sum(1 for p in html_pages if p.get("page_type") == t)
                            for t in {p.get("page_type") for p in html_pages if p.get("page_type")}}
         }
         all_limitations.extend(inv.get("limitations", []))
 
-    # Finding Normalization & Deduplication Gate
-    def finding_fingerprint(item):
-        cat = str(item.get("category", "")).lower()
-        title = " ".join(str(item.get("title", "")).lower().split())
-        return f"{cat}:{title}"
+    # Multi-Locale Finding Consolidation & Deduplication Gate
+    clustered_groups = {}
+    for item in raw_findings:
+        if not isinstance(item, dict):
+            continue
+        cause_id = item.get("cause_id", "GENERIC")
+        base_title = re.sub(r'\s*\([^\)]*\)', '', item.get("title", "")).strip()
+        cluster_key = (cause_id, base_title.lower())
+        clustered_groups.setdefault(cluster_key, []).append(item)
+
+    consolidated_raw = []
+    for cluster_key, group in clustered_groups.items():
+        if len(group) == 1:
+            item = dict(group[0])
+            if "scope" not in item:
+                item["scope"] = "site" if any(k in item.get("title", "").lower() for k in ("homepage", "robots.txt", "organization")) else "page"
+            consolidated_raw.append(item)
+        else:
+            first = group[0]
+            consolidated = dict(first)
+            consolidated["scope"] = "page_group"
+            base_title = re.sub(r'\s*\([^\)]*\)', '', first.get("title", "")).strip()
+            consolidated["title"] = f"{base_title} (across {len(group)} routes)"
+            loc_evidences = [g.get("evidence", "") for g in group if g.get("evidence")]
+            consolidated["evidence"] = " | ".join(loc_evidences[:4])
+            consolidated_raw.append(consolidated)
 
     final_findings = []
     seen_fps = set()
     demoted = []
 
-    sorted_raw = sorted(raw_findings, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium"), 99))
+    sorted_raw = sorted(consolidated_raw, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium") if isinstance(f, dict) else "medium", 99))
 
     for item in sorted_raw:
+        if not isinstance(item, dict):
+            continue
         sev = str(item.get("severity", "medium")).lower()
         if sev not in SEVERITY_ORDER:
             sev = "medium"
         confidence = str(item.get("confidence", "medium")).lower()
-        fp = finding_fingerprint(item)
+        fp = f"{item.get('category', '')}:{item.get('title', '')}"
         if fp in seen_fps:
             continue
         seen_fps.add(fp)
 
         evidence = str(item.get("evidence", "")).strip()
-        if len(evidence) < 8:
+        if len(evidence) < 5:
             demoted.append(dict(
                 title=item.get("title", "Audit observation"),
                 category=item.get("category", "general"),
-                rationale=f"Specialist noted '{item.get('title', '')}' without citing concrete evidence.",
-                suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually.")
+                summary=f"Specialist noted '{item.get('title', '')}' without citing concrete evidence.",
+                priority="low"
             ))
             continue
 
@@ -168,8 +196,8 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
             demoted.append(dict(
                 title=item.get("title", "Audit observation"),
                 category=item.get("category", "general"),
-                rationale=f"Reported with severity '{sev}' but low confidence; held as suggestion pending verification.",
-                suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually.")
+                summary=f"Reported with severity '{sev}' but low confidence; held as suggestion pending verification.",
+                priority="low"
             ))
             continue
 
@@ -181,16 +209,15 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
             "id": f"F-{len(final_findings) + 1:03d}",
             "title": item.get("title", "Audit Finding"),
             "severity": sev,
+            "category": item.get("category", "general"),
+            "root_cause": item.get("root_cause") or item.get("title", "Underlying architectural root cause."),
+            "confidence": confidence,
             "evidence": evidence,
             "suggested_action": {
                 "summary": action_summary or "Review and resolve the identified defect.",
                 "priority": action_priority
             }
         }
-
-        for extra in ("category", "confidence", "root_cause", "cause_family", "cause_id", "impact", "verification", "scope"):
-            if item.get(extra) is not None:
-                finding_entry[extra] = item[extra]
 
         final_findings.append(finding_entry)
 
@@ -205,79 +232,16 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
         "low": sum(1 for f in final_findings if f["severity"] == "low")
     }
 
-    # Taxonomy-Driven Root-Cause Clustering
-    rc_groups = {}
-    for f in final_findings:
-        cf = f.get("cause_family") or "GENERAL.AUDIT"
-        cid = f.get("cause_id") or "GEN-001"
-        rc_text = f.get("root_cause") or f["title"]
-
-        group_key = f"{cf}:{cid}"
-        if group_key not in rc_groups:
-            rc_groups[group_key] = {
-                "cause_family": cf,
-                "cause_id": cid,
-                "root_cause": rc_text,
-                "finding_ids": [],
-                "severities": []
-            }
-        rc_groups[group_key]["finding_ids"].append(f["id"])
-        rc_groups[group_key]["severities"].append(f["severity"])
-
-    root_causes = []
-    for g in rc_groups.values():
-        worst = min(g["severities"], key=lambda s: SEVERITY_ORDER.get(s, 99))
-        root_causes.append({
-            "cause_family": g["cause_family"],
-            "cause_id": g["cause_id"],
-            "root_cause": g["root_cause"],
-            "finding_ids": g["finding_ids"],
-            "max_severity": worst,
-            "suggested_priority": worst if worst != "info" else "low"
-        })
-    root_causes.sort(key=lambda r: SEVERITY_ORDER.get(r["max_severity"], 99))
-
-    # Objective Audit Metrics
-    audit_metrics = {
-        "execution_time_seconds": round(time.time() - start_time, 1) if start_time else 0.5,
-        "html_pages_sampled": all_coverage.get("site_inventory", {}).get("html_pages_sampled", 1),
-        "sitemaps_processed": all_coverage.get("site_inventory", {}).get("sitemaps_processed", 0),
-        "urls_discovered": all_coverage.get("site_inventory", {}).get("urls_discovered", 0),
-        "page_types_covered": all_coverage.get("site_inventory", {}).get("page_types", {}),
-        "critical_blockers": summary_counts["critical"],
-        "confidence_distribution": {
-            "high": sum(1 for f in final_findings if f.get("confidence") == "high"),
-            "medium": sum(1 for f in final_findings if f.get("confidence") == "medium"),
-            "low": sum(1 for f in final_findings if f.get("confidence") == "low")
-        }
-    }
-
-
-    ans_index = all_coverage.get("entity-content-audit", {}).get("answerability_index")
-    if ans_index is not None:
-        audit_metrics["answerability_index"] = ans_index
-
     report = {
         "site": domain,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "summary": summary_counts,
-        "specialists": specialists,
         "findings": final_findings,
-        "audit_metrics": audit_metrics,
+        "proactive_actions": deduped_recommendations
     }
 
-    if root_causes:
-        report["root_causes"] = root_causes
-    if all_observations:
-        report["observations"] = all_observations[:100]
-    if all_coverage:
-        report["coverage"] = all_coverage
-    if all_limitations:
-        report["limitations"] = all_limitations
-    if deduped_recommendations:
-        report["proactive_actions"] = deduped_recommendations
-
     return report
+
 
 
 def main():

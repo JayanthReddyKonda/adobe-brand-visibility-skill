@@ -76,79 +76,54 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
 
 ---
 
-## Example Composed Report
+## Example Clean Production Report
 
 ```json
 {
-  "site": "example.com",
-  "audited_at": "2026-09-20T14:32:00Z",
+  "site": "frescopa.coffee",
+  "audited_at": "2026-08-28T16:52:37Z",
   "summary": {
     "total_findings": 2,
-    "critical": 1,
+    "critical": 0,
     "high": 1,
-    "medium": 0,
+    "medium": 1,
     "low": 0
-  },
-  "specialists": {
-    "discoverability-audit": { "label": "Access, robots.txt & rendering risk", "status": "ok" },
-    "entity-content-audit": { "label": "Entity identity & offer extractability", "status": "ok" },
-    "fact-consistency-audit": { "label": "Fact ledger & cross-page consistency", "status": "ok" },
-    "corroboration-authority-audit": { "label": "Declared authority link verification", "status": "ok" },
-    "engagement-context-audit": { "label": "Orientation & journey continuity", "status": "ok" }
   },
   "findings": [
     {
       "id": "F-001",
-      "title": "robots.txt blocks AI search retrieval crawlers",
-      "severity": "critical",
+      "title": "Product price is inconsistent across first-party surfaces",
+      "severity": "high",
+      "category": "fact-integrity",
+      "root_cause": "The same product is represented with different current prices on the product and category pages.",
       "confidence": "high",
-      "cause_family": "DISCOVERY.ACCESS",
-      "cause_id": "DISC-ROBOTS-RETRIEVAL-BLOCKED",
-      "evidence": "robots.txt (HTTP 200) disallows '/' for retrieval crawler(s): OAI-SearchBot, PerplexityBot.",
+      "evidence": "Product page: ₹5,499. Category page: ₹4,999. Both refer to the same product and offer context.",
       "suggested_action": {
-        "summary": "Allow AI search retrieval crawlers (OAI-SearchBot, PerplexityBot) to crawl public content.",
-        "priority": "critical"
+        "summary": "Establish one authoritative offer value and synchronize visible content and structured data across affected pages.",
+        "priority": "high"
       }
     },
     {
       "id": "F-002",
-      "title": "Conflicting pricing published for 'Velocity X9'",
-      "severity": "high",
-      "confidence": "high",
-      "cause_family": "FACT.CONSISTENCY",
-      "cause_id": "FACT-PRICE-CONTRADICTION",
-      "evidence": "2 page(s) publish conflicting figures for 'Velocity X9': 4999 on https://example.com/legacy; 5499 on https://example.com/products/x9.",
+      "title": "Important product information is difficult to retrieve",
+      "severity": "medium",
+      "category": "discoverability",
+      "root_cause": "Material product facts are absent from the initial machine-readable representation of sampled product pages.",
+      "confidence": "medium",
+      "evidence": "Across sampled product pages, key factual attributes were unavailable in the initial HTML representation.",
       "suggested_action": {
-        "summary": "Establish a single canonical price for 'Velocity X9' and synchronize across all product listings.",
-        "priority": "high"
+        "summary": "Expose core product facts directly in crawlable HTML and keep structured representation consistent.",
+        "priority": "medium"
       }
     }
   ],
-  "audit_metrics": {
-    "execution_time_seconds": 12.4,
-    "pages_sampled": 5,
-    "page_types_covered": { "homepage": 1, "product": 2, "pricing": 1, "about": 1 },
-    "critical_blockers": 1,
-    "confidence_distribution": { "high": 2, "medium": 0, "low": 0 },
-    "answerability_index": 0.85
-  },
-  "root_causes": [
+  "proactive_actions": [
     {
-      "cause_family": "DISCOVERY.ACCESS",
-      "cause_id": "DISC-ROBOTS-RETRIEVAL-BLOCKED",
-      "root_cause": "robots.txt rules disallow AI search retrieval crawlers from accessing the site root.",
-      "finding_ids": ["F-001"],
-      "max_severity": "critical",
-      "suggested_priority": "critical"
-    },
-    {
-      "cause_family": "FACT.CONSISTENCY",
-      "cause_id": "FACT-PRICE-CONTRADICTION",
-      "root_cause": "Different price values for 'Velocity X9' are published across separate first-party pages.",
-      "finding_ids": ["F-002"],
-      "max_severity": "high",
-      "suggested_priority": "high"
+      "title": "Strengthen canonical brand identity",
+      "summary": "Maintain a consistent organization identity, canonical name, logo and authoritative external references across major brand surfaces.",
+      "priority": "low"
     }
   ]
 }
 ```
+

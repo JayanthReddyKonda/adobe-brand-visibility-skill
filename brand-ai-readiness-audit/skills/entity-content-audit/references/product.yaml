@@ -1,0 +1,52 @@
+# Entity Ontology: Product
+entity_type: product
+schema_org_type: Product
+primary_surfaces:
+  - "/products/*"
+  - "/item/*"
+  - "/p/*"
+  - "/shop/*"
+
+core_attributes:
+  - name: name
+    type: string
+    description: "Official canonical name of the product"
+    required: true
+    high_representation_risk: true
+  - name: brand
+    type: Organization | Brand | string
+    description: "Manufacturing or publishing brand entity"
+    required: true
+    high_representation_risk: true
+  - name: price
+    type: numeric | string
+    description: "Current retail or commercial price"
+    required: true
+    volatile: true
+    high_representation_risk: true
+  - name: currency
+    type: ISO-4217 string (e.g. USD, INR, EUR)
+    description: "Currency code for the offered price"
+    required: true
+    high_representation_risk: true
+  - name: availability
+    type: string (InStock | OutOfStock | PreOrder)
+    description: "Current inventory availability state"
+    required: true
+    volatile: true
+    high_representation_risk: true
+  - name: description
+    type: string
+    description: "Concise summary of product capabilities and purpose"
+    required: true
+    high_representation_risk: false
+  - name: sku
+    type: string
+    description: "Unique inventory stock keeping unit identifier"
+    required: false
+    high_representation_risk: false
+
+verification_conditions:
+  price_consistency: "Product page HTML price == JSON-LD offers.price == Catalog list price"
+  availability_consistency: "JSON-LD availability state == Add to Cart button enabled state"
+

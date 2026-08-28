@@ -70,7 +70,7 @@ def init_db(db_path="audit_history.db"):
     conn.close()
 
 
-def save_audit_report(report_dict, db_path="audit_history.db"):
+def save_audit_report(report_dict, internal_data=None, db_path="audit_history.db"):
     if not isinstance(report_dict, dict):
         return None
     init_db(db_path)
@@ -80,10 +80,10 @@ def save_audit_report(report_dict, db_path="audit_history.db"):
     site = report_dict.get("site", "unknown")
     audited_at = report_dict.get("audited_at", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     summary = report_dict.get("summary", {})
-    metrics = report_dict.get("audit_metrics", {})
-    exec_time = metrics.get("execution_time_seconds", 0.0)
+    metrics = (internal_data or {}).get("audit_metrics", {}) or report_dict.get("audit_metrics", {})
+    exec_time = metrics.get("execution_time_seconds", (internal_data or {}).get("execution_time_seconds", 0.0))
     ans_index = metrics.get("answerability_index")
-    raw_str = json.dumps(report_dict)
+    raw_str = json.dumps({"report": report_dict, "internal_data": internal_data}) if internal_data else json.dumps(report_dict)
 
     cur.execute("""
     INSERT INTO audits (
@@ -104,7 +104,7 @@ def save_audit_report(report_dict, db_path="audit_history.db"):
     audit_id = cur.lastrowid
 
     # Save specialist runs
-    specialists = report_dict.get("specialists", {})
+    specialists = (internal_data or {}).get("specialists", {}) or report_dict.get("specialists", {})
     for s_name, s_data in specialists.items():
         if isinstance(s_data, dict):
             cur.execute("""
@@ -116,6 +116,7 @@ def save_audit_report(report_dict, db_path="audit_history.db"):
                 audited_at,
                 json.dumps(s_data)
             ))
+
 
     # Save findings
     findings = report_dict.get("findings", [])

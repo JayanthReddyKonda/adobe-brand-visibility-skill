@@ -198,12 +198,26 @@ def extract_scoped_facts(html_str, url):
         except Exception:
             pass
 
-    # Meta / OpenGraph update timestamps
+    # Meta / OpenGraph update timestamps and brand/title facts
     for meta_key in ("article:modified_time", "og:updated_time", "last-modified"):
         if meta_key in parser.meta_tags:
             facts["modification_dates"].append(parser.meta_tags[meta_key])
 
-    # 3. Text-based scoped price extraction
+    if "og:site_name" in parser.meta_tags:
+        facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
+
+    # 3. Text-based product and offering names from prominent headings
+    for h in parser.headings:
+        htag, htxt = h
+        if len(htxt.split()) <= 8 and not any(k in htxt.lower() for k in ("menu", "navigation", "cookie", "privacy", "terms")):
+            if htag == "h1" and not any(p["name"] == htxt for p in facts["products_with_status"]):
+                facts["products_with_status"].append({
+                    "name": htxt,
+                    "status": "current",
+                    "url": url
+                })
+
+    # 4. Text-based scoped price extraction
     for ctx, txt in parser.text_with_context:
         for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
             norm_p = normalize_price_str(m.group(1))
@@ -216,29 +230,21 @@ def extract_scoped_facts(html_str, url):
                         "raw": m.group(0)
                     })
 
-    # 4. Discontinued / Lifecycle detection in prose (scoped to specific section/heading)
+    # 5. Discontinued / Lifecycle detection in prose (scoped to specific section/heading)
     for ctx, txt in parser.text_with_context:
         if DISCONTINUED_PATTERN.search(txt):
             prod_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "Product")
-            if not any(p["name"] == prod_name for p in facts["products_with_status"]):
-                facts["products_with_status"].append({
-                    "name": prod_name,
-                    "status": "discontinued",
-                    "url": url
-                })
+            for p in facts["products_with_status"]:
+                if p["name"] == prod_name:
+                    p["status"] = "discontinued"
     for h in parser.headings:
         h_text = h[1]
         if DISCONTINUED_PATTERN.search(h_text):
-            if not any(p["name"] == h_text for p in facts["products_with_status"]):
-                facts["products_with_status"].append({
-                    "name": h_text,
-                    "status": "discontinued",
-                    "url": url
-                })
+            for p in facts["products_with_status"]:
+                if p["name"] == h_text:
+                    p["status"] = "discontinued"
 
-
-
-    # 5. Scoped emails & phones
+    # 6. Scoped emails & phones
     for m in EMAIL_PATTERN.finditer(html_str):
         addr = m.group(0).strip(".").lower()
         if not addr.endswith((".png", ".jpg", ".gif", ".webp", ".js", ".css")):
@@ -249,6 +255,12 @@ def extract_scoped_facts(html_str, url):
         digits = re.sub(r"\D", "", m.group(0))
         if 8 <= len(digits) <= 15:
             facts["contact_phones"].append({"scope": "telephone", "phone": digits})
+
+    # Deduplicate facts lists
+    facts["brand_names"] = sorted(set(facts["brand_names"]))
+    facts["taglines"] = sorted(set(facts["taglines"]))
+    facts["modification_dates"] = sorted(set(facts["modification_dates"]))
+
 
     return facts
 
@@ -395,9 +407,14 @@ def audit(base, domain, inv=None):
         "recommendations": recommendations,
         "coverage": {
             "html_pages_checked": len(page_fact_list),
-            "scoped_facts_recorded": sum(len(pf["scoped_prices"]) for pf in page_fact_list),
+            "scoped_facts_recorded": sum(
+                len(pf["scoped_prices"]) + len(pf["contact_emails"]) + len(pf["contact_phones"]) +
+                len(pf["brand_names"]) + len(pf["products_with_status"]) + len(pf["copyright_years"])
+                for pf in page_fact_list
+            ),
             "source": "shared-inventory" if inv is not None else "homepage-only"
         },
+
         "limitations": [
             "Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"
         ]

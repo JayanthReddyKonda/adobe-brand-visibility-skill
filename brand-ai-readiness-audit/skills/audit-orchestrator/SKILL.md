@@ -33,12 +33,28 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 - **`--format`** (string, optional): Output format: `json` (default, machine-readable) or `markdown`.
 - **`--include-proactive` / `--no-proactive`** (flag, optional): Include or suppress proactive improvement recommendations (default: True).
 - **`--with-representation`** (flag, optional): Enable the `assistant-representation-audit` enrichment layer.
-- **`--responses` / `--observations`** (string, optional): Path to JSON file containing observed AI assistant outputs to cross-check.
-- **`--timeout-seconds`** (integer, optional): Maximum total wall-clock runtime in seconds (default: 300s).
+## References to Consult
+
+Before orchestrating the audit, consult the following architectural references:
+- **[references/REPORT_SCHEMA.md](references/REPORT_SCHEMA.md)**: Official report specification, fields, and validation constraints.
+- **[references/REPORT_SCHEMA.json](references/REPORT_SCHEMA.json)**: JSON schema definition for report validation.
+- **[references/COMPOSITION_GUIDELINES.md](references/COMPOSITION_GUIDELINES.md)**: Specialist dispatch, timing, and evidence reconciliation contracts.
+- **[references/check-contracts/contracts-catalog.md](references/check-contracts/contracts-catalog.md)**: Master catalog of specialist audit contracts.
+- **[references/taxonomy/root-causes.md](references/taxonomy/root-causes.md)**: Standardized causal taxonomy families and root causes.
+- **[references/taxonomy/severity-model.md](references/taxonomy/severity-model.md)**: Severity calibration rubric and confidence rules.
+- **[references/entity-types/organization.yaml](references/entity-types/organization.yaml)**: Organization entity schema definition.
+- **[references/entity-types/product.yaml](references/entity-types/product.yaml)**: Product and Offer entity schema definition.
+- **[references/false-positive-cases/multi-tier-pricing.md](references/false-positive-cases/multi-tier-pricing.md)**: Decision table distinguishing tier pricing from authentic contradictions.
+- **[references/false-positive-cases/no-jsonld.md](references/false-positive-cases/no-jsonld.md)**: Decision table distinguishing missing schema from verified defects.
+- **[references/intent-library/pricing-comparison.yaml](references/intent-library/pricing-comparison.yaml)**: Pricing query intent expectations.
+- **[references/intent-library/product-purchase.yaml](references/intent-library/product-purchase.yaml)**: Product purchase query intent expectations.
+- **[references/platforms/crawler-matrix-reference.md](references/platforms/crawler-matrix-reference.md)**: Exhaustive platform roles for AI search crawlers.
 
 ---
 
+
 ## Master Agent Execution Flow (Step-by-Step)
+
 
 The AI Agent must execute this audit as a sequential, self-contained multi-skill flow:
 

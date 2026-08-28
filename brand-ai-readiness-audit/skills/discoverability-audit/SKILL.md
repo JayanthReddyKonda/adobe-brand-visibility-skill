@@ -32,9 +32,9 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[`references/CHECK_CONTRACTS.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/discoverability-audit/references/CHECK_CONTRACTS.md)**: Formal check contracts, evidence criteria, and decision boundaries for discoverability.
-- **[`references/seo-foundations.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/discoverability-audit/references/seo-foundations.md)**: RFC 9309 rules, crawler syntax, canonical consolidation, and SSR vs CSR principles.
-- **[`../audit-orchestrator/references/platforms/crawler-matrix-reference.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/audit-orchestrator/references/platforms/crawler-matrix-reference.md)**: Exhaustive platform roles for OpenAI, Anthropic, Google, Perplexity, Apple, and Common Crawl.
+- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Formal check contracts, evidence criteria, and decision boundaries for discoverability.
+- **[references/seo-foundations.md](references/seo-foundations.md)**: RFC 9309 rules, crawler syntax, canonical consolidation, and SSR vs CSR principles.
+- **[references/crawler-matrix-reference.md](references/crawler-matrix-reference.md)**: Exhaustive platform roles for OpenAI, Anthropic, Google, Perplexity, Apple, and Common Crawl.
 
 ---
 
@@ -43,13 +43,14 @@ Before drawing conclusions, the Agent should consult the following domain refere
 Execute the deterministic extraction script using the shared inventory and `--format json`:
 
 ```bash
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 scripts/discoverability_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json
+python3 scripts/discoverability_check.py --site https://example.com --format json
 ```
+
 
 ---
 

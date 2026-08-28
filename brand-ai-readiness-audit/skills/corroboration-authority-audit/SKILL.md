@@ -29,8 +29,8 @@ Evaluates external entity authority by verifying that declared identity links (`
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[`references/CHECK_CONTRACTS.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/corroboration-authority-audit/references/CHECK_CONTRACTS.md)**: Probing contracts and decision thresholds for authority links.
-- **[`references/identity-vs-claim.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/corroboration-authority-audit/references/identity-vs-claim.md)**: Distinguishing identity link verification from external claim corroboration.
+- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Probing contracts and decision thresholds for authority links.
+- **[references/identity-vs-claim.md](references/identity-vs-claim.md)**: Distinguishing identity link verification from external claim corroboration.
 
 ---
 
@@ -39,13 +39,14 @@ Before drawing conclusions, the Agent should consult the following domain refere
 Execute the authority link verification script with `--format json`:
 
 ```bash
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 scripts/corroboration_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json
+python3 scripts/corroboration_check.py --site https://example.com --format json
 ```
+
 
 ---
 

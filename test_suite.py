@@ -245,6 +245,7 @@ class TestRepresentationCrossCheck(unittest.TestCase):
 
 class TestOrchestratorAndSchemaValidation(unittest.TestCase):
     def test_report_validation(self):
+        # Strict clean production report schema
         report = {
             "site": "example.com",
             "audited_at": "2026-08-28T14:00:00Z",
@@ -255,14 +256,14 @@ class TestOrchestratorAndSchemaValidation(unittest.TestCase):
                 "medium": 0,
                 "low": 0
             },
-            "specialists": {
-                "discoverability-audit": {"label": "Access", "status": "ok"}
-            },
             "findings": [
                 {
                     "id": "F-001",
                     "title": "Robots blocks retrieval",
                     "severity": "critical",
+                    "category": "discoverability",
+                    "root_cause": "Robots.txt blocks AI search bots",
+                    "confidence": "high",
                     "evidence": "Disallow: / for OAI-SearchBot",
                     "suggested_action": {
                         "summary": "Allow OAI-SearchBot on public pages",
@@ -270,13 +271,17 @@ class TestOrchestratorAndSchemaValidation(unittest.TestCase):
                     }
                 }
             ],
-            "audit_metrics": {
-                "pages_sampled": 1,
-                "critical_blockers": 1
-            }
+            "proactive_actions": [
+                {
+                    "title": "Publish sitemap.xml",
+                    "summary": "Publish sitemap.xml to declare indexable pages",
+                    "priority": "low"
+                }
+            ]
         }
         is_valid, errors = validate_report.validate_report_dict(report)
         self.assertTrue(is_valid, f"Validation errors: {errors}")
+
 
 
 class TestResourceIsolationAndSitemaps(unittest.TestCase):
@@ -324,8 +329,8 @@ class TestSQLiteAuditPersistence(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tf:
             db_path = tf.name
 
-
         try:
+            # Clean report schema (no internal debugging dump)
             report = {
                 "site": "example.com",
                 "audited_at": "2026-08-28T15:00:00Z",
@@ -336,26 +341,42 @@ class TestSQLiteAuditPersistence(unittest.TestCase):
                     "medium": 0,
                     "low": 0
                 },
-                "specialists": {
-                    "discoverability-audit": {"label": "Access", "status": "ok"}
-                },
                 "findings": [
                     {
                         "id": "F-001",
                         "title": "Robots blocked",
                         "severity": "critical",
+                        "category": "discoverability",
+                        "root_cause": "Robots.txt blocks AI search bots",
                         "confidence": "high",
                         "evidence": "Disallow: /",
-                        "suggested_action": {"summary": "Allow crawlers"}
+                        "suggested_action": {
+                            "summary": "Allow AI retrieval crawlers in robots.txt",
+                            "priority": "critical"
+                        }
                     }
                 ],
+                "proactive_actions": [
+                    {
+                        "title": "Add Organization JSON-LD",
+                        "summary": "Publish schema.org Organization markup",
+                        "priority": "low"
+                    }
+                ]
+            }
+
+            internal_telemetry = {
+                "specialists": {
+                    "discoverability-audit": {"label": "Access", "status": "ok"}
+                },
+                "execution_time_seconds": 1.5,
                 "audit_metrics": {
                     "execution_time_seconds": 1.5,
                     "answerability_index": 0.95
                 }
             }
 
-            audit_id = audit_db.save_audit_report(report, db_path=db_path)
+            audit_id = audit_db.save_audit_report(report, internal_data=internal_telemetry, db_path=db_path)
             self.assertIsNotNone(audit_id)
             self.assertGreater(audit_id, 0)
 
@@ -363,12 +384,72 @@ class TestSQLiteAuditPersistence(unittest.TestCase):
             self.assertEqual(len(history), 1)
             self.assertEqual(history[0]["site"], "example.com")
             self.assertEqual(history[0]["critical_count"], 1)
+            self.assertEqual(history[0]["total_findings"], 1)
+            self.assertEqual(history[0]["execution_time_seconds"], 1.5)
         finally:
             if os.path.exists(db_path):
                 os.unlink(db_path)
 
 
+
+class TestMultilingualContactAndGranularClassifier(unittest.TestCase):
+    def test_contact_heading_multilingual_pass(self):
+        # On a contact page, "Contáctenos" or "Contact us" is the exact intended heading and MUST NOT be flagged as defect
+        html_es = """
+        <html><head><title>Frescopa - Contáctenos</title></head><body>
+        <h1>Contáctenos</h1>
+        <p>Envíenos un mensaje o visítenos en nuestra tostaduría en Madrid.</p>
+        <p>Email: soporte@frescopa.coffee | Tel: +34 912 345 678</p>
+        <a href="/es/productos">Productos</a>
+        <a href="/es/subscription">Suscripción</a>
+        </body></html>
+        """
+        findings, recs, o_data = engagement_check.audit_page_engagement(html_es, "https://frescopa.coffee/es/contact", page_type="contact")
+        h1_findings = [f for f in findings if f.get("cause_id") == "LOW_INFORMATION_SCENT"]
+        self.assertEqual(len(h1_findings), 0, "Contact page with Contáctenos should not be flagged as low information scent")
+
+    def test_granular_classifier_distinguishes_detail_and_listing(self):
+        from acquire_inventory import classify_page
+        pt1, conf1, tmpl1, loc1 = classify_page("https://frescopa.coffee/en/products/default")
+        self.assertEqual(pt1, "template")
+
+        pt2, conf2, tmpl2, loc2 = classify_page("https://frescopa.coffee/en/products")
+        self.assertEqual(pt2, "product_listing")
+
+        pt3, conf3, tmpl3, loc3 = classify_page("https://frescopa.coffee/en/products/ethiopia-yirgacheffe")
+        self.assertEqual(pt3, "product_detail")
+
+        pt4, conf4, tmpl4, loc4 = classify_page("https://frescopa.coffee/es/subscription")
+        self.assertEqual(pt4, "subscription_flow")
+        self.assertEqual(loc4, "es")
+
+
+class TestSemanticFactLedgerExtraction(unittest.TestCase):
+    def test_facts_extracted_from_headings_and_metadata(self):
+        # Verify facts are extracted even on pure HTML sites without JSON-LD
+        html = """
+        <html><head>
+        <title>Frescopa Artisanal Coffee</title>
+        <meta property="og:site_name" content="Frescopa Coffee Roasters">
+        <meta name="last-modified" content="2026-08-20">
+        </head><body>
+        <h1>Ethiopia Guji Single Origin</h1>
+        <p>Specialty roasted coffee beans with notes of jasmine and bergamot.</p>
+        <p>Price: $24.00 per 250g bag. In Stock.</p>
+        <p>Contact: roastery@frescopa.coffee | +1-800-555-0199</p>
+        <footer>© 2026 Frescopa Roasters</footer>
+        </body></html>
+        """
+        facts = fact_consistency_check.extract_scoped_facts(html, "https://frescopa.coffee/products/guji")
+        self.assertIn("Frescopa Coffee Roasters", facts["brand_names"])
+        self.assertTrue(any(p["name"] == "Ethiopia Guji Single Origin" for p in facts["products_with_status"]))
+        self.assertTrue(any(sp["price"] == "24" for sp in facts["scoped_prices"]))
+        self.assertIn(2026, facts["copyright_years"])
+        self.assertTrue(any(em["email"] == "roastery@frescopa.coffee" for em in facts["contact_emails"]))
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

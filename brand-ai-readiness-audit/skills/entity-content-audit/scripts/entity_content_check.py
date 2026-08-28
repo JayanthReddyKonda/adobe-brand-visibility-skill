@@ -40,30 +40,52 @@ except ImportError:
         except Exception as e:
             return None, "", {}, str(e)
 
-# Weighted Answerability Schema by Page Type (Factual Attributes Only)
+# Weighted Answerability Schema by Page Type (Strictly Factual & Applicable Attributes)
 ANSWERABILITY_WEIGHTS = {
-    "product": {
-        "product_name": (0.35, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
-        "price": (0.30, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
-        "availability": (0.20, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock"]),
-        "specifications": (0.15, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions"])
+    "product_detail": {
+        "product_name": (0.30, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
+        "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
+        "availability": (0.25, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock", "in_stock"]),
+        "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
+    },
+    "product": {  # Alias for single product pages
+        "product_name": (0.30, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
+        "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
+        "availability": (0.25, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock", "in_stock"]),
+        "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
+    },
+    "product_listing": {
+        "catalog_items": (0.40, ["products", "items", "browse", "catalog", "shop", "collection", "filter"]),
+        "category_title": (0.30, ["category", "all products", "our products", "shop all", "catalog", "explore"]),
+        "action_path": (0.30, ["view", "buy", "details", "add to cart", "shop now", "order"])
+    },
+    "category": {
+        "catalog_items": (0.40, ["products", "items", "browse", "catalog", "shop", "collection", "filter"]),
+        "category_title": (0.30, ["category", "all products", "our products", "shop all", "catalog", "explore"]),
+        "action_path": (0.30, ["view", "buy", "details", "add to cart", "shop now", "order"])
+    },
+    "subscription_flow": {
+        "plan_description": (0.35, ["subscription", "club", "membership", "recurring", "monthly", "deliveries", "frequency"]),
+        "selection_options": (0.35, ["choose", "select", "options", "beans", "grind", "frequency", "tier", "plan"]),
+        "cta_action": (0.30, ["subscribe", "join", "sign up", "start", "checkout", "get started"])
     },
     "pricing": {
-        "tier_names": (0.35, ["starter", "pro", "enterprise", "basic", "premium", "tier", "plan"]),
-        "price_figures": (0.35, ["₹", "$", "usd", "inr", "eur", "£", "/mo", "/month", "/year", "free"]),
-        "feature_comparison": (0.30, ["features", "includes", "comparison", "unlimited", "storage", "users"])
+        "tier_names": (0.35, ["starter", "pro", "enterprise", "basic", "premium", "tier", "plan", "membership"]),
+        "price_figures": (0.35, ["₹", "$", "usd", "inr", "eur", "£", "/mo", "/month", "/year", "free", "contact sales"]),
+        "feature_comparison": (0.30, ["features", "includes", "comparison", "unlimited", "storage", "users", "benefits"])
     },
     "service": {
-        "service_name": (0.40, ["service", "consulting", "managed", "solution"]),
-        "deliverables": (0.30, ["deliverables", "capabilities", "scope", "includes"]),
-        "engagement_model": (0.30, ["hourly", "retainer", "fixed", "timeline", "process"])
+        "service_name": (0.40, ["service", "consulting", "managed", "solution", "offerings"]),
+        "deliverables": (0.30, ["deliverables", "capabilities", "scope", "includes", "what we do"]),
+        "engagement_model": (0.30, ["hourly", "retainer", "fixed", "timeline", "process", "contact"])
     },
     "contact": {
-        "email_channel": (0.40, ["@", "mailto:", "support@", "sales@", "contact@"]),
-        "phone_channel": (0.35, ["tel:", "+", "call", "phone"]),
-        "physical_location": (0.25, ["street", "address", "suite", "floor", "city", "headquarters"])
+        "email_channel": (0.40, ["@", "mailto:", "support@", "sales@", "contact@", "email"]),
+        "phone_channel": (0.30, ["tel:", "+", "call", "phone", "hotline"]),
+        "location_or_form": (0.30, ["street", "address", "suite", "floor", "city", "headquarters", "form", "send message", "message"])
     }
 }
+
 
 
 class EntityDOMParser(HTMLParser):

@@ -29,8 +29,8 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[`references/CHECK_CONTRACTS.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/assistant-representation-audit/references/CHECK_CONTRACTS.md)**: Empirical comparison decision rules and claim verification contracts.
-- **[`references/mention-vs-citation.md`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/brand-ai-readiness-audit/skills/assistant-representation-audit/references/mention-vs-citation.md)**: Distinguishing brand mentions from authoritative citation grounding.
+- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Empirical comparison decision rules and claim verification contracts.
+- **[references/mention-vs-citation.md](references/mention-vs-citation.md)**: Distinguishing brand mentions from authoritative citation grounding.
 
 ---
 
@@ -39,13 +39,14 @@ Before drawing conclusions, the Agent should consult the following domain refere
 Execute the representation cross-check script with `--responses` and `--format json`:
 
 ```bash
-python3 skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory <inventory.json> --format json
+python3 scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory <inventory.json> --format json
 ```
 
 Baseline fact snapshot generation (without observed answers):
 ```bash
-python3 skills/assistant-representation-audit/scripts/representation_check.py --site https://example.com --format json
+python3 scripts/representation_check.py --site https://example.com --format json
 ```
+
 
 ---
 

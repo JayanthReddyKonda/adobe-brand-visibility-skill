@@ -115,13 +115,36 @@ class EngagementDOMParser(HTMLParser):
             if txt:
                 self.body_text.append(txt)
 
+GENERIC_H1_TERMS = {"welcome", "home", "main", "untitled", "test", "page", "index", "default"}
+
+VALID_CONTACT_TERMS = {
+    "contact", "contact us", "contact-us", "contáctenos", "contactez-nous",
+    "kontakt", "contact info", "get in touch", "reach us", "customer service",
+    "help desk", "support", "お問い合わせ"
+}
 
 
-def audit_page_engagement(html_content, url, page_type="other"):
-    """Evaluate 5-second orientation, information scent, and intent continuity across multiple signals."""
+def infer_site_type(html_pages):
+    """Infer the industry/domain information architecture from page types and content."""
+    all_text = " ".join((p.get("title", "") + " " + p.get("url", "")) for p in html_pages).lower()
+    page_types = {p.get("page_type") for p in html_pages}
+
+    if any(k in all_text for k in ("coffee", "tea", "roast", "shop", "store", "cart", "apparel", "beans", "subscription")):
+        return "ecommerce_retail", ["products", "shop", "catalog", "coffee", "store", "subscription", "contact", "about", "locations"]
+    if any(k in all_text for k in ("saas", "api", "developer", "cloud", "platform", "software", "docs")):
+        return "saas_developer", ["pricing", "features", "docs", "documentation", "api", "contact", "login", "solutions"]
+    if any(k in all_text for k in ("news", "magazine", "journal", "blog", "articles")):
+        return "media_content", ["articles", "latest", "topics", "search", "about", "contact"]
+    return "general_business", ["products", "services", "pricing", "about", "contact", "help"]
+
+
+def audit_page_engagement(html_content, url, page_type="other", applicable_destinations=None):
+    """Evaluate 5-second orientation, information scent, and intent continuity with site-type awareness."""
     findings = []
     recommendations = []
-    observations = []
+
+    if applicable_destinations is None:
+        applicable_destinations = ["products", "pricing", "about", "contact", "help"]
 
     dom = EngagementDOMParser()
     try:
@@ -136,16 +159,16 @@ def audit_page_engagement(html_content, url, page_type="other"):
 
     # 1. Multi-Signal 5-Second Orientation & Information Scent
     if not dom.h1_list:
-        if not has_descriptive_title and not has_subheadings and visible_words > 80:
+        if not has_descriptive_title and not has_subheadings and visible_words > 150:
             findings.append({
                 "category": "engagement",
                 "title": f"Weak first-visit orientation and missing primary topic statement ({url})",
                 "severity": "medium",
                 "confidence": "high",
-                "root_cause": "The page lacks both an <h1> heading and descriptive title/subheading markers, leaving arriving visitors unoriented.",
+                "root_cause": "The page lacks an <h1> heading, descriptive <title>, and section markers, leaving arriving visitors unoriented.",
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "cause_id": "LOW_INFORMATION_SCENT",
-                "impact": "Visitors arriving from AI search answers cannot quickly verify the page purpose, increasing bounce probability.",
+                "impact": "Visitors arriving from AI search answers cannot quickly verify the page purpose, which could increase bounce rate.",
                 "evidence": f"Found 0 <h1> tags, 0 <h2> tags, and an uninformative <title> ('{dom.title}') on {url}.",
                 "suggested_action": {
                     "summary": "Add a descriptive <h1> headline above the fold clearly stating the offering name and value proposition.",
@@ -153,75 +176,95 @@ def audit_page_engagement(html_content, url, page_type="other"):
                     "verification": f"Confirm {url} contains an <h1> stating the core offering topic."
                 }
             })
-        elif visible_words > 80:
+        elif visible_words > 60:
             recommendations.append({
                 "title": f"Add semantic <h1> element on {url}",
                 "category": "engagement",
                 "rationale": f"Page provides context in <title> ('{dom.title}') but lacks an explicit <h1> heading for semantic structure.",
-                "suggested_action": "Add an <h1> heading matching the page title to strengthen heading information scent."
+                "suggested_action": "Add an <h1> heading representing the page's core purpose to strengthen heading information scent."
             })
     else:
         primary_h1 = dom.h1_list[0].strip()
         h1_clean = primary_h1.lower()
-        if h1_clean in GENERIC_H1_TERMS or len(primary_h1.split()) <= 1:
+        is_contact_page = page_type == "contact" or any(c in url.lower() for c in ("contact", "support", "touch"))
+
+        # Contact pages with "Contact us" or international translations are valid and should PASS
+        if is_contact_page and any(term in h1_clean for term in VALID_CONTACT_TERMS):
+            pass  # Fully semantically clear for a contact page
+        elif h1_clean in GENERIC_H1_TERMS and not has_descriptive_title and visible_words > 20:
             findings.append({
                 "category": "engagement",
                 "title": f"Low-information generic headline on landing page ('{primary_h1}')",
                 "severity": "low",
-                "confidence": "high",
-                "root_cause": f"The primary headline ('{primary_h1}') is generic and conveys weak information scent.",
+                "confidence": "medium",
+                "root_cause": f"The primary headline ('{primary_h1}') is generic and conveys weak information scent without title context.",
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "cause_id": "LOW_INFORMATION_SCENT",
-                "impact": "Visitors skimming above-the-fold content cannot determine the brand's core offering within 5 seconds.",
+                "impact": "Visitors skimming above-the-fold content cannot quickly verify the brand's core offering within 5 seconds.",
                 "evidence": f"Primary <h1> on {url} is '{primary_h1}'.",
                 "suggested_action": {
-                    "summary": "Revise the <h1> to include concrete product nouns and value verbs (e.g. 'Artisanal Fresh Roasted Specialty Coffee').",
+                    "summary": "Revise the <h1> to include concrete product nouns and value verbs representing the offering purpose.",
                     "priority": "low",
                     "verification": "Confirm updated H1 contains descriptive brand or product terminology."
                 }
             })
 
+
     # 2. Destination Discoverability & Navigation Friction
     nav_links_text = " ".join(dom.nav_links + dom.nav_link_texts).lower()
-    found_destinations = [d for d in CORE_DESTINATIONS if d in nav_links_text]
+    found_destinations = [d for d in applicable_destinations if d in nav_links_text]
+
+    # Check if page provides meaningful internal navigation paths or interactive flows
+    all_hrefs = re.findall(r'href=["\'](https?://[^"\']+|/[^"\']+)["\']', html_content, re.I)
+    internal_links_count = len(all_hrefs)
 
 
-    if not found_destinations and len(dom.nav_links) < 3 and visible_words > 100:
+    if len(dom.nav_links) == 0 and internal_links_count < 2 and visible_words > 150 and page_type not in ("template", "other"):
         findings.append({
             "category": "engagement",
             "title": f"Restricted destination navigation on landing page ({url})",
             "severity": "medium",
             "confidence": "medium",
-            "root_cause": "The page lacks navigation links to core brand destinations (Pricing, Docs, Products, Contact).",
+            "root_cause": "The page lacks header, footer, or in-body navigation links to related brand destinations.",
             "cause_family": "EXPERIENCE.CONTINUITY",
             "cause_id": "DESTINATION_NAVIGATION_FRICTION",
-            "impact": "Visitors referred from specific AI answers cannot navigate deeper into related brand resources, causing journey abandonment.",
-            "evidence": f"Found {len(dom.nav_links)} navigation links on {url}; missing links to core sections ({', '.join(CORE_DESTINATIONS[:4])}).",
+            "impact": "Visitors arriving with a specific intent cannot navigate to related brand resources without returning to search, which could increase navigation friction.",
+            "evidence": f"Found {len(dom.nav_links)} navigation elements and {internal_links_count} internal links on {url}.",
             "suggested_action": {
-                "summary": "Add header/footer navigation links to key brand destinations (Pricing, Products, Documentation, Contact).",
+                "summary": "Add header/footer navigation links to key brand destinations.",
                 "priority": "medium",
                 "verification": f"Verify {url} contains discoverable links to core destinations."
             }
         })
-
-    # 3. Intent-to-Landing Match for Specialized Pages
-    if page_type == "pricing" and not any(k in full_text.lower() for k in ("$", "₹", "usd", "inr", "eur", "£", "free", "tier", "plan", "/mo")):
-        findings.append({
-            "category": "intent-continuity",
-            "title": f"Intent-to-landing mismatch: Pricing page omits transparent commercial terms ({url})",
-            "severity": "medium",
-            "confidence": "high",
-            "root_cause": "A pricing-designated landing route contains no visible price figures, plan tiers, or indicative pricing ranges.",
-            "cause_family": "EXPERIENCE.CONTINUITY",
-            "cause_id": "INTENT_TO_LANDING_MISMATCH",
-            "impact": "Visitors referred by pricing comparison queries encounter a content gap, immediately bouncing.",
-            "evidence": f"Pricing page ({url}) contains 0 numerical price figures or plan tier indicators.",
-            "suggested_action": {
-                "summary": "Publish transparent tier pricing or starting ranges above the fold on the pricing landing page.",
-                "priority": "medium",
-                "verification": f"Confirm {url} displays clear pricing tiers and commercial terms."
-            }
+    elif len(dom.nav_links) < 2 and internal_links_count < 4 and visible_words > 80:
+        recommendations.append({
+            "title": f"Enhance contextual navigation paths on {url}",
+            "category": "engagement",
+            "rationale": f"Page has limited outbound navigation links ({internal_links_count} links found).",
+            "suggested_action": "Ensure key user journeys retain contextual header or footer links to main brand destinations."
         })
+
+    # 3. Intent-to-Landing Match for Specialized Commercial Pages
+    if page_type == "pricing":
+        has_prices = any(k in full_text.lower() for k in ("$", "₹", "usd", "inr", "eur", "£", "free", "tier", "plan", "/mo", "quote", "contact sales"))
+        if not has_prices and visible_words > 100:
+            findings.append({
+                "category": "intent-continuity",
+                "title": f"Intent-to-landing mismatch: Pricing page omits commercial terms ({url})",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "A pricing-designated landing route contains no visible price figures, plan tiers, or indicative pricing ranges.",
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "cause_id": "INTENT_TO_LANDING_MISMATCH",
+                "impact": "Visitors arriving with pricing comparison intent encounter a content gap, which could increase bounce rate.",
+                "evidence": f"Pricing page ({url}) contains 0 numerical price figures or plan tier indicators.",
+                "suggested_action": {
+                    "summary": "Publish transparent tier pricing or starting ranges above the fold on the pricing landing page.",
+                    "priority": "medium",
+                    "verification": f"Confirm {url} displays clear pricing tiers and commercial terms."
+                }
+            })
+
 
     return findings, recommendations, {
         "url": url,
@@ -255,8 +298,13 @@ def audit(base, domain, inv=None):
         if html:
             html_pages.append({"url": base + "/", "html": html, "page_type": "homepage"})
 
+    site_type, applicable_destinations = infer_site_type(html_pages)
     for p in html_pages:
-        p_findings, p_recs, p_data = audit_page_engagement(p["html"], p["url"], page_type=p.get("page_type", "other"))
+        p_findings, p_recs, p_data = audit_page_engagement(
+            p["html"], p["url"],
+            page_type=p.get("page_type", "other"),
+            applicable_destinations=applicable_destinations
+        )
         findings.extend(p_findings)
         recommendations.extend(p_recs)
         page_metrics.append(p_data)
@@ -275,11 +323,15 @@ def audit(base, domain, inv=None):
         "recommendations": recommendations,
         "observations": observations,
         "coverage": {
-            "html_pages_evaluated": len(page_metrics),
-            "page_details": page_metrics
+            "html_pages_evaluated": len(html_pages),
+            "site_type_inferred": site_type,
+            "applicable_destinations": applicable_destinations[:6],
+            "average_visible_words": round(sum(pm["visible_words"] for pm in page_metrics) / max(1, len(page_metrics)), 1),
+            "pages_with_h1": sum(1 for pm in page_metrics if pm["h1"]),
+            "pages_with_navigation": sum(1 for pm in page_metrics if pm["navigation_links_found"] > 0)
         },
         "limitations": [
-            "Evaluated structural heading hierarchy, above-the-fold information scent, and navigation destination reachability from raw HTML."
+            "Engagement and orientation analysis is based on static HTML layout semantics; dynamic client-rendered overlays were not evaluated."
         ]
     }
 
