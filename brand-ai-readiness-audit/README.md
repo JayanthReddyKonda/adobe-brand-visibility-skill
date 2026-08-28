@@ -43,14 +43,7 @@ It composes 7 specialist skills under a single entrypoint with an evidence-backe
 brand-ai-readiness-audit/
 ├── marketplace.json
 ├── README.md
-├── evals/
-│   ├── evals.json
-│   ├── run_evals.py
-│   └── fixtures/
-│       ├── crawler-blocked/
-│       ├── conflicting-prices/
-│       ├── csr-rendering/
-│       └── clean-site/
+├── LICENSE
 └── skills/
     ├── audit-orchestrator/
     │   ├── SKILL.md
@@ -124,12 +117,6 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 ```bash
 python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --output report.json
 python3 skills/audit-orchestrator/scripts/validate_report.py report.json
-```
-
-### Run Automated Evaluation Benchmark Suite
-
-```bash
-python3 evals/run_evals.py
 ```
 
 ---
