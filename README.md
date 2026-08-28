@@ -41,4 +41,4 @@ In any compatible agent (Antigravity, Claude Code, Junie, OpenHands, VS Code), p
 
 > *"Audit https://example.com for AI discoverability and on-site engagement and emit the final JSON report."*
 
-The agent discovers `audit-orchestrator` via `SKILL.md` description matching, activates the skill, executes the underlying specialist tools, and emits the schema-compliant report.
+The agent discovers `audit-orchestrator` via `SKILL.md` description matching, activates the skill, executes the underlying specialist tools, and returns the schema-compliant JSON report as its **only** output — the report is presented directly in chat as raw JSON, with no accompanying prose. A file is written only if the user explicitly requests one.

@@ -44,10 +44,11 @@ The central entrypoint skill of the Brand AI-Readiness Audit Marketplace. It com
 6. **Emit & Validate JSON Report**:
    - Generate the final JSON report matching the [Report Schema](references/REPORT_SCHEMA.md).
    - Verify compliance using the bundled validator script.
+   - **Deliver ONLY the JSON report to the user** — output the raw JSON and nothing else: no prose, no commentary, no markdown code fence, no summaries, no file-saving message. Do not write a file unless the user explicitly asks.
 
 ## Output
 
-A JSON report matching the required schema:
+Return ONLY a JSON report matching the required schema (no additional text before or after):
 
 ```json
 {

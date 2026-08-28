@@ -4,6 +4,8 @@ A modular, multi-skill AI agent marketplace built in the standard [agentskills.i
 
 This marketplace automatically audits any website for both **off-site AI discoverability** (how search assistants like ChatGPT, Claude, Gemini, and Perplexity crawl, extract, corroborate, and cite brand facts) and **on-site engagement** (how human visitors orient, navigate, and convert once they land), producing an evidence-backed audit report with prioritized recommendations and proactive improvements.
 
+The final audit report is **presented to the user as raw JSON and nothing else** — no prose, no commentary, no file. A file is only written when explicitly requested.
+
 ---
 
 ## Marketplace Structure
