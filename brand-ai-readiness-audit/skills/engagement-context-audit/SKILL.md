@@ -1,6 +1,13 @@
 ---
-name: engagement-audit
-description: Audit on-site visitor orientation, above-the-fold clarity, heading hierarchies (H1 to H3), information scent, navigation health, and summary readability for AI extractors and bounce prevention. Use when diagnosing why visitors referred from AI search bounce or fail to engage, or why AI assistants produce vague or diluted brand summaries.
+name: engagement-context-audit
+description: >
+  Engagement & context continuity layer. Evaluates whether a visitor arriving
+  from an AI answer can orient and continue their journey: contextual H1
+  presence on content-bearing pages (a missing H1 on an empty CSR shell is
+  NOT flagged here — that is a rendering finding), H1 information scent, and
+  discoverability of key destinations via any navigation links (a literal
+  <nav> tag is not required). Use when diagnosing why visitors referred from
+  AI search bounce or fail to engage.
 license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
 metadata:

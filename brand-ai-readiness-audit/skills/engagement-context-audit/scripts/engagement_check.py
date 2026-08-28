@@ -180,8 +180,14 @@ def main():
         status, html = fetch_url(site_clean)
         if html:
             findings.extend(audit_engagement(html, site_clean))
-
-    print(json.dumps(findings, indent=2))
+            print(json.dumps({"status": "ok", "findings": findings}, indent=2))
+        else:
+            print(json.dumps({"status": "inconclusive", "findings": [],
+                              "error": f"could not reach {site_clean} (network unreachable or blocked)"},
+                             indent=2))
+        return
+    print(json.dumps({"status": "ok" if (findings or args.file) else "inconclusive",
+                      "findings": findings}, indent=2))
 
 if __name__ == "__main__":
     main()

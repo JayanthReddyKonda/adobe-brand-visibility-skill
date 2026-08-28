@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-freshness_check.py - Audits fact freshness, update timestamps, and entity corroboration.
+fact_consistency_check.py - Audits fact freshness, update timestamps, and entity corroboration.
 Zero external dependencies (uses Python standard library).
 """
 
@@ -235,8 +235,16 @@ def main():
                         _, _, p_result = audit_freshness(p_html, link)
                         fetched.append((link, p_result))
                 findings.extend(cross_page_check(home_result, site_clean, fetched))
-
-    print(json.dumps({"findings": findings, "recommendations": recommendations}, indent=2))
+            print(json.dumps({"status": "ok", "findings": findings,
+                              "recommendations": recommendations}, indent=2))
+        else:
+            print(json.dumps({"status": "inconclusive", "findings": [],
+                              "recommendations": [],
+                              "error": f"could not reach {site_clean} (network unreachable or blocked)"},
+                             indent=2))
+        return
+    print(json.dumps({"status": "ok" if (findings or recommendations or args.file) else "inconclusive",
+                      "findings": findings, "recommendations": recommendations}, indent=2))
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,12 @@
 ---
-name: freshness-corroboration
-description: Audit fact freshness, temporal signals (copyright year, dateModified), cross-page consistency, and external entity corroboration (sameAs, Wikidata, Knowledge Graph) for AI trust and accurate brand representation. Use when diagnosing why an AI assistant cites outdated facts, wrong pricing, or confuses a brand with another company.
+name: fact-consistency-audit
+description: >
+  Fact consistency layer. Builds a first-party fact ledger (copyright years,
+  freshness timestamps, organization name) from the homepage plus internal
+  pages and reports only VERIFIED contradictions across pages; weak signals
+  (old copyright year, missing timestamps) are low severity, and missing
+  sameAs is a recommendation, never a defect. Use when diagnosing why an AI
+  assistant cites outdated facts, wrong pricing, or conflicting brand details.
 license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
 metadata:
@@ -64,9 +70,9 @@ Returns a JSON list of structured findings:
 
 ## Available scripts & references
 
-- **`scripts/freshness_check.py`** — Runs automated freshness and entity checks:
+- **`scripts/fact_consistency_check.py`** — Runs automated freshness and entity checks:
   ```bash
-  python3 skills/freshness-corroboration/scripts/freshness_check.py --site example.com
+  python3 skills/freshness-corroboration/scripts/fact_consistency_check.py --site example.com
   ```
   *(On Windows, use `python` or `py`)*
 - **`references/FRESHNESS_CHECKLIST.md`** — Detailed checklist for temporal decay and stale claim detection.

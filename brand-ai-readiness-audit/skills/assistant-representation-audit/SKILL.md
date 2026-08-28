@@ -1,0 +1,48 @@
+---
+name: assistant-representation-audit
+description: >
+  Assistant representation layer (optional enrichment). Cross-checks OBSERVED
+  assistant responses (supplied as JSON by the operator or another agent —
+  this skill never queries AI platforms itself) against the brand's
+  first-party fact snapshot, detecting factual conflicts such as wrong prices,
+  plus observational signals (mentions without citations). Without a responses
+  file it emits the site-side snapshot other systems can compare against.
+  Use when evaluating how AI assistants actually represent the brand.
+---
+# Assistant Representation Audit
+
+## When to use
+- You have logged assistant answers (ChatGPT, Gemini, Perplexity…) about the
+  brand and want to verify them against first-party facts.
+- You want the site-side fact snapshot (visible prices, years, word count)
+  as a comparison baseline.
+
+## Inputs
+- **`site`** (string, required): target domain or URL.
+- **`--responses <file>`** (optional): JSON of observed responses, each with
+  `assistant`, `prompt`, `mentioned`, `cited`, `claims[]{fact, topic}`.
+
+## Procedure
+1. Build the first-party fact snapshot from the homepage (visible prices,
+   years, word count). Unreachable site → `inconclusive`.
+2. If `--responses` is absent, output the snapshot only.
+3. For each observation: unmentioned/uncited are **observational notes**,
+   not site defects.
+4. A claim asserting a price that conflicts with the site's visible prices
+   is a high-severity, medium-confidence **representation conflict** finding.
+
+## Guarantees
+- No AI platform is queried live; the skill only compares supplied
+  observations with fetched site facts (keeps the marketplace portable).
+- One observation is weak evidence: recommend re-testing across prompt
+  families and repetitions before acting on notes.
+
+## Output
+JSON: `{status, snapshot, findings[], observational_notes[]}`.
+
+## Scripts
+- `scripts/representation_check.py --site <url> [--responses file.json]`
+
+## Gotchas
+- Never claim "the AI will hallucinate" — report the *conditions* under which
+  representation diverges from first-party evidence.

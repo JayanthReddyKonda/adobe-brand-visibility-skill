@@ -18,28 +18,41 @@ brand-ai-readiness-audit/
     │   ├── SKILL.md
     │   ├── scripts/{orchestrator.py, validate_report.py}
     │   └── references/{REPORT_SCHEMA.json, REPORT_SCHEMA.md, COMPOSITION_GUIDELINES.md}
-    ├── crawl-render-audit/               # [SPECIALIST] Bot access, SSR/CSR gaps, Schema.org JSON-LD
+    ├── discoverability-audit/            # [SPECIALIST] Crawler access, content availability, structured data
     │   ├── SKILL.md
-    │   ├── scripts/crawl_render_check.py
-    │   └── references/{CRAWL_RENDER_CHECKLIST.md, STRUCTURED_DATA_SPECS.md, AI_BOT_POLICIES.md}
-    ├── freshness-corroboration/          # [SPECIALIST] Staleness, consistency, sameAs entity grounding
+    │   └── scripts/discoverability_check.py
+    ├── entity-content-audit/             # [SPECIALIST] Entity identity clarity & offer extractability
     │   ├── SKILL.md
-    │   ├── scripts/freshness_check.py
+    │   └── scripts/entity_content_check.py
+    ├── fact-consistency-audit/           # [SPECIALIST] Freshness signals & cross-page fact consistency
+    │   ├── SKILL.md
+    │   ├── scripts/fact_consistency_check.py
     │   └── references/{FRESHNESS_CHECKLIST.md, ENTITY_CORROBORATION.md}
-    └── engagement-audit/                 # [SPECIALIST] Heading hierarchy, navigation, AI-summary readiness
+    ├── corroboration-authority-audit/    # [SPECIALIST] Authority-link verification & entity corroboration
+    │   ├── SKILL.md
+    │   └── scripts/corroboration_check.py
+    ├── engagement-context-audit/         # [SPECIALIST] Orientation, hierarchy, journey continuity
+    │   ├── SKILL.md
+    │   ├── scripts/engagement_check.py
+    │   └── references/{ENGAGEMENT_RUBRIC.md, AI_SNIPPET_GUIDELINES.md}
+    └── assistant-representation-audit/   # [OPT-IN] Observed AI representation vs first-party facts
         ├── SKILL.md
-        ├── scripts/engagement_check.py
-        └── references/{ENGAGEMENT_RUBRIC.md, AI_SNIPPET_GUIDELINES.md}
+        └── scripts/representation_check.py
 ```
 
 ## Skills
 
 | Skill | Role |
 |---|---|
-| `audit-orchestrator` *(entrypoint)* | Runs the full lifecycle: loads **all three** specialists (mandatory checklist), deduplicates overlapping findings, calibrates severity, adds proactive opportunities, validates, and emits the report. Bundles the CLI runner and schema validator. |
-| `crawl-render-audit` | Machine readability: `robots.txt` AI-bot directives (`GPTBot`, `ClaudeBot`, …), client-side-rendering gaps, facts locked in images, JSON-LD structured data. |
-| `freshness-corroboration` | Temporal trust: stale dates/copyrights, cross-page contradictions, missing `sameAs` corroboration (Wikidata, social profiles). |
-| `engagement-audit` | Visitor orientation & extractability: above-the-fold value proposition, `H1`–`H3` hierarchy, navigation health, AI-summarizer signal-to-noise. |
+| `audit-orchestrator` *(entrypoint)* | Runs the full lifecycle: loads **all five** core specialists (mandatory checklist), deduplicates overlapping findings, calibrates severity & confidence, adds proactive opportunities, validates, and emits the report. Bundles the CLI runner and schema validator. |
+| `discoverability-audit` | Can retrieval systems access the content? Crawler access, content availability in initial HTML, structured data. |
+| `entity-content-audit` | Is the entity and its offer extractable? Identity clarity, attribute coverage, answerability of key facts. |
+| `fact-consistency-audit` | Are facts current and self-consistent? Freshness signals, cross-page contradictions, corroboration metadata. |
+| `corroboration-authority-audit` | Do declared authority links (sameAs, profiles) resolve and corroborate the entity? |
+| `engagement-context-audit` | Does the journey survive the AI referral? Orientation, heading hierarchy, navigation discoverability, context continuity. |
+| `assistant-representation-audit` *(opt-in)* | What do assistants actually say? Compares observed AI responses against first-party facts (requires observed outputs or API access). |
+
+Every specialist records its execution status (`ok` / `failed` / `not_run`) in the report; tool failure is never misread as "no findings". Proactive improvements (e.g. `llms.txt`) are reported separately as `proactive_actions`, never as defects.
 
 ## Usage
 

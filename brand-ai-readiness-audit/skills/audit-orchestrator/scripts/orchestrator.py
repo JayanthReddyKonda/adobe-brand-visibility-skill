@@ -90,9 +90,17 @@ def run_specialist_tool(script_path, *args):
         if isinstance(data, dict):
             findings = data.get("findings", [])
             recs = data.get("recommendations", [])
-            if isinstance(findings, list) and isinstance(recs, list):
+            if not isinstance(findings, list) or not isinstance(recs, list):
+                return "failed", [], [], "unrecognized output format"
+            # Honor the specialist's own self-reported status: an
+            # "inconclusive"/"failed" specialist must never be recorded as
+            # "ok" with zero findings (that would masquerade as a clean site).
+            sp_status = str(data.get("status", "ok")).lower()
+            if sp_status in ("ok", "success"):
                 return "ok", findings, recs, None
-        return "failed", [], [], "unrecognized output format"
+            if sp_status == "inconclusive":
+                return "inconclusive", [], [], data.get("error", "specialist could not gather evidence")
+            return "failed", [], [], data.get("error", f"specialist reported status '{sp_status}'")
     except subprocess.TimeoutExpired:
         return "failed", [], [], "timed out after 60s"
     except Exception as e:
@@ -145,11 +153,14 @@ def compose_audit(site, include_proactive=True):
     domain, base_url = normalize_target(site)
     raw_findings = []
     specialists = {}
+    specialist_recommendations = []
 
     specialist_runs = [
-        ("crawl-render-audit", "Crawlability, rendering & structured data", "crawl_render_check.py"),
-        ("freshness-corroboration", "Freshness, consistency & entity corroboration", "freshness_check.py"),
-        ("engagement-audit", "Orientation, heading hierarchy & navigation", "engagement_check.py"),
+        ("discoverability-audit", "Access, discovery & rendering risk", "discoverability_check.py"),
+        ("entity-content-audit", "Entity identity & offer extractability", "entity_content_check.py"),
+        ("fact-consistency-audit", "Fact ledger & cross-page consistency", "fact_consistency_check.py"),
+        ("corroboration-authority-audit", "Declared-authority link verification", "corroboration_check.py"),
+        ("engagement-context-audit", "Orientation & journey continuity", "engagement_check.py"),
     ]
     for skill_name, label, filename in specialist_runs:
         script = find_specialist_script(skill_name, filename)
@@ -158,11 +169,11 @@ def compose_audit(site, include_proactive=True):
         if error:
             specialists[skill_name]["error"] = error
         raw_findings.extend(findings)
+        specialist_recommendations.extend(recs)
 
-    all_recommendations = []
+    all_recommendations = list(specialist_recommendations)
     if include_proactive:
         all_recommendations.extend(proactive_checks(domain, base_url))
-
     # Deduplicate by evidence prefix, highest severity first.
     final_findings = []
     seen_evidence = set()
@@ -188,6 +199,10 @@ def compose_audit(site, include_proactive=True):
                 "priority": action.get("priority", sev if sev != "info" else "low")
             }
         }
+        # Preserve the rich evidence model when a specialist supplies it.
+        for extra in ("category", "confidence", "root_cause", "impact", "verification", "scope"):
+            if item.get(extra) is not None:
+                finding_entry[extra] = item[extra]
         final_findings.append(finding_entry)
 
     summary_counts = {"total_findings": len(final_findings), "critical": 0, "high": 0, "medium": 0, "low": 0}
@@ -202,7 +217,7 @@ def compose_audit(site, include_proactive=True):
         "specialists": specialists,
         "findings": final_findings,
     }
-    if include_proactive:
+    if all_recommendations:
         report["proactive_actions"] = all_recommendations
     return report
 

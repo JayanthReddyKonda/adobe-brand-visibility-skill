@@ -23,46 +23,62 @@ The central entrypoint skill of the Brand AI-Readiness Audit Marketplace. It com
 
 - **`site`** (string, required): The target domain or URL to audit (e.g., `example.com` or `https://example.com`).
 - **`include_proactive`** (boolean, optional): Set to `false` to skip proactive improvement checks (default: enabled).
+- **`with_representation`** (boolean, optional): Set to `true` to also run `assistant-representation-audit` (opt-in enrichment; requires observed assistant outputs or API access).
 
 ## Procedure
 
-This is a **mandatory, ordered workflow**. You MUST load and run ALL THREE specialist skills before composing the report. Do not skip any specialist, do not reorder them, and do not emit the report until every checklist item below is complete and its findings have been collected.
+This is a **mandatory, ordered workflow**. You MUST load and run ALL FIVE core specialist skills before composing the report. Do not skip any specialist, do not reorder them, and do not emit the report until every checklist item below is complete and its findings have been collected.
 
 > Progressive disclosure: agents do not auto-load every skill. The specialists below are NOT loaded into your context automatically — you must explicitly load each one's `SKILL.md` and run its bundled script as instructed. Verify each by running it and capturing its findings.
 
 ### Mandatory checklist (do all, in order)
 
 - [ ] **Step 1 — Normalize target**: Clean and validate the target domain/URL. Determine the canonical `base_url`.
-- [ ] **Step 2 — Load & run `crawl-render-audit`** (MANDATORY):
-  - Load its instructions: read [`../crawl-render-audit/SKILL.md`](../crawl-render-audit/SKILL.md).
-  - Execute its bundled script to inspect bot access, SSR/CSR rendering gaps, machine-readable content, and Schema.org JSON-LD:
+- [ ] **Step 2 — Load & run `discoverability-audit`** (MANDATORY):
+  - Load its instructions: read [`../discoverability-audit/SKILL.md`](../discoverability-audit/SKILL.md).
+  - Execute its bundled script to inspect crawler access, content availability to non-JS retrieval, and structured data:
     ```bash
-    python3 skills/crawl-render-audit/scripts/crawl_render_check.py --site <base_url>
+    python3 skills/discoverability-audit/scripts/discoverability_check.py --site <base_url>
     ```
   - Collect all findings it returns. If it returns none, record that as a result (do not skip).
-- [ ] **Step 3 — Load & run `freshness-corroboration`** (MANDATORY):
-  - Load its instructions: read [`../freshness-corroboration/SKILL.md`](../freshness-corroboration/SKILL.md).
-  - Execute its bundled script to check timestamps, staleness, cross-page consistency, and `sameAs` entity grounding:
+- [ ] **Step 3 — Load & run `entity-content-audit`** (MANDATORY):
+  - Load its instructions: read [`../entity-content-audit/SKILL.md`](../entity-content-audit/SKILL.md).
+  - Execute its bundled script to evaluate entity identity clarity and offer/attribute extractability:
     ```bash
-    python3 skills/freshness-corroboration/scripts/freshness_check.py --site <base_url>
+    python3 skills/entity-content-audit/scripts/entity_content_check.py --site <base_url>
     ```
   - Collect all findings it returns. If it returns none, record that as a result (do not skip).
-- [ ] **Step 4 — Load & run `engagement-audit`** (MANDATORY):
-  - Load its instructions: read [`../engagement-audit/SKILL.md`](../engagement-audit/SKILL.md).
-  - Execute its bundled script to evaluate above-the-fold orientation, heading hierarchy, information scent, and navigation:
+- [ ] **Step 4 — Load & run `fact-consistency-audit`** (MANDATORY):
+  - Load its instructions: read [`../fact-consistency-audit/SKILL.md`](../fact-consistency-audit/SKILL.md).
+  - Execute its bundled script to check freshness signals, cross-page fact consistency, and corroboration metadata:
     ```bash
-    python3 skills/engagement-audit/scripts/engagement_check.py --site <base_url>
+    python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <base_url>
     ```
   - Collect all findings it returns. If it returns none, record that as a result (do not skip).
-- [ ] **Step 5 — Proactive checks**: Run `proactive_checks` (llms.txt, sitemap) against the live site unless disabled.
-- [ ] **Step 6 — Reconcile & deduplicate**: Merge overlapping findings across the three specialists according to [Composition Guidelines](references/COMPOSITION_GUIDELINES.md). Reassign sequential IDs (`F-001`, `F-002`, ...). Note any case where a specialist returned no findings so the report reflects a genuinely clean result, never fabricated findings.
-- [ ] **Step 7 — Calibrate severity & prioritize**: Map defects to `critical`/`high`/`medium`/`low` based on impact on AI citation and user engagement. Ensure every finding includes concrete `evidence` and a mechanism-sound `suggested_action`.
-- [ ] **Step 8 — Validation gate (MANDATORY, do not skip)**: Before emitting, validate the assembled report against the schema:
+- [ ] **Step 5 — Load & run `corroboration-authority-audit`** (MANDATORY):
+  - Load its instructions: read [`../corroboration-authority-audit/SKILL.md`](../corroboration-authority-audit/SKILL.md).
+  - Execute its bundled script to verify declared authority links (sameAs, social profiles) resolve and corroborate the entity:
+    ```bash
+    python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site <base_url>
+    ```
+  - Collect all findings it returns. If it returns none, record that as a result (do not skip).
+- [ ] **Step 6 — Load & run `engagement-context-audit`** (MANDATORY):
+  - Load its instructions: read [`../engagement-context-audit/SKILL.md`](../engagement-context-audit/SKILL.md).
+  - Execute its bundled script to evaluate orientation, heading hierarchy, information scent, and journey continuity:
+    ```bash
+    python3 skills/engagement-context-audit/scripts/engagement_check.py --site <base_url>
+    ```
+  - Collect all findings it returns. If it returns none, record that as a result (do not skip).
+- [ ] **Step 7 — Optional: run `assistant-representation-audit`**: Only if `with_representation` is enabled and observed assistant outputs or an assistant API are available. Skip silently otherwise (record status `not_run`).
+- [ ] **Step 8 — Proactive checks**: Run `proactive_checks` (llms.txt, sitemap) against the live site unless disabled.
+- [ ] **Step 9 — Reconcile & deduplicate**: Merge overlapping findings across specialists according to [Composition Guidelines](references/COMPOSITION_GUIDELINES.md). Reassign sequential IDs (`F-001`, `F-002`, ...). Note any case where a specialist returned no findings so the report reflects a genuinely clean result, never fabricated findings.
+- [ ] **Step 10 — Calibrate severity & confidence**: Map defects to `critical`/`high`/`medium`/`low` based on impact on AI citation and user engagement. Every finding needs concrete `evidence` and a mechanism-sound `suggested_action`. Never convert tool failure into zero findings — surface specialist status instead.
+- [ ] **Step 11 — Validation gate (MANDATORY, do not skip)**: Before emitting, validate the assembled report against the schema:
   ```bash
   python3 skills/audit-orchestrator/scripts/validate_report.py <report_file>
   ```
   If validation fails, fix the report and re-validate. Only proceed when it passes.
-- [ ] **Step 9 — Emit**: Output ONLY the validated JSON report (see Output rule below).
+- [ ] **Step 12 — Emit**: Output ONLY the validated JSON report (see Output rule below).
 
 ## Output
 
