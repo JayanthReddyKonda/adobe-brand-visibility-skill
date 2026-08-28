@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 """
 orchestrator.py - Entrypoint CLI for Brand AI-Readiness Audit Marketplace.
-Composes the marketplace's specialist audit skills, enforces a strict global
-time deadline (< 5 minutes), reconciles evidence-backed findings, deduplicates
-overlapping signals and recommendations, groups findings under a standardized
-root-cause taxonomy, and emits a strictly validated JSON audit report.
-
-Guarantees:
-  - All findings derive from real, on-demand probes. Nothing is fabricated.
-  - Specialist execution status is always recorded ("ok" / "failed" / "inconclusive" / "not_run").
-    Tool failure is NEVER converted into zero findings.
-  - Hard wall-clock execution deadline is enforced across all phases.
-  - SSRF protection and response size caps are enforced across all network fetches.
-  - The final report is validated against the formal schema before emission.
+Composes the marketplace's specialist audit skills under a strict global
+monotonic deadline (< 5 minutes), enforces the Intent -> Entity -> Fact -> Page
+abstraction, deduplicates overlapping signals, groups findings under a pure
+causal taxonomy, and emits a strictly validated JSON audit report.
 """
 
 import sys
@@ -29,7 +21,7 @@ from urllib.parse import urlparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
 
-# Import safe_fetch utility
+# Import canonical safe_fetch utility
 try:
     from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 except ImportError:
@@ -187,10 +179,8 @@ def _sitemap_urls(sitemap_body, limit=60):
     return [loc.strip() for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", sitemap_body or "")][:limit]
 
 
-def build_inventory(base_url, max_pages=16, budget_seconds=60):
-    """Bounded, SSRF-safe shared crawl.
-    Mandatory: homepage, robots.txt, sitemaps, and priority pages within budget.
-    """
+def build_inventory(base_url, max_pages=16, deadline=None):
+    """Bounded, SSRF-safe shared crawl within monotonic deadline."""
     start = time.time()
     parsed_base = urlparse(base_url)
     target_netloc = parsed_base.netloc.lower()
@@ -218,6 +208,11 @@ def build_inventory(base_url, max_pages=16, budget_seconds=60):
         "html": home_html
     })
 
+    # Check deadline
+    if deadline and time.time() >= deadline:
+        inv["limitations"].append("Inventory truncated at acquisition deadline.")
+        return inv, {"homepage_reachable": True, "pages_sampled": 1, "elapsed_seconds": round(time.time() - start, 1)}
+
     # 2. robots.txt
     r_status, robots_txt, _, _ = safe_fetch(base_url + "/robots.txt", timeout=8, max_bytes=512*1024)
     inv["robots"] = {"status": r_status, "text": robots_txt if r_status == 200 else None}
@@ -226,26 +221,25 @@ def build_inventory(base_url, max_pages=16, budget_seconds=60):
         sitemap_urls = [l.split(":", 1)[1].strip() for l in robots_txt.splitlines()
                         if l.lower().startswith("sitemap:")][:5]
 
-    # 3. Sitemaps (Same-origin constraint)
+    # 3. Sitemaps
     locs = []
     candidates = sitemap_urls or [base_url + "/sitemap.xml"]
     for sm in candidates:
-        if time.time() - start > budget_seconds:
+        if deadline and time.time() >= deadline:
             break
         sm_netloc = urlparse(sm).netloc.lower()
         if sm_netloc and sm_netloc != target_netloc:
-            continue  # ignore external sitemaps for security
+            continue
         s_status, s_body, _, _ = safe_fetch(sm, timeout=8, max_bytes=2*1024*1024)
         if s_status == 200 and s_body and "<loc>" in s_body:
             inv["sitemap_urls"].append(sm)
             child_locs = _sitemap_urls(s_body)
-            # Filter to same-origin URLs
             valid_child = [u for u in child_locs if urlparse(u).netloc.lower() == target_netloc]
             locs.extend(valid_child)
 
             if "<sitemapindex" in s_body:
                 for sub_sm in child_locs[:3]:
-                    if time.time() - start > budget_seconds:
+                    if deadline and time.time() >= deadline:
                         break
                     if urlparse(sub_sm).netloc.lower() == target_netloc:
                         c_status, c_body, _, _ = safe_fetch(sub_sm, timeout=8, max_bytes=2*1024*1024)
@@ -254,7 +248,7 @@ def build_inventory(base_url, max_pages=16, budget_seconds=60):
 
     inv["sitemap_url_count"] = len(locs)
 
-    # 4. Priority selection across page types within budget
+    # 4. Priority selection
     seen = {p["url"].rstrip("/") for p in inv["pages"]}
     by_type = {}
     for u in locs:
@@ -269,14 +263,14 @@ def build_inventory(base_url, max_pages=16, budget_seconds=60):
     selected = []
     for t in priority_order:
         for u in by_type.get(t, [])[:3]:
-            if len(selected) >= max_pages - 1 or time.time() - start > budget_seconds:
+            if len(selected) >= max_pages - 1 or (deadline and time.time() >= deadline):
                 break
             selected.append(u)
-        if len(selected) >= max_pages - 1 or time.time() - start > budget_seconds:
+        if len(selected) >= max_pages - 1 or (deadline and time.time() >= deadline):
             break
 
     for u in selected:
-        if time.time() - start > budget_seconds:
+        if deadline and time.time() >= deadline:
             inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
             break
         p_status, p_html, _, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
@@ -304,7 +298,6 @@ def build_inventory(base_url, max_pages=16, budget_seconds=60):
 
 
 def write_inventory_file(inv):
-    """Persist inventory to temporary JSON file."""
     try:
         fd, path = tempfile.mkstemp(suffix="_inventory.json", prefix="brand_audit_")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -315,21 +308,7 @@ def write_inventory_file(inv):
 
 
 def proactive_checks(domain, base_url):
-    """Perform proactive improvement checks."""
     recommendations = []
-
-    # Optional /llms.txt probe
-    llms_status = safe_check_status(f"{base_url}/llms.txt", timeout=5)
-    if llms_status == 404:
-        recommendations.append({
-            "title": "Optional experiment: publish an /llms.txt index",
-            "category": "proactive-discovery",
-            "rationale": f"GET {base_url}/llms.txt returned HTTP 404. llms.txt is a community convention "
-                         "used by some LLM clients to discover Markdown feeds. (Not required for Google AI search).",
-            "suggested_action": "Consider publishing /llms.txt as an optional navigation aid for external LLM tools."
-        })
-
-    # Sitemap check
     sitemap_status = safe_check_status(f"{base_url}/sitemap.xml", timeout=5)
     if sitemap_status == 404:
         recommendations.append({
@@ -338,12 +317,10 @@ def proactive_checks(domain, base_url):
             "rationale": f"GET {base_url}/sitemap.xml returned HTTP 404.",
             "suggested_action": "Publish sitemap.xml listing all canonical public URLs and declare it in robots.txt."
         })
-
     return recommendations
 
 
 def deduplicate_recommendations(rec_list):
-    """Deduplicate recommendations by normalized action title and category."""
     seen = {}
     deduped = []
     for r in rec_list:
@@ -353,7 +330,6 @@ def deduplicate_recommendations(rec_list):
         cat = r.get("category", "general")
         key = (cat.lower(), " ".join(title.lower().split()))
         if key in seen:
-            # Merge rationales if distinct
             existing = seen[key]
             if r.get("rationale") and r["rationale"] not in existing.get("rationale", ""):
                 existing["rationale"] += " " + r["rationale"]
@@ -365,8 +341,8 @@ def deduplicate_recommendations(rec_list):
 
 def compose_audit(site, include_proactive=True, with_representation=False,
                   responses_file=None, timeout_seconds=300):
-    """Compose full audit under a strict global wall-clock deadline."""
     start_time = time.time()
+    monotonic_deadline = start_time + timeout_seconds
     domain, base_url = normalize_target(site)
     raw_findings = []
     specialists = {}
@@ -376,8 +352,8 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     all_limitations = []
 
     # 1. Acquisition Phase (Shared Inventory) - max 60s
-    acquisition_budget = min(60, max(15, timeout_seconds - 60))
-    inventory, inv_stats = build_inventory(base_url, budget_seconds=acquisition_budget)
+    acquisition_deadline = min(monotonic_deadline, start_time + 60)
+    inventory, inv_stats = build_inventory(base_url, deadline=acquisition_deadline)
     inventory_path = write_inventory_file(inventory) if inventory else None
 
     if inventory_path:
@@ -409,10 +385,10 @@ def compose_audit(site, include_proactive=True, with_representation=False,
             "reason": "Optional representation layer disabled (run with --with-representation to enable)"
         }
 
-    # Execute specialists sequentially with dynamically calculated timeouts
+    # Execute specialists sequentially with monotonic deadline
     for idx, (skill_name, label, filename, extra_args) in enumerate(specialist_runs):
-        elapsed = time.time() - start_time
-        remaining_time = timeout_seconds - elapsed
+        now = time.time()
+        remaining_time = monotonic_deadline - now
         remaining_specialists = len(specialist_runs) - idx
 
         if remaining_time <= 5:
@@ -424,7 +400,6 @@ def compose_audit(site, include_proactive=True, with_representation=False,
             all_limitations.append(f"{skill_name}: Skipped due to global execution time limit.")
             continue
 
-        # Dynamic specialist timeout
         spec_timeout = max(10, min(40, int((remaining_time - 5) / max(1, remaining_specialists))))
 
         script = find_specialist_script(skill_name, filename)
@@ -482,7 +457,6 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         seen_fps.add(fp)
 
         evidence = str(item.get("evidence", "")).strip()
-        # Eligibility Gate: concrete evidence required
         if len(evidence) < 8:
             demoted.append(dict(
                 title=item.get("title", "Audit observation"),
@@ -604,7 +578,6 @@ def compose_audit(site, include_proactive=True, with_representation=False,
 
 
 def validation_gate(report):
-    """Run validator on the generated report before emission."""
     try:
         proc = subprocess.run(
             [sys.executable, VALIDATOR, "-", "--quiet"],

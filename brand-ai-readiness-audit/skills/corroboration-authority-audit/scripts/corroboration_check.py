@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
-corroboration_check.py - Cross-web authority & corroboration layer.
+corroboration_check.py - Cross-web authority & corroboration audit layer.
 
-Distinguishes between:
-  1. Identity Link Verification: Checks that declared sameAs profile URLs
-     (Wikidata, Crunchbase, LinkedIn, X, GitHub) resolve with HTTP 200 without broken links.
-  2. Authority / Entity Corroboration: Checks whether external profiles corroborate
-     the brand's first-party entity identity.
+Causal Root Causes:
+  - AUTHORITY.IDENTITY_CORROBORATION: BROKEN_AUTHORITY_ANCHOR
+  - AUTHORITY.CLAIM_CORROBORATION: CLAIM_CORROBORATION_GAP
 """
 import sys
 import os
 import json
-import re
 import argparse
+from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 try:
@@ -21,8 +19,8 @@ try:
 except ImportError:
     import urllib.request, urllib.error
     DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=512*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
@@ -31,100 +29,130 @@ except ImportError:
         except Exception as e:
             return None, "", {}, str(e)
 
-    def safe_check_status(url, timeout=5, max_bytes=65536, user_agent=DEFAULT_USER_AGENT):
-        status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="HEAD")
-        if status is not None:
-            return status
-        status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
-        return status
+
+class SameAsExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_json_ld = False
+        self.json_ld_contents = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "script":
+            attr_dict = {k.lower(): (v or "") for k, v in attrs}
+            if "application/ld+json" in attr_dict.get("type", "").lower():
+                self.in_json_ld = True
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "script":
+            self.in_json_ld = False
+
+    def handle_data(self, data):
+        if self.in_json_ld:
+            self.json_ld_contents.append(data.strip())
 
 
 def extract_sameas_links(html):
-    """Extract sameAs URLs from JSON-LD on the page."""
-    links = []
-    for raw in re.findall(r'<script[^>]*ld\+json[^>]*>(.*?)</script>', html or "", re.S | re.I):
+    """Extract sameAs URLs from JSON-LD blocks."""
+    parser = SameAsExtractor()
+    try:
+        parser.feed(html)
+    except Exception:
+        pass
+    links = set()
+    for raw in parser.json_ld_contents:
         try:
             data = json.loads(raw)
+            objs = data if isinstance(data, list) else [data]
+            if isinstance(data, dict) and "@graph" in data:
+                objs = data["@graph"]
+            for o in objs:
+                if isinstance(o, dict) and "sameAs" in o:
+                    s = o["sameAs"]
+                    if isinstance(s, list):
+                        for u in s:
+                            if isinstance(u, str) and u.startswith("http"):
+                                links.add(u.strip())
+                    elif isinstance(s, str) and s.startswith("http"):
+                        links.add(s.strip())
         except Exception:
-            continue
-        objs = data if isinstance(data, list) else [data]
-        if isinstance(data, dict) and "@graph" in data:
-            objs = data["@graph"]
-        for o in objs:
-            if isinstance(o, dict):
-                sa = o.get("sameAs") or []
-                sa_list = sa if isinstance(sa, list) else [sa]
-                for s in sa_list:
-                    if isinstance(s, str) and s.startswith("http"):
-                        links.append(s.strip())
-    return sorted(set(links))
+            pass
+    return sorted(links)
 
 
 def audit(base, domain, inv=None):
-    findings, recommendations = [], []
-    observations, limitations = [], []
+    findings = []
+    recommendations = []
+    observations = []
 
+    # 1. Fetch Homepage
     if inv is not None:
         home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
-        if not home or not home.get("html"):
-            return {"status": "inconclusive", "findings": [], "recommendations": [],
-                    "error": "inventory lacks a usable homepage snapshot"}
-        html = home["html"]
+        html = home.get("html") if home else None
     else:
         status, html, _, err = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
-        if status is None or not html:
-            return {"status": "inconclusive", "findings": [], "recommendations": [],
-                    "error": f"could not reach {base}: {err}"}
+        if not html:
+            return {
+                "status": "inconclusive",
+                "findings": [],
+                "recommendations": [],
+                "error": f"could not reach {base}: {err}"
+            }
 
-    same_links = extract_sameas_links(html)
-    checked_links = []
+    if not html:
+        return {
+            "status": "inconclusive",
+            "findings": [],
+            "recommendations": [],
+            "error": f"could not retrieve content from {base}"
+        }
 
-    if same_links:
-        broken_links = []
-        authorities_verified = []
+    sameas_urls = extract_sameas_links(html)
 
-        for link in same_links[:8]:
-            code = safe_check_status(link, timeout=8)
-            checked_links.append({"url": link, "http_status": code})
+    # 2. Check declared authority links
+    if not sameas_urls:
+        recommendations.append({
+            "title": "Declare authoritative identity links (sameAs)",
+            "category": "corroboration",
+            "rationale": "No sameAs links were declared in JSON-LD. Declaring links to Wikidata, Wikipedia, Crunchbase, or official profiles helps AI models verify brand identity against independent authorities.",
+            "suggested_action": "Add sameAs URLs to the Organization JSON-LD markup pointing to official profiles and third-party registries."
+        })
+        return {
+            "status": "ok",
+            "findings": [],
+            "recommendations": recommendations,
+            "observations": observations,
+            "coverage": {"sameas_count": 0, "probed": 0},
+            "limitations": []
+        }
 
-            if code is None:
-                continue
-            if code in (404, 410, 500, 502, 503):
-                broken_links.append({"url": link, "http_status": code})
-            elif code == 200:
-                authorities_verified.append(link)
+    # 3. Probe up to 5 declared links
+    checked = []
+    broken = []
+    for u in sameas_urls[:5]:
+        status, _, headers, err = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
+        res_entry = {"url": u, "status": status, "error": err}
+        checked.append(res_entry)
 
-        if broken_links:
-            findings.append(dict(
-                category="corroboration",
-                title="Declared authority profile links do not resolve",
-                severity="medium",
-                confidence="high",
-                root_cause="sameAs profile URLs declared in Organization structured data return 4xx/5xx HTTP errors.",
-                cause_family="AUTHORITY.CORROBORATION",
-                cause_id="AUTH-SAMEAS-BROKEN",
-                impact="Dead or broken authority links degrade entity corroboration and signal neglected machine metadata.",
-                evidence="; ".join(f"{b['url']} -> HTTP {b['http_status']}" for b in broken_links),
-                suggested_action=dict(
-                    summary="Remove or update dead sameAs URLs so all declared third-party profiles return HTTP 200.",
-                    priority="medium",
-                    verification="Re-probe sameAs URLs and confirm all resolve with HTTP 200.")))
+        if status is not None and (status >= 400 or status < 200):
+            broken.append(f"{u} (HTTP {status})")
 
-        if authorities_verified:
-            observations.append(dict(
-                id=f"OBS-{len(observations) + 1:03d}",
-                category="corroboration",
-                source={"url": base + "/", "method": "sameas-resolver"},
-                observation=f"Verified {len(authorities_verified)} external authority profile(s)",
-                evidence=f"Live profiles confirmed: {', '.join(authorities_verified)}",
-                confidence="high"
-            ))
-    else:
-        recommendations.append(dict(
-            title="Declare third-party authority profiles (sameAs)",
-            category="authority-corroboration",
-            rationale="No sameAs links were declared in structured data. Adding verified Wikidata, Crunchbase, and social profiles strengthens entity disambiguation.",
-            suggested_action="Publish sameAs links in Organization JSON-LD to authoritative external databases."))
+    if broken:
+        findings.append({
+            "category": "corroboration",
+            "title": f"Broken authority/profile links declared in sameAs ({len(broken)} link(s))",
+            "severity": "medium",
+            "confidence": "high",
+            "root_cause": "Declared sameAs identity links return HTTP 4xx or 5xx error codes.",
+            "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+            "cause_id": "BROKEN_AUTHORITY_ANCHOR",
+            "impact": "AI models attempting to verify entity identity against independent authorities encounter broken links, reducing confidence.",
+            "evidence": f"Declared sameAs links returned error status: {'; '.join(broken)}.",
+            "suggested_action": {
+                "summary": "Update or remove broken sameAs URLs in Organization JSON-LD markup.",
+                "priority": "medium",
+                "verification": "Confirm all declared sameAs URLs return HTTP 200."
+            }
+        })
 
     return {
         "status": "ok",
@@ -132,19 +160,21 @@ def audit(base, domain, inv=None):
         "recommendations": recommendations,
         "observations": observations,
         "coverage": {
-            "sameas_links_declared": len(same_links),
-            "links_checked": checked_links,
-            "source": "shared-inventory" if inv is not None else "independent-fetch"
+            "sameas_count": len(sameas_urls),
+            "probed": len(checked),
+            "results": checked
         },
-        "limitations": limitations
+        "limitations": [
+            "Probed declared sameAs authority URLs; full web-wide claim corroboration was bounded to declared links."
+        ]
     }
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
-    ap.add_argument("--site", required=True)
-    ap.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
+    parser.add_argument("--site", required=True)
+    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
         s = "https://" + s

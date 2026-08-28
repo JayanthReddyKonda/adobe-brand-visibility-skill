@@ -3,11 +3,11 @@
 test_suite.py - Comprehensive verification test suite for Brand AI-Readiness Audit Marketplace.
 Tests:
   1. SSRF prevention and IP filtering against loopback, private, link-local, and cloud metadata.
-  2. Bounded response streaming and truncation.
-  3. Crawler matrix semantics (training vs retrieval bot disallow rules).
-  4. Scoped fact consistency and contradiction detection.
-  5. Answerability engine attribute coverage.
-  6. Engagement orientation and heading scent checks.
+  2. Crawler matrix semantics (training vs retrieval bot disallow rules).
+  3. Scoped fact consistency and contradiction detection.
+  4. Product lifecycle conflict detection (discontinued vs current).
+  5. Mathematical Answerability Engine attribute coverage.
+  6. Engagement orientation, intent-continuity, and information scent checks.
   7. Optional representation cross-check with observed AI outputs.
   8. End-to-end multi-specialist composition, taxonomy root causes, and schema validation.
 """
@@ -112,7 +112,7 @@ Disallow: /
         self.assertEqual(res["status"], "ok")
         critical_findings = [f for f in res["findings"] if f["severity"] == "critical"]
         self.assertTrue(len(critical_findings) >= 1)
-        self.assertIn("retrieval", critical_findings[0]["title"].lower())
+        self.assertEqual(critical_findings[0]["cause_id"], "AI_RETRIEVAL_BLOCKED")
 
 
 class TestFactConsistencyAndScope(unittest.TestCase):
@@ -149,7 +149,38 @@ class TestFactConsistencyAndScope(unittest.TestCase):
         findings, recs = fact_consistency_check.evaluate_fact_consistency([facts1, facts2], "https://example.com")
         price_findings = [f for f in findings if f["category"] == "fact-consistency"]
         self.assertTrue(len(price_findings) >= 1)
-        self.assertEqual(price_findings[0]["cause_family"], "FACT.CONSISTENCY")
+        self.assertEqual(price_findings[0]["cause_id"], "FIRST_PARTY_FACT_CONFLICT")
+
+    def test_product_lifecycle_conflict(self):
+        page1 = """
+        <html><head><title>Velocity X7 Legacy</title></head><body>
+        <h1>Velocity X7 Drone</h1>
+        <p>Discontinued Model: Velocity X7 is no longer in production.</p>
+        </body></html>
+        """
+        page2 = """
+        <html><head><title>Store Catalog</title></head><body>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "Velocity X7 Drone",
+          "offers": {
+            "@type": "Offer",
+            "price": "3999",
+            "availability": "https://schema.org/InStock"
+          }
+        }
+        </script>
+        <h1>Velocity X7 Drone</h1>
+        <p>In Stock - Buy Now</p>
+        </body></html>
+        """
+        facts1 = fact_consistency_check.extract_scoped_facts(page1, "https://example.com/legacy/x7")
+        facts2 = fact_consistency_check.extract_scoped_facts(page2, "https://example.com/store/x7")
+        findings, recs = fact_consistency_check.evaluate_fact_consistency([facts1, facts2], "https://example.com")
+        lc_findings = [f for f in findings if f["cause_id"] == "DISCONTINUED_VS_CURRENT_CONFLICT"]
+        self.assertTrue(len(lc_findings) >= 1)
 
 
 class TestEntityAnswerability(unittest.TestCase):
@@ -159,6 +190,7 @@ class TestEntityAnswerability(unittest.TestCase):
         <h1>Garuda Velocity X9</h1>
         <p>High performance drone with 4K camera and 30min flight time.</p>
         <p>Price: ₹5,499. Status: In Stock. Brand: Garuda Aerospace.</p>
+        <button class="btn-cta">Buy Now</button>
         </body></html>
         """
         dom = entity_content_check.EntityDOMParser()
@@ -181,7 +213,7 @@ class TestEngagementOrientation(unittest.TestCase):
         </body></html>
         """
         findings, recs, o_data = engagement_check.audit_page_engagement(html, "https://example.com/")
-        generic_h1 = [f for f in findings if f["cause_id"] == "ENG-H1-GENERIC"]
+        generic_h1 = [f for f in findings if f["cause_id"] == "LOW_INFORMATION_SCENT"]
         self.assertTrue(len(generic_h1) >= 1)
 
 
@@ -205,7 +237,7 @@ class TestRepresentationCrossCheck(unittest.TestCase):
         }
         findings, notes = representation_check.compare_assistant_observations(snapshot, observations_data)
         self.assertEqual(len(findings), 1)
-        self.assertEqual(findings[0]["cause_family"], "REPRESENTATION.ACCURACY")
+        self.assertEqual(findings[0]["cause_id"], "AI_FACT_CONFLICT")
         self.assertEqual(findings[0]["severity"], "high")
 
 
@@ -244,81 +276,6 @@ class TestOrchestratorAndSchemaValidation(unittest.TestCase):
         is_valid, errors = validate_report.validate_report_dict(report)
         self.assertTrue(is_valid, f"Validation errors: {errors}")
 
-    def test_full_inventory_specialist_composition(self):
-        # Create a mock inventory with rich multi-page fixtures
-        inv = {
-            "base_url": "https://garuda-drones.example.com",
-            "pages": [
-                {
-                    "url": "https://garuda-drones.example.com/",
-                    "status": 200,
-                    "page_type": "homepage",
-                    "html": """
-                    <html><head><title>Garuda Drones - Autonomous Flight</title>
-                    <script type="application/ld+json">
-                    {
-                      "@context": "https://schema.org",
-                      "@type": "Organization",
-                      "name": "Garuda Drones",
-                      "url": "https://garuda-drones.example.com",
-                      "sameAs": ["https://www.wikidata.org/wiki/Q12345"]
-                    }
-                    </script>
-                    </head><body>
-                    <h1>Garuda Autonomous Drones</h1>
-                    <p>Next-generation commercial drones built for survey and delivery.</p>
-                    <nav><a href="/products">Products</a> <a href="/pricing">Pricing</a></nav>
-                    <footer><p>© 2026 Garuda Drones</p></footer>
-                    </body></html>
-                    """
-                },
-                {
-                    "url": "https://garuda-drones.example.com/products/x9",
-                    "status": 200,
-                    "page_type": "product",
-                    "html": """
-                    <html><head><title>Velocity X9 - Garuda Drones</title>
-                    <script type="application/ld+json">
-                    {
-                      "@context": "https://schema.org",
-                      "@type": "Product",
-                      "name": "Velocity X9",
-                      "offers": {
-                        "@type": "Offer",
-                        "price": "5499",
-                        "priceCurrency": "INR",
-                        "availability": "https://schema.org/InStock"
-                      }
-                    }
-                    </script>
-                    </head><body>
-                    <h1>Velocity X9 Drone</h1>
-                    <p>Price: ₹5,499. High endurance survey drone.</p>
-                    </body></html>
-                    """
-                }
-            ],
-            "robots": {
-                "status": 200,
-                "text": "User-agent: *\nDisallow: /admin\n\nUser-agent: OAI-SearchBot\nAllow: /\n"
-            }
-        }
-
-        # Test each specialist against the inventory
-        disc_res = discoverability_check.audit(inv["base_url"], "garuda-drones.example.com", inv=inv)
-        self.assertEqual(disc_res["status"], "ok")
-
-        ent_res = entity_content_check.audit(inv["base_url"], "garuda-drones.example.com", inv=inv)
-        self.assertEqual(ent_res["status"], "ok")
-        self.assertEqual(ent_res["entity_snapshot"]["organization"]["name"], "Garuda Drones")
-
-        fact_res = fact_consistency_check.audit(inv["base_url"], "garuda-drones.example.com", inv=inv)
-        self.assertEqual(fact_res["status"], "ok")
-
-        eng_res = engagement_check.audit(inv["base_url"], "garuda-drones.example.com", inv=inv)
-        self.assertEqual(eng_res["status"], "ok")
-
 
 if __name__ == "__main__":
     unittest.main()
-

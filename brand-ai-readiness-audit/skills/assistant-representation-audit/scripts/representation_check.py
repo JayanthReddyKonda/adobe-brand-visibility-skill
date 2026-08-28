@@ -2,9 +2,8 @@
 """
 representation_check.py - Assistant representation layer (optional enrichment).
 
-Cross-checks observed AI assistant outputs (supplied via --responses or --observations JSON)
-against the brand's verified first-party facts to detect pricing contradictions,
-unsupported claims, outdated facts, and citation omissions.
+Causal Root Causes:
+  - REPRESENTATION.ACCURACY: AI_FACT_CONFLICT, AI_UNSUPPORTED_CLAIM, AI_CITATION_GAP
 """
 import sys
 import os
@@ -29,7 +28,6 @@ except ImportError:
             return e.code, "", dict(e.headers or {}), str(e)
         except Exception as e:
             return None, "", {}, str(e)
-
 
 PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
 
@@ -136,7 +134,6 @@ def compare_assistant_observations(snapshot, observations_data):
             claim_prices = PRICE_PATTERN.findall(fact_str)
             for cp in claim_prices:
                 norm_cp = re.sub(r"[^\d]", "", cp)
-                # Check if this price is stated in the claim but missing from on-site prices
                 if norm_cp and site_prices and not any(norm_cp == re.sub(r"[^\d]", "", sp) for sp in site_prices):
                     findings.append({
                         "category": "representation",
@@ -145,7 +142,7 @@ def compare_assistant_observations(snapshot, observations_data):
                         "confidence": "high",
                         "root_cause": f"The AI assistant asserts a price ({cp}) that does not match any current on-site pricing.",
                         "cause_family": "REPRESENTATION.ACCURACY",
-                        "cause_id": "REP-PRICE-CONFLICT",
+                        "cause_id": "AI_FACT_CONFLICT",
                         "impact": "Users interacting with AI assistants receive inaccurate commercial terms before landing on the site.",
                         "evidence": f"{assistant_name} asserted '{fact_str}' for prompt '{prompt}'. Visible site prices: {', '.join(sorted(site_prices)[:5])}.",
                         "suggested_action": {
@@ -158,47 +155,35 @@ def compare_assistant_observations(snapshot, observations_data):
     return findings, observational_notes
 
 
-def audit(site, responses_file=None, inv=None):
-    s = site.strip()
-    if not s.startswith("http"):
-        s = "https://" + s
-    p = urlparse(s)
-    base = f"{p.scheme}://{p.netloc}"
-
+def audit(base, domain, responses_file=None, inv=None):
     snapshot = build_fact_snapshot(base, inv=inv)
-    if snapshot.get("status") != "ok":
-        return {
-            "status": "inconclusive",
-            "findings": [],
-            "recommendations": [],
-            "error": snapshot.get("error", "could not build fact snapshot")
-        }
+    if snapshot.get("status") == "inconclusive":
+        return snapshot
 
     findings = []
-    recommendations = []
     observational_notes = []
 
     if responses_file and os.path.exists(responses_file):
         try:
             with open(responses_file, "r", encoding="utf-8") as f:
-                obs_data = json.load(f)
-            f_list, notes = compare_assistant_observations(snapshot, obs_data)
-            findings.extend(f_list)
+                observations_data = json.load(f)
+            f_findings, notes = compare_assistant_observations(snapshot, observations_data)
+            findings.extend(f_findings)
             observational_notes.extend(notes)
         except Exception as e:
-            return {
-                "status": "inconclusive",
-                "findings": [],
-                "recommendations": [],
-                "error": f"Failed to parse responses file: {e}"
-            }
+            return {"status": "failed", "error": f"failed to parse responses file: {e}"}
     else:
-        # Emits the site baseline snapshot when no responses file is provided
+        observational_notes.append({
+            "signal": "No observed responses file provided. Generated first-party fact baseline snapshot."
+        })
+
+    recommendations = []
+    if not responses_file:
         recommendations.append({
-            "title": "Evaluate AI assistant representation with observed responses",
-            "category": "representation-testing",
-            "rationale": "No observed AI assistant response dataset was supplied. Provide a --responses file to cross-check live ChatGPT, Claude, and Perplexity quotes.",
-            "suggested_action": "Supply a --responses file containing recorded assistant prompts, citations, and claims."
+            "title": "Supply observed assistant responses for empirical grounding",
+            "category": "representation",
+            "rationale": "Without logged assistant responses, the representation layer cannot detect empirical hallucinations.",
+            "suggested_action": "Pass a JSON file of observed answers via --responses to cross-check brand representation."
         })
 
     return {
@@ -206,10 +191,15 @@ def audit(site, responses_file=None, inv=None):
         "findings": findings,
         "recommendations": recommendations,
         "observational_notes": observational_notes,
+        "snapshot": {
+            "title": snapshot.get("title"),
+            "prices_visible": snapshot.get("prices_visible"),
+            "years_visible": snapshot.get("years_visible"),
+            "word_count": snapshot.get("word_count")
+        },
         "coverage": {
-            "site_snapshot_built": True,
-            "observations_evaluated": len(observational_notes) + len(findings),
-            "source": "shared-inventory" if inv is not None else "independent-fetch"
+            "mode": "empirical-comparison" if responses_file else "baseline-snapshot-only",
+            "prices_tracked": len(snapshot.get("prices_visible", []))
         }
     }
 
@@ -220,7 +210,11 @@ def main():
     parser.add_argument("--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check")
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
     args = parser.parse_args()
-
+    s = args.site.strip()
+    if not s.startswith("http"):
+        s = "https://" + s
+    p = urlparse(s)
+    base = f"{p.scheme}://{p.netloc}"
     inv = None
     if args.inventory and os.path.exists(args.inventory):
         try:
@@ -228,8 +222,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-
-    print(json.dumps(audit(args.site, responses_file=args.responses, inv=inv), indent=2))
+    print(json.dumps(audit(base, p.netloc, responses_file=args.responses, inv=inv), indent=2))
 
 
 if __name__ == "__main__":

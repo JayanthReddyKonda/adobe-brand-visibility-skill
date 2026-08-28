@@ -2,9 +2,10 @@
 """
 fact_consistency_check.py - Audits fact freshness, update timestamps, and cross-page fact consistency.
 
-Builds a scoped first-party fact ledger. Contradictions are reported ONLY when the
-same entity/attribute/scope has conflicting values across first-party pages.
-Prevents false positives between distinct tiers, departments, or products.
+Causal Root Causes:
+  - FACT.CONSISTENCY: FIRST_PARTY_FACT_CONFLICT, CONFLICTING_COMMERCIAL_TERMS
+  - FACT.FRESHNESS: LEGACY_FACT_PROPAGATION, STALE_AUTHORITATIVE_FACT
+  - FACT.LIFECYCLE: DISCONTINUED_VS_CURRENT_CONFLICT
 """
 import sys
 import os
@@ -39,6 +40,7 @@ CURRENT_YEAR = datetime.now().year
 PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
 EMAIL_PATTERN = re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+', re.IGNORECASE)
 PHONE_PATTERN = re.compile(r'(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}')
+DISCONTINUED_PATTERN = re.compile(r'\b(discontinued|retired|legacy|obsolete|end of life|out of production)\b', re.IGNORECASE)
 
 
 class FreshnessAnalyzer(HTMLParser):
@@ -104,7 +106,7 @@ def normalize_price_str(raw):
 
 
 def extract_scoped_facts(html_str, url):
-    """Extract first-party facts with contextual scope."""
+    """Extract first-party facts with contextual scope, status, and lifecycle."""
     parser = FreshnessAnalyzer()
     try:
         parser.feed(html_str)
@@ -116,10 +118,12 @@ def extract_scoped_facts(html_str, url):
         "url": url,
         "copyright_years": [],
         "brand_names": [],
+        "taglines": [],
         "scoped_prices": [],
         "contact_emails": [],
         "contact_phones": [],
-        "modification_dates": []
+        "modification_dates": [],
+        "products_with_status": []
     }
 
     # 1. Copyright years
@@ -133,7 +137,7 @@ def extract_scoped_facts(html_str, url):
             pass
     facts["copyright_years"] = sorted(set(facts["copyright_years"]))
 
-    # 2. Brand names & dates from structured data
+    # 2. Structured Data extraction
     for raw in parser.json_ld_contents:
         try:
             data = json.loads(raw)
@@ -147,17 +151,26 @@ def extract_scoped_facts(html_str, url):
                 if otype in ("organization", "brand", "corporation"):
                     if o.get("name"):
                         facts["brand_names"].append(o["name"].strip())
+                    if o.get("slogan") or o.get("alternateName"):
+                        facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
                 elif otype in ("product", "individualproduct"):
-                    pname = o.get("name") or "Product"
+                    pname = str(o.get("name") or "Product").strip()
                     offers = o.get("offers") or {}
                     offer_obj = offers[0] if isinstance(offers, list) and offers else offers
                     if isinstance(offer_obj, dict):
                         p_val = offer_obj.get("price") or offer_obj.get("lowPrice")
+                        avail = str(offer_obj.get("availability") or "").lower()
+                        status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else "current")
+                        facts["products_with_status"].append({
+                            "name": pname,
+                            "status": status,
+                            "url": url
+                        })
                         if p_val:
                             norm_p = normalize_price_str(str(p_val))
                             if norm_p:
                                 facts["scoped_prices"].append({
-                                    "entity": pname.strip(),
+                                    "entity": pname,
                                     "price": norm_p,
                                     "raw": str(p_val)
                                 })
@@ -168,17 +181,16 @@ def extract_scoped_facts(html_str, url):
         except Exception:
             pass
 
-    # OpenGraph / Meta update timestamps
+    # Meta / OpenGraph update timestamps
     for meta_key in ("article:modified_time", "og:updated_time", "last-modified"):
         if meta_key in parser.meta_tags:
             facts["modification_dates"].append(parser.meta_tags[meta_key])
 
-    # 3. Scoped prices from text with nearest section context
+    # 3. Text-based scoped price extraction
     for ctx, txt in parser.text_with_context:
         for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
             norm_p = normalize_price_str(m.group(1))
             if norm_p and len(norm_p) >= 2:
-                # Use contextual heading name
                 section_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "Product")
                 if not any(sp["price"] == norm_p and sp["entity"] == section_name for sp in facts["scoped_prices"]):
                     facts["scoped_prices"].append({
@@ -187,14 +199,23 @@ def extract_scoped_facts(html_str, url):
                         "raw": m.group(0)
                     })
 
-    # 4. Scoped emails
+    # 4. Discontinued / Lifecycle detection in prose
+    for h in parser.headings:
+        h_text = h[1]
+        if DISCONTINUED_PATTERN.search(h_text) or DISCONTINUED_PATTERN.search(full_text[:400]):
+            facts["products_with_status"].append({
+                "name": h_text,
+                "status": "discontinued",
+                "url": url
+            })
+
+    # 5. Scoped emails & phones
     for m in EMAIL_PATTERN.finditer(html_str):
         addr = m.group(0).strip(".").lower()
         if not addr.endswith((".png", ".jpg", ".gif", ".webp", ".js", ".css")):
             scope = "sales" if "sales" in addr else ("support" if "support" in addr else "general")
             facts["contact_emails"].append({"scope": scope, "email": addr})
 
-    # 5. Scoped phones
     for m in PHONE_PATTERN.finditer(full_text):
         digits = re.sub(r"\D", "", m.group(0))
         if 8 <= len(digits) <= 15:
@@ -204,11 +225,11 @@ def extract_scoped_facts(html_str, url):
 
 
 def evaluate_fact_consistency(page_fact_list, base_url):
-    """Detect verified contradictions across first-party pages."""
+    """Detect verified contradictions and lifecycle conflicts across first-party pages."""
     findings = []
     recommendations = []
 
-    # 1. Scoped Price Contradictions: same entity / product / tier with conflicting prices
+    # 1. Scoped Price Contradictions
     price_ledger = {}
     for pf in page_fact_list:
         for sp in pf["scoped_prices"]:
@@ -236,8 +257,8 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 "confidence": "high",
                 "root_cause": f"Different price values for '{ent}' are published across separate first-party pages.",
                 "cause_family": "FACT.CONSISTENCY",
-                "cause_id": "FACT-PRICE-CONTRADICTION",
-                "impact": "AI retrieval systems quote contradictory pricing, creating user distrust and commercial confusion.",
+                "cause_id": "FIRST_PARTY_FACT_CONFLICT",
+                "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
                 "evidence": f"{len(affected_urls)} page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
                 "suggested_action": {
                     "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
@@ -246,7 +267,36 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 }
             })
 
-    # 2. Copyright Year Inconsistency
+    # 2. Product Lifecycle Conflicts (Discontinued vs Active)
+    status_by_name = {}
+    for pf in page_fact_list:
+        for p in pf.get("products_with_status", []):
+            name_clean = p["name"].lower().strip()
+            if len(name_clean) > 3:
+                status_by_name.setdefault(name_clean, []).append((p["status"], p["url"]))
+
+    for name, statuses in status_by_name.items():
+        stat_types = {s[0] for s in statuses}
+        if "discontinued" in stat_types and ("in_stock" in stat_types or "current" in stat_types):
+            urls = {s[1] for s in statuses}
+            findings.append({
+                "category": "lifecycle",
+                "title": f"Product lifecycle conflict for '{name}' (discontinued vs current)",
+                "severity": "high",
+                "confidence": "high",
+                "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
+                "cause_family": "FACT.LIFECYCLE",
+                "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
+                "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
+                "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
+                "suggested_action": {
+                    "summary": f"Synchronize availability status for '{name}' across all product pages and structured data.",
+                    "priority": "high",
+                    "verification": f"Re-crawl {', '.join(urls)} and confirm consistent lifecycle badges."
+                }
+            })
+
+    # 3. Copyright Year Inconsistency (Signals legacy fact drift)
     c_years_by_url = {}
     for pf in page_fact_list:
         if pf["copyright_years"]:
@@ -263,10 +313,10 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 "title": "Inconsistent copyright years across site pages",
                 "severity": "medium",
                 "confidence": "high",
-                "root_cause": "Different pages publish disparate copyright years (e.g. stale footer templates).",
+                "root_cause": "Disparate copyright years indicate unmaintained legacy page templates.",
                 "cause_family": "FACT.FRESHNESS",
-                "cause_id": "FACT-COPYRIGHT-DISPARITY",
-                "impact": "AI assistants use copyright dates as a heuristic freshness signal; conflicting dates signal neglected content.",
+                "cause_id": "LEGACY_FACT_PROPAGATION",
+                "impact": "AI models use footer dates as a heuristic freshness signal; stale dates reduce answer authority.",
                 "evidence": f"Copyright years range from {oldest_year} to {newest_year} across sampled URLs: {'; '.join(details[:4])}.",
                 "suggested_action": {
                     "summary": f"Standardize site footers to dynamically render the current copyright year ({CURRENT_YEAR}).",
@@ -275,31 +325,10 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 }
             })
 
-    # 3. Missing Freshness Signals
-    pages_missing_dates = [pf["url"] for pf in page_fact_list if not pf["modification_dates"]]
-    if len(pages_missing_dates) == len(page_fact_list) and len(page_fact_list) >= 2:
-        findings.append({
-            "category": "freshness",
-            "title": "No freshness timestamps exposed across audited pages",
-            "severity": "low",
-            "confidence": "high",
-            "root_cause": "Pages omit article:modified_time, og:updated_time, or dateModified structured data.",
-            "cause_family": "FACT.FRESHNESS",
-            "cause_id": "FACT-TIMESTAMPS-MISSING",
-            "impact": "AI retrieval systems cannot verify content currency, reducing ranking confidence for time-sensitive queries.",
-            "evidence": f"All {len(page_fact_list)} sampled page(s) omit dateModified/article:modified_time metadata.",
-            "suggested_action": {
-                "summary": "Expose ISO 8601 modification timestamps via OpenGraph and Schema.org metadata.",
-                "priority": "low",
-                "verification": "Inspect response headers and markup for valid dateModified timestamps."
-            }
-        })
-
     return findings, recommendations
 
 
 def audit(base, domain, inv=None):
-    """Audit fact freshness and consistency."""
     findings = []
     recommendations = []
     page_fact_list = []
@@ -334,7 +363,9 @@ def audit(base, domain, inv=None):
             "scoped_facts_recorded": sum(len(pf["scoped_prices"]) for pf in page_fact_list),
             "source": "shared-inventory" if inv is not None else "homepage-only"
         },
-        "limitations": (["Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"] if page_fact_list else [])
+        "limitations": [
+            "Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"
+        ]
     }
 
 
