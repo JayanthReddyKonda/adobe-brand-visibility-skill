@@ -116,15 +116,14 @@ class EntityDOMParser(HTMLParser):
 
     def handle_data(self, data):
         if self.in_json_ld:
-            self.json_ld_contents.append(data.strip())
+            self.json_ld_contents.append(data)
         elif self.in_title:
-            self.title += data.strip()
+            self.title += " " + data.strip()
         elif self.current_h is not None:
-            self.current_h_text.append(data.strip())
+            self.current_h_text.append(data)
         elif not self.in_script:
-            txt = data.strip()
-            if txt:
-                self.text_content.append(txt)
+            if data.strip():
+                self.text_content.append(data.strip())
 
 
 def parse_json_ld(raw_json_list):
@@ -145,15 +144,27 @@ def parse_json_ld(raw_json_list):
     return entities
 
 
+def matches_schema_type(entity, target_types):
+    """Check if a JSON-LD entity matches target schema types (handling string or list @type)."""
+    if not isinstance(entity, dict):
+        return False
+    raw_t = entity.get("@type", "")
+    if isinstance(raw_t, list):
+        types = {str(t).lower() for t in raw_t}
+    else:
+        types = {str(raw_t).lower()}
+    return bool(types.intersection({t.lower() for t in target_types}))
+
+
 def evaluate_page_answerability(page_type, html_content, dom, url):
     """Calculate mathematically reproducible weighted Answerability Index."""
     weights_map = ANSWERABILITY_WEIGHTS.get(page_type)
     if not weights_map:
         return None
 
-    full_text = " ".join(dom.text_content).lower()
-    headings_text = " ".join(h[1] for h in dom.headings).lower()
-    search_space = f"{full_text} {headings_text} {html_content.lower()}"
+    full_text = " ".join(dom.text_content)
+    headings_text = " ".join(h[1] for h in dom.headings)
+    search_space = f"{full_text} {headings_text}"
 
     present_attributes = []
     missing_attributes = []
@@ -163,7 +174,8 @@ def evaluate_page_answerability(page_type, html_content, dom, url):
     for attr_name, (weight, patterns) in weights_map.items():
         found = False
         for pat in patterns:
-            if pat in search_space:
+            # Word boundary regex search to prevent substring pollution
+            if re.search(r'\b' + re.escape(pat) + r'\b', search_space, re.I) or (len(pat) > 3 and pat.lower() in search_space.lower()):
                 found = True
                 break
         if found:
@@ -230,17 +242,15 @@ def audit(base, domain, inv=None):
 
     json_ld_entities = parse_json_ld(dom.json_ld_contents)
 
-    # 2. Organization Entity Recognition
+    # 2. Organization Entity Recognition (supports array @type)
     org_entity = None
     for e in json_ld_entities:
-        if isinstance(e, dict):
-            etype = str(e.get("@type", "")).lower()
-            if etype in ("organization", "corporation", "brand", "localbusiness"):
-                org_entity = e
-                break
+        if matches_schema_type(e, ("organization", "corporation", "brand", "localbusiness")):
+            org_entity = e
+            break
 
     og_site_name = dom.og_tags.get("og:site_name")
-    brand_name = (org_entity.get("name") if org_entity else None) or og_site_name or dom.title.split("-")[0].split("|")[0].strip()
+    brand_name = (org_entity.get("name") if org_entity and isinstance(org_entity.get("name"), str) else None) or og_site_name or dom.title.split("-")[0].split("|")[0].strip()
 
     if not org_entity:
         if not og_site_name and not dom.title:
@@ -248,6 +258,7 @@ def audit(base, domain, inv=None):
                 "category": "entity-identity",
                 "title": "Missing machine-explicit Organization entity",
                 "severity": "medium",
+
                 "confidence": "high",
                 "root_cause": "The brand publishes no Schema.org Organization markup, OpenGraph site_name, or descriptive title.",
                 "cause_family": "ENTITY.IDENTITY",

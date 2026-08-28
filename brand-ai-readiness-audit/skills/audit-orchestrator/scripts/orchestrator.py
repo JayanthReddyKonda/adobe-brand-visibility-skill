@@ -24,31 +24,11 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
 
-# Import canonical safe_fetch utility
-try:
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            try:
-                body = e.read(max_bytes).decode("utf-8", "ignore")
-            except Exception:
-                body = ""
-            return e.code, body, dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
-
-    def safe_check_status(url, timeout=5, max_bytes=65536, user_agent=DEFAULT_USER_AGENT):
-        status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
-        return status
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
@@ -57,6 +37,7 @@ NON_HTML_EXTENSIONS = (
     ".svg", ".webp", ".mp4", ".mp3", ".json", ".js", ".css", ".zip",
     ".gz", ".tar", ".ico", ".woff", ".woff2", ".ttf", ".eot"
 )
+
 
 PRIORITY_KEYWORDS = [
     ("product", ["/product/", "/products/", "/p/", "/item/", "/store/", "/shop/"]),
@@ -150,12 +131,44 @@ def is_sitemap_or_non_html_url(url):
 
 
 def classify_page(url, title=""):
-    """Classify an HTML page by URL path and title keywords."""
-    hay = (url + " " + (title or "")).lower()
-    for ptype, kws in PRIORITY_KEYWORDS:
-        if any(k in hay for k in kws):
+    """Classify an HTML page using path segment matching and word boundaries."""
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+    t_lower = (title or "").lower()
+
+    # Priority 1: Match against exact URL path segments (prevents substring false positives like billingsley -> billing)
+    path_parts = [p for p in path.split("/") if p]
+    for ptype, kws in [
+        ("pricing", {"pricing", "prices", "plans", "billing", "subscription", "pricing-plans", "membership"}),
+        ("product", {"product", "products", "p", "item", "items", "shop", "store"}),
+        ("service", {"service", "services", "solution", "solutions", "offering", "offerings"}),
+        ("category", {"category", "categories", "collection", "collections", "browse"}),
+        ("contact", {"contact", "support", "help", "contact-us", "reach-us"}),
+        ("location", {"location", "locations", "store-locator", "where-to-buy"}),
+        ("about", {"about", "about-us", "company", "our-team", "story", "mission"}),
+        ("documentation", {"docs", "documentation", "guide", "api", "developer"}),
+        ("article", {"blog", "news", "article", "articles", "posts", "insights"}),
+    ]:
+        if any(seg in kws for seg in path_parts):
             return ptype
+
+    # Priority 2: Match against page title using explicit word boundaries
+    for ptype, patterns in [
+        ("pricing", [r"\bpricing\b", r"\bplans\b", r"\bsubscription\b"]),
+        ("product", [r"\bproducts?\b", r"\bstore\b", r"\bshop\b"]),
+        ("service", [r"\bservices?\b", r"\bsolutions?\b"]),
+        ("category", [r"\bcategor(y|ies)\b", r"\bcollection\b"]),
+        ("contact", [r"\bcontact\s*us\b", r"\bhelp\s*desk\b", r"\bcustomer\s*support\b"]),
+        ("location", [r"\blocations?\b", r"\bstore\s*locator\b"]),
+        ("about", [r"\babout\s*us\b", r"\bour\s*company\b", r"\bour\s*mission\b"]),
+        ("documentation", [r"\bdocumentation\b", r"\bdeveloper\s*guide\b", r"\bapi\s*docs\b"]),
+        ("article", [r"\bblog\b", r"\bnews\b", r"\barticle\b"]),
+    ]:
+        if any(re.search(pat, t_lower) for pat in patterns):
+            return ptype
+
     return "other"
+
 
 
 def _visible_words(html):
@@ -302,11 +315,23 @@ def build_inventory(base_url, max_pages=16, deadline=None):
         if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
             break
 
-    # 5. Fetch and Content-Type Gate Sampled Pages
+    # 5. Fetch and Content-Type Gate Sampled Pages (Respecting robots.txt)
+    rp = None
+    if robots_txt and r_status == 200:
+        try:
+            import urllib.robotparser
+            rp = urllib.robotparser.RobotFileParser()
+            rp.parse(robots_txt.splitlines())
+        except Exception:
+            rp = None
+
     for u in selected_urls:
         if deadline and time.time() >= deadline:
             inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
             break
+        if rp and not rp.can_fetch(DEFAULT_USER_AGENT, u):
+            continue  # Respect robots.txt Disallow on crawler fetches
+
         p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
         if p_html and is_html_response(p_headers, p_html):
             seen_urls.add(u.rstrip("/"))
@@ -322,6 +347,7 @@ def build_inventory(base_url, max_pages=16, deadline=None):
             })
 
     inv["elapsed_seconds"] = round(time.time() - start, 1)
+
     stats = {
         "homepage_reachable": True,
         "html_pages_sampled": len(inv["pages"]),
@@ -402,8 +428,12 @@ def run_specialist_tool(script_path, timeout_sec, *args):
         return "failed", [], [], str(e), [], {}, []
 
 
-def proactive_checks(domain, base_url):
+def proactive_checks(domain, base_url, inv_stats=None):
     recommendations = []
+    # If sitemaps were already discovered on the site, do not flag a false 404
+    if inv_stats and inv_stats.get("sitemaps_found", 0) > 0:
+        return recommendations
+
     sitemap_status = safe_check_status(f"{base_url}/sitemap.xml", timeout=5)
     if sitemap_status == 404:
         recommendations.append({
@@ -413,6 +443,7 @@ def proactive_checks(domain, base_url):
             "suggested_action": "Publish a canonical sitemap.xml listing all indexable URLs and declare it in robots.txt alongside Organization structured data."
         })
     return recommendations
+
 
 
 def deduplicate_recommendations(rec_list):
@@ -526,7 +557,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     # 3. Proactive Improvement Checks
     all_recommendations = list(specialist_recommendations)
     if include_proactive:
-        all_recommendations.extend(proactive_checks(domain, base_url))
+        all_recommendations.extend(proactive_checks(domain, base_url, inv_stats=inv_stats))
 
     # 4. Finding Normalization & Deduplication Gate
     def finding_fingerprint(item):
@@ -538,9 +569,11 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     seen_fps = set()
     demoted = []
 
-    sorted_raw = sorted(raw_findings, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium"), 99))
+    sorted_raw = sorted(raw_findings, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium") if isinstance(f, dict) else "medium", 99))
 
     for item in sorted_raw:
+        if not isinstance(item, dict):
+            continue
         sev = str(item.get("severity", "medium")).lower()
         if sev not in SEVERITY_ORDER:
             sev = "medium"
@@ -551,7 +584,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         seen_fps.add(fp)
 
         evidence = str(item.get("evidence", "")).strip()
-        if len(evidence) < 8:
+        if len(evidence) < 5:
             demoted.append(dict(
                 title=item.get("title", "Audit observation"),
                 category=item.get("category", "general"),
@@ -559,6 +592,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
                 suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually.")
             ))
             continue
+
 
         if sev in ("critical", "high") and confidence == "low":
             demoted.append(dict(
@@ -692,6 +726,55 @@ def validation_gate(report):
         return False
 
 
+def format_markdown_report(report):
+    lines = []
+    site = report.get("site", "Target Site")
+    summary = report.get("summary", {})
+    metrics = report.get("audit_metrics", {})
+
+    lines.append(f"# Brand AI-Readiness Audit Report: {site}")
+    lines.append(f"**Audited At:** {report.get('audited_at', 'N/A')}  ")
+    lines.append(f"**Total Findings:** {summary.get('total_findings', 0)} (Critical: {summary.get('critical', 0)}, High: {summary.get('high', 0)}, Medium: {summary.get('medium', 0)}, Low: {summary.get('low', 0)})  ")
+    if "answerability_index" in metrics:
+        lines.append(f"**Answerability Index:** {metrics['answerability_index']}  ")
+    lines.append("")
+
+    lines.append("## Specialist Layer Status")
+    for s_name, s_data in report.get("specialists", {}).items():
+        st = s_data.get("status", "unknown")
+        lbl = s_data.get("label", s_name)
+        lines.append(f"- **{lbl}** (`{s_name}`): `{st}`")
+    lines.append("")
+
+    findings = report.get("findings", [])
+    if findings:
+        lines.append("## Key Findings")
+        for f in findings:
+            fid = f.get("id", "F-???")
+            sev = f.get("severity", "medium").upper()
+            title = f.get("title", "Finding")
+            lines.append(f"### [{sev}] {fid}: {title}")
+            lines.append(f"- **Evidence:** {f.get('evidence', 'None')}")
+            lines.append(f"- **Root Cause:** {f.get('root_cause', 'N/A')}")
+            action = f.get("suggested_action", {})
+            action_summary = action.get("summary") if isinstance(action, dict) else str(action)
+            lines.append(f"- **Suggested Action:** {action_summary}")
+            lines.append("")
+    else:
+        lines.append("## Key Findings")
+        lines.append("No critical or high-severity defects detected across audited pages.")
+        lines.append("")
+
+    proactive = report.get("proactive_actions", [])
+    if proactive:
+        lines.append("## Proactive Recommendations")
+        for r in proactive:
+            lines.append(f"- **{r.get('title', 'Recommendation')}**: {r.get('suggested_action', r.get('rationale', ''))}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def main():
     args = parse_args()
     report = compose_audit(
@@ -713,14 +796,19 @@ def main():
         except Exception as e:
             sys.stderr.write(f"SQLite save warning: {e}\n")
 
-    output_json = json.dumps(report, indent=2)
+    if args.format == "markdown":
+        out_content = format_markdown_report(report)
+    else:
+        out_content = json.dumps(report, indent=2)
+
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(output_json + "\n")
+            f.write(out_content + "\n")
     else:
-        print(output_json)
+        print(out_content)
 
 
 if __name__ == "__main__":
     main()
+
 

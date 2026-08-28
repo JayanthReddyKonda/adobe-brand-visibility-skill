@@ -175,6 +175,15 @@ def safe_fetch(url, timeout=10, max_bytes=2 * 1024 * 1024, user_agent=DEFAULT_US
                     break
 
             raw_body = b"".join(chunks)[:max_bytes]
+            # Handle gzip decompression
+            encoding = (resp.headers.get("Content-Encoding") or "").lower()
+            if "gzip" in encoding or raw_body.startswith(b"\x1f\x8b") or url.lower().split("?")[0].endswith((".gz", ".xml.gz")):
+                try:
+                    import gzip
+                    raw_body = gzip.decompress(raw_body)
+                except Exception:
+                    pass
+
             charset = resp.headers.get_content_charset() or "utf-8"
             body = raw_body.decode(charset, errors="ignore")
             return status, body, headers, None
@@ -184,10 +193,18 @@ def safe_fetch(url, timeout=10, max_bytes=2 * 1024 * 1024, user_agent=DEFAULT_US
         headers = dict(e.headers or {})
         try:
             raw_body = e.read(max_bytes)
+            encoding = (e.headers.get("Content-Encoding") or "").lower()
+            if "gzip" in encoding or raw_body.startswith(b"\x1f\x8b") or url.lower().split("?")[0].endswith((".gz", ".xml.gz")):
+                try:
+                    import gzip
+                    raw_body = gzip.decompress(raw_body)
+                except Exception:
+                    pass
             body = raw_body.decode("utf-8", errors="ignore")
         except Exception:
             body = ""
         return status, body, headers, str(e)
+
 
     except Exception as e:
         return None, "", {}, str(e)

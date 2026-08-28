@@ -52,7 +52,7 @@ class SameAsExtractor(HTMLParser):
 
 
 def extract_sameas_links(html):
-    """Extract sameAs URLs from JSON-LD blocks."""
+    """Extract sameAs URLs from JSON-LD blocks, supporting strings and @id objects."""
     parser = SameAsExtractor()
     try:
         parser.feed(html)
@@ -68,12 +68,14 @@ def extract_sameas_links(html):
             for o in objs:
                 if isinstance(o, dict) and "sameAs" in o:
                     s = o["sameAs"]
-                    if isinstance(s, list):
-                        for u in s:
-                            if isinstance(u, str) and u.startswith("http"):
-                                links.add(u.strip())
-                    elif isinstance(s, str) and s.startswith("http"):
-                        links.add(s.strip())
+                    s_list = s if isinstance(s, list) else [s]
+                    for u in s_list:
+                        if isinstance(u, str) and u.startswith("http"):
+                            links.add(u.strip())
+                        elif isinstance(u, dict) and "@id" in u:
+                            target = str(u["@id"]).strip()
+                            if target.startswith("http"):
+                                links.add(target)
         except Exception:
             pass
     return sorted(links)
@@ -86,10 +88,13 @@ def audit(base, domain, inv=None):
 
     # 1. Fetch Homepage
     if inv is not None:
-        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and p.get("resource_type", "html") == "html"), None)
+        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and ("html" in str(p.get("resource_type", "")).lower() or "html" in str(p.get("content_type", "")).lower())), None)
+        if not home and inv.get("pages"):
+            home = inv["pages"][0]
         html = home.get("html") if home else None
     else:
         status, html, _, err = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
+
         if not html:
             return {
                 "status": "inconclusive",

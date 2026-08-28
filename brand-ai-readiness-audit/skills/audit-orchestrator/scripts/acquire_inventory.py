@@ -65,11 +65,44 @@ def is_sitemap_or_non_html_url(url):
 
 
 def classify_page(url, title=""):
-    hay = (url + " " + (title or "")).lower()
-    for ptype, kws in PRIORITY_KEYWORDS:
-        if any(k in hay for k in kws):
+    """Classify an HTML page using path segment matching and word boundaries."""
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+    t_lower = (title or "").lower()
+
+    # Priority 1: Match against exact URL path segments (prevents substring false positives like billingsley -> billing)
+    path_parts = [p for p in path.split("/") if p]
+    for ptype, kws in [
+        ("pricing", {"pricing", "prices", "plans", "billing", "subscription", "pricing-plans", "membership"}),
+        ("product", {"product", "products", "p", "item", "items", "shop", "store"}),
+        ("service", {"service", "services", "solution", "solutions", "offering", "offerings"}),
+        ("category", {"category", "categories", "collection", "collections", "browse"}),
+        ("contact", {"contact", "support", "help", "contact-us", "reach-us"}),
+        ("location", {"location", "locations", "store-locator", "where-to-buy"}),
+        ("about", {"about", "about-us", "company", "our-team", "story", "mission"}),
+        ("documentation", {"docs", "documentation", "guide", "api", "developer"}),
+        ("article", {"blog", "news", "article", "articles", "posts", "insights"}),
+    ]:
+        if any(seg in kws for seg in path_parts):
             return ptype
+
+    # Priority 2: Match against page title using explicit word boundaries
+    for ptype, patterns in [
+        ("pricing", [r"\bpricing\b", r"\bplans\b", r"\bsubscription\b"]),
+        ("product", [r"\bproducts?\b", r"\bstore\b", r"\bshop\b"]),
+        ("service", [r"\bservices?\b", r"\bsolutions?\b"]),
+        ("category", [r"\bcategor(y|ies)\b", r"\bcollection\b"]),
+        ("contact", [r"\bcontact\s*us\b", r"\bhelp\s*desk\b", r"\bcustomer\s*support\b"]),
+        ("location", [r"\blocations?\b", r"\bstore\s*locator\b"]),
+        ("about", [r"\babout\s*us\b", r"\bour\s*company\b", r"\bour\s*mission\b"]),
+        ("documentation", [r"\bdocumentation\b", r"\bdeveloper\s*guide\b", r"\bapi\s*docs\b"]),
+        ("article", [r"\bblog\b", r"\bnews\b", r"\barticle\b"]),
+    ]:
+        if any(re.search(pat, t_lower) for pat in patterns):
+            return ptype
+
     return "other"
+
 
 
 def _visible_words(html):
@@ -208,10 +241,23 @@ def build_inventory(base_url, max_pages=16, deadline=None):
         if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
             break
 
+    # Parse robots.txt for crawler's own URL fetch gating
+    rp = None
+    if robots_txt and r_status == 200:
+        try:
+            import urllib.robotparser
+            rp = urllib.robotparser.RobotFileParser()
+            rp.parse(robots_txt.splitlines())
+        except Exception:
+            rp = None
+
     for u in selected_urls:
         if deadline and time.time() >= deadline:
             inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
             break
+        if rp and not rp.can_fetch(DEFAULT_USER_AGENT, u):
+            continue  # Respect robots.txt Disallow for crawler's own requests
+
         p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
         if p_html and is_html_response(p_headers, p_html):
             seen_urls.add(u.rstrip("/"))
@@ -227,6 +273,7 @@ def build_inventory(base_url, max_pages=16, deadline=None):
             })
 
     inv["elapsed_seconds"] = round(time.time() - start, 1)
+
     stats = {
         "homepage_reachable": True,
         "html_pages_sampled": len(inv["pages"]),

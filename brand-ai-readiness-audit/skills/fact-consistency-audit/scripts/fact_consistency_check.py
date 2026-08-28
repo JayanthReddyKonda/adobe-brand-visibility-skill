@@ -100,8 +100,25 @@ class FreshnessAnalyzer(HTMLParser):
 
 
 def normalize_price_str(raw):
-    """Normalize price string to digits (e.g. '₹5,499.00' -> '5499')."""
-    digits = re.sub(r"[^\d]", "", raw.split(".")[0])
+    """Normalize price string to integer units supporting international formats (e.g. '₹5,499.00' -> '5499', '€1.250,50' -> '1250')."""
+    if not raw:
+        return None
+    s = str(raw).strip()
+    # European format with dot thousand separator and comma decimal: 1.250,50
+    if re.search(r'\d+\.\d{3},\d{2}', s):
+        s = s.replace(".", "").split(",")[0]
+    elif "," in s and "." in s:
+        # Standard US/UK: 1,250.50
+        s = s.replace(",", "").split(".")[0]
+    elif "," in s:
+        parts = s.split(",")
+        if len(parts) == 2 and len(parts[1]) == 2:
+            s = parts[0]
+        else:
+            s = s.replace(",", "")
+    elif "." in s:
+        s = s.split(".")[0]
+    digits = re.sub(r"[^\d]", "", s)
     return digits or None
 
 
@@ -149,7 +166,7 @@ def extract_scoped_facts(html_str, url):
                     continue
                 otype = str(o.get("@type", "")).lower()
                 if otype in ("organization", "brand", "corporation"):
-                    if o.get("name"):
+                    if o.get("name") and isinstance(o["name"], str):
                         facts["brand_names"].append(o["name"].strip())
                     if o.get("slogan") or o.get("alternateName"):
                         facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
@@ -174,9 +191,9 @@ def extract_scoped_facts(html_str, url):
                                     "price": norm_p,
                                     "raw": str(p_val)
                                 })
-                if "dateModified" in o:
+                if "dateModified" in o and isinstance(o["dateModified"], str):
                     facts["modification_dates"].append(o["dateModified"])
-                elif "datePublished" in o:
+                elif "datePublished" in o and isinstance(o["datePublished"], str):
                     facts["modification_dates"].append(o["datePublished"])
         except Exception:
             pass
@@ -199,15 +216,27 @@ def extract_scoped_facts(html_str, url):
                         "raw": m.group(0)
                     })
 
-    # 4. Discontinued / Lifecycle detection in prose
+    # 4. Discontinued / Lifecycle detection in prose (scoped to specific section/heading)
+    for ctx, txt in parser.text_with_context:
+        if DISCONTINUED_PATTERN.search(txt):
+            prod_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "Product")
+            if not any(p["name"] == prod_name for p in facts["products_with_status"]):
+                facts["products_with_status"].append({
+                    "name": prod_name,
+                    "status": "discontinued",
+                    "url": url
+                })
     for h in parser.headings:
         h_text = h[1]
-        if DISCONTINUED_PATTERN.search(h_text) or DISCONTINUED_PATTERN.search(full_text[:400]):
-            facts["products_with_status"].append({
-                "name": h_text,
-                "status": "discontinued",
-                "url": url
-            })
+        if DISCONTINUED_PATTERN.search(h_text):
+            if not any(p["name"] == h_text for p in facts["products_with_status"]):
+                facts["products_with_status"].append({
+                    "name": h_text,
+                    "status": "discontinued",
+                    "url": url
+                })
+
+
 
     # 5. Scoped emails & phones
     for m in EMAIL_PATTERN.finditer(html_str):

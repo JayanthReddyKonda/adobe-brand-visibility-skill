@@ -238,11 +238,12 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
     root_causes.sort(key=lambda r: SEVERITY_ORDER.get(r["max_severity"], 99))
 
     # Objective Audit Metrics
-    html_pages_count = len(all_coverage.get("site_inventory", {}).get("page_types", {})) or 1
     audit_metrics = {
+        "execution_time_seconds": round(time.time() - start_time, 1) if start_time else 0.5,
         "html_pages_sampled": all_coverage.get("site_inventory", {}).get("html_pages_sampled", 1),
         "sitemaps_processed": all_coverage.get("site_inventory", {}).get("sitemaps_processed", 0),
         "urls_discovered": all_coverage.get("site_inventory", {}).get("urls_discovered", 0),
+        "page_types_covered": all_coverage.get("site_inventory", {}).get("page_types", {}),
         "critical_blockers": summary_counts["critical"],
         "confidence_distribution": {
             "high": sum(1 for f in final_findings if f.get("confidence") == "high"),
@@ -250,6 +251,7 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
             "low": sum(1 for f in final_findings if f.get("confidence") == "low")
         }
     }
+
 
     ans_index = all_coverage.get("entity-content-audit", {}).get("answerability_index")
     if ans_index is not None:
@@ -279,6 +281,7 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
 
 
 def main():
+    start = time.time()
     args = parse_args()
     inv = load_json_file(args.inventory)
     d_res = load_json_file(args.discoverability)
@@ -288,7 +291,8 @@ def main():
     eng_res = load_json_file(args.engagement)
     rep_res = load_json_file(args.representation)
 
-    report = synthesize(args.site, inv=inv, d_res=d_res, e_res=e_res, f_res=f_res, c_res=c_res, eng_res=eng_res, rep_res=rep_res)
+    report = synthesize(args.site, inv=inv, d_res=d_res, e_res=e_res, f_res=f_res, c_res=c_res, eng_res=eng_res, rep_res=rep_res, start_time=start)
+
 
     # Validate against schema
     try:

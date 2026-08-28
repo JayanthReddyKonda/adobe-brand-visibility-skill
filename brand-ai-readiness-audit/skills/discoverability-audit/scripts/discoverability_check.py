@@ -71,7 +71,7 @@ class Dom(HTMLParser):
             self.canonical = a.get("href")
         if t == "meta" and a.get("name", "").lower() == "robots":
             self.meta_robots = a.get("content", "")
-        if t == "div" and a.get("id") in ("root", "app", "__next"):
+        if (t in ("div", "main", "section") and a.get("id") in ("root", "app", "__next", "__nuxt", "app-root", "___gatsby", "svelte-app")) or t == "app-root":
             self.spa_root = True
         if t == "a" and a.get("href"):
             self.links.append(a["href"])
@@ -163,7 +163,9 @@ def audit(base, domain, inv=None):
             home_page = inv["pages"][0]
         status = home_page.get("status") if home_page else None
         html = home_page.get("html", "") if home_page else ""
-        headers = {}
+        headers = home_page.get("headers", {}) if home_page else {}
+        if not headers and home_page and home_page.get("content_type"):
+            headers = {"content-type": home_page.get("content_type")}
         err = None
         r_info = inv.get("robots") or (inv.get("infrastructure") or {}).get("robots") or {}
         r_status = r_info.get("status")
@@ -200,6 +202,28 @@ def audit(base, domain, inv=None):
         })
         return {"status": "ok", "findings": findings, "recommendations": []}
 
+    # Check Contract C3: Differential AI Crawler Access / WAF Block Probe
+    if inv is None or status == 200:
+        bot_ua = "Mozilla/5.0 (compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)"
+        bot_status, _, _, _ = safe_fetch(base + "/", timeout=6, max_bytes=65536, user_agent=bot_ua, method="HEAD")
+        if bot_status in (403, 401, 503) and status == 200:
+            findings.append({
+                "category": "crawlability",
+                "title": "WAF / Server blocks AI search crawlers at HTTP layer",
+                "severity": "critical",
+                "confidence": "high",
+                "root_cause": "The web server or WAF returns HTTP 403/503 specifically when probed with AI search crawler User-Agents.",
+                "cause_family": "DISCOVERY.ACCESS",
+                "cause_id": "AI_RETRIEVAL_BLOCKED",
+                "impact": "Real-time AI search assistants (ChatGPT Search) are blocked from fetching site content regardless of robots.txt declarations.",
+                "evidence": f"GET / returned HTTP 200 for standard browsers but HTTP {bot_status} for OAI-SearchBot.",
+                "suggested_action": {
+                    "summary": "Configure WAF/CDN security rules (Cloudflare, AWS WAF, Akamai) to allow verified AI search retrieval bots.",
+                    "priority": "critical",
+                    "verification": "Probe the root URL with OAI-SearchBot User-Agent and confirm HTTP 200 is returned."
+                }
+            })
+
     # 2. Parse DOM & Inspect Meta Robots / Canonical / Rendering
     dom = Dom()
     try:
@@ -207,25 +231,28 @@ def audit(base, domain, inv=None):
     except Exception:
         pass
 
-    # Meta Robots Check
-    meta_rob = (dom.meta_robots or headers.get("x-robots-tag", "")).lower()
-    if "noindex" in meta_rob:
+    # Meta Robots Check (Combines <meta name="robots"> and X-Robots-Tag header, checks for noindex and none)
+    x_robots = str(headers.get("x-robots-tag", "")).lower()
+    meta_tag = str(dom.meta_robots or "").lower()
+    combined_robots = f"{meta_tag} {x_robots}".strip()
+    if "noindex" in combined_robots or "none" in combined_robots:
         findings.append({
             "category": "indexability",
-            "title": "Homepage explicitly excludes indexers (noindex directive)",
+            "title": "Homepage explicitly excludes indexers (noindex/none directive)",
             "severity": "critical",
             "confidence": "high",
-            "root_cause": "A noindex directive in meta robots or X-Robots-Tag excludes the page from search indexes.",
+            "root_cause": "A noindex or none directive in meta robots or X-Robots-Tag excludes the page from search indexes.",
             "cause_family": "DISCOVERY.ACCESS",
             "cause_id": "NOINDEX_EXCLUSION",
             "impact": "AI assistants and search engines are instructed not to index or cite this page.",
-            "evidence": f"Found '{meta_rob}' in meta robots or X-Robots-Tag header.",
+            "evidence": f"Found '{combined_robots}' in meta robots or X-Robots-Tag header.",
             "suggested_action": {
-                "summary": "Remove the 'noindex' directive from public landing pages.",
+                "summary": "Remove the 'noindex' or 'none' directive from public landing pages.",
                 "priority": "critical",
-                "verification": "Inspect response headers and HTML markup to ensure 'noindex' is absent."
+                "verification": "Inspect response headers and HTML markup to ensure 'noindex' and 'none' are absent."
             }
         })
+
 
     # Canonical Check
     if dom.canonical:

@@ -40,9 +40,6 @@ class TextDOMParser(HTMLParser):
         self.title = ""
         self.in_title = False
 
-    def handle_starttag(tag, attrs):
-        pass
-
     def handle_starttag(self, tag, attrs):
         if tag.lower() in ("script", "style", "noscript"):
             self.skip_depth += 1
@@ -94,8 +91,18 @@ def build_fact_snapshot(site, inv=None):
     }
 
 
+def parse_price_num(raw):
+    try:
+        clean = re.sub(r"[^\d.]", "", str(raw).replace(",", ""))
+        return float(clean) if clean else None
+    except (ValueError, TypeError):
+        return None
+
+
+
 def compare_assistant_observations(snapshot, observations_data):
     """Compare observed AI assistant outputs against the on-site fact snapshot."""
+
     findings = []
     observational_notes = []
 
@@ -105,8 +112,8 @@ def compare_assistant_observations(snapshot, observations_data):
     elif isinstance(observations_data, list):
         obs_list = observations_data
 
-    site_text_lower = snapshot.get("full_text", "").lower()
-    site_prices = set(snapshot.get("prices_visible", []))
+    site_prices = snapshot.get("prices_visible", [])
+    site_num_prices = [parse_price_num(p) for p in site_prices if parse_price_num(p) is not None]
 
     for idx, obs in enumerate(obs_list):
         assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx+1}"
@@ -133,11 +140,11 @@ def compare_assistant_observations(snapshot, observations_data):
             fact_str = str(claim.get("fact") or claim.get("text") or "")
             topic = str(claim.get("topic") or "general")
 
-            # Price contradiction check
+            # Price contradiction check (using numerical float comparison)
             claim_prices = PRICE_PATTERN.findall(fact_str)
             for cp in claim_prices:
-                norm_cp = re.sub(r"[^\d]", "", cp)
-                if norm_cp and site_prices and not any(norm_cp == re.sub(r"[^\d]", "", sp) for sp in site_prices):
+                claim_num = parse_price_num(cp)
+                if claim_num is not None and site_num_prices and not any(abs(claim_num - sv) < 0.01 for sv in site_num_prices):
                     findings.append({
                         "category": "representation",
                         "title": f"{assistant_name} states conflicting pricing for brand",

@@ -56,6 +56,10 @@ class EngagementDOMParser(HTMLParser):
         self.current_text = []
         self.body_text = []
         self.nav_links = []
+        self.nav_link_texts = []
+        self.in_anchor = False
+        self.current_anchor_text = []
+        self.current_href = ""
         self.ctas = []
 
     def handle_starttag(self, tag, attrs):
@@ -70,13 +74,15 @@ class EngagementDOMParser(HTMLParser):
             self.current_tag = tag_lower
             self.current_text = []
         elif tag_lower == "a":
-            href = attr_dict.get("href", "")
-            if href:
-                self.nav_links.append(href)
+            self.in_anchor = True
+            self.current_anchor_text = []
+            self.current_href = attr_dict.get("href", "")
+            if self.current_href:
+                self.nav_links.append(self.current_href)
                 cls = attr_dict.get("class", "").lower()
                 role = attr_dict.get("role", "").lower()
                 if "btn" in cls or "button" in cls or "cta" in cls or role == "button":
-                    self.ctas.append(href)
+                    self.ctas.append(self.current_href)
 
     def handle_endtag(self, tag):
         tag_lower = tag.lower()
@@ -92,16 +98,23 @@ class EngagementDOMParser(HTMLParser):
             if self.current_text:
                 self.h2_list.append(" ".join(self.current_text).strip())
             self.current_tag = None
+        elif tag_lower == "a":
+            if self.in_anchor and self.current_anchor_text:
+                self.nav_link_texts.append(" ".join(self.current_anchor_text).strip())
+            self.in_anchor = False
 
     def handle_data(self, data):
         if self.in_title:
-            self.title += data.strip()
-        elif self.current_tag in ("h1", "h2"):
+            self.title += " " + data.strip()
+        if self.current_tag in ("h1", "h2"):
             self.current_text.append(data.strip())
-        elif not self.in_script:
+        if self.in_anchor:
+            self.current_anchor_text.append(data.strip())
+        if not self.in_script:
             txt = data.strip()
             if txt:
                 self.body_text.append(txt)
+
 
 
 def audit_page_engagement(html_content, url, page_type="other"):
@@ -169,8 +182,9 @@ def audit_page_engagement(html_content, url, page_type="other"):
             })
 
     # 2. Destination Discoverability & Navigation Friction
-    nav_links_text = " ".join(dom.nav_links).lower()
+    nav_links_text = " ".join(dom.nav_links + dom.nav_link_texts).lower()
     found_destinations = [d for d in CORE_DESTINATIONS if d in nav_links_text]
+
 
     if not found_destinations and len(dom.nav_links) < 3 and visible_words > 100:
         findings.append({
