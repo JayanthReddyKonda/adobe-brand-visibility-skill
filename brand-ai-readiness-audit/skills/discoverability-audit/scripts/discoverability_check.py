@@ -2,46 +2,63 @@
 """
 discoverability_check.py - Access & discovery layer of the Brand AI-Readiness Audit.
 
-Evidence hierarchy: L1 direct HTTP/DOM evidence only. Heuristics never
-exceed LOW severity. Network-inconclusive probes surface status instead of
-claims ("inconclusive" never looks like a clean site).
+Evidence hierarchy: L1 direct HTTP/DOM evidence only.
+Crawler matrix semantics:
+  - 'retrieval' crawlers affect live citations in AI search (blocking is a critical/high defect).
+  - 'training' crawlers affect model training/grounding (blocking is an intentional opt-out, not a retrieval defect).
+  - 'user_fetch' tokens represent on-demand user browsing actions.
 """
-import sys, os, re, json, argparse
-import urllib.request, urllib.error
+import sys
+import os
+import re
+import json
+import argparse
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
-UA = {"User-Agent": "Mozilla/5.0 (compatible; BrandReadinessBot/1.0)"}
-AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot",
-           "PerplexityBot", "Google-Extended", "Applebot-Extended", "CCBot", "anthropic-ai"]
-
-# Per-bot role: "retrieval" crawlers affect whether the site is cited in an
-# AI search product; "training" tokens affect only model training/grounding.
-# They are deliberately tracked separately - blocking a training token must
-# never be conflated with blocking retrieval access (and vice versa).
-CRAWLER_SEMANTICS = {
-    "OAI-SearchBot": "retrieval", "Claude-SearchBot": "retrieval",
-    "PerplexityBot": "retrieval", "ChatGPT-User": "user_fetch",
-    "anthropic-ai": "retrieval",
-    "GPTBot": "training", "ClaudeBot": "training",
-    "Google-Extended": "training", "Applebot-Extended": "training",
-    "CCBot": "training",
-}
-
-
-def fetch(url, timeout=10):
-    req = urllib.request.Request(url, headers=UA)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, r.read().decode("utf-8", "ignore"), dict(r.headers)
-    except urllib.error.HTTPError as e:
+# Import safe_fetch from orchestrator if available, or define fallback
+try:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request, urllib.error
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
         try:
-            body = e.read().decode("utf-8", "ignore")
-        except Exception:
-            body = ""
-        return e.code, body, dict(e.headers or {})
-    except Exception:
-        return None, "", {}
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
+        except urllib.error.HTTPError as e:
+            try:
+                body = e.read(max_bytes).decode("utf-8", "ignore")
+            except Exception:
+                body = ""
+            return e.code, body, dict(e.headers or {}), str(e)
+        except Exception as e:
+            return None, "", {}, str(e)
+
+    def safe_check_status(url, timeout=5, max_bytes=65536, user_agent=DEFAULT_USER_AGENT):
+        status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
+        return status
+
+AI_BOTS = [
+    "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai",
+    "ChatGPT-User",
+    "GPTBot", "ClaudeBot", "Google-Extended", "Applebot-Extended", "CCBot"
+]
+
+CRAWLER_SEMANTICS = {
+    "OAI-SearchBot": {"role": "retrieval", "platform": "OpenAI / SearchGPT", "impact_desc": "Live web search & citation generation in ChatGPT Search."},
+    "Claude-SearchBot": {"role": "retrieval", "platform": "Anthropic / Claude", "impact_desc": "Live web search and real-time grounding in Claude."},
+    "PerplexityBot": {"role": "retrieval", "platform": "Perplexity AI", "impact_desc": "Direct citation and source index for Perplexity AI answers."},
+    "anthropic-ai": {"role": "retrieval", "platform": "Anthropic", "impact_desc": "Anthropic AI retrieval and search crawler."},
+    "ChatGPT-User": {"role": "user_fetch", "platform": "OpenAI", "impact_desc": "On-demand URL fetch triggered directly by an end-user conversation."},
+    "GPTBot": {"role": "training", "platform": "OpenAI", "impact_desc": "Model pre-training and offline dataset collection."},
+    "ClaudeBot": {"role": "training", "platform": "Anthropic", "impact_desc": "Model training dataset collection for Claude foundation models."},
+    "Google-Extended": {"role": "training", "platform": "Google", "impact_desc": "Training token for Gemini and Vertex AI foundation models."},
+    "Applebot-Extended": {"role": "training", "platform": "Apple", "impact_desc": "Training data collection for Apple Intelligence models."},
+    "CCBot": {"role": "training", "platform": "Common Crawl", "impact_desc": "Open foundation model pre-training corpus."},
+}
 
 
 class Dom(HTMLParser):
@@ -84,10 +101,10 @@ def parse_domain(site):
 
 def parse_robots(body):
     """Parse robots.txt into UA-grouped rule lists (RFC 9309-style groups)."""
-    groups = []          # list of {"agents": [...], "rules": [(k, v), ...]}
+    groups = []
     sitemaps = []
     current = None
-    for line in body.splitlines():
+    for line in (body or "").splitlines():
         line = line.split("#")[0].strip()
         if not line or ":" not in line:
             continue
@@ -114,21 +131,28 @@ def _pattern_matches(pattern, path):
 
 
 def robots_access(groups, ua, path="/"):
-    """Decide allow/deny for a user-agent + path. Returns the deciding rule
-    ('allow'/'disallow', value) or ('allow', None) when no rule applies.
-    Longest matching rule wins; 'allow' wins ties (per RFC 9309)."""
+    """Decide allow/deny for a user-agent + path per RFC 9309 rules.
+    Specific user-agent groups take precedence over the generic '*' group."""
     ua = ua.lower()
-    rules = []
+    specific_rules = []
+    wildcard_rules = []
+
     for g in groups:
-        if "*" in g["agents"] or ua in g["agents"]:
-            rules.extend(g["rules"])
+        agents = [a.lower() for a in g.get("agents", [])]
+        if ua in agents:
+            specific_rules.extend(g.get("rules", []))
+        elif "*" in agents:
+            wildcard_rules.extend(g.get("rules", []))
+
+    # Specific group takes precedence if present; otherwise fall back to wildcard
+    rules = specific_rules if specific_rules else wildcard_rules
+
     best = ("allow", None, -1)
     for k, v in rules:
         if not v:
             continue
         if _pattern_matches(v, path):
             specificity = len(v)
-            # 'allow' wins equal-length ties
             if k == "allow" and specificity == best[2]:
                 best = (k, v, specificity)
             elif specificity > best[2]:
@@ -137,11 +161,10 @@ def robots_access(groups, ua, path="/"):
 
 
 def audit(base, domain, inv=None):
-    """Audit access & discovery. When `inv` (shared site inventory JSON from
-    the orchestrator) is supplied, its homepage HTML and robots.txt are used
-    instead of re-fetching — all specialists then operate on the same
-    evidence snapshot."""
+    """Audit access & discovery."""
     findings, recommendations, evidence = [], [], []
+    observations, limitations = [], []
+
     if inv is not None:
         home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
         if not home or not home.get("html"):
@@ -149,7 +172,7 @@ def audit(base, domain, inv=None):
                     "error": "inventory lacks a usable homepage snapshot"}
         status, html, headers = home["status"], home["html"], {}
     else:
-        status, html, headers = fetch(base + "/")
+        status, html, headers, err = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
     if status is None:
         return {"status": "inconclusive", "findings": [], "recommendations": [],
                 "error": f"could not reach {base} (network unreachable or blocked)"}
@@ -157,6 +180,7 @@ def audit(base, domain, inv=None):
         findings.append(dict(
             category="access", title=f"Homepage returns HTTP {status}", severity="critical",
             confidence="high", root_cause="The landing page is not retrievable.",
+            cause_family="DISCOVERY.ACCESS", cause_id="DISC-HTTP-ERR",
             impact="No retrieval system, and no visitor, can access the site.",
             evidence=f"GET {base}/ returned HTTP {status}.",
             suggested_action=dict(summary="Restore availability of the homepage (HTTP 200).",
@@ -164,61 +188,103 @@ def audit(base, domain, inv=None):
                                   verification=f"Re-request {base}/ and confirm HTTP 200.")))
         return {"status": "ok", "findings": findings, "recommendations": recommendations}
 
-    # robots.txt: per-bot access with real path matching (RFC 9309-style).
-    # Absence of a rule = allowed; only explicit blanket denials are reported.
+    # robots.txt: per-bot access with RFC 9309 path matching
     if inv is not None and inv.get("robots") is not None:
         r_status, r_body = inv["robots"].get("status"), inv["robots"].get("text") or ""
     else:
-        r_status, r_body, _ = fetch(base + "/robots.txt")
+        r_status, r_body, _, _ = safe_fetch(base + "/robots.txt", timeout=8, max_bytes=512*1024)
     groups, sitemaps = [], []
     if r_status == 200 and r_body:
         groups, sitemaps = parse_robots(r_body)
-    blocked = [b for b in AI_BOTS
-               if robots_access(groups, b, "/")[0] == "disallow"]
-    if blocked:
-        sev = "critical" if any(x in blocked for x in ("GPTBot", "OAI-SearchBot", "ClaudeBot", "PerplexityBot")) else "medium"
-        findings.append(dict(
-            category="access", title="robots.txt blocks AI crawler user-agents", severity=sev,
-            confidence="high",
-            root_cause="robots.txt matching rules exclude AI retrieval systems from the site root.",
-            impact="AI assistants that respect robots.txt cannot retrieve or cite the site's content for these user-agents.",
-            evidence=f"robots.txt (HTTP {r_status}) longest-match Deny rules apply to '/' for: {', '.join(blocked)}.",
-            suggested_action=dict(summary="Remove blanket Disallow rules for AI retrieval user-agents on public content.",
-                                  priority=sev,
-                                  verification="Re-fetch robots.txt and confirm these user-agents are no longer denied at '/'.")))
 
-    # Multi-UA probe: distinguish "whole site blocks this client" from
-    # "AI crawler is selectively blocked". Only acts on divergence.
+    crawler_matrix = {}
+    blocked_retrieval = []
+    blocked_training = []
+    blocked_user_fetch = []
+
+    for bot in AI_BOTS:
+        rule, matched = robots_access(groups, bot, "/") if r_status == 200 else ("allow", None)
+        meta = CRAWLER_SEMANTICS.get(bot, {"role": "unknown", "platform": "Unknown", "impact_desc": ""})
+        role = meta["role"]
+        is_disallowed = (rule == "disallow")
+        crawler_matrix[bot] = {
+            "role": role,
+            "platform": meta.get("platform"),
+            "disallowed": is_disallowed,
+            "deciding_rule": matched,
+            "impact": meta.get("impact_desc")
+        }
+        if is_disallowed:
+            if role == "retrieval":
+                blocked_retrieval.append(bot)
+            elif role == "training":
+                blocked_training.append(bot)
+            elif role == "user_fetch":
+                blocked_user_fetch.append(bot)
+
+    # 1. Blocked retrieval crawlers -> CRITICAL / HIGH defect
+    if blocked_retrieval:
+        sev = "critical" if any(b in blocked_retrieval for b in ("OAI-SearchBot", "Claude-SearchBot", "PerplexityBot")) else "high"
+        findings.append(dict(
+            category="access",
+            title="robots.txt blocks AI search retrieval crawlers",
+            severity=sev,
+            confidence="high",
+            root_cause="robots.txt rules disallow AI search retrieval crawlers from accessing the site root.",
+            cause_family="DISCOVERY.ACCESS",
+            cause_id="DISC-ROBOTS-RETRIEVAL-BLOCKED",
+            impact="AI assistants (ChatGPT Search, Perplexity, Claude Search) cannot crawl or cite the site's content in real-time answers.",
+            evidence=f"robots.txt (HTTP {r_status}) disallows '/' for retrieval crawler(s): {', '.join(blocked_retrieval)}.",
+            suggested_action=dict(
+                summary="Allow AI search retrieval crawlers (e.g. OAI-SearchBot, Claude-SearchBot, PerplexityBot) to crawl public content.",
+                priority=sev,
+                verification="Re-fetch robots.txt and verify retrieval crawlers are no longer denied at '/'.")))
+
+    # 2. Blocked training crawlers -> INFORMATIONAL observation (training opt-out)
+    if blocked_training:
+        observations.append(dict(
+            id=f"OBS-{len(observations) + 1:03d}",
+            category="governance",
+            source={"url": f"{base}/robots.txt", "method": "robots-parser"},
+            observation=f"robots.txt disallows training bots: {', '.join(blocked_training)}",
+            evidence=f"Intentional AI model training opt-out detected for {len(blocked_training)} crawler token(s). This prevents bulk model pre-training but does not impair live AI search citations.",
+            confidence="high"
+        ))
+
+    # Multi-UA probe: check if WAF/edge firewall selectively blocks AI retrieval User-Agents
     bot_probe = {}
-    for bot in ("GPTBot", "ClaudeBot", "PerplexityBot"):
-        req = urllib.request.Request(base + "/", headers={"User-Agent": f"Mozilla/5.0 (compatible; {bot}/1.0)"})
-        try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                bot_probe[bot] = resp.status
-        except urllib.error.HTTPError as e:
-            bot_probe[bot] = e.code
-        except Exception:
-            bot_probe[bot] = None
+    for bot in ("OAI-SearchBot", "PerplexityBot", "Claude-SearchBot"):
+        p_status, _, _, _ = safe_fetch(base + "/", timeout=8, max_bytes=65536,
+                                       user_agent=f"Mozilla/5.0 (compatible; {bot}/1.0; +https://agentskills.io)")
+        bot_probe[bot] = p_status
+
     divergent = [f"{b}: HTTP {s}" for b, s in bot_probe.items()
-                 if s is not None and s >= 403 and status < 400]
+                 if s is not None and s in (403, 401, 503) and status < 400]
     if divergent:
         findings.append(dict(
-            category="access", title="AI crawler user-agents receive different treatment than browser requests",
-            severity="high", confidence="medium",
-            root_cause="The server responds differently to AI-crawler User-Agent strings than to browser requests (WAF/bot filtering or UA rules).",
-            impact="AI retrieval systems may be blocked even where robots.txt permits access; content is unreachable to those systems regardless of directives.",
-            evidence=f"Browser request: HTTP {status}; bot-UA requests: {'; '.join(divergent)}.",
-            suggested_action=dict(summary="Review WAF/bot-mitigation rules to permit verified AI retrieval crawlers on public content.",
-                                  priority="high",
-                                  verification="Re-issue requests with the listed user-agents and confirm HTTP 200.")))
+            category="access",
+            title="AI search crawlers receive WAF / edge blocking",
+            severity="high",
+            confidence="medium",
+            root_cause="The edge server/WAF returns 4xx/5xx responses to AI-crawler User-Agent headers while permitting browser requests.",
+            cause_family="DISCOVERY.ACCESS",
+            cause_id="DISC-WAF-BLOCK",
+            impact="Retrieval systems cannot access content even where robots.txt permits access.",
+            evidence=f"Browser request returned HTTP {status}; AI search user-agents returned: {'; '.join(divergent)}.",
+            suggested_action=dict(
+                summary="Review edge WAF and bot mitigation rules to whitelist verified AI search crawlers on public routes.",
+                priority="high",
+                verification="Send test HTTP GET requests with crawler UA strings and verify HTTP 200 responses.")))
 
+    # Sitemap check
     if not sitemaps and r_status == 200:
-        s_status, _, _ = fetch(base + "/sitemap.xml")
+        s_status, _, _, _ = safe_fetch(base + "/sitemap.xml", timeout=6, max_bytes=1024*1024)
         if s_status != 200:
             recommendations.append(dict(
                 title="Publish an XML sitemap",
-                rationale=f"No Sitemap directive in robots.txt and {base}/sitemap.xml returned HTTP {s_status}.",
-                suggested_action="Publish sitemap.xml and declare it in robots.txt."))
+                category="discovery",
+                rationale=f"No Sitemap declared in robots.txt and {base}/sitemap.xml returned HTTP {s_status}.",
+                suggested_action="Publish sitemap.xml with canonical public URLs and declare it in robots.txt."))
 
     parser = Dom()
     try:
@@ -229,82 +295,97 @@ def audit(base, domain, inv=None):
     xrobots = headers.get("X-Robots-Tag", "")
     if "noindex" in ((parser.meta_robots or "") + " " + xrobots).lower():
         findings.append(dict(
-            category="access", title="Page is marked noindex", severity="critical",
+            category="access",
+            title="Page is marked noindex",
+            severity="critical",
             confidence="high",
-            root_cause="A robots meta tag or X-Robots-Tag header instructs indexers to discard the page.",
-            impact="The page is excluded from indexes and is unlikely to be quoted or cited by AI systems.",
+            root_cause="A robots meta tag or X-Robots-Tag header instructs search and AI indexers to discard the page.",
+            cause_family="DISCOVERY.ACCESS",
+            cause_id="DISC-NOINDEX",
+            impact="The page is excluded from retrieval indexes and will not be cited by AI systems.",
             evidence=f"Directives on {base}/: meta robots='{parser.meta_robots}', X-Robots-Tag='{xrobots}'.",
-            suggested_action=dict(summary="Remove the noindex directive from public pages.",
-                                  priority="critical",
-                                  verification="Re-fetch and confirm neither directive contains 'noindex'.")))
+            suggested_action=dict(
+                summary="Remove the noindex directive from public indexable pages.",
+                priority="critical",
+                verification="Re-fetch and confirm neither directive contains 'noindex'.")))
 
     if parser.canonical:
         canon = urljoin(base + "/", parser.canonical)
         if canon.rstrip("/") != base.rstrip("/"):
-            # Canonical is a hint, not a verdict. Only a finding when
-            # corroborated by sitemap disagreement; otherwise informational.
             sitemap_mentions_canon = False
             if sitemaps:
-                s_status, s_body, _ = fetch(sitemaps[0])
+                s_status, s_body, _, _ = safe_fetch(sitemaps[0], timeout=8, max_bytes=2*1024*1024)
                 if s_status == 200 and s_body and canon in s_body:
                     sitemap_mentions_canon = True
             if sitemap_mentions_canon:
                 findings.append(dict(
-                    category="discovery", title="Consistent canonical target differs from requested host",
-                    severity="medium", confidence="high",
-                    root_cause="The site consolidates onto a different canonical host (declared in markup and confirmed by the sitemap).",
-                    impact=f"Retrieval systems may index {canon} instead of {base}/; audits and citations must reference the canonical host.",
-                    evidence=f"<link rel='canonical' href='{parser.canonical}'> on {base}/ resolves to {canon}; sitemap {sitemaps[0]} lists {canon}.",
-                    suggested_action=dict(summary="Use the canonical host consistently in all references and re-audit against it.",
-                                          priority="medium",
-                                          verification=f"Confirm internal links and sitemap all use {canon}.")))
+                    category="discovery",
+                    title="Canonical target consolidates onto different host",
+                    severity="medium",
+                    confidence="high",
+                    root_cause="The site consolidates onto a different canonical host (declared in markup and confirmed by sitemap).",
+                    cause_family="DISCOVERY.CANONICAL",
+                    cause_id="DISC-CANONICAL-MISMATCH",
+                    impact=f"Retrieval systems index {canon} instead of {base}/; references and citations point to the canonical host.",
+                    evidence=f"<link rel='canonical' href='{parser.canonical}'> resolves to {canon}; confirmed by sitemap {sitemaps[0]}.",
+                    suggested_action=dict(
+                        summary="Audit canonical consolidation to ensure intended domain alignment across all brand assets.",
+                        priority="medium",
+                        verification=f"Confirm internal links and sitemap all use {canon}.")))
             else:
                 recommendations.append(dict(
                     title="Verify homepage canonical target",
-                    rationale=f"<link rel='canonical'> on {base}/ points to {canon}. A differing canonical can be intentional (e.g. www vs apex); no corroborating signal was found, so no defect is asserted.",
-                    suggested_action=f"Confirm {canon} is the intended primary host and that redirects, sitemap, and internal links agree with it."))
+                    category="discovery",
+                    rationale=f"<link rel='canonical'> points to {canon}. If intentional, ensure all internal links and sitemaps align.",
+                    suggested_action=f"Confirm {canon} is the intended canonical host."))
 
-    # Rendering risk: precise about what was verified (initial HTML only).
+    # Rendering risk: raw HTML text extraction
     words = len(" ".join(parser.text).split())
     if words < 30:
-        detail = "empty SPA root container detected" if parser.spa_root else "no SPA root detected"
+        detail = "empty SPA root container detected" if parser.spa_root else "no SPA root marker"
         findings.append(dict(
-            category="rendering", title="Primary content absent from initial HTML (rendering risk)",
-            severity="high", confidence="medium",
-            root_cause="Content appears to be injected client-side; the initial HTML response carries almost no text.",
-            impact="Retrieval systems that do not execute JavaScript (several AI crawlers among them) receive an effectively empty page. Systems that render JS may still succeed - a risk, not a proven outage.",
-            evidence=f"Initial HTML of {base}/ contains {words} words of visible text ({detail}). Verified against the raw HTTP response body only; no rendering was performed.",
-            suggested_action=dict(summary="Ensure core text is present in the initial HTML response (SSR/SSG/prerendering); rendering choice is an implementation detail, content availability is not.",
-                                  priority="high",
-                                  verification="Re-fetch raw HTML and confirm primary copy appears in the response body.")))
+            category="rendering",
+            title="Primary content absent from initial HTML (rendering risk)",
+            severity="high",
+            confidence="medium",
+            root_cause="Content appears to be injected client-side via JavaScript; the initial HTML response contains minimal readable text.",
+            cause_family="DISCOVERY.RENDERING",
+            cause_id="DISC-CSR-RENDERING-RISK",
+            impact="AI retrieval systems that do not execute JavaScript receive an empty page and cannot index or cite the content.",
+            evidence=f"Initial HTML of {base}/ carries only {words} words of visible text ({detail}). Verified on raw HTTP response body.",
+            suggested_action=dict(
+                summary="Ensure primary brand and product copy is present in the initial HTML payload (via SSR, SSG, or pre-rendering).",
+                priority="high",
+                verification="Fetch raw HTML response and confirm main heading and copy are present without running JavaScript.")))
 
     internal = [l for l in parser.links if l.startswith("/") or domain in l]
-    # Per-platform crawler matrix: each bot's access + role semantics.
-    # Distance between "blocked for retrieval" and "blocked for training" is
-    # always preserved - a training opt-out is not a visibility defect.
-    crawler_matrix = {}
-    for bot in AI_BOTS:
-        rule, matched = robots_access(groups, bot, "/") if r_status == 200 else ("allow", None)
-        role = CRAWLER_SEMANTICS.get(bot, "unknown")
-        crawler_matrix[bot] = {"role": role, "disallowed": rule == "disallow",
-                               "deciding_rule": matched}
-    evidence.append(dict(url=base + "/", http_status=status, words=words,
-                         internal_links=len(internal), robots_status=r_status,
-                         sitemaps=sitemaps))
-    return {"status": "ok", "findings": findings, "recommendations": recommendations,
-            "evidence": evidence,
-            "coverage": {"homepage_checked": True, "robots_checked": r_status == 200,
-                         "sitemap_declared": bool(sitemaps),
-                         "crawler_matrix": crawler_matrix,
-                         "source": "shared-inventory" if inv is not None else "independent-fetch"},
-            "limitations": ([] if r_status == 200 else
-                            ["robots.txt not retrievable (HTTP %s); access rules unverified" % r_status])}
+    evidence.append(dict(
+        url=base + "/", http_status=status, words=words,
+        internal_links=len(internal), robots_status=r_status,
+        sitemaps=sitemaps
+    ))
+
+    return {
+        "status": "ok",
+        "findings": findings,
+        "recommendations": recommendations,
+        "observations": observations,
+        "evidence": evidence,
+        "coverage": {
+            "homepage_checked": True,
+            "robots_checked": r_status == 200,
+            "sitemap_declared": bool(sitemaps),
+            "crawler_matrix": crawler_matrix,
+            "source": "shared-inventory" if inv is not None else "independent-fetch"
+        },
+        "limitations": ([] if r_status == 200 else [f"robots.txt returned HTTP {r_status}; access rules unverified"])
+    }
 
 
 def main():
     ap = argparse.ArgumentParser(description="Access & discovery audit layer.")
     ap.add_argument("--site", required=True)
-    ap.add_argument("--inventory", help="Path to shared site-inventory JSON (from audit-orchestrator); use its snapshot instead of re-fetching")
+    ap.add_argument("--inventory", help="Path to shared site-inventory JSON (from audit-orchestrator)")
     args = ap.parse_args()
     base, domain = parse_domain(args.site)
     inv = None
@@ -319,4 +400,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

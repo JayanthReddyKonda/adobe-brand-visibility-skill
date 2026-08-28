@@ -1,95 +1,83 @@
 # Composition, Evidence & Severity Guidelines
 
 How `audit-orchestrator` acquires evidence, composes specialist outputs, gates
-findings, and reports root causes. This document describes the *implemented*
+findings, enforces global deadlines, and reports root causes. This document describes the *implemented*
 orchestrator — SKILL.md, this reference, and `scripts/orchestrator.py` are one
 methodology, not three opinions.
 
 ---
 
-## 1. Specialist responsibilities (v2 skill set)
+## 1. Specialist Responsibilities
 
 | Skill | Owns | Does NOT own |
 | :--- | :--- | :--- |
-| `discoverability-audit` | Access, crawl rules (robots/ai-robots), noindex, canonical, rendering risk, discovery aids | Structured data, page content |
-| `entity-content-audit` | Entity identity, attributes, structured representation, answerability gaps | Crawler access rules |
-| `fact-consistency-audit` | Fact ledger, volatile facts, cross-page contradictions, freshness of *facts* (not copyright years) | Entity identity correctness |
+| `discoverability-audit` | Access, crawler rules (distinguishing retrieval vs training bots), noindex, canonical, rendering risk, discovery aids | Structured data, page content |
+| `entity-content-audit` | Entity identity, structured schema (JSON-LD), Answerability Engine, material attribute completeness | Crawler access rules |
+| `fact-consistency-audit` | Fact ledger, scoped volatile facts (prices, contacts), cross-page contradictions, freshness timestamps | Entity identity correctness |
 | `corroboration-authority-audit` | Independent source verification of first-party claims (sameAs, external profiles) | First-party content quality |
-| `engagement-context-audit` | Intent orientation, navigation continuity, context preservation on landing pages | Technical crawlability |
-| `assistant-representation-audit` | Classification of *observed* AI assistant outputs (optional enrichment; never run unprompted) | Site-side checks |
+| `engagement-context-audit` | Intent orientation (5-second test), heading information scent, navigation continuity on landing pages | Technical crawlability |
+| `assistant-representation-audit` | Cross-checking *observed* AI assistant outputs against first-party facts (opt-in enrichment) | Site-side crawl rules |
 
-## 2. Shared site inventory
+---
 
-The orchestrator performs ONE bounded acquisition pass and hands every
-specialist the same evidence snapshot via `--inventory <file>`:
+## 2. Global Wall-Clock Deadline (< 5 Minutes)
 
-- Mandatory: homepage, robots.txt, sitemap (index sitemaps expanded one level).
-- Priority selection: 10–20 URLs classified by page type
-  (product, pricing, service, category, contact, location, about,
-  documentation, article) — never a bulk crawl. Small sites may be covered
-  fully; large sites are sampled by type. Time-budgeted (~90s).
-- Specialists fall back to independent fetching when no inventory is supplied,
-  and report `coverage.source: shared-inventory | independent-fetch` either way.
+The orchestrator enforces a strict total runtime budget (default 300 seconds):
+- **Phase 1 (Acquisition Crawl):** Bounded to ≤ 60 seconds.
+- **Phase 2 (Specialist Execution):** Dynamic allocation where each specialist receives `(remaining_time - buffer) / remaining_specialists`.
+- **Budget Expiry:** If remaining time is ≤ 5s, remaining specialists are marked with `status: "not_run"` and `reason: "Execution skipped: global time budget exhausted"`. Tool failure is never converted into zero findings.
 
-## 3. Evidence contract
+---
 
-Every specialist output is:
+## 3. SSRF Protection & Bounded Streaming
 
-```json
-{
-  "status": "ok | failed | not_run | inconclusive",
-  "coverage": {},
-  "observations": [],
-  "findings": [],
-  "recommendations": [],
-  "limitations": []
-}
-```
+Every network fetch in the orchestrator and all specialist tools enforces:
+1. **Scheme Validation:** `http` and `https` only.
+2. **DNS & IP Validation:** Rejection of private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), and cloud-metadata addresses.
+3. **Bounded Redirects:** Max 5 redirects with target IP re-validation on every hop.
+4. **Hard Size Caps:** HTML pages (max 2 MB), robots.txt (max 512 KB), sitemaps (max 2 MB), external authority probes (max 512 KB).
+5. **Same-Origin Crawling:** Sitemaps and priority links must match the target domain origin.
 
-Findings carry `category, title, severity, confidence, evidence, root_cause,
-impact, suggested_action{summary, priority, verification}`. The orchestrator
-aggregates observations into the final report and never converts an
-`inconclusive` specialist into a clean result — failure must never become
-"clean".
+---
 
-## 4. Eligibility gate (finding → final report)
+## 4. Crawler Matrix Semantics
+
+- **Retrieval Bots:** `OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`, `anthropic-ai`. Blocking on public content = `critical` / `high` finding.
+- **Training Bots:** `GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`, `CCBot`. Blocking = `info` / `low` observation (training opt-out, not AI search retrieval failure).
+- **User Fetch:** `ChatGPT-User`. User-initiated browsing token.
+
+---
+
+## 5. Eligibility Gate & Deduplication
 
 Before a specialist finding enters `findings[]`:
+1. It must cite concrete evidence (≥ 8 characters of gathered evidence). Evidence-less assertions become `proactive_actions[]`.
+2. High/critical severity with low confidence is demoted to a recommendation.
+3. Overlapping findings and recommendations are deduplicated using normalized fingerprints (`category:title` and `(action_category, action_title)`).
 
-1. It must cite concrete evidence (≥ 10 chars of specific, gathered evidence).
-   Evidence-less assertions become `proactive_actions[]`, never silent drops.
-2. `critical`/`high` severity with `low` confidence is demoted to a
-   recommendation ("potentially serious, insufficient evidence"). Severity and
-   confidence are separate axes; low confidence never auto-becomes a high
-   defect.
-3. Duplicates (normalized title fingerprint) are collapsed, keeping the
-   highest-severity instance.
+---
 
-## 5. Root-cause layer
+## 6. Taxonomy-Driven Root-Cause Clustering
 
-Findings sharing a `root_cause` are clustered into `root_causes[]` with
-contributing `finding_ids`, categories, and max severity — so the report
-recommends one prioritized action per cause instead of N scattered defects.
+Findings are clustered by standardized taxonomy families:
+- `DISCOVERY.ACCESS`: HTTP availability, noindex, crawler disallow.
+- `DISCOVERY.RENDERING`: Initial HTML text absence, client-side rendering dependency.
+- `DISCOVERY.CANONICAL`: Canonical host consolidation discrepancies.
+- `ENTITY.IDENTITY`: Missing Organization / Brand structured identity.
+- `ENTITY.ANSWERABILITY`: Material attribute gaps across product, pricing, service pages.
+- `FACT.CONSISTENCY`: Cross-page price, contact, or brand contradictions.
+- `FACT.FRESHNESS`: Stale copyright years, missing modification timestamps.
+- `AUTHORITY.CORROBORATION`: Broken sameAs authority profiles.
+- `EXPERIENCE.CONTINUITY`: Heading information scent, missing navigation, orientation gaps.
+- `REPRESENTATION.ACCURACY`: Divergence between observed AI claims and first-party facts.
 
-## 6. Diagnostic dimensions (not a visibility score)
+---
 
-`diagnostic_dimensions` (crawlability, entity clarity, fact integrity,
-citation readiness, context continuity) are internal diagnostic indices
-derived from THIS run's findings only. They are explicitly not a predictive
-ranking of AI-assistant visibility; no single number predicts assistant
-behavior across platforms.
+## 7. Objective Audit Metrics
 
-## 7. Severity rubric (calibrated, evidence-gated)
-
-| Level | Criteria |
-| :--- | :--- |
-| `critical` | Site inaccessible or fully excluded from retrieval (verified: blanket AI-crawler `Disallow: /`, hard 4xx/5xx on core pages) |
-| `high` | Verified defect with direct retrieval/answer impact and adequate confidence |
-| `medium` | Verified degradation (missing discovery aids, weak orientation) |
-| `low` / `info` | Minor gaps, polish |
-
-Any "expected best practice" without site-specific evidence is a
-`recommendation`, not a finding. Absence of a file the site never promised
-(`llms.txt`, FAQ schema) is a proactive suggestion at most.
-
-
+Synthetic point deduction scores are avoided. The orchestrator emits objective metrics:
+- `pages_sampled`: Count of URLs audited.
+- `page_types_covered`: Breakdown of page types evaluated.
+- `critical_blockers`: Total count of critical access/indexing blockers.
+- `confidence_distribution`: High, medium, and low confidence evidence counts.
+- `answerability_index`: Average material attribute coverage across sampled pages.

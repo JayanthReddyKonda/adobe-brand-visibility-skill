@@ -1,66 +1,87 @@
-# SEO Foundations (discoverability reference)
+# Technical SEO Foundations for AI Retrieval
 
-A compact internal reference for the deterministic checks the discoverability
-skill performs against a site's public infrastructure. It is deliberately scoped
-to what can be measured from raw HTTP/HTML without a browser, and it avoids
-turning generic SEO folklore into automated defects.
+This reference synthesizes essential technical SEO mechanisms and their causal impact on AI discovery, indexing, and retrieval.
 
-## What is really being checked
+---
 
-The core question is not "does this page use good SEO?" but:
+## 1. robots.txt & Access Directives (RFC 9309)
 
-> **Is the important content present and reachable for the relevant retrieval
-> client?**
+robots.txt governs **crawling access**, not indexing.
 
-That is why JavaScript-rendering is NOT itself a defect: Google renders with
-Chromium and supports JS. The only render-adjacent risk we assert is when the
-initial HTML response carries almost no visible text (a *risk* for clients that
-do not execute JS — stated as a risk, never as a proven outage).
+### User-Agent Matching Precedence
+- Per RFC 9309, specific user-agent tokens (e.g. `User-agent: OAI-SearchBot`) **override** the generic wildcard group (`User-agent: *`).
+- Longest path match wins within a group; `Allow` wins equal-length ties.
 
-## robots.txt
+### Path Syntax Rules
+```txt
+# Blocks /admin, /admin/, /admin123
+Disallow: /admin
 
-- Parsed per RFC 9309-style groups: `User-agent:` groups with their `Allow` /
-  `Disallow` / `Sitemap` lines; longest-match path rules with `*`/`$` wildcards.
-- **Disallow ≠ index control.** robots.txt only controls crawling; `noindex`
-  meta/header controls indexing. Absence of a rule means allowed — never infer
-  a block that is not explicitly stated.
-- `Sitemap:` directives are read here too.
+# Blocks ONLY paths under /admin/
+Disallow: /admin/
 
-## AI crawler matrix (training vs retrieval kept separate)
+# Wildcards
+Disallow: /*.pdf$    # Blocks all PDF files
+Disallow: /*/temp/   # Blocks temp directory at any depth
+```
 
-Different bots have different purposes. We record each bot's role alongside its
-disallowed status so a *training opt-out* is never misreported as a *search
-visibility defect* (and vice versa):
+### Critical AI Distinctions
+- **Retrieval Bots:** `OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`. Blocking these prevents live citations in generative answers.
+- **Training Bots:** `GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`, `CCBot`. Blocking these prevents model training but does not affect search visibility.
 
-| Bot | Role | Blocking consequence |
-|-----|------|----------------------|
-| `OAI-SearchBot` | retrieval | not cited in ChatGPT search |
-| `Claude-SearchBot` / `anthropic-ai` | retrieval | not cited in Claude search |
-| `PerplexityBot` | retrieval | not cited in Perplexity answers |
-| `GPTBot`, `ClaudeBot` | training | excluded from model training |
-| `Google-Extended` | training | excludes Gemini training/grounding only — **no effect on Google Search or AI Overviews**, not a ranking signal |
-| `Applebot-Extended`, `CCBot` | training | excluded from training corpora |
+---
 
-Semantics: only *retrieval-role* bots being blocked is treated as a visibility
-defect; *training-role* blocking is recorded but not flagged as a defect.
+## 2. Canonicalization & Consolidation
 
-## Sitemap
+The canonical link element (`<link rel="canonical" href="...">`) signals the authoritative primary URL for duplicate or parameterized content.
 
-- A 404 or missing `Sitemap:` when `/sitemap.xml` is absent is a
-  **recommendation**, not a defect.
-- Canonical disagreements are only findings when corroborated (e.g. the sitemap
-  also lists the canonical target); otherwise they are informational.
+### Canonical Rules
+- **Self-Referential Canonical:** Every unique indexable page should declare a self-referential canonical URL.
+- **Protocol & Host Uniformity:** Consistently specify HTTPS and the chosen apex/www domain format.
+- **Header Alternative:** Use `Link: <https://example.com/file.pdf>; rel="canonical"` for non-HTML assets.
 
-## Canonical, noindex, X-Robots-Tag
+### AI Search Impact
+AI assistants consolidate citations onto the declared canonical target. Mismatches between sitemaps and markup create citation ambiguity.
 
-- `noindex` (meta robots or X-Robots-Tag) → defect: page excluded from indexes.
-- `rel=canonical` is a hint, not a verdict; only assert a cross-host canonical
-  when an independent signal (sitemap) agrees.
+---
 
-## What is deliberately NOT flagged here
+## 3. XML Sitemaps & Discovery Aids
 
-- Missing JSON-LD on its own → handled by entity-content-audit.
-- `/llms.txt` absence → optional experiment, not a defect (Google does not use
-  it for AI Overviews / AI Mode).
-- JavaScript rendering choice per se → only missing content in the initial HTML
-  is a risk.
+XML sitemaps provide an explicit inventory of indexable URLs.
+
+### Sitemaps Standards
+- Maximum 50,000 URLs and 50 MB per sitemap file.
+- Use `<sitemapindex>` for larger multi-category sites.
+- Specify accurate `<lastmod>` ISO 8601 timestamps (only update when material content changes).
+
+### `llms.txt` Role
+- `llms.txt` is an optional Markdown feed for community LLM tools.
+- **Google does NOT use `llms.txt`** for AI Overviews or AI Mode (standard web indexing is used).
+- Its absence is NEVER an SEO or AI discoverability defect.
+
+---
+
+## 4. Rendering & Content Extractability
+
+### Server-Side Rendering (SSR) vs Client-Side Rendering (CSR)
+- **SSR / SSG:** Initial HTML contains full semantic markup and text. Safest for all AI crawlers.
+- **CSR (Client-Side SPA):** Initial HTML contains minimal text (`<div id="root"></div>`) requiring JavaScript execution.
+- **AI Crawler Capability:** While Googlebot renders JavaScript, several AI search fetchers evaluate the raw HTTP stream only. Primary text should always be present in the initial HTML payload.
+
+---
+
+## 5. Snippet Controls for Generative AI
+
+Fine-grained controls to govern how search engines and AI assistants quote content:
+
+```html
+<!-- Prevent snippet creation and AI quote extraction -->
+<meta name="robots" content="nosnippet">
+
+<!-- Limit snippet length -->
+<meta name="robots" content="max-snippet:160">
+
+<!-- Exclude specific sections from snippets/AI answers -->
+<div data-nosnippet>Proprietary pricing notes not for snippet extraction.</div>
+```
+*(Note: `data-nosnippet` is only supported on `span`, `div`, and `section` tags).*

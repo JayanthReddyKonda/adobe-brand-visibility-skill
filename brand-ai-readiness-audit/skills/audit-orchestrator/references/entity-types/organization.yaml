@@ -1,0 +1,45 @@
+# Entity Ontology: Organization
+entity_type: organization
+schema_org_type: Organization
+primary_surfaces:
+  - "/"
+  - "/about"
+  - "/company"
+  - "/contact"
+
+core_attributes:
+  - name: name
+    type: string
+    description: "Official legal or commercial brand name"
+    required: true
+    high_representation_risk: true
+  - name: url
+    type: URL string
+    description: "Canonical website domain"
+    required: true
+    high_representation_risk: true
+  - name: logo
+    type: Image URL string
+    description: "Direct link to canonical SVG/PNG logo asset"
+    required: true
+    high_representation_risk: true
+  - name: sameAs
+    type: list of URL strings
+    description: "Authoritative external profiles (Wikidata, Crunchbase, LinkedIn, X, GitHub)"
+    required: true
+    high_representation_risk: true
+  - name: description
+    type: string
+    description: "Official mission and industry category summary"
+    required: false
+    high_representation_risk: false
+  - name: contactPoint
+    type: ContactPoint object
+    description: "Official support phone and email channels"
+    required: false
+    high_representation_risk: false
+
+verification_conditions:
+  identity_resolution: "Organization JSON-LD name == og:site_name == <title> brand suffix"
+  authority_resolution: "Every sameAs URL returns HTTP 200 without redirecting to a foreign host"
+

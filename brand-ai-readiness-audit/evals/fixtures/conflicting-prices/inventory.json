@@ -1,0 +1,27 @@
+{
+  "base_url": "https://drone-store.example.com",
+  "pages": [
+    {
+      "url": "https://drone-store.example.com/",
+      "status": 200,
+      "page_type": "homepage",
+      "html": "<html><head><title>Garuda Drone Store</title></head><body><h1>Garuda Autonomous Drones</h1><p>Welcome to our official hardware store.</p><nav><a href=\"/products/x9\">Velocity X9</a></nav></body></html>"
+    },
+    {
+      "url": "https://drone-store.example.com/products/x9",
+      "status": 200,
+      "page_type": "product",
+      "html": "<html><head><title>Velocity X9 Drone</title></head><body><h1>Velocity X9 Drone</h1><p>High performance survey drone. Official price: ₹5,499. Status: In Stock.</p></body></html>"
+    },
+    {
+      "url": "https://drone-store.example.com/promo/legacy-flyer",
+      "status": 200,
+      "page_type": "product",
+      "html": "<html><head><title>Special Flyer</title></head><body><h1>Velocity X9 Drone</h1><p>Get the Velocity X9 Drone now for only ₹4,999 in our introductory catalog!</p></body></html>"
+    }
+  ],
+  "robots": {
+    "status": 200,
+    "text": "User-agent: *\nAllow: /\n"
+  }
+}

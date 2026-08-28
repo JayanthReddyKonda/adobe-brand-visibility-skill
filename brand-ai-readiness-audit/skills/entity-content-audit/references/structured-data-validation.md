@@ -1,67 +1,83 @@
-# Structured Data Validation (entity-content reference)
+# Structured Data Reference & Validation Guide
 
-Internal reference for how the entity-content skill treats structured data
-(JSON-LD). It deliberately positions structured data as a *consistency and
-extractability aid*, not as a checklist that rewards markup for its own sake.
+Implementation rules for JSON-LD structured data to ensure unambiguous entity recognition, offer extraction, and rich result eligibility.
 
-## The real signal: markup vs visible content
+---
 
-The single most valuable check is **does the structured data agree with what is
-visibly on the page?**
+## 1. Syntax & Placement Best Practices
 
+- **Format:** JSON-LD format inside `<script type="application/ld+json">` is strongly recommended.
+- **Graph Combining (`@graph`):** Combine multiple entities into a single linked graph to preserve relationships between the publisher, webpage, and main offering.
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://example.com/#organization",
+      "name": "Acme Aerospace",
+      "url": "https://example.com",
+      "logo": "https://example.com/logo.png",
+      "sameAs": [
+        "https://www.wikidata.org/wiki/Q12345",
+        "https://www.linkedin.com/company/acme"
+      ]
+    },
+    {
+      "@type": "Product",
+      "@id": "https://example.com/products/x9#product",
+      "name": "Velocity X9",
+      "brand": { "@id": "https://example.com/#organization" },
+      "description": "Commercial autonomous survey drone with 4K camera.",
+      "offers": {
+        "@type": "Offer",
+        "price": "5499",
+        "priceCurrency": "INR",
+        "availability": "https://schema.org/InStock",
+        "url": "https://example.com/products/x9"
+      }
+    }
+  ]
+}
+</script>
 ```
-VISIBLE: ₹5,499      JSON-LD: ₹4,999   →  REAL DEFECT (offer mismatch)
-VISIBLE: ₹5,499      JSON-LD: ₹5,499   →  consistent, good
-JSON-LD absent                           →  NOT automatically a finding
-```
 
-Markup that contradicts visible content (price, availability, currency, name) is
-a genuine problem; markup that is merely absent is not. Incorrect or misleading
-markup is the harmful case.
+---
 
-## When markup absence matters
+## 2. Organization Schema
 
-Absence only becomes relevant in combination with a *reliability intent*: for a
-local business, reviews, or product the pages your site truly wants cited.
-Then it is framed as an extractability **opportunity** (a recommendation with a
-coverage ratio), never as an automatic defect.
+Explicit organization metadata enables knowledge graph recognition and entity disambiguation.
 
-## Type-appropriate required properties (page-type aware)
+| Property | Type | Requirement | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | Text | Required | Official brand name |
+| `url` | URL | Required | Canonical homepage URL |
+| `logo` | ImageURL / ImageObject | Recommended | Direct link to high-res logo |
+| `sameAs` | Array of URLs | Recommended | Authoritative profile URLs (Wikidata, Crunchbase, official social) |
+| `contactPoint` | ContactPoint | Optional | Support phone and email details |
 
-Match expected attributes to the page type before judging completeness:
+---
 
-| Page type | Material attributes |
-|-----------|---------------------|
-| Product | price, currency, availability, brand, sku, variants, specs |
-| LocalBusiness | address, hours, phone, geo, services |
-| Article / Blog | headline, datePublished, author, publisher |
-| Organization / WebSite | name, url, logo |
-| Event | name, startDate, location, offers |
+## 3. Product & Offer Schema
 
-Gaps here become recommendations with a measured coverage ratio (e.g.
-"offers/attrs present on X of Y product pages"), never a blanket defect.
+Ensures commercial terms (pricing, availability, variants) are extracted deterministically by AI assistants.
 
-## Validation order
+| Property | Type | Requirement | Description |
+| :--- | :--- | :--- | :--- |
+| `name` | Text | Required | Official product title |
+| `offers.price` | Number / Text | Required | Numerical price without currency symbols |
+| `offers.priceCurrency` | ISO 4217 Text | Required | Currency code (e.g. `USD`, `INR`, `EUR`) |
+| `offers.availability` | ItemAvailability URL | Required | `https://schema.org/InStock`, `OutOfStock`, `PreOrder` |
+| `brand` | Brand / Organization | Recommended | Producing brand entity |
+| `description` | Text | Recommended | Accurate product summary |
+| `sku` | Text | Optional | Stock keeping unit |
 
-1. Identify page type.
-2. Identify important entities and material attributes.
-3. Detect present JSON-LD.
-4. Validate syntax (parses, valid `@context`, valid `@type`).
-5. Validate semantics (`@id` consistency, required properties, datatypes).
-6. Compare to visible content (the decisive step).
+---
 
-## `sameAs` and entity disambiguation
+## 4. Defect vs Recommendation Rules
 
-- `sameAs` pointing to authoritative profiles (Wikidata, official social,
-  registries) strengthens entity identity.
-- Present `sameAs` are verified reachable (HTTP 200) by corroboration-audit.
-- Absent `sameAs` is a strengthening **recommendation**, raised only when
-  competing entities share the brand name (disambiguation risk); otherwise
-  informational.
-
-## What is NOT treated as a defect
-
-- Any valid structured data type present but not producing a rich result.
-- FAQ / HowTo / Sitelinks SearchBox markup (features retired; markup remains
-  valid schema.org and is not penalized).
-- Absence of a rich-result feature: eligibility ≠ guarantee of appearance.
+- **Absence of Markup:** An extractability opportunity (`recommendation`), NEVER an automatic defect if visible text is clear.
+- **Markup-vs-DOM Contradiction:** A verified defect (`finding`) if JSON-LD price contradicts visible on-page price.
+- **Incomplete Product Markup:** A low-severity defect if Product schema exists but omits price or availability.

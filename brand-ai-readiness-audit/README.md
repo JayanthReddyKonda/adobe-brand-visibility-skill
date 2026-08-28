@@ -1,100 +1,149 @@
-# Brand AI-Readiness Audit Marketplace
+# Brand AI-Readiness Audit
 
-[agentskills.io](https://agentskills.io)-compliant multi-skill marketplace built for **Adobe University Hackathon 2026 — Round 3**. It audits any website for:
+Zero-dependency Python 3 marketplace for Adobe University Hackathon 2026 (Round 3) conforming to `agentskills.io`.
 
-- **AI Discoverability** — how assistants (ChatGPT, Claude, Gemini, Perplexity) crawl, extract, corroborate, and cite brand facts.
-- **On-Site Engagement** — how visitors orient, navigate, and convert after landing.
+Entrypoint: `audit-orchestrator`
 
-The entrypoint skill emits a single, schema-compliant JSON report — **presented to the user as raw JSON and nothing else**. A file is written only on explicit request.
+## Overview
 
-## Structure
+The `audit-orchestrator` skill audits any domain for AI-readiness across search crawlers and AI assistants (ChatGPT, Claude, Gemini, Perplexity). It creates a shared site inventory and runs specialist skills against a consistent evidence snapshot.
+
+## Skills Included
+
+- **audit-orchestrator**: Entrypoint orchestrator that manages shared crawl inventory, runs specialists, clusters root causes, and emits schema-validated JSON.
+- **discoverability-audit**: Checks AI crawler access (robots.txt rules for GPTBot, PerplexityBot, etc.), HTML extractability, and canonical tags.
+- **entity-content-audit**: Verifies brand entity identity, schema markup (JSON-LD), and content answerability.
+- **fact-consistency-audit**: Identifies stale facts, cross-page factual contradictions, and missing citations.
+- **corroboration-authority-audit**: Resolves sameAs/social links and validates external authority sources.
+- **engagement-context-audit**: Evaluates structural headings, orientation, and user journey continuity for AI referral traffic.
+- **assistant-representation-audit**: Opt-in audit to check observed AI assistant outputs against on-site brand facts.
+
+## Requirements & Compliance
+
+- Entrypoint: `audit-orchestrator` defined in `marketplace.json`
+- Dependencies: Python 3 standard library only (`urllib`, `json`, `html.parser`, `re`, `xml.etree`)
+- Non-interactive: Standard CLI flags
+- Output: Standard JSON emitted to stdout
+- Validation: Schema-validated via `validate_report.py`
+
+## Project Structure
 
 ```text
 brand-ai-readiness-audit/
-├── marketplace.json                      # Manifest: skills + designated entrypoint
+├── marketplace.json
 ├── README.md
 └── skills/
-    ├── audit-orchestrator/               # [ENTRYPOINT] Composes specialists, reconciles & emits report
+    ├── audit-orchestrator/
     │   ├── SKILL.md
-    │   ├── scripts/{orchestrator.py, validate_report.py}
-    │   └── references/{REPORT_SCHEMA.json, REPORT_SCHEMA.md, COMPOSITION_GUIDELINES.md}
-    ├── discoverability-audit/            # [SPECIALIST] Crawler access, content availability, structured data
+    │   ├── scripts/
+    │   │   ├── orchestrator.py
+    │   │   └── validate_report.py
+    │   └── references/
+    │       ├── COMPOSITION_GUIDELINES.md
+    │       ├── REPORT_SCHEMA.json
+    │       └── REPORT_SCHEMA.md
+    ├── discoverability-audit/
     │   ├── SKILL.md
-    │   └── scripts/discoverability_check.py
-    ├── entity-content-audit/             # [SPECIALIST] Entity identity clarity & offer extractability
+    │   ├── scripts/discoverability_check.py
+    │   └── references/
+    │       ├── CHECK_CONTRACTS.md
+    │       └── seo-foundations.md
+    ├── entity-content-audit/
     │   ├── SKILL.md
-    │   └── scripts/entity_content_check.py
-    ├── fact-consistency-audit/           # [SPECIALIST] Freshness signals & cross-page fact consistency
+    │   ├── scripts/entity_content_check.py
+    │   └── references/
+    │       ├── CHECK_CONTRACTS.md
+    │       └── structured-data-validation.md
+    ├── fact-consistency-audit/
     │   ├── SKILL.md
     │   ├── scripts/fact_consistency_check.py
-    │   └── references/{FRESHNESS_CHECKLIST.md, ENTITY_CORROBORATION.md}
-    ├── corroboration-authority-audit/    # [SPECIALIST] Authority-link verification & entity corroboration
+    │   └── references/
+    │       ├── ENTITY_CORROBORATION.md
+    │       └── FRESHNESS_CHECKLIST.md
+    ├── corroboration-authority-audit/
     │   ├── SKILL.md
-    │   └── scripts/corroboration_check.py
-    ├── engagement-context-audit/         # [SPECIALIST] Orientation, hierarchy, journey continuity
+    │   ├── scripts/corroboration_check.py
+    │   └── references/CHECK_CONTRACTS.md
+    ├── engagement-context-audit/
     │   ├── SKILL.md
     │   ├── scripts/engagement_check.py
-    │   └── references/{ENGAGEMENT_RUBRIC.md, AI_SNIPPET_GUIDELINES.md}
-    └── assistant-representation-audit/   # [OPT-IN] Observed AI representation vs first-party facts
+    │   └── references/
+    │       ├── AI_SNIPPET_GUIDELINES.md
+    │       └── ENGAGEMENT_RUBRIC.md
+    └── assistant-representation-audit/
         ├── SKILL.md
-        └── scripts/representation_check.py
+        ├── scripts/representation_check.py
+        └── references/
+            ├── CHECK_CONTRACTS.md
+            └── mention-vs-citation.md
 ```
-
-## Skills
-
-| Skill | Role |
-|---|---|
-| `audit-orchestrator` *(entrypoint)* | Runs the full lifecycle: loads **all five** core specialists (mandatory checklist), deduplicates overlapping findings, calibrates severity & confidence, adds proactive opportunities, validates, and emits the report. Bundles the CLI runner and schema validator. |
-| `discoverability-audit` | Can retrieval systems access the content? Crawler access, content availability in initial HTML, structured data. |
-| `entity-content-audit` | Is the entity and its offer extractable? Identity clarity, attribute coverage, answerability of key facts. |
-| `fact-consistency-audit` | Are facts current and self-consistent? Freshness signals, cross-page contradictions, corroboration metadata. |
-| `corroboration-authority-audit` | Do declared authority links (sameAs, profiles) resolve and corroborate the entity? |
-| `engagement-context-audit` | Does the journey survive the AI referral? Orientation, heading hierarchy, navigation discoverability, context continuity. |
-| `assistant-representation-audit` *(opt-in)* | What do assistants actually say? Compares observed AI responses against first-party facts (requires observed outputs or API access). |
-
-Every specialist records its execution status (`ok` / `failed` / `not_run`) in the report; tool failure is never misread as "no findings". Proactive improvements (e.g. `llms.txt`) are reported separately as `proactive_actions`, never as defects.
 
 ## Usage
 
+### Run Full Audit
+
 ```bash
-# Full composed audit — report printed to stdout as JSON
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site example.com
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com
+```
 
-# Optional: write the report to a file
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site example.com --output report.json
+### Save Report to File
 
-# Validate a report against the schema
+```bash
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --output report.json
+```
+
+### Validate Report Schema
+
+```bash
 python3 skills/audit-orchestrator/scripts/validate_report.py report.json
 ```
 
-In a compatible agent client, prompt naturally — e.g. *"Audit https://example.com for AI discoverability and engagement"* — and the entrypoint skill activates via description matching and returns the JSON report as its only output.
+### Run Individual Specialist
 
-## Report Format
+```bash
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com
+```
+
+## Output Format
+
+The orchestrator outputs schema-validated JSON with the following structure:
 
 ```json
 {
   "site": "example.com",
-  "audited_at": "2026-09-20T14:32:00Z",
-  "summary": { "total_findings": 4, "critical": 1, "high": 2, "medium": 1, "low": 0 },
+  "audited_at": "2026-08-28T12:00:00Z",
+  "summary": {
+    "total_findings": 1,
+    "critical": 1,
+    "high": 0,
+    "medium": 0,
+    "low": 0
+  },
+  "specialists": {
+    "discoverability-audit": { "status": "ok" },
+    "entity-content-audit": { "status": "ok" },
+    "fact-consistency-audit": { "status": "ok" },
+    "corroboration-authority-audit": { "status": "ok" },
+    "engagement-context-audit": { "status": "ok" }
+  },
   "findings": [
     {
       "id": "F-001",
-      "title": "AI crawlers disallowed in robots.txt",
+      "title": "AI search crawler blocked by robots.txt",
       "severity": "critical",
-      "evidence": "robots.txt explicitly disallows GPTBot and ClaudeBot across all paths.",
+      "evidence": "robots.txt contains Disallow: / for Google-Extended",
       "suggested_action": {
-        "summary": "Update robots.txt to permit verified AI search bots.",
+        "summary": "Narrow or remove Google-Extended disallow rule",
         "priority": "critical"
       }
     }
-  ]
+  ],
+  "diagnostic_dimensions": {
+    "crawlability": 80.0,
+    "entity_clarity": 100.0,
+    "fact_integrity": 100.0,
+    "citation_readiness": 100.0,
+    "context_continuity": 90.0
+  }
 }
 ```
-
-## Design Principles
-
-- **Read-only**: audits never modify live sites or take destructive actions.
-- **Evidence-backed**: every defect finding must be traceable to evidence collected during the run (live HTTP responses, parsed HTML, fetched external profiles); findings that fail the evidence or confidence gate are demoted to recommendations rather than asserted. When evidence is insufficient, the relevant check is reported as `inconclusive` — never invented and never silently clean.
-- **Deterministic composition**: the orchestrator must load and run all specialist skills and pass schema validation before emitting.
-- **Zero-dependency core**: standard-library Python 3 only (`urllib`, `html.parser`, `json`, `re`, `xml.etree`) for cross-platform portability.
-- **Progressive disclosure**: compact declarative `SKILL.md` files; deep criteria in `references/`, deterministic checks in `scripts/`.

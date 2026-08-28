@@ -1,25 +1,34 @@
-# AI Snippet & Summary Optimization Guidelines
+# AI Snippet & Information Scent Guidelines
 
-AI assistants and inbox summarizers extract condensed summaries from web pages and emails. This guide provides actionable patterns to ensure summaries capture core brand substance rather than boilerplate filler.
-
----
-
-## 1. The AI Summarization Signal-to-Noise Problem
-
-When AI summarizers process a page, they truncate boilerplate headers, cookie banners, navigation menus, and marketing fluff. If the genuine substance of the page is diluted by low-value filler or buried in dense paragraphs, the generated summary will be inaccurate or omit critical brand differentiators.
+How to structure on-page content so AI search assistants and human visitors can immediately extract answers and orient without bouncing.
 
 ---
 
-## 2. Inverted Pyramid Information Design
+## 1. Conclusion-First Writing Architecture
 
-1. **Lead Paragraph (The Core Fact)**: Open every section and page with a concise, factual 1-2 sentence definition.
-2. **Supporting Detail (The How & Why)**: Follow with concrete features, integration partners, and benchmarks.
-3. **Structured Bullet Points**: Use unordered lists (`<ul>`) for feature lists, technical specifications, and compatibility tables. LLMs extract structured lists with higher fidelity than long narrative prose.
+AI models and skimming visitors prioritize direct answers in above-the-fold passages:
+
+- **Direct Answer in Lead Paragraph:** State the core definition, price, or product capability within the first 50–100 words.
+- **Fact-Dense Sentences:** Use explicit combinations of `[Subject] + [Attribute] + [Numerical Value/Unit] + [Timeframe]`.
+  - *Poor:* "Our revolutionary solution offers unprecedented affordability and power."
+  - *Strong:* "The Velocity X9 drone costs ₹5,499, delivers 30 minutes of flight time, and captures 4K 60fps video."
 
 ---
 
-## 3. Email & Messaging Summary Readiness
+## 2. Heading Hierarchy & Information Scent
 
-- **Primary Action in First 50 Words**: Ensure transactional emails, newsletters, or pitch pages present the core action and value above any design flourishes.
-- **Explicit Call to Action (CTA)**: Always pair key value claims with an unambiguous action link.
+Headings provide structural boundaries for passage indexing and AI chunking:
 
+- **Single H1 per Page:** The primary `<h1>` must clearly name the brand, product, or core topic. Avoid generic filler titles ("Welcome", "Home", "Overview").
+- **Question-Form H2/H3 Headings:** Phrase subheadings as clear questions or explicit topic statements (e.g. `<h2>What is the battery range of Velocity X9?</h2>`).
+- **No Skipping Levels:** Maintain a strict logical hierarchy (`H1` -> `H2` -> `H3`). Never skip from `H1` directly to `H4`.
+
+---
+
+## 3. Snippet Visibility Controls
+
+| Directive | Implementation | Effect on AI Answers |
+| :--- | :--- | :--- |
+| `nosnippet` | `<meta name="robots" content="nosnippet">` | Prevents the page from being quoted in snippets or AI Overviews entirely. |
+| `max-snippet` | `<meta name="robots" content="max-snippet:160">` | Restricts snippet quotes to the specified character length. |
+| `data-nosnippet` | `<div data-nosnippet>...</div>` | Excludes specific proprietary text or pricing footnotes from AI quotes while keeping the rest indexable. |

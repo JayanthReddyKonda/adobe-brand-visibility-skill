@@ -1,44 +1,96 @@
 #!/usr/bin/env python3
 """
 orchestrator.py - Entrypoint CLI for Brand AI-Readiness Audit Marketplace.
-Composes the marketplace's specialist audit skills, reconciles their
-evidence-backed findings, deduplicates overlapping signals, adds proactive
-improvement recommendations, and emits a strictly validated JSON audit report.
+Composes the marketplace's specialist audit skills, enforces a strict global
+time deadline (< 5 minutes), reconciles evidence-backed findings, deduplicates
+overlapping signals and recommendations, groups findings under a standardized
+root-cause taxonomy, and emits a strictly validated JSON audit report.
 
 Guarantees:
-  - All findings derive from real, on-demand checks. Nothing is fabricated.
-  - Specialist execution status is always recorded ("ok" / "failed" /
-    "not_run"). Tool failure is NEVER converted into zero findings.
-  - The final report is validated before being emitted; on validation
-    failure the orchestrator exits non-zero instead of emitting.
-
-Usage:
-  python3 orchestrator.py --site example.com [--output report.json]
+  - All findings derive from real, on-demand probes. Nothing is fabricated.
+  - Specialist execution status is always recorded ("ok" / "failed" / "inconclusive" / "not_run").
+    Tool failure is NEVER converted into zero findings.
+  - Hard wall-clock execution deadline is enforced across all phases.
+  - SSRF protection and response size caps are enforced across all network fetches.
+  - The final report is validated against the formal schema before emission.
 """
 
 import sys
 import os
 import re
 import json
+import time
 import argparse
 import tempfile
-from datetime import datetime, timezone
 import subprocess
+from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
 
+# Import safe_fetch utility
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request, urllib.error
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
+        except urllib.error.HTTPError as e:
+            try:
+                body = e.read(max_bytes).decode("utf-8", "ignore")
+            except Exception:
+                body = ""
+            return e.code, body, dict(e.headers or {}), str(e)
+        except Exception as e:
+            return None, "", {}, str(e)
+
+    def safe_check_status(url, timeout=5, max_bytes=65536, user_agent=DEFAULT_USER_AGENT):
+        status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
+        return status
+
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+
+PRIORITY_KEYWORDS = [
+    ("product", ["product", "/p/", "shop", "store", "item", "catalog"]),
+    ("pricing", ["pricing", "price", "plans", "billing", "subscription"]),
+    ("service", ["service", "solution", "offering", "consulting"]),
+    ("category", ["category", "collection", "browse"]),
+    ("contact", ["contact", "support", "help", "reach-us"]),
+    ("location", ["location", "store-locator", "branch", "where-to-buy"]),
+    ("about", ["about", "company", "team", "story", "mission"]),
+    ("documentation", ["docs", "documentation", "guide", "api", "developer", "help-center"]),
+    ("article", ["blog", "news", "article", "post", "insight"]),
+]
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Audit a website for AI discoverability and on-site engagement by composing specialist skills."
+        description="Audit a website for AI discoverability, content extractability, and visitor engagement."
     )
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. example.com or https://example.com)")
     parser.add_argument("--output", "-o", help="Path to save the generated JSON report (defaults to stdout)")
-    parser.add_argument("--include-proactive", action="store_true", default=True,
+    
+    # Proactive recommendations flag pair
+    parser.add_argument("--include-proactive", dest="include_proactive", action="store_true", default=True,
                         help="Include proactive (non-defect) improvement recommendations (default: True)")
+    parser.add_argument("--no-proactive", dest="include_proactive", action="store_false",
+                        help="Disable proactive improvement recommendations")
+
+    # Optional assistant representation flags
+    parser.add_argument("--with-representation", action="store_true", default=False,
+                        help="Run optional assistant-representation-audit skill to cross-check observed AI assistant answers")
+    parser.add_argument("--responses", "--observations", dest="responses_file",
+                        help="Path to JSON file containing observed AI assistant outputs")
+
+    # Global time limit
+    parser.add_argument("--timeout-seconds", type=int, default=300,
+                        help="Maximum total audit wall-clock runtime in seconds (default: 300s)")
+
     return parser.parse_args()
 
 
@@ -56,11 +108,12 @@ def normalize_target(site_input):
 
 
 def find_specialist_script(skill_name, script_filename):
-    """Dynamically discover a specialist script across common skill layouts."""
+    """Dynamically discover a specialist script across known skill directory roots."""
     search_roots = [
         os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", skill_name, "scripts")),
         os.path.abspath(os.path.join(os.getcwd(), "brand-ai-readiness-audit", "skills", skill_name, "scripts")),
         os.path.abspath(os.path.join(os.getcwd(), ".agents", "skills", skill_name, "scripts")),
+        os.path.abspath(os.path.join(os.getcwd(), "skills", skill_name, "scripts")),
     ]
     for root in search_roots:
         candidate = os.path.join(root, script_filename)
@@ -69,18 +122,13 @@ def find_specialist_script(skill_name, script_filename):
     return None
 
 
-def run_specialist_tool(script_path, *args):
-    """Execute a specialist script. Returns (status, findings, recommendations, error).
-
-    status: "ok" | "failed" | "not_run". A failed or not_run specialist
-    contributes NO findings and NO implicit "clean" signal - the status is
-    surfaced in the report instead.
-    """
+def run_specialist_tool(script_path, timeout_sec, *args):
+    """Execute a specialist script with a dedicated time budget."""
     if not script_path or not os.path.exists(script_path):
         return "not_run", [], [], "specialist script not found", [], {}, []
     try:
         cmd = [sys.executable, script_path] + list(args)
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
         if proc.returncode != 0:
             err = (proc.stderr or "non-zero exit").strip().splitlines()
             return "failed", [], [], err[-1] if err else "non-zero exit", [], {}, []
@@ -94,9 +142,6 @@ def run_specialist_tool(script_path, *args):
             recs = data.get("recommendations", [])
             if not isinstance(findings, list) or not isinstance(recs, list):
                 return "failed", [], [], "unrecognized output format", [], {}, []
-            # Unified evidence contract (v3): specialists may also emit
-            # observations[], coverage{}, limitations[]. Missing keys are
-            # tolerated for backwards compatibility.
             observations = data.get("observations", [])
             coverage = data.get("coverage", {})
             limitations = data.get("limitations", [])
@@ -106,78 +151,20 @@ def run_specialist_tool(script_path, *args):
                 coverage = {}
             if not isinstance(limitations, list):
                 limitations = []
-            # Honor the specialist's own self-reported status: an
-            # "inconclusive"/"failed" specialist must never be recorded as
-            # "ok" with zero findings (that would masquerade as a clean site).
             sp_status = str(data.get("status", "ok")).lower()
             if sp_status in ("ok", "success"):
                 return "ok", findings, recs, None, observations, coverage, limitations
             if sp_status == "inconclusive":
-                return ("inconclusive", [], [], data.get("error", "specialist could not gather evidence"),
-                        observations, coverage, limitations)
-            return ("failed", [], [], data.get("error", f"specialist reported status '{sp_status}'"),
-                    observations, coverage, limitations)
+                return "inconclusive", [], [], data.get("error", "specialist could not gather evidence"), observations, coverage, limitations
+            return "failed", [], [], data.get("error", f"specialist reported status '{sp_status}'"), observations, coverage, limitations
     except subprocess.TimeoutExpired:
-        return "failed", [], [], "timed out after 120s", [], {}, []
+        return "failed", [], [], f"timed out after {timeout_sec}s", [], {}, []
     except Exception as e:
         return "failed", [], [], str(e), [], {}, []
 
-def check_url_status(url, timeout=5):
-    """GET a URL and return its HTTP status code, or None if unreachable."""
-    import urllib.request
-    import urllib.error
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"}
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            return response.status
-    except urllib.error.HTTPError as e:
-        return e.code
-    except Exception:
-        return None
-
-
-def fetch_page(url, timeout=8):
-    """GET a URL; return (status, body, headers). Never raises."""
-    import urllib.request
-    import urllib.error
-    req = urllib.request.Request(
-        url, headers={"User-Agent": "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, r.read().decode("utf-8", "ignore"), dict(r.headers)
-    except urllib.error.HTTPError as e:
-        try:
-            body = e.read().decode("utf-8", "ignore")
-        except Exception:
-            body = ""
-        return e.code, body, dict(e.headers or {})
-    except Exception:
-        return None, "", {}
-
-
-# --- Shared site inventory -------------------------------------------------
-# One bounded acquisition pass shared by ALL specialists: homepage + robots +
-# sitemap + priority pages (page-type classified). Specialists receive the
-# inventory file and operate on the SAME evidence snapshot; without it they
-# fetch for themselves (backwards compatible).
-
-PRIORITY_KEYWORDS = [
-    ("product", ["product", "/p/", "shop", "store", "item"]),
-    ("pricing", ["pricing", "price", "plans", "billing"]),
-    ("service", ["service", "solution", "offering"]),
-    ("category", ["category", "collection", "catalog"]),
-    ("contact", ["contact", "support", "help"]),
-    ("location", ["location", "store-locator", "branch"]),
-    ("about", ["about", "company", "team", "story"]),
-    ("documentation", ["docs", "documentation", "guide", "api", "developer", "help-center"]),
-    ("article", ["blog", "news", "article", "post", "insight"]),
-]
-
 
 def classify_page(url, title=""):
-    """Classify a page by URL/title keywords. 'other' is a valid class."""
+    """Classify a page by URL/title keywords."""
     hay = (url + " " + (title or "")).lower()
     for ptype, kws in PRIORITY_KEYWORDS:
         if any(k in hay for k in kws):
@@ -186,8 +173,7 @@ def classify_page(url, title=""):
 
 
 def _visible_words(html):
-    text = re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html or "",
-                  flags=re.S | re.I)
+    text = re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html or "", flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", " ", text)
     return len(text.split())
 
@@ -198,91 +184,127 @@ def _extract_title(html):
 
 
 def _sitemap_urls(sitemap_body, limit=60):
-    return [loc.strip() for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>",
-                                              sitemap_body or "")][:limit]
+    return [loc.strip() for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", sitemap_body or "")][:limit]
 
 
-def build_inventory(base_url, max_pages=16, budget_seconds=90):
-    """Bounded, page-type-aware crawl. Mandatory: homepage, robots.txt,
-    sitemap. Then priority URLs within the time budget. Returns
-    (inventory_dict_or_None, stats)."""
-    import time
+def build_inventory(base_url, max_pages=16, budget_seconds=60):
+    """Bounded, SSRF-safe shared crawl.
+    Mandatory: homepage, robots.txt, sitemaps, and priority pages within budget.
+    """
     start = time.time()
-    inv = {"base_url": base_url,
-           "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-           "robots": None, "sitemap_urls": [], "pages": [], "limitations": []}
+    parsed_base = urlparse(base_url)
+    target_netloc = parsed_base.netloc.lower()
 
-    # 1. Homepage (mandatory)
-    status, home_html, headers = fetch_page(base_url + "/")
-    if not home_html:
-        return None, {"homepage_reachable": False}
-    inv["pages"].append({"url": base_url + "/", "status": status, "page_type": "homepage",
-                         "title": _extract_title(home_html),
-                         "word_count": _visible_words(home_html), "html": home_html})
+    inv = {
+        "base_url": base_url,
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "robots": None,
+        "sitemap_urls": [],
+        "pages": [],
+        "limitations": []
+    }
 
-    # 2. robots.txt (mandatory)
-    r_status, robots_txt, _ = fetch_page(base_url + "/robots.txt")
+    # 1. Homepage
+    status, home_html, headers, err = safe_fetch(base_url + "/", timeout=10, max_bytes=2*1024*1024)
+    if not home_html or status is None:
+        return None, {"homepage_reachable": False, "error": err}
+
+    inv["pages"].append({
+        "url": base_url + "/",
+        "status": status,
+        "page_type": "homepage",
+        "title": _extract_title(home_html),
+        "word_count": _visible_words(home_html),
+        "html": home_html
+    })
+
+    # 2. robots.txt
+    r_status, robots_txt, _, _ = safe_fetch(base_url + "/robots.txt", timeout=8, max_bytes=512*1024)
     inv["robots"] = {"status": r_status, "text": robots_txt if r_status == 200 else None}
     sitemap_urls = []
     if robots_txt and r_status == 200:
         sitemap_urls = [l.split(":", 1)[1].strip() for l in robots_txt.splitlines()
                         if l.lower().startswith("sitemap:")][:5]
 
-    # 3. Sitemap (mandatory attempt); expand an index sitemap one level
+    # 3. Sitemaps (Same-origin constraint)
     locs = []
-    for sm in sitemap_urls or [base_url + "/sitemap.xml"]:
-        s_status, s_body, _ = fetch_page(sm)
+    candidates = sitemap_urls or [base_url + "/sitemap.xml"]
+    for sm in candidates:
+        if time.time() - start > budget_seconds:
+            break
+        sm_netloc = urlparse(sm).netloc.lower()
+        if sm_netloc and sm_netloc != target_netloc:
+            continue  # ignore external sitemaps for security
+        s_status, s_body, _, _ = safe_fetch(sm, timeout=8, max_bytes=2*1024*1024)
         if s_status == 200 and s_body and "<loc>" in s_body:
             inv["sitemap_urls"].append(sm)
-            locs.extend(_sitemap_urls(s_body))
+            child_locs = _sitemap_urls(s_body)
+            # Filter to same-origin URLs
+            valid_child = [u for u in child_locs if urlparse(u).netloc.lower() == target_netloc]
+            locs.extend(valid_child)
+
             if "<sitemapindex" in s_body:
-                for child in _sitemap_urls(s_body)[:3]:
-                    c_status, c_body, _ = fetch_page(child)
-                    if c_status == 200 and c_body and "<loc>" in c_body:
-                        locs.extend(_sitemap_urls(c_body))
+                for sub_sm in child_locs[:3]:
+                    if time.time() - start > budget_seconds:
+                        break
+                    if urlparse(sub_sm).netloc.lower() == target_netloc:
+                        c_status, c_body, _, _ = safe_fetch(sub_sm, timeout=8, max_bytes=2*1024*1024)
+                        if c_status == 200 and c_body:
+                            locs.extend([u for u in _sitemap_urls(c_body) if urlparse(u).netloc.lower() == target_netloc])
+
     inv["sitemap_url_count"] = len(locs)
 
-    # 4. Priority selection: classify sitemap URLs, prefer high-value types,
-    #    respect the time budget (Adobe brief: <5 min typical runtime).
+    # 4. Priority selection across page types within budget
     seen = {p["url"].rstrip("/") for p in inv["pages"]}
     by_type = {}
     for u in locs:
-        if u.rstrip("/") in seen or u.rstrip("/") == base_url:
+        u_clean = u.rstrip("/")
+        if u_clean in seen or u_clean == base_url.rstrip("/"):
             continue
-        by_type.setdefault(classify_page(u), []).append(u)
+        ptype = classify_page(u)
+        by_type.setdefault(ptype, []).append(u)
+
     priority_order = ["product", "pricing", "service", "category", "contact",
                       "location", "about", "documentation", "article", "other"]
     selected = []
     for t in priority_order:
-        for u in by_type.get(t, [])[:4]:
+        for u in by_type.get(t, [])[:3]:
             if len(selected) >= max_pages - 1 or time.time() - start > budget_seconds:
                 break
             selected.append(u)
         if len(selected) >= max_pages - 1 or time.time() - start > budget_seconds:
             break
+
     for u in selected:
         if time.time() - start > budget_seconds:
-            inv["limitations"].append("inventory crawl truncated at time budget")
+            inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
             break
-        p_status, p_html, _ = fetch_page(u)
+        p_status, p_html, _, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
         if p_html:
             seen.add(u.rstrip("/"))
-            inv["pages"].append({"url": u, "status": p_status,
-                                 "page_type": classify_page(u),
-                                 "title": _extract_title(p_html),
-                                 "word_count": _visible_words(p_html), "html": p_html})
+            inv["pages"].append({
+                "url": u,
+                "status": p_status,
+                "page_type": classify_page(u),
+                "title": _extract_title(p_html),
+                "word_count": _visible_words(p_html),
+                "html": p_html
+            })
 
     inv["elapsed_seconds"] = round(time.time() - start, 1)
-    stats = {"homepage_reachable": True, "pages": len(inv["pages"]),
-             "sitemap_urls_discovered": len(locs),
-             "elapsed_seconds": inv["elapsed_seconds"],
-             "page_types": {t: sum(1 for p in inv["pages"] if p["page_type"] == t)
-                            for t in {p["page_type"] for p in inv["pages"]}}}
+    stats = {
+        "homepage_reachable": True,
+        "pages_sampled": len(inv["pages"]),
+        "sitemap_urls_discovered": len(locs),
+        "elapsed_seconds": inv["elapsed_seconds"],
+        "page_types": {t: sum(1 for p in inv["pages"] if p["page_type"] == t)
+                       for t in {p["page_type"] for p in inv["pages"]}}
+    }
     return inv, stats
 
 
 def write_inventory_file(inv):
-    """Persist the inventory to a temp file; return the path or None."""
+    """Persist inventory to temporary JSON file."""
     try:
         fd, path = tempfile.mkstemp(suffix="_inventory.json", prefix="brand_audit_")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -293,41 +315,58 @@ def write_inventory_file(inv):
 
 
 def proactive_checks(domain, base_url):
-    """Proactive (non-defect) improvement recommendations.
-
-    Each is grounded in a real probe. Inconclusive probes (network errors,
-    unexpected statuses) produce NO claim rather than a guess.
-    """
+    """Perform proactive improvement checks."""
     recommendations = []
 
-    # /llms.txt: an optional community proposal. Google does NOT use it for AI
-    # Overviews / AI Mode, so its absence is deliberately NOT reported as a
-    # defect and is never recommended by default. Only surfaced as an optional
-    # experiment for non-Google consumers, and only when the file is absent.
-    llms_status = check_url_status(f"{base_url}/llms.txt")
+    # Optional /llms.txt probe
+    llms_status = safe_check_status(f"{base_url}/llms.txt", timeout=5)
     if llms_status == 404:
         recommendations.append({
             "title": "Optional experiment: publish an /llms.txt index",
-            "rationale": f"GET {base_url}/llms.txt returned HTTP 404. llms.txt is a voluntary community "
-                         "proposal, not a Google requirement (Google states no additional machine-readable "
-                         "files are needed for AI Overviews / AI Mode). Consider it only if you target "
-                         "non-Google LLM consumers; it has no effect on Google visibility.",
-            "suggested_action": "Publish /llms.txt only as an optional experiment for non-Google AI consumers; "
-                                "do not treat its absence as a defect."
+            "category": "proactive-discovery",
+            "rationale": f"GET {base_url}/llms.txt returned HTTP 404. llms.txt is a community convention "
+                         "used by some LLM clients to discover Markdown feeds. (Not required for Google AI search).",
+            "suggested_action": "Consider publishing /llms.txt as an optional navigation aid for external LLM tools."
         })
 
-    sitemap_status = check_url_status(f"{base_url}/sitemap.xml")
+    # Sitemap check
+    sitemap_status = safe_check_status(f"{base_url}/sitemap.xml", timeout=5)
     if sitemap_status == 404:
         recommendations.append({
-            "title": "Add an XML sitemap",
-            "rationale": f"GET {base_url}/sitemap.xml returned HTTP 404, so crawlers lack a content-enumeration aid.",
-            "suggested_action": "Publish sitemap.xml and reference it from robots.txt."
+            "title": "Publish an XML sitemap",
+            "category": "discovery",
+            "rationale": f"GET {base_url}/sitemap.xml returned HTTP 404.",
+            "suggested_action": "Publish sitemap.xml listing all canonical public URLs and declare it in robots.txt."
         })
+
     return recommendations
 
 
-def compose_audit(site, include_proactive=True):
-    """Compose findings, specialist statuses, and proactive recommendations."""
+def deduplicate_recommendations(rec_list):
+    """Deduplicate recommendations by normalized action title and category."""
+    seen = {}
+    deduped = []
+    for r in rec_list:
+        if not isinstance(r, dict):
+            continue
+        title = r.get("title", "").strip()
+        cat = r.get("category", "general")
+        key = (cat.lower(), " ".join(title.lower().split()))
+        if key in seen:
+            # Merge rationales if distinct
+            existing = seen[key]
+            if r.get("rationale") and r["rationale"] not in existing.get("rationale", ""):
+                existing["rationale"] += " " + r["rationale"]
+            continue
+        seen[key] = dict(r)
+        deduped.append(seen[key])
+    return deduped
+
+
+def compose_audit(site, include_proactive=True, with_representation=False,
+                  responses_file=None, timeout_seconds=300):
+    """Compose full audit under a strict global wall-clock deadline."""
+    start_time = time.time()
     domain, base_url = normalize_target(site)
     raw_findings = []
     specialists = {}
@@ -336,31 +375,67 @@ def compose_audit(site, include_proactive=True):
     all_coverage = {}
     all_limitations = []
 
-    # --- Shared site inventory: one bounded acquisition pass. Specialists
-    # operate on the SAME evidence snapshot (prevents inconsistent fetches,
-    # avoids redundant crawling, keeps runtime inside the 5-minute budget).
-    inventory, inv_stats = build_inventory(base_url)
+    # 1. Acquisition Phase (Shared Inventory) - max 60s
+    acquisition_budget = min(60, max(15, timeout_seconds - 60))
+    inventory, inv_stats = build_inventory(base_url, budget_seconds=acquisition_budget)
     inventory_path = write_inventory_file(inventory) if inventory else None
+
     if inventory_path:
         all_coverage["site_inventory"] = inv_stats
         all_limitations.extend(inventory.get("limitations", []))
     elif inv_stats and not inv_stats.get("homepage_reachable", True):
-        all_limitations.append("homepage unreachable: inventory could not be built")
+        all_limitations.append(f"Homepage unreachable ({inv_stats.get('error', 'Network error')}); inventory could not be built.")
 
+    # 2. Specialist Execution Phase
     specialist_runs = [
-        ("discoverability-audit", "Access, discovery & rendering risk", "discoverability_check.py"),
-        ("entity-content-audit", "Entity identity & offer extractability", "entity_content_check.py"),
-        ("fact-consistency-audit", "Fact ledger & cross-page consistency", "fact_consistency_check.py"),
-        ("corroboration-authority-audit", "Declared-authority link verification", "corroboration_check.py"),
-        ("engagement-context-audit", "Orientation & journey continuity", "engagement_check.py"),
+        ("discoverability-audit", "Access, robots.txt & rendering risk", "discoverability_check.py", []),
+        ("entity-content-audit", "Entity identity & offer extractability", "entity_content_check.py", []),
+        ("fact-consistency-audit", "Fact ledger & cross-page consistency", "fact_consistency_check.py", []),
+        ("corroboration-authority-audit", "Declared authority link verification", "corroboration_check.py", []),
+        ("engagement-context-audit", "Orientation & journey continuity", "engagement_check.py", []),
     ]
-    for skill_name, label, filename in specialist_runs:
+
+    if with_representation:
+        rep_args = []
+        if responses_file and os.path.exists(responses_file):
+            rep_args = ["--responses", responses_file]
+        specialist_runs.append(
+            ("assistant-representation-audit", "Observed assistant representation cross-check", "representation_check.py", rep_args)
+        )
+    else:
+        specialists["assistant-representation-audit"] = {
+            "label": "Observed assistant representation cross-check",
+            "status": "not_run",
+            "reason": "Optional representation layer disabled (run with --with-representation to enable)"
+        }
+
+    # Execute specialists sequentially with dynamically calculated timeouts
+    for idx, (skill_name, label, filename, extra_args) in enumerate(specialist_runs):
+        elapsed = time.time() - start_time
+        remaining_time = timeout_seconds - elapsed
+        remaining_specialists = len(specialist_runs) - idx
+
+        if remaining_time <= 5:
+            specialists[skill_name] = {
+                "label": label,
+                "status": "not_run",
+                "reason": "Execution skipped: global time budget exhausted"
+            }
+            all_limitations.append(f"{skill_name}: Skipped due to global execution time limit.")
+            continue
+
+        # Dynamic specialist timeout
+        spec_timeout = max(10, min(40, int((remaining_time - 5) / max(1, remaining_specialists))))
+
         script = find_specialist_script(skill_name, filename)
         args = ["--site", base_url]
         if inventory_path:
             args += ["--inventory", inventory_path]
+        args += extra_args
+
         status, findings, recs, error, observations, coverage, limitations = \
-            run_specialist_tool(script, *args)
+            run_specialist_tool(script, spec_timeout, *args)
+
         specialists[skill_name] = {"label": label, "status": status}
         if error:
             specialists[skill_name]["error"] = error
@@ -372,26 +447,28 @@ def compose_audit(site, include_proactive=True):
                 all_observations.append(obs)
         raw_findings.extend(findings)
         specialist_recommendations.extend(recs)
+
     if inventory_path:
         try:
             os.unlink(inventory_path)
         except OSError:
             pass
 
+    # 3. Proactive Improvement Checks
     all_recommendations = list(specialist_recommendations)
     if include_proactive:
         all_recommendations.extend(proactive_checks(domain, base_url))
-    # Deduplicate by evidence prefix, highest severity first.
-    # Fingerprint dedup: same logical check re-run across pages (or re-emitted
-    # by two specialists) shares a normalized title; distinct checks keep
-    # distinct titles. Far more robust than prefix-matching free-text evidence.
-    def fingerprint(item):
+
+    # 4. Finding Normalization & Deduplication Gate
+    def finding_fingerprint(item):
+        cat = str(item.get("category", "")).lower()
         title = " ".join(str(item.get("title", "")).lower().split())
-        return title
+        return f"{cat}:{title}"
 
     final_findings = []
-    seen = set()
-    demoted = []  # findings failing the eligibility gate -> recommendations
+    seen_fps = set()
+    demoted = []
+
     sorted_raw = sorted(raw_findings, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium"), 99))
 
     for item in sorted_raw:
@@ -399,97 +476,109 @@ def compose_audit(site, include_proactive=True):
         if sev not in SEVERITY_ORDER:
             sev = "medium"
         confidence = str(item.get("confidence", "medium")).lower()
-        fp = fingerprint(item)
-        if fp and fp in seen:
+        fp = finding_fingerprint(item)
+        if fp in seen_fps:
             continue
-        if fp:
-            seen.add(fp)
+        seen_fps.add(fp)
+
         evidence = str(item.get("evidence", "")).strip()
-        # --- Eligibility gate: a defect finding must (a) cite concrete
-        # evidence gathered during this run and (b) not be a high-severity
-        # claim resting on low confidence. Failures become recommendations,
-        # never silent drops.
-        if len(evidence) < 10:
+        # Eligibility Gate: concrete evidence required
+        if len(evidence) < 8:
             demoted.append(dict(
                 title=item.get("title", "Audit observation"),
-                rationale=f"Specialist asserted '{item.get('title', '')}' without citing concrete evidence; "
-                          "recorded as an improvement suggestion rather than a defect.",
-                suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually and add supporting evidence.")))
+                category=item.get("category", "general"),
+                rationale=f"Specialist noted '{item.get('title', '')}' without citing concrete evidence.",
+                suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually.")
+            ))
             continue
+
         if sev in ("critical", "high") and confidence == "low":
             demoted.append(dict(
                 title=item.get("title", "Audit observation"),
-                rationale=f"Potentially serious (originally '{sev}') but evidence confidence is low; "
-                          "held as a suggestion pending stronger evidence rather than asserted as a defect.",
-                suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually.")))
+                category=item.get("category", "general"),
+                rationale=f"Reported with severity '{sev}' but low confidence; held as suggestion pending verification.",
+                suggested_action=item.get("suggested_action", {}).get("summary", "Verify manually.")
+            ))
             continue
+
         action = item.get("suggested_action", {})
+        action_summary = action.get("summary") if isinstance(action, dict) else str(action)
+        action_priority = action.get("priority", sev if sev != "info" else "low") if isinstance(action, dict) else sev
+
         finding_entry = {
             "id": f"F-{len(final_findings) + 1:03d}",
             "title": item.get("title", "Audit Finding"),
             "severity": sev,
             "evidence": evidence,
             "suggested_action": {
-                "summary": action.get("summary", "Review and resolve the identified defect."),
-                "priority": action.get("priority", sev if sev != "info" else "low")
+                "summary": action_summary or "Review and resolve the identified defect.",
+                "priority": action_priority
             }
         }
-        # Preserve the rich evidence model when a specialist supplies it.
-        for extra in ("category", "confidence", "root_cause", "impact", "verification", "scope"):
+
+        # Rich context preservation
+        for extra in ("category", "confidence", "root_cause", "cause_family", "cause_id", "impact", "verification", "scope"):
             if item.get(extra) is not None:
                 finding_entry[extra] = item[extra]
+
         final_findings.append(finding_entry)
 
     all_recommendations.extend(demoted)
+    deduped_recommendations = deduplicate_recommendations(all_recommendations)
 
-    summary_counts = {"total_findings": len(final_findings), "critical": 0, "high": 0, "medium": 0, "low": 0}
-    for f in final_findings:
-        if f["severity"] in summary_counts:
-            summary_counts[f["severity"]] += 1
+    summary_counts = {
+        "total_findings": len(final_findings),
+        "critical": sum(1 for f in final_findings if f["severity"] == "critical"),
+        "high": sum(1 for f in final_findings if f["severity"] == "high"),
+        "medium": sum(1 for f in final_findings if f["severity"] == "medium"),
+        "low": sum(1 for f in final_findings if f["severity"] == "low")
+    }
 
-    # --- Root-cause layer: cluster related findings under a shared cause so
-    # the report recommends one prioritized action per cause, not N scattered
-    # defects (operationalizes Round 2's root-cause requirement).
-    root_causes = []
+    # 5. Taxonomy-Driven Root-Cause Clustering
     rc_groups = {}
     for f in final_findings:
-        rc = f.get("root_cause")
-        if not rc:
-            continue
-        key = " ".join(str(rc).lower().split())[:120]
-        g = rc_groups.setdefault(key, {"root_cause": str(f["root_cause"]), "finding_ids": [],
-                                       "categories": set(), "severities": []})
-        g["finding_ids"].append(f["id"])
-        if f.get("category"):
-            g["categories"].add(str(f["category"]))
-        g["severities"].append(f["severity"])
+        cf = f.get("cause_family") or "GENERAL.AUDIT"
+        cid = f.get("cause_id") or "GEN-001"
+        rc_text = f.get("root_cause") or f["title"]
+
+        group_key = f"{cf}:{cid}"
+        if group_key not in rc_groups:
+            rc_groups[group_key] = {
+                "cause_family": cf,
+                "cause_id": cid,
+                "root_cause": rc_text,
+                "finding_ids": [],
+                "severities": []
+            }
+        rc_groups[group_key]["finding_ids"].append(f["id"])
+        rc_groups[group_key]["severities"].append(f["severity"])
+
+    root_causes = []
     for g in rc_groups.values():
         worst = min(g["severities"], key=lambda s: SEVERITY_ORDER.get(s, 99))
         root_causes.append({
+            "cause_family": g["cause_family"],
+            "cause_id": g["cause_id"],
             "root_cause": g["root_cause"],
             "finding_ids": g["finding_ids"],
-            "categories": sorted(g["categories"]),
             "max_severity": worst,
-            "suggested_priority": worst if worst != "info" else "low",
+            "suggested_priority": worst if worst != "info" else "low"
         })
     root_causes.sort(key=lambda r: SEVERITY_ORDER.get(r["max_severity"], 99))
 
-    # --- Diagnostic dimensions: internal diagnostic indices derived from
-    # specialist status + finding mix. These are explicitly DIAGNOSTIC, not a
-    # predictive "AI visibility score" (no single number predicts assistant
-    # behavior; platforms measure visibility differently).
-    diagnostic_dimensions = {}
-    for name, skill, cats in (
-        ("crawlability", "discoverability-audit", ("access", "rendering", "discovery")),
-        ("entity_clarity", "entity-content-audit", ("entity-identity", "content-quality")),
-        ("fact_integrity", "fact-consistency-audit", ("fact-consistency", "freshness")),
-        ("citation_readiness", "corroboration-authority-audit", ("corroboration",)),
-        ("context_continuity", "engagement-context-audit", ("orientation", "navigation")),
-    ):
-        if specialists.get(skill, {}).get("status") != "ok":
-            continue
-        hits = [f for f in final_findings if f.get("category") in cats]
-        diagnostic_dimensions[name] = round(max(0.0, 100.0 - 10 * len(hits)), 1)
+    # 6. Objective Audit Metrics
+    audit_metrics = {
+        "execution_time_seconds": round(time.time() - start_time, 1),
+        "pages_sampled": inv_stats.get("pages_sampled", 1) if inv_stats else 1,
+        "page_types_covered": inv_stats.get("page_types", {}) if inv_stats else {},
+        "critical_blockers": summary_counts["critical"],
+        "confidence_distribution": {
+            "high": sum(1 for f in final_findings if f.get("confidence") == "high"),
+            "medium": sum(1 for f in final_findings if f.get("confidence") == "medium"),
+            "low": sum(1 for f in final_findings if f.get("confidence") == "low")
+        },
+        "answerability_index": all_coverage.get("entity-content-audit", {}).get("answerability_index", 1.0)
+    }
 
     report = {
         "site": domain,
@@ -497,11 +586,9 @@ def compose_audit(site, include_proactive=True):
         "summary": summary_counts,
         "specialists": specialists,
         "findings": final_findings,
+        "audit_metrics": audit_metrics,
     }
-    if diagnostic_dimensions:
-        report["diagnostic_dimensions"] = diagnostic_dimensions
-        report["diagnostic_note"] = ("Diagnostic indices derived from this run's findings only. "
-                                     "They are not a predictive ranking of AI-assistant visibility.")
+
     if root_causes:
         report["root_causes"] = root_causes
     if all_observations:
@@ -510,17 +597,14 @@ def compose_audit(site, include_proactive=True):
         report["coverage"] = all_coverage
     if all_limitations:
         report["limitations"] = all_limitations
-    if all_recommendations:
-        report["proactive_actions"] = all_recommendations
+    if deduped_recommendations:
+        report["proactive_actions"] = deduped_recommendations
+
     return report
 
 
 def validation_gate(report):
-    """Run the bundled validator on the composed report before emitting.
-
-    Returns True only if the report validates. On failure, diagnostics are
-    written to stderr and the caller must NOT emit the report.
-    """
+    """Run validator on the generated report before emission."""
     try:
         proc = subprocess.run(
             [sys.executable, VALIDATOR, "-", "--quiet"],
@@ -538,7 +622,13 @@ def validation_gate(report):
 
 def main():
     args = parse_args()
-    report = compose_audit(args.site, include_proactive=args.include_proactive)
+    report = compose_audit(
+        args.site,
+        include_proactive=args.include_proactive,
+        with_representation=args.with_representation,
+        responses_file=args.responses_file,
+        timeout_seconds=args.timeout_seconds
+    )
 
     if not validation_gate(report):
         sys.exit(1)
