@@ -23,6 +23,7 @@ class EngagementAnalyzer(HTMLParser):
         self.headings = []
         self.nav_links_count = 0
         self.in_nav = False
+        self.total_anchors = 0
         self.paragraphs = []
         self.in_paragraph = False
         self.current_paragraph_text = []
@@ -37,8 +38,10 @@ class EngagementAnalyzer(HTMLParser):
             self.current_heading_text = []
         elif tag_lower == "nav":
             self.in_nav = True
-        elif tag_lower == "a" and self.in_nav:
-            self.nav_links_count += 1
+        elif tag_lower == "a":
+            self.total_anchors += 1
+            if self.in_nav:
+                self.nav_links_count += 1
         elif tag_lower == "p":
             self.in_paragraph = True
             self.current_paragraph_text = []
@@ -78,30 +81,44 @@ def audit_engagement(html_str, url_or_domain):
 
     h1_tags = [text for tag, text in parser.headings if tag == "h1"]
     h2_tags = [text for tag, text in parser.headings if tag == "h2"]
+    total_text = " ".join(parser.paragraphs)
+    word_count = len(total_text.split())
+    content_bearing = word_count >= 50
 
-    # 1. H1 Presence & Count
+    # 1. H1 presence — contextual, not automatic.
+    #    On a content-bearing page with no H1, orientation suffers; on an
+    #    empty/CSR shell page the crawl-render skill already reports the
+    #    rendering gap, so we do not double-penalize here.
     if len(h1_tags) == 0:
-        findings.append({
-            "id": "ENG-H1-MISSING",
-            "title": "Missing semantic H1 heading tag on landing page",
-            "severity": "high",
-            "evidence": f"Found 0 <h1> tags on {url_or_domain}. Lacks a clear semantic title to orient visitors and AI summary crawlers.",
-            "suggested_action": {
-                "summary": "Add a prominent <h1> element clearly articulating the core brand or product identity above the fold.",
-                "priority": "high"
-            }
-        })
-    elif len(h1_tags) > 1:
-        findings.append({
-            "id": "ENG-H1-MULTIPLE",
-            "title": "Multiple competing H1 headings detected",
-            "severity": "medium",
-            "evidence": f"Found {len(h1_tags)} separate <h1> tags ({h1_tags[:2]}), diluting page topic focus for search indexers.",
-            "suggested_action": {
-                "summary": "Consolidate to a single primary <h1> heading and convert secondary headers to <h2>.",
-                "priority": "medium"
-            }
-        })
+        if content_bearing:
+            findings.append({
+                "id": "ENG-H1-MISSING",
+                "title": "No H1 heading on content-bearing page",
+                "severity": "medium",
+                "evidence": f"Page carries ~{word_count} words but has no <h1>. Other headings present: {len(h2_tags)}. AI summarizers and skimming visitors lack a single primary topic statement.",
+                "suggested_action": {
+                    "summary": "Add one prominent <h1> that states what the page/brand offers, above the fold.",
+                    "priority": "medium"
+                }
+            })
+    else:
+        # H1 quality: does it communicate substance (information scent)?
+        primary_h1 = h1_tags[0]
+        if len(primary_h1.split()) < 3:
+            findings.append({
+                "id": "ENG-H1-VAGUE",
+                "title": "H1 heading carries little information scent",
+                "severity": "low",
+                "evidence": f"The page's <h1> is '{primary_h1}' ({len(primary_h1.split())} words). Short, generic headings do not tell visitors or AI summarizers what the organization actually offers.",
+                "suggested_action": {
+                    "summary": "Rewrite the <h1> to state the offer concretely, e.g. '<Brand>: freshly roasted specialty coffee delivered monthly'.",
+                    "priority": "low"
+                }
+            })
+
+    # Note: multiple H1 elements are valid HTML5 and are NOT reported as a
+    # defect; only their combined semantic clarity would matter, which
+    # requires human/LLM judgment beyond deterministic scope.
 
     # 2. Heading Hierarchy & Information Scent
     if len(h2_tags) == 0 and len(parser.paragraphs) > 3:
@@ -116,15 +133,17 @@ def audit_engagement(html_str, url_or_domain):
             }
         })
 
-    # 3. Navigation Structure
-    if parser.nav_links_count == 0:
+    # 3. Navigation — the real question is whether key destinations can be
+    #    discovered, not whether a literal <nav> tag exists. Header/footer
+    #    link menus (any anchors) satisfy discoverability.
+    if parser.nav_links_count == 0 and parser.total_anchors < 3 and content_bearing:
         findings.append({
             "id": "ENG-NAV-MISSING",
-            "title": "No standard semantic navigation links detected",
+            "title": "No navigational links discovered",
             "severity": "medium",
-            "evidence": "Semantic <nav> element with primary site links is absent or empty, causing high bounce risk for referred visitors.",
+            "evidence": f"Page carries ~{word_count} words but contains only {parser.total_anchors} link(s) and no <nav> menu. Visitors referred by AI assistants cannot discover other key destinations (pricing, docs, about), raising bounce risk.",
             "suggested_action": {
-                "summary": "Include a standard semantic <nav> header with direct links to Product, Pricing, Documentation, and About.",
+                "summary": "Add a navigation menu with direct links to core destinations (Product, Pricing, Docs, About).",
                 "priority": "medium"
             }
         })

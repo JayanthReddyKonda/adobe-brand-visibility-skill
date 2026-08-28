@@ -3,7 +3,6 @@ name: audit-orchestrator
 description: Audit a website for AI discoverability and on-site engagement by composing the marketplace's specialist skills and emitting a single evidence-backed JSON report conforming to the required schema. Use when diagnosing why a brand is missing, stale, or misrepresented in AI assistants (ChatGPT, Claude, Gemini, Perplexity), or why visitors who arrive bounce.
 license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
-allowed-tools: Bash Read
 metadata:
   role: entrypoint
   version: "1.0.0"
@@ -68,6 +67,11 @@ This is a **mandatory, ordered workflow**. You MUST load and run ALL THREE speci
 ## Output
 
 Return ONLY a JSON report matching the required schema (no additional text before or after). The report must reflect output from ALL the mandatory specialist skills above; a finding of zero problems is a valid, truthful result only if every specialist genuinely returned nothing.
+
+Marketplace report extensions (beyond the required schema):
+
+- **`specialists`**: execution status (`ok` / `failed` / `not_run`) per specialist. A failed or not-run specialist is NEVER treated as "no findings" — its status and error are always surfaced in the report.
+- **`proactive_actions`**: improvement opportunities grounded in real probes (e.g. missing `llms.txt` / `sitemap.xml`, absent `sameAs` on a crawlable site). These are explicitly NOT defects and are kept out of `findings` and out of the severity summary.
 
 ```json
 {

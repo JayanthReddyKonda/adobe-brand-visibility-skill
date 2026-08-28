@@ -128,12 +128,23 @@ def audit_html_content(html_str, url_or_domain):
     if word_count < 30 and parser.spa_root_found:
         findings.append({
             "id": "CR-RENDER-01",
-            "title": "Client-side rendering gap: Raw HTML contains no substantive text",
+            "title": "Primary content not present in initial HTML (client-side rendering)",
             "severity": "high",
-            "evidence": f"Raw HTML body contains only {word_count} words and an empty SPA root container. AI crawlers without JS execution will index an empty page.",
+            "evidence": f"Initial HTML body contains only {word_count} words and an empty SPA root container. Crawlers that do not execute JavaScript (including most AI assistants) retrieve an effectively empty page. Verified directly against the raw HTML.",
             "suggested_action": {
-                "summary": "Implement Server-Side Rendering (SSR) or Static Site Generation (SSG) to render core text into initial HTML.",
+                "summary": "Implement Server-Side Rendering (SSR) or Static Site Generation (SSG) so core text is present in the initial HTML response.",
                 "priority": "high"
+            }
+        })
+    elif word_count < 30:
+        findings.append({
+            "id": "CR-RENDER-02",
+            "title": "Initial HTML contains almost no text",
+            "severity": "low",
+            "evidence": f"Raw HTML body contains only {word_count} words of visible text. If the page relies on JavaScript to render content, non-JS crawlers will see an empty page; verify the page renders its content server-side.",
+            "suggested_action": {
+                "summary": "Confirm core content is present in the initial HTML response, not injected solely by client-side JavaScript.",
+                "priority": "low"
             }
         })
 
@@ -164,15 +175,17 @@ def audit_html_content(html_str, url_or_domain):
                 }
             })
 
-    if not schemas_detected:
+    if not schemas_detected and word_count >= 30:
+        # Absence of structured data on an otherwise crawlable page is an
+        # improvement opportunity, not a proven discoverability defect.
         findings.append({
             "id": "CR-SCHEMA-01",
-            "title": "Missing Schema.org JSON-LD structured data",
-            "severity": "high",
-            "evidence": f"No Schema.org structured data found on {url_or_domain}.",
+            "title": "No Schema.org structured data (optional improvement)",
+            "severity": "low",
+            "evidence": f"Page text is crawlable ({word_count} words in initial HTML) but no Schema.org JSON-LD is present. Structured data is not strictly required for discovery here; it would make entity facts explicit for AI assistants.",
             "suggested_action": {
-                "summary": "Add Schema.org JSON-LD markup (e.g. Organization, Product, FAQPage) to explicitly declare brand entities.",
-                "priority": "high"
+                "summary": "Consider adding Schema.org JSON-LD (e.g. Organization, Product, FAQPage) to declare brand entities explicitly.",
+                "priority": "low"
             }
         })
 

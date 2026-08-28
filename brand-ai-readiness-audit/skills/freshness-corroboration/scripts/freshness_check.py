@@ -52,7 +52,10 @@ class FreshnessAnalyzer(HTMLParser):
                 self.text_content.append(txt)
 
 def audit_freshness(html_str, url_or_domain):
+    """Returns (findings, recommendations). Only evidence-backed defects are
+    findings; improvement opportunities are returned as recommendations."""
     findings = []
+    recommendations = []
     parser = FreshnessAnalyzer()
     try:
         parser.feed(html_str)
@@ -61,32 +64,44 @@ def audit_freshness(html_str, url_or_domain):
 
     full_text = " ".join(parser.text_content)
 
-    # 1. Check Copyright Year
+    result = {
+        "copyright_year": None,
+        "org_name": None,
+        "has_dates": False,
+        "has_same_as": False,
+        "word_count": len(full_text.split()),
+    }
+
+    # 1. Copyright year (weak maintenance signal -> low severity at most)
     copyright_matches = re.findall(r'(?:©|&copy;|copyright)\s*(?:[0-9]{4}\s*[-–]\s*)?([0-9]{4})', full_text, re.IGNORECASE)
     if copyright_matches:
         try:
             latest_c_year = max(int(y) for y in copyright_matches if 1990 <= int(y) <= CURRENT_YEAR + 1)
+            result["copyright_year"] = latest_c_year
             if latest_c_year < CURRENT_YEAR - 1:
+                # A copyright year alone is not proof of stale *content*;
+                # it is a weak maintenance signal.
                 findings.append({
                     "id": "FC-COPYRIGHT-STALE",
-                    "title": "Outdated copyright year detected",
-                    "severity": "medium",
-                    "evidence": f"Visible copyright notice shows '{latest_c_year}', which is older than {CURRENT_YEAR - 1}. Stale dates signal abandoned maintenance to AI models.",
+                    "title": "Copyright year suggests minimal maintenance",
+                    "severity": "low",
+                    "evidence": f"Footer copyright shows '{latest_c_year}' while current year is {CURRENT_YEAR}. This is a weak signal on its own and does not prove content is stale, but it may read as an abandoned site.",
                     "suggested_action": {
-                        "summary": f"Update footer copyright year to {CURRENT_YEAR} and consider using a dynamic year snippet.",
-                        "priority": "medium"
+                        "summary": f"Update the copyright year to {CURRENT_YEAR} (ideally render it dynamically). Verify volatile facts (pricing, dates, availability) are current.",
+                        "priority": "low"
                     }
                 })
         except ValueError:
             pass
 
-    # 2. Check Modified Timestamps
-    has_modified_meta = any(k in parser.meta_tags for k in [
-        "article:modified_time", "og:updated_time", "last-modified", "date"
-    ])
-    
-    # 3. Check JSON-LD for sameAs and dateModified
-    has_same_as = False
+    # 2. Extract organization name for cross-page comparison
+    title_match = re.search(r'<title[^>]*>([^<]+)</title>', html_str, re.IGNORECASE)
+    if title_match:
+        result["org_name"] = title_match.group(1).strip()
+
+    # 3. Modification timestamps (weak signal -> low, only for content pages)
+    has_modified_meta = any(k in parser.meta_tags for k in
+                            ["article:modified_time", "og:updated_time", "last-modified"])
     has_date_modified = False
     same_as_links = []
 
@@ -99,7 +114,7 @@ def audit_freshness(html_str, url_or_domain):
             for obj in objects:
                 if isinstance(obj, dict):
                     if "sameAs" in obj:
-                        has_same_as = True
+                        result["has_same_as"] = True
                         val = obj["sameAs"]
                         if isinstance(val, list):
                             same_as_links.extend(val)
@@ -107,35 +122,34 @@ def audit_freshness(html_str, url_or_domain):
                             same_as_links.append(val)
                     if "dateModified" in obj or "datePublished" in obj:
                         has_date_modified = True
+                        result["has_dates"] = True
         except Exception:
             pass
+    result["has_dates"] = result["has_dates"] or has_modified_meta
 
-    if not has_modified_meta and not has_date_modified:
+    if not result["has_dates"] and result["word_count"] >= 100:
+        # Missing timestamps on a content-bearing page: low-severity signal.
         findings.append({
             "id": "FC-DATE-MODIFIED-MISSING",
-            "title": "Missing content modification timestamps",
-            "severity": "medium",
-            "evidence": "No 'dateModified' or 'article:modified_time' metadata found to communicate content freshness.",
+            "title": "No freshness timestamps exposed",
+            "severity": "low",
+            "evidence": f"Page carries {result['word_count']} words of content but exposes no 'dateModified', 'article:modified_time', or equivalent. AI assistants cannot judge how current the information is; this is a signal gap, not proof of stale content.",
             "suggested_action": {
-                "summary": "Expose ISO 8601 modification dates in OpenGraph and JSON-LD markup.",
-                "priority": "medium"
+                "summary": "Expose ISO 8601 modification dates via OpenGraph ('article:modified_time') and JSON-LD ('dateModified') on content pages.",
+                "priority": "low"
             }
         })
 
-    # 4. Check Entity Corroboration (sameAs links)
-    if not has_same_as or not same_as_links:
-        findings.append({
-            "id": "FC-ENTITY-SAMEAS-MISSING",
-            "title": "Missing sameAs entity corroboration links in structured data",
-            "severity": "high",
-            "evidence": f"Structured data on {url_or_domain} lacks 'sameAs' links to Wikidata, Crunchbase, or verified social profiles, increasing entity ambiguity for AI assistants.",
-            "suggested_action": {
-                "summary": "Add authoritative 'sameAs' URLs in Organization JSON-LD linking to Wikidata and corporate registry profiles.",
-                "priority": "high"
-            }
+    # 4. Entity corroboration: absence of sameAs alone is NOT evidence of
+    #    entity ambiguity, so it is an optional improvement, not a defect.
+    if not result["has_same_as"] and result["word_count"] >= 30:
+        recommendations.append({
+            "title": "Add sameAs entity links to structured data",
+            "rationale": f"No 'sameAs' links to authoritative profiles (Wikidata, social, registries) were found on {url_or_domain}. If competing entities share the brand name, this raises entity-disambiguation risk; absent such ambiguity it is simply a strengthening measure.",
+            "suggested_action": "Add 'sameAs' URLs to the Organization JSON-LD pointing at Wikidata, Crunchbase, and official social profiles."
         })
 
-    return findings
+    return findings, recommendations, result
 
 def fetch_url(url, timeout=5):
     req = urllib.request.Request(
@@ -149,26 +163,80 @@ def fetch_url(url, timeout=5):
         sys.stderr.write(f"Fetch failed for {url}: {e}\n")
         return None, None
 
+def extract_internal_links(html_str, base_url, limit=2):
+    """Extract a few same-domain links for cross-page consistency checks."""
+    links = []
+    base_domain = "/".join(base_url.split("/")[:3])
+    for match in re.finditer(r'<a[^>]+href=["\']([^"\'#]+)["\']', html_str, re.IGNORECASE):
+        href = match.group(1)
+        if href.startswith(("mailto:", "tel:", "javascript:")):
+            continue
+        if href.startswith("/"):
+            links.append(base_domain + href)
+        elif href.startswith(base_domain):
+            links.append(href)
+        if len(links) >= limit:
+            break
+    return links
+
+
+def cross_page_check(home_result, home_url, fetched_pages):
+    """Compare identity/maintenance signals across pages. Only a verified
+    contradiction is a finding; missing signals never are."""
+    findings = []
+    for page_url, page_result in fetched_pages:
+        # Copyright-year contradiction across pages of the same site
+        y1, y2 = home_result.get("copyright_year"), page_result.get("copyright_year")
+        if y1 and y2 and y1 != y2:
+            findings.append({
+                "id": "FC-CROSS-COPYRIGHT",
+                "title": "Inconsistent copyright years across pages",
+                "severity": "medium",
+                "evidence": f"'{home_url}' shows copyright {y1} while '{page_url}' shows {y2}. Contradictory maintenance signals on the same site confuse freshness inference.",
+                "suggested_action": {
+                    "summary": "Render the copyright year dynamically so it is identical across all pages.",
+                    "priority": "medium"
+                }
+            })
+    return findings
+
+
 def main():
     parser = argparse.ArgumentParser(description="Audit fact freshness and entity corroboration.")
     parser.add_argument("--site", help="URL or domain to audit")
     parser.add_argument("--file", help="Path to local HTML file to inspect")
+    parser.add_argument("--no-cross-page", action="store_true", help="Skip cross-page consistency fetching")
     args = parser.parse_args()
 
     findings = []
+    recommendations = []
 
     if args.file and os.path.exists(args.file):
         with open(args.file, "r", encoding="utf-8") as f:
             html = f.read()
-        findings.extend(audit_freshness(html, args.file))
+        f_findings, f_recs, _ = audit_freshness(html, args.file)
+        findings.extend(f_findings)
+        recommendations.extend(f_recs)
 
     if args.site:
         site_clean = args.site if args.site.startswith("http") else f"https://{args.site}"
         status, html = fetch_url(site_clean)
         if html:
-            findings.extend(audit_freshness(html, site_clean))
+            f_findings, f_recs, home_result = audit_freshness(html, site_clean)
+            findings.extend(f_findings)
+            recommendations.extend(f_recs)
 
-    print(json.dumps(findings, indent=2))
+            # Cross-page consistency: verify facts on a couple of internal pages.
+            if not args.no_cross_page:
+                fetched = []
+                for link in extract_internal_links(html, site_clean):
+                    p_status, p_html = fetch_url(link)
+                    if p_html:
+                        _, _, p_result = audit_freshness(p_html, link)
+                        fetched.append((link, p_result))
+                findings.extend(cross_page_check(home_result, site_clean, fetched))
+
+    print(json.dumps({"findings": findings, "recommendations": recommendations}, indent=2))
 
 if __name__ == "__main__":
     main()

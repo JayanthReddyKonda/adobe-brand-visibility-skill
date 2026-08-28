@@ -3,7 +3,6 @@ name: freshness-corroboration
 description: Audit fact freshness, temporal signals (copyright year, dateModified), cross-page consistency, and external entity corroboration (sameAs, Wikidata, Knowledge Graph) for AI trust and accurate brand representation. Use when diagnosing why an AI assistant cites outdated facts, wrong pricing, or confuses a brand with another company.
 license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
-allowed-tools: Bash Read
 metadata:
   role: specialist
   domain: trust-accuracy

@@ -3,7 +3,6 @@ name: engagement-audit
 description: Audit on-site visitor orientation, above-the-fold clarity, heading hierarchies (H1 to H3), information scent, navigation health, and summary readability for AI extractors and bounce prevention. Use when diagnosing why visitors referred from AI search bounce or fail to engage, or why AI assistants produce vague or diluted brand summaries.
 license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
-allowed-tools: Bash Read
 metadata:
   role: specialist
   domain: engagement

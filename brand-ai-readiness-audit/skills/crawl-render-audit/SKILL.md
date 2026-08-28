@@ -3,7 +3,6 @@ name: crawl-render-audit
 description: Audit website crawlability, bot directives (robots.txt, AI user-agents), client-side rendering gaps (SSR vs CSR), machine-readable DOM content, and Schema.org JSON-LD structured data for AI discoverability. Use when diagnosing why AI search assistants cannot crawl, read, or parse a brand's website.
 license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
-allowed-tools: Bash Read
 metadata:
   role: specialist
   domain: discoverability
