@@ -44,7 +44,9 @@ JSON: `{status, findings[], recommendations[], entity, products_found, words}`.
 Findings use the rich model (category/confidence/root_cause/impact/verification).
 
 ## Scripts
-- `scripts/entity_content_check.py --site <url>`
+- `scripts/entity_content_check.py --site <url> [--inventory <file.json>]`
+  (`--inventory` supplies the orchestrator's shared site snapshot; without it
+  the script fetches pages itself.)
 
 ## Gotchas
 - If the page is a CSR shell, entity analysis is meaningless — return

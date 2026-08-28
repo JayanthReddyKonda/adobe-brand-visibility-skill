@@ -75,8 +75,11 @@ Returns a JSON list of structured findings:
 
 - **`scripts/engagement_check.py`** — Runs automated engagement and hierarchy analysis:
   ```bash
-  python3 skills/engagement-audit/scripts/engagement_check.py --site example.com
+  python3 skills/engagement-context-audit/scripts/engagement_check.py --site example.com [--inventory <file.json>]
   ```
+  (`--inventory` supplies the orchestrator's shared site snapshot and enables
+  landing-page continuity checks on its internal pages; without it only the
+  homepage is analyzed.)
   *(On Windows, use `python` or `py`)*
 - **`references/ENGAGEMENT_RUBRIC.md`** — Comprehensive orientation and bounce prevention heuristics.
 - **`references/AI_SNIPPET_GUIDELINES.md`** — Summary extractability and signal-to-noise guidelines.

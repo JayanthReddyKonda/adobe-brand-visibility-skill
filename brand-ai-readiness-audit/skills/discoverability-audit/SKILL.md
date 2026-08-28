@@ -45,7 +45,9 @@ rich model: `category, title, severity, confidence, root_cause, impact,
 evidence, suggested_action{summary, priority, verification}`.
 
 ## Scripts
-- `scripts/discoverability_check.py --site <url>`
+- `scripts/discoverability_check.py --site <url> [--inventory <file.json>]`
+  (`--inventory` supplies the orchestrator's shared site snapshot; without it
+  the script fetches the homepage and robots.txt itself.)
 
 ## Gotchas
 - Network-unreachable targets must return `inconclusive`, not zero findings.

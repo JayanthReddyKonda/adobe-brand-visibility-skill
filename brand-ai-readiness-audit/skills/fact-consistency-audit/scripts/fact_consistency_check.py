@@ -275,7 +275,16 @@ def main():
     parser.add_argument("--site", help="URL or domain to audit")
     parser.add_argument("--file", help="Path to local HTML file to inspect")
     parser.add_argument("--no-cross-page", action="store_true", help="Skip cross-page consistency fetching")
+    parser.add_argument("--inventory", help="Path to shared site-inventory JSON (from audit-orchestrator); its pages replace independent fetches")
     args = parser.parse_args()
+
+    inv = None
+    if getattr(args, "inventory", None) and os.path.exists(args.inventory):
+        try:
+            with open(args.inventory, "r", encoding="utf-8") as f:
+                inv = json.load(f)
+        except Exception:
+            inv = None
 
     findings = []
     recommendations = []
@@ -289,27 +298,45 @@ def main():
 
     if args.site:
         site_clean = args.site if args.site.startswith("http") else f"https://{args.site}"
-        status, html = fetch_url(site_clean)
+        # Shared inventory: use the orchestrator's evidence snapshot when
+        # provided (homepage + bounded priority pages, no re-fetching).
+        if inv is not None:
+            home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+            html = home.get("html") if home else None
+        else:
+            status, html = fetch_url(site_clean)
         if html:
             f_findings, f_recs, home_result = audit_freshness(html, site_clean)
             findings.extend(f_findings)
             recommendations.extend(f_recs)
 
-            # Cross-page consistency: verify facts on a couple of internal pages.
+            # Cross-page consistency: verify facts across the shared page set.
+            pages = []
             if not args.no_cross_page:
                 fetched = []
                 page_facts = [extract_facts(html, site_clean)]
-                for link in extract_internal_links(html, site_clean):
-                    p_status, p_html = fetch_url(link)
-                    if p_html:
-                        _, _, p_result = audit_freshness(p_html, link)
-                        fetched.append((link, p_result))
-                        page_facts.append(extract_facts(p_html, link))
+                if inv is not None:
+                    pages = [(p["url"], p["html"]) for p in inv.get("pages", [])
+                             if p.get("html") and p.get("page_type") != "homepage"]
+                else:
+                    pages = []
+                    for link in extract_internal_links(html, site_clean):
+                        p_status, p_html = fetch_url(link)
+                        if p_html:
+                            pages.append((link, p_html))
+                for link, p_html in pages[:8]:
+                    _, _, p_result = audit_freshness(p_html, link)
+                    fetched.append((link, p_result))
+                    page_facts.append(extract_facts(p_html, link))
                 findings.extend(cross_page_check(home_result, site_clean, fetched))
                 # Fact ledger: conflicting values for the same fact across pages.
                 findings.extend(fact_ledger_check(page_facts))
             print(json.dumps({"status": "ok", "findings": findings,
-                              "recommendations": recommendations}, indent=2))
+                              "recommendations": recommendations,
+                              "coverage": {"pages_checked": 1 + (len(pages) if not args.no_cross_page else 0),
+                                           "source": "shared-inventory" if inv is not None else "independent-fetch"},
+                              "limitations": (["fact extraction covers raw HTML text and JSON-LD only"] if inv is not None else [])},
+                             indent=2))
         else:
             print(json.dumps({"status": "inconclusive", "findings": [],
                               "recommendations": [],

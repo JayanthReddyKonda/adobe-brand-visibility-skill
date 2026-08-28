@@ -31,7 +31,9 @@ description: >
 JSON: `{status, findings[], recommendations[], links_checked[]}`.
 
 ## Scripts
-- `scripts/corroboration_check.py --site <url>`
+- `scripts/corroboration_check.py --site <url> [--inventory <file.json>]`
+  (the inventory flag is accepted for interface consistency; corroboration
+  fetches external sources independently.)
 
 ## Gotchas
 - Never equate "missing sameAs" with "entity ambiguity" — ambiguity requires

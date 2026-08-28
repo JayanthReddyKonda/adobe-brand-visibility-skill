@@ -94,7 +94,7 @@ In a compatible agent client, prompt naturally — e.g. *"Audit https://example.
 ## Design Principles
 
 - **Read-only**: audits never modify live sites or take destructive actions.
-- **Evidence-backed**: every finding cites verifiable evidence; nothing is synthesized — clean sites yield zero findings.
+- **Evidence-backed**: every defect finding must be traceable to evidence collected during the run (live HTTP responses, parsed HTML, fetched external profiles); findings that fail the evidence or confidence gate are demoted to recommendations rather than asserted. When evidence is insufficient, the relevant check is reported as `inconclusive` — never invented and never silently clean.
 - **Deterministic composition**: the orchestrator must load and run all specialist skills and pass schema validation before emitting.
 - **Zero-dependency core**: standard-library Python 3 only (`urllib`, `html.parser`, `json`, `re`, `xml.etree`) for cross-platform portability.
 - **Progressive disclosure**: compact declarative `SKILL.md` files; deep criteria in `references/`, deterministic checks in `scripts/`.

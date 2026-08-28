@@ -1,54 +1,95 @@
-# Composition, Reconciliation & Severity Guidelines
+# Composition, Evidence & Severity Guidelines
 
-This guide details how `audit-orchestrator` composes specialist audit outputs, resolves conflicts, deduplicates overlapping signals, calculates severity levels, and synthesizes proactive improvements.
-
----
-
-## 1. Specialist Skill Responsibilities
-
-1. **`crawl-render-audit`**: Focuses strictly on technical access, bot directives, DOM hydration/render barriers, text vs non-text barriers, and JSON-LD schema presence.
-2. **`freshness-corroboration`**: Focuses on fact decay, date markers, cross-page claim divergence, and entity disambiguation (`sameAs` links).
-3. **`engagement-audit`**: Focuses on visitor orientation, heading hierarchies (`H1-H3`), navigational integrity, and concise AI summary extractability.
+How `audit-orchestrator` acquires evidence, composes specialist outputs, gates
+findings, and reports root causes. This document describes the *implemented*
+orchestrator — SKILL.md, this reference, and `scripts/orchestrator.py` are one
+methodology, not three opinions.
 
 ---
 
-## 2. Reconciliation & Deduplication Workflow
+## 1. Specialist responsibilities (v2 skill set)
 
-When specialist skills return individual findings, the orchestrator performs the following normalization:
+| Skill | Owns | Does NOT own |
+| :--- | :--- | :--- |
+| `discoverability-audit` | Access, crawl rules (robots/ai-robots), noindex, canonical, rendering risk, discovery aids | Structured data, page content |
+| `entity-content-audit` | Entity identity, attributes, structured representation, answerability gaps | Crawler access rules |
+| `fact-consistency-audit` | Fact ledger, volatile facts, cross-page contradictions, freshness of *facts* (not copyright years) | Entity identity correctness |
+| `corroboration-authority-audit` | Independent source verification of first-party claims (sameAs, external profiles) | First-party content quality |
+| `engagement-context-audit` | Intent orientation, navigation continuity, context preservation on landing pages | Technical crawlability |
+| `assistant-representation-audit` | Classification of *observed* AI assistant outputs (optional enrichment; never run unprompted) | Site-side checks |
 
-```mermaid
-graph TD
-    A[Collect Specialist Outputs] --> B[Deduplicate Overlapping Signals]
-    B --> C[Assign Unique IDs F-001..F-NNN]
-    C --> D[Calibrate Severity Ratings]
-    D --> E[Synthesize Proactive Recommendations]
-    E --> F[Generate Summary Counts]
-    F --> G[Emit Final JSON Report]
+## 2. Shared site inventory
+
+The orchestrator performs ONE bounded acquisition pass and hands every
+specialist the same evidence snapshot via `--inventory <file>`:
+
+- Mandatory: homepage, robots.txt, sitemap (index sitemaps expanded one level).
+- Priority selection: 10–20 URLs classified by page type
+  (product, pricing, service, category, contact, location, about,
+  documentation, article) — never a bulk crawl. Small sites may be covered
+  fully; large sites are sampled by type. Time-budgeted (~90s).
+- Specialists fall back to independent fetching when no inventory is supplied,
+  and report `coverage.source: shared-inventory | independent-fetch` either way.
+
+## 3. Evidence contract
+
+Every specialist output is:
+
+```json
+{
+  "status": "ok | failed | not_run | inconclusive",
+  "coverage": {},
+  "observations": [],
+  "findings": [],
+  "recommendations": [],
+  "limitations": []
+}
 ```
 
-### Overlap Deduplication Rules
-- **Schema & Entity Conflict**: If `crawl-render-audit` reports missing `Organization` schema and `freshness-corroboration` reports missing `sameAs` links, consolidate into a single finding prioritizing structured entity markup with `sameAs` identifiers.
-- **Render Gaps & Heading Extraction**: If `crawl-render-audit` notes client-side-only rendering and `engagement-audit` reports missing `H1` tags due to JS-only rendering, merge into an SSR / DOM accessibility finding with specific engagement impacts cited in evidence.
+Findings carry `category, title, severity, confidence, evidence, root_cause,
+impact, suggested_action{summary, priority, verification}`. The orchestrator
+aggregates observations into the final report and never converts an
+`inconclusive` specialist into a clean result — failure must never become
+"clean".
 
----
+## 4. Eligibility gate (finding → final report)
 
-## 3. Severity & Priority Rubric
+Before a specialist finding enters `findings[]`:
 
-| Level | Discoverability Criteria | Engagement Criteria | Action Priority |
-| :--- | :--- | :--- | :--- |
-| **`critical`** | Site completely blocked to AI indexers (`robots.txt` disallows all bots, HTTP 403/500, empty HTML body). | Severe site malfunction, broken primary conversion funnel, unreadable layout. | Immediate fix required |
-| **`high`** | No structured data (JSON-LD missing), core brand facts locked in images/canvas without text equivalents, major entity ambiguity. | Missing above-the-fold value prop, absent `H1` tag, broken primary navigation. | Urgent (P1) |
-| **`medium`** | Stale dates (>2 years old), missing `dateModified`, minor schema omissions (e.g. missing `BreadcrumbList`). | Confusing heading hierarchy, excessive jargon/filler text diluting AI summary quality. | Recommended (P2) |
-| **`low`** | Proactive enhancements (e.g. adding `llms.txt`, FAQ schemas where none exist). | Minor styling or micro-copy improvements. | Proactive (P3) |
+1. It must cite concrete evidence (≥ 10 chars of specific, gathered evidence).
+   Evidence-less assertions become `proactive_actions[]`, never silent drops.
+2. `critical`/`high` severity with `low` confidence is demoted to a
+   recommendation ("potentially serious, insufficient evidence"). Severity and
+   confidence are separate axes; low confidence never auto-becomes a high
+   defect.
+3. Duplicates (normalized title fingerprint) are collapsed, keeping the
+   highest-severity instance.
 
----
+## 5. Root-cause layer
 
-## 4. Proactive Suggestions (Beyond Direct Defects)
+Findings sharing a `root_cause` are clustered into `root_causes[]` with
+contributing `finding_ids`, categories, and max severity — so the report
+recommends one prioritized action per cause instead of N scattered defects.
 
-A high-scoring audit report does not stop at flagging explicit errors; it recommends proactive architectural optimizations that give brands an AI visibility edge:
+## 6. Diagnostic dimensions (not a visibility score)
 
-1. **`llms.txt` & `llms-full.txt` Endpoint**: Provide standard Markdown documentation indexes for LLM web readers.
-2. **Entity Disambiguation via Wikidata & Knowledge Graph**: Link official identities in JSON-LD `sameAs` to prevent brand name collisions.
-3. **Structured FAQPage & Q&A Schema**: Expose key user questions directly in machine-readable format for conversational answer extraction.
-4. **Summary-First Information Design**: Position high-density 1-2 sentence core value propositions at the top of landing pages for instant assistant parsing.
+`diagnostic_dimensions` (crawlability, entity clarity, fact integrity,
+citation readiness, context continuity) are internal diagnostic indices
+derived from THIS run's findings only. They are explicitly not a predictive
+ranking of AI-assistant visibility; no single number predicts assistant
+behavior across platforms.
+
+## 7. Severity rubric (calibrated, evidence-gated)
+
+| Level | Criteria |
+| :--- | :--- |
+| `critical` | Site inaccessible or fully excluded from retrieval (verified: blanket AI-crawler `Disallow: /`, hard 4xx/5xx on core pages) |
+| `high` | Verified defect with direct retrieval/answer impact and adequate confidence |
+| `medium` | Verified degradation (missing discovery aids, weak orientation) |
+| `low` / `info` | Minor gaps, polish |
+
+Any "expected best practice" without site-specific evidence is a
+`recommendation`, not a finding. Absence of a file the site never promised
+(`llms.txt`, FAQ schema) is a proactive suggestion at most.
+
 

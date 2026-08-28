@@ -123,9 +123,20 @@ def robots_access(groups, ua, path="/"):
     return best[0], best[1]
 
 
-def audit(base, domain):
+def audit(base, domain, inv=None):
+    """Audit access & discovery. When `inv` (shared site inventory JSON from
+    the orchestrator) is supplied, its homepage HTML and robots.txt are used
+    instead of re-fetching — all specialists then operate on the same
+    evidence snapshot."""
     findings, recommendations, evidence = [], [], []
-    status, html, headers = fetch(base + "/")
+    if inv is not None:
+        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+        if not home or not home.get("html"):
+            return {"status": "inconclusive", "findings": [], "recommendations": [],
+                    "error": "inventory lacks a usable homepage snapshot"}
+        status, html, headers = home["status"], home["html"], {}
+    else:
+        status, html, headers = fetch(base + "/")
     if status is None:
         return {"status": "inconclusive", "findings": [], "recommendations": [],
                 "error": f"could not reach {base} (network unreachable or blocked)"}
@@ -142,7 +153,10 @@ def audit(base, domain):
 
     # robots.txt: per-bot access with real path matching (RFC 9309-style).
     # Absence of a rule = allowed; only explicit blanket denials are reported.
-    r_status, r_body, _ = fetch(base + "/robots.txt")
+    if inv is not None and inv.get("robots") is not None:
+        r_status, r_body = inv["robots"].get("status"), inv["robots"].get("text") or ""
+    else:
+        r_status, r_body, _ = fetch(base + "/robots.txt")
     groups, sitemaps = [], []
     if r_status == 200 and r_body:
         groups, sitemaps = parse_robots(r_body)
@@ -256,15 +270,28 @@ def audit(base, domain):
                          internal_links=len(internal), robots_status=r_status,
                          sitemaps=sitemaps))
     return {"status": "ok", "findings": findings, "recommendations": recommendations,
-            "evidence": evidence}
+            "evidence": evidence,
+            "coverage": {"homepage_checked": True, "robots_checked": r_status == 200,
+                         "sitemap_declared": bool(sitemaps),
+                         "source": "shared-inventory" if inv is not None else "independent-fetch"},
+            "limitations": ([] if r_status == 200 else
+                            ["robots.txt not retrievable (HTTP %s); access rules unverified" % r_status])}
 
 
 def main():
     ap = argparse.ArgumentParser(description="Access & discovery audit layer.")
     ap.add_argument("--site", required=True)
+    ap.add_argument("--inventory", help="Path to shared site-inventory JSON (from audit-orchestrator); use its snapshot instead of re-fetching")
     args = ap.parse_args()
     base, domain = parse_domain(args.site)
-    print(json.dumps(audit(base, domain), indent=2))
+    inv = None
+    if args.inventory and os.path.exists(args.inventory):
+        try:
+            with open(args.inventory, "r", encoding="utf-8") as f:
+                inv = json.load(f)
+        except Exception:
+            inv = None
+    print(json.dumps(audit(base, domain, inv=inv), indent=2))
 
 
 if __name__ == "__main__":

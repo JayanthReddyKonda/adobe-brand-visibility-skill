@@ -100,6 +100,7 @@ def audit(site):
 def main():
     ap = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
     ap.add_argument("--site", required=True)
+    ap.add_argument("--inventory", help="Shared site-inventory JSON (accepted for interface consistency; corroboration checks external sources and fetches them independently)")
     args = ap.parse_args()
     print(json.dumps(audit(args.site), indent=2))
 

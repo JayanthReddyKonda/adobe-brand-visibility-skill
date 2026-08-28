@@ -108,16 +108,28 @@ def extract_entities(dom, base):
     return org, products, dates
 
 
-def audit(base, domain):
+def audit(base, domain, inv=None):
     """Entity & content understanding audit.
 
     Contract: only measured understanding gaps become findings. Structured
     data absence is at most a recommendation. Inconclusive fetches surface
-    status instead of a clean bill of health.
+    status instead of a clean bill of health. When `inv` (shared site
+    inventory from the orchestrator) is supplied, its pages are used as the
+    evidence snapshot and page-type-aware attribute coverage is measured.
     """
     findings, recommendations = [], []
+    observations, limitations = [], []
 
-    status, html, _ = fetch(base + "/")
+    if inv is not None:
+        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+        if not home or not home.get("html"):
+            return {"status": "inconclusive", "findings": [], "recommendations": [],
+                    "error": "inventory lacks a usable homepage snapshot"}
+        status, html = home["status"], home["html"]
+        inv_pages = [p for p in inv.get("pages", []) if p.get("html") and p.get("page_type") != "homepage"]
+    else:
+        status, html = fetch(base + "/")[:2]
+        inv_pages = []
     if status is None:
         return {"status": "inconclusive", "findings": [], "recommendations": [],
                 "error": f"could not reach {base}"}
@@ -187,19 +199,93 @@ def audit(base, domain):
             rationale="No sameAs links were found. Without them, AI systems cannot tie this site to Wikidata/social/registry identities. Absence alone is not ambiguity - add them to preempt disambiguation risk.",
             suggested_action="List authoritative profile URLs (Wikidata, registries, official social) in Organization.sameAs."))
 
+    # 5. Page-type-aware attribute coverage (answerability layer): for each
+    #    inventory page of a known type, measure whether the expected material
+    #    attributes are present. Gaps become RECOMMENDATIONS with a measured
+    #    coverage ratio — not defects (absence of an attribute is not proof of
+    #    a defect; it is an answerability gap).
+    EXPECTED_ATTRS = {
+        "product": ["name", "price", "description", "availability", "brand"],
+        "pricing": ["price", "plan", "currency-or-unit"],
+        "location": ["address", "hours", "phone"],
+        "documentation": ["version", "example", "command-or-api"],
+        "contact": ["email-or-form", "phone", "address"],
+    }
+    attr_coverage = {}
+    for page in inv_pages:
+        ptype = page.get("page_type")
+        expected = EXPECTED_ATTRS.get(ptype)
+        if not expected:
+            continue
+        pd = Dom()
+        try:
+            pd.feed(page["html"])
+        except Exception:
+            continue
+        text = " ".join(pd.text).lower()
+        porg, pprods, _ = extract_entities(pd, base)
+        present = []
+        if ptype == "product":
+            if pd.title: present.append("name")
+            if pprods and any(p.get("price") for p in pprods): present.append("price")
+            if pprods and any(p.get("description") for p in pprods): present.append("description")
+            if pprods and any(p.get("availability") for p in pprods): present.append("availability")
+            if pprods and any(p.get("name") for p in pprods): present.append("brand")
+        else:
+            markers = {"pricing": {"price": PRICE_RE.search(text), "plan": "plan" in text,
+                                   "currency-or-unit": bool(PRICE_RE.search(text))},
+                       "location": {"address": "address" in text, "hours": "hours" in text or "open" in text,
+                                    "phone": bool(re.search(r"\+?\d[\d\s().-]{7,}\d", text))},
+                       "documentation": {"version": "version" in text or "v[0-9]" in text,
+                                         "example": "example" in text,
+                                         "command-or-api": "api" in text or "$ " in text or "npm" in text},
+                       "contact": {"email-or-form": "@" in text or "form" in text,
+                                   "phone": bool(re.search(r"\+?\d[\d\s().-]{7,}\d", text)),
+                                   "address": "address" in text}}
+            present = [k for k, hit in markers.get(ptype, {}).items() if hit]
+        ratio = round(len(set(present)) / len(expected), 2) if expected else 1.0
+        attr_coverage[page["url"]] = {"page_type": ptype, "present": sorted(set(present)),
+                                      "missing": sorted(set(expected) - set(present)),
+                                      "coverage": ratio}
+        observations.append(dict(
+            id=f"OBS-{len(observations) + 1:03d}", category="answerability",
+            source={"url": page["url"], "method": "shared-inventory"},
+            observation=f"{ptype} page attribute coverage {ratio:.0%}",
+            evidence=f"present: {', '.join(sorted(set(present))) or 'none'}; missing: {', '.join(sorted(set(expected) - set(present))) or 'none'}",
+            confidence="medium"))
+        if ratio < 0.6:
+            recommendations.append(dict(
+                title=f"Add missing material attributes to {ptype} page ({page['url']})",
+                rationale=f"Measured attribute coverage is {ratio:.0%}. Missing material facts reduce answerability: "
+                          "questions a user would ask about this page cannot be answered from its content.",
+                suggested_action=f"State the missing attributes explicitly: {', '.join(sorted(set(expected) - set(present)))}."))
+
     return {"status": "ok", "findings": findings, "recommendations": recommendations,
-            "entity": org, "products_found": len(products), "words": words}
+            "entity": org, "products_found": len(products), "words": words,
+            "observations": observations,
+            "coverage": {"pages_analyzed": 1 + len(inv_pages), "attribute_coverage": attr_coverage,
+                         "source": "shared-inventory" if inv is not None else "homepage-only"},
+            "limitations": (["attribute coverage measured against keyword/JSON-LD markers only; "
+                             "rendered or image-borne attributes are not visible in raw HTML"] if inv_pages else [])}
 
 
 def main():
     ap = argparse.ArgumentParser(description="Entity & content understanding audit layer.")
     ap.add_argument("--site", required=True)
+    ap.add_argument("--inventory", help="Path to shared site-inventory JSON (from audit-orchestrator)")
     args = ap.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
         s = "https://" + s
     p = urlparse(s)
-    print(json.dumps(audit(f"{p.scheme}://{p.netloc}", p.netloc), indent=2))
+    inv = None
+    if args.inventory and os.path.exists(args.inventory):
+        try:
+            with open(args.inventory, "r", encoding="utf-8") as f:
+                inv = json.load(f)
+        except Exception:
+            inv = None
+    print(json.dumps(audit(f"{p.scheme}://{p.netloc}", p.netloc, inv=inv), indent=2))
 
 
 if __name__ == "__main__":

@@ -139,21 +139,49 @@ def main():
     parser = argparse.ArgumentParser(description="Audit on-site visitor orientation, heading hierarchy, and summary readability.")
     parser.add_argument("--site", help="URL or domain to audit")
     parser.add_argument("--file", help="Path to local HTML file to inspect")
+    parser.add_argument("--inventory", help="Path to shared site-inventory JSON (from audit-orchestrator); its pages replace independent fetches")
     args = parser.parse_args()
 
     findings = []
+    pages_checked = 0
+
+    inv = None
+    if getattr(args, "inventory", None) and os.path.exists(args.inventory):
+        try:
+            with open(args.inventory, "r", encoding="utf-8") as f:
+                inv = json.load(f)
+        except Exception:
+            inv = None
 
     if args.file and os.path.exists(args.file):
         with open(args.file, "r", encoding="utf-8") as f:
             html = f.read()
         findings.extend(audit_engagement(html, args.file))
+        pages_checked += 1
 
     if args.site:
         site_clean = args.site if args.site.startswith("http") else f"https://{args.site}"
-        status, html = fetch_url(site_clean)
+        if inv is not None:
+            home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+            html = home.get("html") if home else None
+            inner = [(p["url"], p["html"]) for p in inv.get("pages", [])
+                     if p.get("html") and p.get("page_type") != "homepage"][:2]
+        else:
+            status, html = fetch_url(site_clean)
+            inner = []
         if html:
             findings.extend(audit_engagement(html, site_clean))
-            print(json.dumps({"status": "ok", "findings": findings}, indent=2))
+            pages_checked += 1
+            # Context continuity: orientation on the landing page AND on the
+            # pages an AI referral is most likely to land on.
+            for url, p_html in inner:
+                findings.extend(audit_engagement(p_html, url))
+                pages_checked += 1
+            print(json.dumps({"status": "ok", "findings": findings,
+                              "coverage": {"pages_checked": pages_checked,
+                                           "source": "shared-inventory" if inv is not None else "homepage-only"},
+                              "limitations": (["orientation measured on raw HTML structure; interactive or rendered navigation is not visible"] if inv is not None else [])},
+                             indent=2))
         else:
             print(json.dumps({"status": "inconclusive", "findings": [],
                               "error": f"could not reach {site_clean} (network unreachable or blocked)"},

@@ -72,8 +72,10 @@ Returns a JSON list of structured findings:
 
 - **`scripts/fact_consistency_check.py`** — Runs automated freshness and entity checks:
   ```bash
-  python3 skills/freshness-corroboration/scripts/fact_consistency_check.py --site example.com
+  python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site example.com [--inventory <file.json>]
   ```
+  (`--inventory` supplies the orchestrator's shared site snapshot; without it
+  the script fetches pages itself. `--no-cross-page` skips cross-page checks.)
   *(On Windows, use `python` or `py`)*
 - **`references/FRESHNESS_CHECKLIST.md`** — Detailed checklist for temporal decay and stale claim detection.
 - **`references/ENTITY_CORROBORATION.md`** — Entity disambiguation and knowledge graph grounding reference.
