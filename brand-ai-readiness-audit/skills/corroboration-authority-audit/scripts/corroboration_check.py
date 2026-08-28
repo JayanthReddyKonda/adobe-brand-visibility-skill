@@ -13,21 +13,13 @@ import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            return e.code, "", dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
+if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
+    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
 
 
 class SameAsExtractor(HTMLParser):

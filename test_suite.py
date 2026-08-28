@@ -443,9 +443,10 @@ class TestSemanticFactLedgerExtraction(unittest.TestCase):
         facts = fact_consistency_check.extract_scoped_facts(html, "https://frescopa.coffee/products/guji")
         self.assertIn("Frescopa Coffee Roasters", facts["brand_names"])
         self.assertTrue(any(p["name"] == "Ethiopia Guji Single Origin" for p in facts["products_with_status"]))
-        self.assertTrue(any(sp["price"] == "24" for sp in facts["scoped_prices"]))
+        self.assertTrue(any(sp["price"] == "24.00" for sp in facts["scoped_prices"]))
         self.assertIn(2026, facts["copyright_years"])
         self.assertTrue(any(em["email"] == "roastery@frescopa.coffee" for em in facts["contact_emails"]))
+
 
 
 if __name__ == "__main__":

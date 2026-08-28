@@ -55,8 +55,7 @@ Before orchestrating the audit, consult the following architectural references:
 
 ## Master Agent Execution Flow (Step-by-Step)
 
-
-The AI Agent must execute this audit as a sequential, self-contained multi-skill flow:
+The AI Agent must execute this audit as a sequential, self-contained multi-skill flow, reading each specialist's `SKILL.md` and domain decision table before executing its diagnostic script:
 
 ### Step 1: Inventory Acquisition
 Acquire the type-safe shared inventory (homepage + robots.txt + sitemaps -> HTML pages):
@@ -65,87 +64,59 @@ python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site <target_ur
 ```
 
 ### Step 2: Discoverability & Retrieval Audit
-1. **Load Context:** Read `skills/discoverability-audit/SKILL.md` and `skills/discoverability-audit/references/seo-foundations.md`.
-2. **Execute Self-Contained Script:**
+1. **Load Context & Decision Rubric:** Read `skills/discoverability-audit/SKILL.md` and `skills/discoverability-audit/references/crawler-matrix-reference.md`.
+2. **Execute Diagnostic Script:**
    ```bash
    python3 skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_disc.json
    ```
 
 ### Step 3: Entity Identity & Answerability Audit
-1. **Load Context:** Read `skills/entity-content-audit/SKILL.md` and `skills/entity-content-audit/references/structured-data-validation.md`.
-2. **Execute Self-Contained Script:**
+1. **Load Context & Decision Rubric:** Read `skills/entity-content-audit/SKILL.md` and `skills/entity-content-audit/references/structured-data-validation.md`.
+2. **Execute Diagnostic Script:**
    ```bash
    python3 skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_entity.json
    ```
 
 ### Step 4: Fact Consistency & Lifecycle Audit
-1. **Load Context:** Read `skills/fact-consistency-audit/SKILL.md` and `skills/fact-consistency-audit/references/fact-normalization.md`.
-2. **Execute Self-Contained Script:**
+1. **Load Context & Decision Rubric:** Read `skills/fact-consistency-audit/SKILL.md` and `skills/fact-consistency-audit/references/multi-tier-pricing.md`.
+2. **Execute Diagnostic Script:**
    ```bash
    python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_fact.json
    ```
 
 ### Step 5: Authority & SameAs Corroboration Audit
-1. **Load Context:** Read `skills/corroboration-authority-audit/SKILL.md` and `skills/corroboration-authority-audit/references/identity-vs-claim.md`.
-2. **Execute Self-Contained Script:**
+1. **Load Context & Decision Rubric:** Read `skills/corroboration-authority-audit/SKILL.md` and `skills/corroboration-authority-audit/references/identity-vs-claim.md`.
+2. **Execute Diagnostic Script:**
    ```bash
    python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_corr.json
    ```
 
 ### Step 6: Engagement & Context Continuity Audit
-1. **Load Context:** Read `skills/engagement-context-audit/SKILL.md` and `skills/engagement-context-audit/references/5-second-orientation.md`.
-2. **Execute Self-Contained Script:**
+1. **Load Context & Decision Rubric:** Read `skills/engagement-context-audit/SKILL.md` and `skills/engagement-context-audit/references/5-second-orientation.md`.
+2. **Execute Diagnostic Script:**
    ```bash
    python3 skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_eng.json
    ```
 
 ### Step 7 (Optional): Assistant Representation Audit
-1. **Load Context:** Read `skills/assistant-representation-audit/SKILL.md` and `skills/assistant-representation-audit/references/mention-vs-citation.md`.
-2. **Execute Self-Contained Script (if responses provided):**
+1. **Load Context & Decision Rubric:** Read `skills/assistant-representation-audit/SKILL.md` and `skills/assistant-representation-audit/references/mention-vs-citation.md`.
+2. **Execute Diagnostic Script (if responses provided):**
    ```bash
    python3 skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory /tmp/inv.json --format json > /tmp/res_rep.json
    ```
 
 ### Step 8: Master Evidence Synthesis & Schema Validation Gate
-Synthesize the collected specialist outputs, assign root causes from `root-causes.md`, deduplicate recommendations, and validate against `REPORT_SCHEMA.json`:
+The audit pipeline synthesizes specialist findings, assigns root causes from `root-causes.md`, deduplicates recommendations, and validates against `REPORT_SCHEMA.json`:
 ```bash
-python3 skills/audit-orchestrator/scripts/synthesize_report.py \
-  --site <target_url> \
-  --inventory /tmp/inv.json \
-  --discoverability /tmp/res_disc.json \
-  --entity /tmp/res_entity.json \
-  --fact /tmp/res_fact.json \
-  --corroboration /tmp/res_corr.json \
-  --engagement /tmp/res_eng.json \
-  --db audit_history.db \
-  --format json
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site <target_url> --format json
 ```
-
-*Note: Alternatively, `orchestrator.py --site <target_url> [--db audit_history.db] --format json` coordinates this entire pipeline sequentially within the 300s monotonic deadline.*
-
----
-
-## Zero-Dependency SQLite Audit Persistence
-
-Every audit run, specialist check trace, and finding record can be automatically persisted into a local SQLite database using Python's standard library `sqlite3` (no pip dependencies required):
-
-- **Store an audit report into SQLite:**
-  ```bash
-  python3 skills/audit-orchestrator/scripts/audit_db.py --save report.json --db audit_history.db
-  ```
-- **List past audits and metrics:**
-  ```bash
-  python3 skills/audit-orchestrator/scripts/audit_db.py --list --db audit_history.db
-  ```
-- **Tables Managed:**
-  - `audits`: site, timestamp, runtime, total findings, critical count, answerability index, full report JSON.
-  - `specialist_runs`: audit ID, specialist name, site, status, output JSON.
-  - `findings`: audit ID, finding ID, title, severity, confidence, causal family, evidence, suggested action.
+All specialist checks, shared inventory acquisition, multi-signal evidence reconciliation, and strict schema validation are executed sequentially within the 300s monotonic deadline.
 
 
 ---
 
 ## Ten Mandatory Invariants
+
 
 1. **Only genuine `text/html` resources can enter page-level audits.** XML sitemaps, robots.txt, feeds, and JSON endpoints are infrastructure assets and MUST NEVER be audited as user-facing pages.
 2. **Non-HTML resources cannot enter engagement or orientation checks.**

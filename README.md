@@ -80,6 +80,7 @@ brand-ai-readiness-audit/
     │   │   └── discoverability_check.py
     │   └── references/
     │       ├── CHECK_CONTRACTS.md
+    │       ├── crawler-matrix-reference.md
     │       └── seo-foundations.md
     ├── entity-content-audit/
     │   ├── SKILL.md
@@ -87,15 +88,19 @@ brand-ai-readiness-audit/
     │   │   └── entity_content_check.py
     │   └── references/
     │       ├── CHECK_CONTRACTS.md
+    │       ├── organization.yaml
+    │       ├── product.yaml
     │       └── structured-data-validation.md
     ├── fact-consistency-audit/
     │   ├── SKILL.md
     │   ├── scripts/
     │   │   └── fact_consistency_check.py
     │   └── references/
+    │       ├── CHECK_CONTRACTS.md
     │       ├── ENTITY_CORROBORATION.md
     │       ├── FRESHNESS_CHECKLIST.md
     │       ├── fact-normalization.md
+    │       ├── multi-tier-pricing.md
     │       └── temporal-freshness.md
     ├── corroboration-authority-audit/
     │   ├── SKILL.md
@@ -111,7 +116,10 @@ brand-ai-readiness-audit/
     │   └── references/
     │       ├── 5-second-orientation.md
     │       ├── AI_SNIPPET_GUIDELINES.md
-    │       └── ENGAGEMENT_RUBRIC.md
+    │       ├── CHECK_CONTRACTS.md
+    │       ├── ENGAGEMENT_RUBRIC.md
+    │       ├── pricing-comparison.yaml
+    │       └── product-purchase.yaml
     └── assistant-representation-audit/
         ├── SKILL.md
         ├── scripts/
@@ -179,6 +187,7 @@ Conforms 100% to the Adobe Round-3 mandatory report schema:
 {
   "site": "example.com",
   "audited_at": "2026-08-28T14:30:00Z",
+  "audit_status": "ok",
   "summary": {
     "total_findings": 1,
     "critical": 1,
@@ -189,41 +198,25 @@ Conforms 100% to the Adobe Round-3 mandatory report schema:
   "findings": [
     {
       "id": "F-001",
-      "title": "AI search retrieval crawler blocked in robots.txt",
+      "title": "AI search retrieval crawlers blocked in robots.txt (OAI-SearchBot, PerplexityBot)",
       "severity": "critical",
+      "category": "crawlability",
+      "root_cause": "robots.txt explicitly disallows AI search retrieval crawlers responsible for live citations.",
       "confidence": "high",
-      "root_cause": "robots.txt explicitly disallows AI search retrieval crawlers (OAI-SearchBot, PerplexityBot).",
-      "cause_family": "DISCOVERY.ACCESS",
-      "cause_id": "AI_RETRIEVAL_BLOCKED",
-      "impact": "Content is excluded from real-time AI assistant citations and generative search answers.",
-      "evidence": "robots.txt disallows OAI-SearchBot and PerplexityBot on path '/'.",
+      "evidence": "robots.txt disallows 2 retrieval crawler(s): OAI-SearchBot (Disallow: /), PerplexityBot (Disallow: /).",
       "suggested_action": {
-        "summary": "Allow AI search retrieval bots in robots.txt while maintaining training crawler restrictions if desired.",
-        "priority": "critical",
-        "verification": "Inspect robots.txt to confirm Allow or absence of Disallow for OAI-SearchBot and PerplexityBot."
+        "summary": "Allow AI search retrieval bots (OAI-SearchBot, PerplexityBot) on public routes in robots.txt.",
+        "priority": "critical"
       }
     }
   ],
-  "audit_metrics": {
-    "execution_time_seconds": 12.4,
-    "html_pages_sampled": 8,
-    "sitemaps_processed": 1,
-    "urls_discovered": 45,
-    "page_types_covered": {
-      "homepage": 1,
-      "product": 3,
-      "pricing": 1,
-      "about": 1,
-      "contact": 1,
-      "documentation": 1
-    },
-    "critical_blockers": 1,
-    "confidence_distribution": {
-      "high": 1,
-      "medium": 0,
-      "low": 0
-    },
-    "answerability_index": 0.85
-  }
+  "proactive_actions": [
+    {
+      "title": "Add Organization JSON-LD schema",
+      "summary": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles.",
+      "priority": "low"
+    }
+  ]
 }
 ```
+

@@ -29,27 +29,9 @@ if SCRIPT_DIR not in sys.path:
 VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+from acquire_inventory import build_inventory, classify_page, normalize_target, is_html_response
 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
-
-NON_HTML_EXTENSIONS = (
-    ".xml", ".xml.gz", ".txt", ".pdf", ".jpg", ".jpeg", ".png", ".gif",
-    ".svg", ".webp", ".mp4", ".mp3", ".json", ".js", ".css", ".zip",
-    ".gz", ".tar", ".ico", ".woff", ".woff2", ".ttf", ".eot"
-)
-
-
-PRIORITY_KEYWORDS = [
-    ("product", ["/product/", "/products/", "/p/", "/item/", "/store/", "/shop/"]),
-    ("pricing", ["/pricing", "/prices", "/plans", "/billing", "/subscription"]),
-    ("service", ["/service", "/services", "/solution", "/solutions", "/offering"]),
-    ("category", ["/category/", "/categories/", "/collection/", "/collections/", "/browse/"]),
-    ("contact", ["/contact", "/support", "/help", "/reach-us"]),
-    ("location", ["/location", "/locations", "/store-locator", "/where-to-buy"]),
-    ("about", ["/about", "/company", "/our-team", "/story", "/mission"]),
-    ("documentation", ["/docs", "/documentation", "/guide", "/api", "/developer"]),
-    ("article", ["/blog/", "/news/", "/article/", "/posts/", "/insights/"]),
-]
 
 
 def parse_args():
@@ -82,344 +64,6 @@ def parse_args():
 
     return parser.parse_args()
 
-
-
-def normalize_target(site_input):
-    """Normalize user input to clean domain and base URL."""
-    target = site_input.strip()
-    if not (target.startswith("http://") or target.startswith("https://")):
-        domain = target.split("/")[0]
-        base_url = f"https://{domain}"
-    else:
-        parts = target.split("://", 1)[1]
-        domain = parts.split("/")[0]
-        base_url = f"{target.split('://')[0]}://{domain}"
-    return domain, base_url
-
-
-def is_html_response(headers, body_snippet=""):
-    """Strict Content-Type verification to ensure only genuine HTML enters page audits."""
-    ctype = ""
-    for k, v in (headers or {}).items():
-        if k.lower() == "content-type":
-            ctype = str(v).lower()
-            break
-
-    if "text/html" in ctype or "application/xhtml+xml" in ctype:
-        return True
-    if any(x in ctype for x in ("application/xml", "text/xml", "application/json", "application/pdf", "image/")):
-        return False
-
-    # Fallback to inspecting initial snippet if header is ambiguous
-    snippet = body_snippet.strip()[:200].lower()
-    if snippet.startswith("<?xml") or "<urlset" in snippet or "<sitemapindex" in snippet:
-        return False
-    if "<!doctype html" in snippet or "<html" in snippet:
-        return True
-
-    return False
-
-
-def is_sitemap_or_non_html_url(url):
-    """Early filter to reject sitemaps and non-HTML assets from candidate page lists."""
-    u_lower = url.lower().split("?")[0].split("#")[0]
-    if u_lower.endswith(NON_HTML_EXTENSIONS):
-        return True
-    if "sitemap" in u_lower or "feed.xml" in u_lower or "rss.xml" in u_lower or "robots.txt" in u_lower:
-        return True
-    return False
-
-
-KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
-
-
-def extract_locale_and_template(url):
-    parsed = urlparse(url)
-    segments = [s for s in parsed.path.strip("/").split("/") if s]
-    locale = "default"
-    if segments and (segments[0].lower() in KNOWN_LOCALES or re.match(r'^[a-z]{2}(-[a-z]{2})?$', segments[0].lower())):
-        locale = segments[0].lower()
-        logical_path = "/" + "/".join(segments[1:])
-    else:
-        logical_path = parsed.path or "/"
-    return locale, logical_path
-
-
-def classify_page(url, title=""):
-    """Classify an HTML page with confidence, granular page types, and template identification."""
-    parsed = urlparse(url)
-    locale, logical_path = extract_locale_and_template(url)
-    segments = [s for s in logical_path.strip("/").split("/") if s]
-    t_lower = (title or "").lower()
-
-    if not segments or logical_path == "/":
-        return "homepage", "high", "/", locale
-
-    last_seg = segments[-1]
-    # Check for placeholder/template routes
-    if last_seg in ("default", "placeholder", "template", "empty", "sample", "test"):
-        return "template", "high", logical_path, locale
-
-    # Check for category / listing vs product detail
-    if len(segments) == 1 and segments[0] in ("products", "shop", "catalog", "store", "items"):
-        return "product_listing", "high", logical_path, locale
-
-    if len(segments) >= 2 and segments[0] in ("products", "p", "product", "item", "items", "shop", "catalog") and segments[1] not in ("default", "all", "category", "categories"):
-        return "product_detail", "high", "/products/*", locale
-
-    if any(s in ("category", "categories", "collection", "collections", "browse") for s in segments):
-        return "category", "high", logical_path, locale
-
-    if any(s in ("subscription", "subscribe", "club", "membership") for s in segments):
-        return "subscription_flow", "high", "/subscription", locale
-
-    if any(s in ("pricing", "prices", "plans", "billing", "pricing-plans") for s in segments):
-        return "pricing", "high", "/pricing", locale
-
-    if any(s in ("contact", "support", "help", "contact-us", "reach-us", "get-in-touch") for s in segments):
-        return "contact", "high", "/contact", locale
-
-    if any(s in ("location", "locations", "stores", "store-locator", "where-to-buy", "branches") for s in segments):
-        return "location", "high", "/locations", locale
-
-    if any(s in ("about", "about-us", "company", "our-team", "story", "mission", "who-we-are") for s in segments):
-        return "about", "high", "/about", locale
-
-    if any(s in ("docs", "documentation", "guide", "guides", "api", "developer", "manual") for s in segments):
-        return "documentation", "high", "/docs", locale
-
-    if any(s in ("blog", "news", "article", "articles", "posts", "insights", "journal") for s in segments):
-        return "article", "high", "/article", locale
-
-    # Title-based inferences with multilingual awareness
-    if re.search(r'\b(contact\s*(us|ez-nous)?|contáctenos|kontakt|お問い合わせ)\b', t_lower):
-        return "contact", "high", "/contact", locale
-    if re.search(r'\b(pricing|plans|tarifs|preise)\b', t_lower):
-        return "pricing", "medium", "/pricing", locale
-    if re.search(r'\b(subscription|abonnement|suscripción|subscribe)\b', t_lower):
-        return "subscription_flow", "high", "/subscription", locale
-    if re.search(r'\b(products?|catalog|shop|boutique|tienda)\b', t_lower):
-        return "product_listing", "medium", "/products", locale
-    if re.search(r'\b(about\s*(us)?|notre\s*histoire|sobre\s*nosotros|company)\b', t_lower):
-        return "about", "medium", "/about", locale
-
-    return "other", "low", logical_path, locale
-
-
-def _visible_words(html):
-    text = re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html or "", flags=re.S | re.I)
-    text = re.sub(r"<[^>]+>", " ", text)
-    return len(text.split())
-
-
-def _extract_title(html):
-    m = re.search(r"<title[^>]*>([^<]{1,300})</title>", html or "", re.I)
-    return m.group(1).strip() if m else ""
-
-
-def _parse_sitemap_xml(sitemap_body):
-    """Parse sitemap XML body and return (child_sitemaps, page_urls)."""
-    child_sitemaps = []
-    page_urls = []
-    if not sitemap_body or "<loc>" not in sitemap_body:
-        return child_sitemaps, page_urls
-
-    locs = [loc.strip() for loc in re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", sitemap_body, re.IGNORECASE)]
-
-    if "<sitemapindex" in sitemap_body.lower():
-        child_sitemaps = locs
-    else:
-        page_urls = locs
-
-    return child_sitemaps, page_urls
-
-
-def build_inventory(base_url, max_pages=28, deadline=None):
-    """Type-safe, SSRF-bounded inventory crawl separating infrastructure from HTML pages."""
-    start = time.time()
-    parsed_base = urlparse(base_url)
-    target_netloc = parsed_base.netloc.lower()
-
-    inv = {
-        "base_url": base_url,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "infrastructure": {
-            "robots": None,
-            "sitemaps_discovered": [],
-            "sitemaps_processed": 0,
-            "urls_extracted": 0,
-            "same_origin_urls": 0
-        },
-        "robots": None,
-        "pages": [],
-        "limitations": []
-    }
-
-    # 1. Fetch Homepage
-    status, home_html, home_headers, err = safe_fetch(base_url + "/", timeout=10, max_bytes=2*1024*1024)
-    if not home_html or status is None:
-        return None, {"homepage_reachable": False, "error": err}
-
-    if is_html_response(home_headers, home_html):
-        pt, pconf, ptmpl, ploc = classify_page(base_url + "/", _extract_title(home_html))
-        inv["pages"].append({
-            "url": base_url + "/",
-            "status": status,
-            "resource_type": "html",
-            "content_type": home_headers.get("content-type", "text/html"),
-            "page_type": pt,
-            "page_type_confidence": pconf,
-            "logical_template": ptmpl,
-            "locale": ploc,
-            "title": _extract_title(home_html),
-            "word_count": _visible_words(home_html),
-            "html": home_html,
-            "headers": home_headers
-        })
-
-    # Check deadline
-    if deadline and time.time() >= deadline:
-        inv["limitations"].append("Inventory truncated at acquisition deadline.")
-        return inv, {
-            "homepage_reachable": True,
-            "html_pages_sampled": len(inv["pages"]),
-            "sitemaps_processed": 0,
-            "elapsed_seconds": round(time.time() - start, 1)
-        }
-
-    # 2. robots.txt
-    r_status, robots_txt, _, _ = safe_fetch(base_url + "/robots.txt", timeout=8, max_bytes=512*1024)
-    inv["robots"] = {"status": r_status, "text": robots_txt if r_status == 200 else None}
-    inv["infrastructure"]["robots"] = inv["robots"]
-
-    sitemap_candidates = []
-    if robots_txt and r_status == 200:
-        sitemap_candidates = [l.split(":", 1)[1].strip() for l in robots_txt.splitlines()
-                              if l.lower().startswith("sitemap:")][:5]
-    if not sitemap_candidates:
-        sitemap_candidates = [base_url + "/sitemap.xml"]
-
-    # 3. Process Sitemaps as Infrastructure Resources
-    extracted_page_urls = []
-    sitemaps_to_process = list(sitemap_candidates)
-    processed_sitemaps = set()
-
-    while sitemaps_to_process and len(processed_sitemaps) < 8:
-        if deadline and time.time() >= deadline:
-            break
-        sm_url = sitemaps_to_process.pop(0)
-        if sm_url in processed_sitemaps:
-            continue
-        sm_netloc = urlparse(sm_url).netloc.lower()
-        if sm_netloc and sm_netloc != target_netloc:
-            continue
-
-        processed_sitemaps.add(sm_url)
-        inv["infrastructure"]["sitemaps_discovered"].append(sm_url)
-
-        s_status, s_body, _, _ = safe_fetch(sm_url, timeout=8, max_bytes=2*1024*1024)
-        if s_status == 200 and s_body:
-            inv["infrastructure"]["sitemaps_processed"] += 1
-            child_sms, raw_page_urls = _parse_sitemap_xml(s_body)
-            # Add child sitemaps to processing queue
-            for c_sm in child_sms:
-                if c_sm not in processed_sitemaps and urlparse(c_sm).netloc.lower() == target_netloc:
-                    sitemaps_to_process.append(c_sm)
-            # Collect valid candidate page URLs
-            for pu in raw_page_urls:
-                if urlparse(pu).netloc.lower() == target_netloc and not is_sitemap_or_non_html_url(pu):
-                    extracted_page_urls.append(pu)
-
-    # Also extract in-HTML links from homepage if sitemap yielded few URLs
-    if len(extracted_page_urls) < 10 and home_html:
-        for m in re.finditer(r'href=["\'](https?://[^"\']+|/[^"\']+)["\']', home_html, re.I):
-            href = m.group(1).split("#")[0].split("?")[0]
-            full_u = urljoin(base_url, href)
-            if urlparse(full_u).netloc.lower() == target_netloc and not is_sitemap_or_non_html_url(full_u):
-                extracted_page_urls.append(full_u)
-
-    inv["infrastructure"]["urls_extracted"] = len(extracted_page_urls)
-    unique_page_urls = list(dict.fromkeys(extracted_page_urls))
-    inv["infrastructure"]["same_origin_urls"] = len(unique_page_urls)
-
-    # 4. Priority Adaptive Selection across Page Types, Templates, and Locales
-    seen_urls = {p["url"].rstrip("/") for p in inv["pages"]}
-    by_template = {}
-    for u in unique_page_urls:
-        u_clean = u.rstrip("/")
-        if u_clean in seen_urls or u_clean == base_url.rstrip("/"):
-            continue
-        ptype, pconf, ptmpl, ploc = classify_page(u)
-        by_template.setdefault((ptype, ptmpl), []).append(u)
-
-    priority_types = [
-        "product_detail", "product_listing", "subscription_flow", "pricing",
-        "category", "about", "contact", "location", "documentation", "article", "other"
-    ]
-    selected_urls = []
-    for pt in priority_types:
-        matching_keys = [k for k in by_template.keys() if k[0] == pt]
-        for k in matching_keys:
-            for u in by_template[k][:3]:
-                if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
-                    break
-                selected_urls.append(u)
-            if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
-                break
-        if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
-            break
-
-    # 5. Fetch and Content-Type Gate Sampled Pages (Respecting robots.txt)
-    rp = None
-    if robots_txt and r_status == 200:
-        try:
-            import urllib.robotparser
-            rp = urllib.robotparser.RobotFileParser()
-            rp.parse(robots_txt.splitlines())
-        except Exception:
-            rp = None
-
-    for u in selected_urls:
-        if deadline and time.time() >= deadline:
-            inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
-            break
-        if rp and not rp.can_fetch(DEFAULT_USER_AGENT, u):
-            continue  # Respect robots.txt Disallow on crawler fetches
-
-        p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
-        if p_html and is_html_response(p_headers, p_html):
-            seen_urls.add(u.rstrip("/"))
-            pt, pconf, ptmpl, ploc = classify_page(u, _extract_title(p_html))
-            inv["pages"].append({
-                "url": u,
-                "status": p_status,
-                "resource_type": "html",
-                "content_type": p_headers.get("content-type", "text/html"),
-                "page_type": pt,
-                "page_type_confidence": pconf,
-                "logical_template": ptmpl,
-                "locale": ploc,
-                "title": _extract_title(p_html),
-                "word_count": _visible_words(p_html),
-                "html": p_html,
-                "headers": p_headers
-            })
-
-    inv["elapsed_seconds"] = round(time.time() - start, 1)
-
-
-    stats = {
-        "homepage_reachable": True,
-        "html_pages_sampled": len(inv["pages"]),
-        "sitemaps_found": len(inv["infrastructure"]["sitemaps_discovered"]),
-        "sitemaps_processed": inv["infrastructure"]["sitemaps_processed"],
-        "urls_discovered": inv["infrastructure"]["urls_extracted"],
-        "same_origin_urls": inv["infrastructure"]["same_origin_urls"],
-        "elapsed_seconds": inv["elapsed_seconds"],
-        "page_types": {t: sum(1 for p in inv["pages"] if p.get("page_type") == t)
-                       for t in {p.get("page_type") for p in inv["pages"] if p.get("page_type")}}
-    }
-    return inv, stats
 
 
 def write_inventory_file(inv):
@@ -532,8 +176,8 @@ def deduplicate_recommendations(rec_list):
 
 def compose_audit(site, include_proactive=True, with_representation=False,
                   responses_file=None, timeout_seconds=300, return_internal=False):
-    start_time = time.time()
-    monotonic_deadline = start_time + timeout_seconds
+    start_mono = time.monotonic()
+    monotonic_deadline = start_mono + timeout_seconds
     domain, base_url = normalize_target(site)
     raw_findings = []
     specialists = {}
@@ -543,7 +187,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     all_limitations = []
 
     # 1. Acquisition Phase (Type-Safe Shared Inventory) - max 60s
-    acquisition_deadline = min(monotonic_deadline, start_time + 60)
+    acquisition_deadline = min(monotonic_deadline, start_mono + 60)
     inventory, inv_stats = build_inventory(base_url, deadline=acquisition_deadline)
     inventory_path = write_inventory_file(inventory) if inventory else None
 
@@ -577,7 +221,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         }
 
     for idx, (skill_name, label, filename, extra_args) in enumerate(specialist_runs):
-        now = time.time()
+        now = time.monotonic()
         remaining_time = monotonic_deadline - now
         remaining_specialists = len(specialist_runs) - idx
 
@@ -719,9 +363,21 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         "low": sum(1 for f in final_findings if f["severity"] == "low")
     }
 
+    # Determine audit_status
+    active_statuses = [info.get("status") for k, info in specialists.items() if info.get("status") != "not_run"]
+    if not inv_stats or not inv_stats.get("homepage_reachable", True):
+        audit_status = "inconclusive"
+    elif all(st == "inconclusive" for st in active_statuses):
+        audit_status = "inconclusive"
+    elif any(st in ("failed", "inconclusive") for st in active_statuses):
+        audit_status = "partial"
+    else:
+        audit_status = "ok"
+
     report = {
         "site": domain,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "audit_status": audit_status,
         "summary": summary_counts,
         "findings": final_findings,
         "proactive_actions": deduped_recommendations
@@ -730,7 +386,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     internal_telemetry = {
         "specialists": specialists,
         "audit_metrics": {
-            "execution_time_seconds": round(time.time() - start_time, 1),
+            "execution_time_seconds": round(time.monotonic() - start_mono, 1),
             "html_pages_sampled": inv_stats.get("html_pages_sampled", 1) if inv_stats else 1,
             "sitemaps_processed": inv_stats.get("sitemaps_processed", 0) if inv_stats else 0,
             "urls_discovered": inv_stats.get("urls_discovered", 0) if inv_stats else 0,
@@ -745,6 +401,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     if return_internal:
         return report, internal_telemetry
     return report
+
 
 
 def validation_gate(report):

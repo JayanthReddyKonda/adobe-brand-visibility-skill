@@ -16,31 +16,71 @@ from datetime import datetime
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            try:
-                body = e.read(max_bytes).decode("utf-8", "ignore")
-            except Exception:
-                body = ""
-            return e.code, body, dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
+if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
+    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 CURRENT_YEAR = datetime.now().year
 PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
 EMAIL_PATTERN = re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+', re.IGNORECASE)
 PHONE_PATTERN = re.compile(r'(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}')
 DISCONTINUED_PATTERN = re.compile(r'\b(discontinued|retired|legacy|obsolete|end of life|out of production)\b', re.IGNORECASE)
+
+
+def extract_currency(raw_str):
+    s = (raw_str or "").upper()
+    if "₹" in raw_str or "INR" in s or "RS" in s:
+        return "INR"
+    if "$" in raw_str or "USD" in s:
+        return "USD"
+    if "€" in raw_str or "EUR" in s:
+        return "EUR"
+    if "£" in raw_str or "GBP" in s:
+        return "GBP"
+    return "UNKNOWN"
+
+
+def extract_interval(raw_str):
+    s = (raw_str or "").lower()
+    if "/mo" in s or "per month" in s or "monthly" in s or "/month" in s:
+        return "month"
+    if "/yr" in s or "per year" in s or "annual" in s or "/year" in s:
+        return "year"
+    if "/wk" in s or "/week" in s or "weekly" in s:
+        return "week"
+    return "one_time"
+
+
+def normalize_price_str(raw):
+    """Normalize price string to standardized float string representation (e.g. '$49.99' -> '49.99', '€1.250,50' -> '1250.50', '₹5,499' -> '5499.00')."""
+    if not raw:
+        return None
+    s = str(raw).strip()
+    # European format with dot thousand separator and comma decimal: 1.250,50
+    if re.search(r'\d+\.\d{3},\d{2}', s):
+        s = s.replace(".", "").replace(",", ".")
+    elif "," in s and "." in s:
+        # Standard US/UK: 1,250.50
+        s = s.replace(",", "")
+    elif "," in s:
+        parts = s.split(",")
+        if len(parts) == 2 and len(parts[1]) == 2:
+            s = parts[0] + "." + parts[1]
+        else:
+            s = s.replace(",", "")
+    
+    m = re.search(r'(\d+(?:\.\d{1,2})?)', s)
+    if not m:
+        return None
+    try:
+        val = float(m.group(1))
+        return f"{val:.2f}"
+    except ValueError:
+        return None
+
 
 
 class FreshnessAnalyzer(HTMLParser):
@@ -99,27 +139,12 @@ class FreshnessAnalyzer(HTMLParser):
                 self.text_with_context.append((self.current_section, txt))
 
 
-def normalize_price_str(raw):
-    """Normalize price string to integer units supporting international formats (e.g. '₹5,499.00' -> '5499', '€1.250,50' -> '1250')."""
-    if not raw:
-        return None
-    s = str(raw).strip()
-    # European format with dot thousand separator and comma decimal: 1.250,50
-    if re.search(r'\d+\.\d{3},\d{2}', s):
-        s = s.replace(".", "").split(",")[0]
-    elif "," in s and "." in s:
-        # Standard US/UK: 1,250.50
-        s = s.replace(",", "").split(".")[0]
-    elif "," in s:
-        parts = s.split(",")
-        if len(parts) == 2 and len(parts[1]) == 2:
-            s = parts[0]
-        else:
-            s = s.replace(",", "")
-    elif "." in s:
-        s = s.split(".")[0]
-    digits = re.sub(r"[^\d]", "", s)
-    return digits or None
+UTILITY_HEADINGS = {
+    "contact", "contact us", "about", "about us", "privacy policy", "terms of service",
+    "terms & conditions", "cart", "shopping cart", "checkout", "login", "register",
+    "cookie policy", "faq", "frequently asked questions", "search", "menu", "navigation",
+    "home", "homepage", "welcome", "pricing", "plans", "subscription", "overview"
+}
 
 
 def extract_scoped_facts(html_str, url):
@@ -171,25 +196,29 @@ def extract_scoped_facts(html_str, url):
                     if o.get("slogan") or o.get("alternateName"):
                         facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
                 elif otype in ("product", "individualproduct"):
-                    pname = str(o.get("name") or "Product").strip()
+                    pname = str(o.get("name") or "").strip()
                     offers = o.get("offers") or {}
                     offer_obj = offers[0] if isinstance(offers, list) and offers else offers
                     if isinstance(offer_obj, dict):
                         p_val = offer_obj.get("price") or offer_obj.get("lowPrice")
+                        p_curr = str(offer_obj.get("priceCurrency") or "USD").upper()
                         avail = str(offer_obj.get("availability") or "").lower()
                         status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else "current")
-                        facts["products_with_status"].append({
-                            "name": pname,
-                            "status": status,
-                            "url": url
-                        })
-                        if p_val:
+                        if pname:
+                            facts["products_with_status"].append({
+                                "name": pname,
+                                "status": status,
+                                "url": url
+                            })
+                        if p_val and pname:
                             norm_p = normalize_price_str(str(p_val))
                             if norm_p:
                                 facts["scoped_prices"].append({
                                     "entity": pname,
                                     "price": norm_p,
-                                    "raw": str(p_val)
+                                    "currency": p_curr,
+                                    "interval": "one_time",
+                                    "raw": f"{p_curr} {p_val}"
                                 })
                 if "dateModified" in o and isinstance(o["dateModified"], str):
                     facts["modification_dates"].append(o["dateModified"])
@@ -206,11 +235,12 @@ def extract_scoped_facts(html_str, url):
     if "og:site_name" in parser.meta_tags:
         facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
 
-    # 3. Text-based product and offering names from prominent headings
+    # 3. Text-based product and offering names from prominent headings (filtered against utility terms)
     for h in parser.headings:
         htag, htxt = h
-        if len(htxt.split()) <= 8 and not any(k in htxt.lower() for k in ("menu", "navigation", "cookie", "privacy", "terms")):
-            if htag == "h1" and not any(p["name"] == htxt for p in facts["products_with_status"]):
+        h_clean = htxt.lower().strip()
+        if len(htxt.split()) <= 8 and h_clean not in UTILITY_HEADINGS and not any(k in h_clean for k in ("cookie", "privacy", "terms", "navigation")):
+            if htag == "h1" and not any(p["name"].lower() == h_clean for p in facts["products_with_status"]):
                 facts["products_with_status"].append({
                     "name": htxt,
                     "status": "current",
@@ -221,28 +251,54 @@ def extract_scoped_facts(html_str, url):
     for ctx, txt in parser.text_with_context:
         for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
             norm_p = normalize_price_str(m.group(1))
-            if norm_p and len(norm_p) >= 2:
-                section_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "Product")
-                if not any(sp["price"] == norm_p and sp["entity"] == section_name for sp in facts["scoped_prices"]):
-                    facts["scoped_prices"].append({
-                        "entity": section_name,
-                        "price": norm_p,
-                        "raw": m.group(0)
-                    })
+            if norm_p and float(norm_p) > 0:
+                section_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "")
+                s_clean = section_name.lower().strip()
+                if section_name and s_clean not in UTILITY_HEADINGS:
+                    curr = extract_currency(m.group(0))
+                    invl = extract_interval(txt)
+                    if not any(sp["price"] == norm_p and sp["entity"].lower() == s_clean and sp["currency"] == curr and sp["interval"] == invl for sp in facts["scoped_prices"]):
+                        facts["scoped_prices"].append({
+                            "entity": section_name,
+                            "price": norm_p,
+                            "currency": curr,
+                            "interval": invl,
+                            "raw": m.group(0)
+                        })
 
     # 5. Discontinued / Lifecycle detection in prose (scoped to specific section/heading)
     for ctx, txt in parser.text_with_context:
         if DISCONTINUED_PATTERN.search(txt):
-            prod_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "Product")
-            for p in facts["products_with_status"]:
-                if p["name"] == prod_name:
-                    p["status"] = "discontinued"
+            prod_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "")
+            if prod_name and prod_name.lower().strip() not in UTILITY_HEADINGS:
+                matched = False
+                for p in facts["products_with_status"]:
+                    if p["name"].lower() == prod_name.lower():
+                        p["status"] = "discontinued"
+                        matched = True
+                if not matched:
+                    facts["products_with_status"].append({
+                        "name": prod_name,
+                        "status": "discontinued",
+                        "url": url
+                    })
+
     for h in parser.headings:
         h_text = h[1]
         if DISCONTINUED_PATTERN.search(h_text):
-            for p in facts["products_with_status"]:
-                if p["name"] == h_text:
-                    p["status"] = "discontinued"
+            if h_text.lower().strip() not in UTILITY_HEADINGS:
+                matched = False
+                for p in facts["products_with_status"]:
+                    if p["name"].lower() == h_text.lower():
+                        p["status"] = "discontinued"
+                        matched = True
+                if not matched:
+                    facts["products_with_status"].append({
+                        "name": h_text,
+                        "status": "discontinued",
+                        "url": url
+                    })
+
 
     # 6. Scoped emails & phones
     for m in EMAIL_PATTERN.finditer(html_str):
@@ -261,7 +317,6 @@ def extract_scoped_facts(html_str, url):
     facts["taglines"] = sorted(set(facts["taglines"]))
     facts["modification_dates"] = sorted(set(facts["modification_dates"]))
 
-
     return facts
 
 
@@ -270,19 +325,20 @@ def evaluate_fact_consistency(page_fact_list, base_url):
     findings = []
     recommendations = []
 
-    # 1. Scoped Price Contradictions
+    # 1. Scoped Price Contradictions (entity + currency + interval)
     price_ledger = {}
     for pf in page_fact_list:
         for sp in pf["scoped_prices"]:
             ent = sp["entity"].lower().strip()
-            if len(ent) < 3 or ent in ("general", "home", "pricing", "pricing plans"):
+            if len(ent) < 3 or ent in UTILITY_HEADINGS:
                 continue
-            price_ledger.setdefault(ent, {}).setdefault(sp["price"], []).append({
+            key = (ent, sp.get("currency", "USD"), sp.get("interval", "one_time"))
+            price_ledger.setdefault(key, {}).setdefault(sp["price"], []).append({
                 "url": pf["url"],
                 "raw": sp["raw"]
             })
 
-    for ent, val_map in price_ledger.items():
+    for (ent, curr, invl), val_map in price_ledger.items():
         if len(val_map) >= 2:
             details = []
             affected_urls = set()
@@ -296,7 +352,7 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 "title": f"Conflicting pricing published for '{ent}'",
                 "severity": "high",
                 "confidence": "high",
-                "root_cause": f"Different price values for '{ent}' are published across separate first-party pages.",
+                "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
                 "cause_family": "FACT.CONSISTENCY",
                 "cause_id": "FIRST_PARTY_FACT_CONFLICT",
                 "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
@@ -313,7 +369,7 @@ def evaluate_fact_consistency(page_fact_list, base_url):
     for pf in page_fact_list:
         for p in pf.get("products_with_status", []):
             name_clean = p["name"].lower().strip()
-            if len(name_clean) > 3:
+            if len(name_clean) > 3 and name_clean not in UTILITY_HEADINGS:
                 status_by_name.setdefault(name_clean, []).append((p["status"], p["url"]))
 
     for name, statuses in status_by_name.items():
@@ -337,7 +393,7 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 }
             })
 
-    # 3. Copyright Year Inconsistency (Signals legacy fact drift)
+    # 3. Copyright Year Inconsistency (Signals legacy fact drift - emitted as proactive observation unless paired with conflict)
     c_years_by_url = {}
     for pf in page_fact_list:
         if pf["copyright_years"]:
@@ -347,26 +403,16 @@ def evaluate_fact_consistency(page_fact_list, base_url):
     if len(unique_years) >= 2:
         oldest_year = min(unique_years)
         newest_year = max(unique_years)
-        if newest_year - oldest_year >= 2:
-            details = [f"{url} ({yr})" for url, yr in sorted(c_years_by_url.items())]
-            findings.append({
+        if newest_year - oldest_year >= 3:
+            recommendations.append({
+                "title": "Synchronize footer copyright year across templates",
                 "category": "freshness",
-                "title": "Inconsistent copyright years across site pages",
-                "severity": "medium",
-                "confidence": "high",
-                "root_cause": "Disparate copyright years indicate unmaintained legacy page templates.",
-                "cause_family": "FACT.FRESHNESS",
-                "cause_id": "LEGACY_FACT_PROPAGATION",
-                "impact": "AI models use footer dates as a heuristic freshness signal; stale dates reduce answer authority.",
-                "evidence": f"Copyright years range from {oldest_year} to {newest_year} across sampled URLs: {'; '.join(details[:4])}.",
-                "suggested_action": {
-                    "summary": f"Standardize site footers to dynamically render the current copyright year ({CURRENT_YEAR}).",
-                    "priority": "medium",
-                    "verification": "Confirm all page footers display the synchronized current year."
-                }
+                "rationale": f"Copyright years range from {oldest_year} to {newest_year} across sampled page templates.",
+                "suggested_action": f"Standardize site footers to dynamically render current year ({CURRENT_YEAR})."
             })
 
     return findings, recommendations
+
 
 
 def audit(base, domain, inv=None):

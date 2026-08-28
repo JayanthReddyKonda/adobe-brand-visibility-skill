@@ -16,25 +16,13 @@ import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            try:
-                body = e.read(max_bytes).decode("utf-8", "ignore")
-            except Exception:
-                body = ""
-            return e.code, body, dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
+if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
+    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
 
 GENERIC_H1_TERMS = {
     "welcome", "home", "homepage", "untitled", "index", "hello",
@@ -154,34 +142,40 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
 
     full_text = " ".join(dom.body_text)
     visible_words = len(full_text.split())
-    has_descriptive_title = len(dom.title.strip().split()) >= 3
+    clean_title = dom.title.strip()
+    has_descriptive_title = len(clean_title.split()) >= 3
     has_subheadings = len(dom.h2_list) >= 1
+    has_functional_context = (
+        page_type in ("subscription_flow", "product_detail", "product_listing", "checkout")
+        or any(k in url.lower() for k in ("subscription", "suscrip", "abonn", "pricing", "plans", "catalog", "shop", "store"))
+        or any(k in clean_title.lower() for k in ("subscription", "suscrip", "abonn", "pricing", "plans", "catalog", "shop", "store", "contact"))
+    )
 
     # 1. Multi-Signal 5-Second Orientation & Information Scent
     if not dom.h1_list:
-        if not has_descriptive_title and not has_subheadings and visible_words > 150:
+        if not has_descriptive_title and not has_subheadings and not has_functional_context and visible_words > 150:
             findings.append({
                 "category": "engagement",
                 "title": f"Weak first-visit orientation and missing primary topic statement ({url})",
                 "severity": "medium",
                 "confidence": "high",
-                "root_cause": "The page lacks an <h1> heading, descriptive <title>, and section markers, leaving arriving visitors unoriented.",
+                "root_cause": "The page lacks an H1 heading, descriptive page title, and section markers, leaving arriving visitors unoriented.",
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "cause_id": "LOW_INFORMATION_SCENT",
                 "impact": "Visitors arriving from AI search answers cannot quickly verify the page purpose, which could increase bounce rate.",
-                "evidence": f"Found 0 <h1> tags, 0 <h2> tags, and an uninformative <title> ('{dom.title}') on {url}.",
+                "evidence": f"Found 0 H1 heading tags, 0 H2 tags, and a non-descriptive page title ('{clean_title}') on {url}.",
                 "suggested_action": {
-                    "summary": "Add a descriptive <h1> headline above the fold clearly stating the offering name and value proposition.",
+                    "summary": "Add a descriptive H1 headline above the fold clearly stating the offering name and value proposition.",
                     "priority": "medium",
-                    "verification": f"Confirm {url} contains an <h1> stating the core offering topic."
+                    "verification": f"Confirm {url} contains an H1 stating the core offering topic."
                 }
             })
         elif visible_words > 60:
             recommendations.append({
-                "title": f"Add semantic <h1> element on {url}",
+                "title": f"Add semantic H1 heading element on {url}",
                 "category": "engagement",
-                "rationale": f"Page provides context in <title> ('{dom.title}') but lacks an explicit <h1> heading for semantic structure.",
-                "suggested_action": "Add an <h1> heading representing the page's core purpose to strengthen heading information scent."
+                "rationale": f"Page provides functional context in page title ('{clean_title}') but lacks an explicit H1 heading for semantic structure.",
+                "suggested_action": "Add an H1 heading representing the page's core purpose to strengthen heading information scent."
             })
     else:
         primary_h1 = dom.h1_list[0].strip()
@@ -191,7 +185,7 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
         # Contact pages with "Contact us" or international translations are valid and should PASS
         if is_contact_page and any(term in h1_clean for term in VALID_CONTACT_TERMS):
             pass  # Fully semantically clear for a contact page
-        elif h1_clean in GENERIC_H1_TERMS and not has_descriptive_title and visible_words > 20:
+        elif h1_clean in GENERIC_H1_TERMS and not has_descriptive_title and not has_functional_context and visible_words > 20:
             findings.append({
                 "category": "engagement",
                 "title": f"Low-information generic headline on landing page ('{primary_h1}')",
@@ -201,13 +195,14 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "cause_id": "LOW_INFORMATION_SCENT",
                 "impact": "Visitors skimming above-the-fold content cannot quickly verify the brand's core offering within 5 seconds.",
-                "evidence": f"Primary <h1> on {url} is '{primary_h1}'.",
+                "evidence": f"Primary H1 on {url} is '{primary_h1}'.",
                 "suggested_action": {
-                    "summary": "Revise the <h1> to include concrete product nouns and value verbs representing the offering purpose.",
+                    "summary": "Revise the H1 to include concrete product nouns and value verbs representing the offering purpose.",
                     "priority": "low",
                     "verification": "Confirm updated H1 contains descriptive brand or product terminology."
                 }
             })
+
 
 
     # 2. Destination Discoverability & Navigation Friction

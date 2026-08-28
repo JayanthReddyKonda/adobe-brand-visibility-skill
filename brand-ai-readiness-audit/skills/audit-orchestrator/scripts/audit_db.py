@@ -171,9 +171,46 @@ def list_recent_audits(db_path="audit_history.db", limit=10):
     conn = get_connection(db_path)
     cur = conn.cursor()
     cur.execute("""
-    SELECT id, site, audited_at, execution_time_seconds, total_findings, critical_count, high_count, answerability_index
+    SELECT id, site, audited_at, execution_time_seconds, total_findings, critical_count, high_count, medium_count, low_count, answerability_index
     FROM audits ORDER BY id DESC LIMIT ?
     """, (limit,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_audit_details(audit_id, db_path="audit_history.db"):
+    """Retrieve full audit record, including specialist run traces and findings."""
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM audits WHERE id = ?", (audit_id,))
+    audit_row = cur.fetchone()
+    if not audit_row:
+        conn.close()
+        return None
+
+    audit_dict = dict(audit_row)
+    cur.execute("SELECT * FROM specialist_runs WHERE audit_id = ? ORDER BY id ASC", (audit_id,))
+    audit_dict["specialist_runs"] = [dict(r) for r in cur.fetchall()]
+
+    cur.execute("SELECT * FROM findings WHERE audit_id = ? ORDER BY id ASC", (audit_id,))
+    audit_dict["findings"] = [dict(r) for r in cur.fetchall()]
+
+    conn.close()
+    return audit_dict
+
+
+def get_site_trend(site, db_path="audit_history.db", limit=10):
+    """Retrieve historical score and finding trends for a site over time."""
+    init_db(db_path)
+    conn = get_connection(db_path)
+    cur = conn.cursor()
+    clean_site = site.split("://")[-1].split("/")[0].lower()
+    cur.execute("""
+    SELECT id, site, audited_at, execution_time_seconds, total_findings, critical_count, high_count, medium_count, low_count, answerability_index
+    FROM audits WHERE LOWER(site) LIKE ? ORDER BY id DESC LIMIT ?
+    """, (f"%{clean_site}%", limit))
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
@@ -184,6 +221,8 @@ def main():
     parser.add_argument("--db", default="audit_history.db", help="Path to SQLite database (default: audit_history.db)")
     parser.add_argument("--save", help="Path to JSON report file to store into SQLite")
     parser.add_argument("--list", action="store_true", help="List recent audit records from SQLite database")
+    parser.add_argument("--details", type=int, help="Show full details, specialist traces, and findings for an audit ID")
+    parser.add_argument("--trend", help="Show historical audit trend for a specific domain/site")
     parser.add_argument("--limit", type=int, default=10, help="Number of records to list (default: 10)")
     args = parser.parse_args()
 
@@ -192,6 +231,16 @@ def main():
             data = json.load(f)
         audit_id = save_audit_report(data, db_path=args.db)
         print(json.dumps({"status": "saved", "audit_id": audit_id, "db": args.db}))
+    elif args.details:
+        details = get_audit_details(args.details, db_path=args.db)
+        if details:
+            print(json.dumps(details, indent=2))
+        else:
+            sys.stderr.write(f"Audit ID {args.details} not found in {args.db}\n")
+            sys.exit(1)
+    elif args.trend:
+        trend = get_site_trend(args.trend, db_path=args.db, limit=args.limit)
+        print(json.dumps(trend, indent=2))
     elif args.list:
         records = list_recent_audits(db_path=args.db, limit=args.limit)
         print(json.dumps(records, indent=2))
@@ -202,4 +251,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

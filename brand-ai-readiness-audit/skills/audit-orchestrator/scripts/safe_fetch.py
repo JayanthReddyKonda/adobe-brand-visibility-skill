@@ -117,8 +117,37 @@ class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def _decompress_gzip_bounded(raw_bytes, max_bytes):
+    """Safely decompress gzip data with a hard byte cap to prevent zip bombs."""
+    if not raw_bytes:
+        return b""
+    import zlib
+    try:
+        # 16 + MAX_WBITS enables gzip decoding
+        dobj = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        out_chunks = []
+        bytes_decompressed = 0
+        chunk_size = 32768
+        for i in range(0, len(raw_bytes), chunk_size):
+            chunk = raw_bytes[i:i + chunk_size]
+            decomp = dobj.decompress(chunk, max_bytes - bytes_decompressed + 1)
+            if decomp:
+                out_chunks.append(decomp)
+                bytes_decompressed += len(decomp)
+            if bytes_decompressed > max_bytes:
+                break
+        return b"".join(out_chunks)[:max_bytes]
+    except Exception:
+        try:
+            import gzip, io
+            with gzip.GzipFile(fileobj=io.BytesIO(raw_bytes)) as gz:
+                return gz.read(max_bytes)
+        except Exception:
+            return raw_bytes[:max_bytes]
+
+
 def safe_fetch(url, timeout=10, max_bytes=2 * 1024 * 1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-    """Safely fetch a URL with SSRF protection, timeout, and response body size limit.
+    """Safely fetch a URL with SSRF protection, monotonic timeout, and bounded response body cap.
 
     Args:
         url: URL string to fetch.
@@ -175,14 +204,10 @@ def safe_fetch(url, timeout=10, max_bytes=2 * 1024 * 1024, user_agent=DEFAULT_US
                     break
 
             raw_body = b"".join(chunks)[:max_bytes]
-            # Handle gzip decompression
+            # Handle bounded gzip decompression
             encoding = (resp.headers.get("Content-Encoding") or "").lower()
             if "gzip" in encoding or raw_body.startswith(b"\x1f\x8b") or url.lower().split("?")[0].endswith((".gz", ".xml.gz")):
-                try:
-                    import gzip
-                    raw_body = gzip.decompress(raw_body)
-                except Exception:
-                    pass
+                raw_body = _decompress_gzip_bounded(raw_body, max_bytes)
 
             charset = resp.headers.get_content_charset() or "utf-8"
             body = raw_body.decode(charset, errors="ignore")
@@ -195,27 +220,23 @@ def safe_fetch(url, timeout=10, max_bytes=2 * 1024 * 1024, user_agent=DEFAULT_US
             raw_body = e.read(max_bytes)
             encoding = (e.headers.get("Content-Encoding") or "").lower()
             if "gzip" in encoding or raw_body.startswith(b"\x1f\x8b") or url.lower().split("?")[0].endswith((".gz", ".xml.gz")):
-                try:
-                    import gzip
-                    raw_body = gzip.decompress(raw_body)
-                except Exception:
-                    pass
+                raw_body = _decompress_gzip_bounded(raw_body, max_bytes)
             body = raw_body.decode("utf-8", errors="ignore")
         except Exception:
             body = ""
         return status, body, headers, str(e)
-
 
     except Exception as e:
         return None, "", {}, str(e)
 
 
 def safe_check_status(url, timeout=5, max_bytes=65536, user_agent=DEFAULT_USER_AGENT):
-    """Probes status code of a URL using HEAD with fallback to GET."""
-    status, _, _, err = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="HEAD")
-    if status is not None:
+    """Probes status code of a URL using HEAD with fallback to GET for 403/405/501 or failure."""
+    status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="HEAD")
+    if status is not None and status not in (403, 405, 501):
         return status
-    # Some servers reject HEAD requests (e.g. 405 Method Not Allowed or 403); retry GET with small max_bytes
-    status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
-    return status
+    # Fallback to GET with bounded small read
+    get_status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
+    return get_status if get_status is not None else status
+
 

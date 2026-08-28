@@ -13,21 +13,12 @@ import argparse
 from urllib.parse import urlparse
 from html.parser import HTMLParser
 
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            return e.code, "", dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
+if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
+    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
 
@@ -60,35 +51,47 @@ class TextDOMParser(HTMLParser):
 
 
 def build_fact_snapshot(site, inv=None):
-    """Build a baseline first-party fact snapshot from genuine HTML."""
+    """Build a comprehensive baseline first-party fact snapshot from all sampled HTML pages."""
+    html_pages = []
     if inv is not None:
-        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and p.get("resource_type", "html") == "html"), None)
-        html = home.get("html") if home else None
+        html_pages = [p for p in inv.get("pages", []) if p.get("resource_type", "html") == "html" and p.get("html")]
     else:
-        status, html, _, err = safe_fetch(site, timeout=10, max_bytes=2*1024*1024)
+        status, html, _, _ = safe_fetch(site, timeout=10, max_bytes=2*1024*1024)
+        if html:
+            html_pages = [{"url": site, "html": html}]
 
-    if not html:
+    if not html_pages:
         return {"status": "inconclusive", "error": f"could not reach {site}"}
 
-    dom = TextDOMParser()
-    try:
-        dom.feed(html)
-    except Exception:
-        pass
+    all_prices = []
+    all_years = []
+    full_texts = []
+    primary_title = ""
 
-    full_text = " ".join(dom.text)
-    prices = PRICE_PATTERN.findall(full_text)
-    years = re.findall(r'\b(20\d{2})\b', full_text)
+    for page in html_pages:
+        dom = TextDOMParser()
+        try:
+            dom.feed(page.get("html", ""))
+        except Exception:
+            pass
+        if not primary_title and dom.title:
+            primary_title = dom.title
+        p_text = " ".join(dom.text)
+        full_texts.append(p_text)
+        all_prices.extend(PRICE_PATTERN.findall(p_text))
+        all_years.extend(re.findall(r'\b(20\d{2})\b', p_text))
 
+    combined_text = " ".join(full_texts)
     return {
         "status": "ok",
         "site": site,
-        "title": dom.title,
-        "prices_visible": sorted(set(prices))[:25],
-        "years_visible": sorted(set(years))[:10],
-        "word_count": len(full_text.split()),
-        "full_text": full_text
+        "title": primary_title,
+        "prices_visible": sorted(set(all_prices)),
+        "years_visible": sorted(set(all_years))[:10],
+        "word_count": len(combined_text.split()),
+        "full_text": combined_text[:20000]
     }
+
 
 
 def parse_price_num(raw):

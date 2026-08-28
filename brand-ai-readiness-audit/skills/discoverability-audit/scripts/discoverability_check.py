@@ -15,29 +15,17 @@ import argparse
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            try:
-                body = e.read(max_bytes).decode("utf-8", "ignore")
-            except Exception:
-                body = ""
-            return e.code, body, dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
+if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
+    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 AI_BOTS = [
     "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai",
     "ChatGPT-User",
+
     "GPTBot", "ClaudeBot", "Google-Extended", "Applebot-Extended", "CCBot"
 ]
 
@@ -234,8 +222,9 @@ def audit(base, domain, inv=None):
     # Meta Robots Check (Combines <meta name="robots"> and X-Robots-Tag header, checks for noindex and none)
     x_robots = str(headers.get("x-robots-tag", "")).lower()
     meta_tag = str(dom.meta_robots or "").lower()
-    combined_robots = f"{meta_tag} {x_robots}".strip()
-    if "noindex" in combined_robots or "none" in combined_robots:
+    raw_directives = re.split(r'[,;\s]+', f"{meta_tag} {x_robots}".strip())
+    robot_tokens = {d.strip() for d in raw_directives if d.strip()}
+    if "noindex" in robot_tokens or "none" in robot_tokens:
         findings.append({
             "category": "indexability",
             "title": "Homepage explicitly excludes indexers (noindex/none directive)",
@@ -245,13 +234,14 @@ def audit(base, domain, inv=None):
             "cause_family": "DISCOVERY.ACCESS",
             "cause_id": "NOINDEX_EXCLUSION",
             "impact": "AI assistants and search engines are instructed not to index or cite this page.",
-            "evidence": f"Found '{combined_robots}' in meta robots or X-Robots-Tag header.",
+            "evidence": f"Found direct exclusion directive in meta robots / X-Robots-Tag ({', '.join(sorted(robot_tokens & {'noindex', 'none'}))}).",
             "suggested_action": {
                 "summary": "Remove the 'noindex' or 'none' directive from public landing pages.",
                 "priority": "critical",
                 "verification": "Inspect response headers and HTML markup to ensure 'noindex' and 'none' are absent."
             }
         })
+
 
 
     # Canonical Check

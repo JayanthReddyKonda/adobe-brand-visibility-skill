@@ -11,12 +11,14 @@ import re
 import json
 import time
 import argparse
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from safe_fetch import safe_fetch, DEFAULT_USER_AGENT
+
 
 NON_HTML_EXTENSIONS = (
     ".xml", ".xml.gz", ".txt", ".pdf", ".jpg", ".jpeg", ".png", ".gif",
@@ -195,9 +197,10 @@ def normalize_target(site):
     return urlparse(base).netloc, base
 
 
-def build_inventory(site, max_pages=28, timeout_seconds=90):
-    start = time.time()
-    deadline = start + timeout_seconds
+def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
+    start_mono = time.monotonic()
+    if deadline is None:
+        deadline = start_mono + timeout_seconds
     domain, base_url = normalize_target(site)
     target_netloc = urlparse(base_url).netloc.lower()
 
@@ -218,7 +221,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
     status, html, headers, err = safe_fetch(base_url + "/", timeout=10, max_bytes=2*1024*1024)
     if status is None or not html:
         inv["limitations"].append(f"Homepage unreachable ({err or 'network error'}); inventory could not be built.")
-        return inv, {"homepage_reachable": False, "html_pages_sampled": 0, "sitemaps_processed": 0, "urls_discovered": 0, "elapsed_seconds": round(time.time() - start, 1)}
+        return inv, {"homepage_reachable": False, "html_pages_sampled": 0, "sitemaps_processed": 0, "urls_discovered": 0, "elapsed_seconds": round(time.monotonic() - start_mono, 1)}
 
     ptype, pconf, ptmpl, ploc = classify_page(base_url + "/", _extract_title(html))
     inv["pages"].append({
@@ -236,14 +239,15 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
         "headers": headers
     })
 
-    if deadline and time.time() >= deadline:
+    if deadline and time.monotonic() >= deadline:
         inv["limitations"].append("Inventory truncated at acquisition deadline.")
         return inv, {
             "homepage_reachable": True,
             "html_pages_sampled": len(inv["pages"]),
             "sitemaps_processed": 0,
-            "elapsed_seconds": round(time.time() - start, 1)
+            "elapsed_seconds": round(time.monotonic() - start_mono, 1)
         }
+
 
     # 2. robots.txt
     r_status, robots_txt, _, _ = safe_fetch(base_url + "/robots.txt", timeout=8, max_bytes=512*1024)
@@ -263,7 +267,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
     processed_sitemaps = set()
 
     while sitemaps_to_process and len(processed_sitemaps) < 8:
-        if deadline and time.time() >= deadline:
+        if deadline and time.monotonic() >= deadline:
             break
         sm_url = sitemaps_to_process.pop(0)
         if sm_url in processed_sitemaps:
@@ -318,14 +322,13 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
         matching_keys = [k for k in by_template.keys() if k[0] == pt]
         for k in matching_keys:
             for u in by_template[k][:3]:
-                if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
+                if len(selected_urls) >= max_pages - 1 or (deadline and time.monotonic() >= deadline):
                     break
                 selected_urls.append(u)
-            if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
+            if len(selected_urls) >= max_pages - 1 or (deadline and time.monotonic() >= deadline):
                 break
-        if len(selected_urls) >= max_pages - 1 or (deadline and time.time() >= deadline):
+        if len(selected_urls) >= max_pages - 1 or (deadline and time.monotonic() >= deadline):
             break
-
 
     # Parse robots.txt for crawler's own URL fetch gating
     rp = None
@@ -338,7 +341,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
             rp = None
 
     for u in selected_urls:
-        if deadline and time.time() >= deadline:
+        if deadline and time.monotonic() >= deadline:
             inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
             break
         if rp and not rp.can_fetch(DEFAULT_USER_AGENT, u):
@@ -363,8 +366,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
                 "headers": p_headers
             })
 
-
-    inv["elapsed_seconds"] = round(time.time() - start, 1)
+    inv["elapsed_seconds"] = round(time.monotonic() - start_mono, 1)
 
     stats = {
         "homepage_reachable": True,
@@ -378,6 +380,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90):
                        for t in {p.get("page_type") for p in inv["pages"] if p.get("page_type")}}
     }
     return inv, stats
+
 
 
 def main():

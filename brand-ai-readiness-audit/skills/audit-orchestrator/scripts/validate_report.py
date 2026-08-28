@@ -38,6 +38,12 @@ def validate_report_dict(data):
     if not validate_iso8601(data["audited_at"]):
         errors.append(f"'audited_at' must be a valid ISO 8601 timestamp (e.g., '2026-09-20T14:32:00Z'), got '{data.get('audited_at')}'")
 
+    # Check optional/recommended audit_status
+    if "audit_status" in data:
+        if data["audit_status"] not in ("ok", "partial", "inconclusive"):
+            errors.append(f"'audit_status' must be one of ['ok', 'partial', 'inconclusive'], got '{data.get('audit_status')}'")
+
+
     # Check summary
     summary = data.get("summary")
     if not isinstance(summary, dict):

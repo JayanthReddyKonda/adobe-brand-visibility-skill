@@ -20,34 +20,22 @@ import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-orchestrator", "scripts")))
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request, urllib.error
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        req = urllib.request.Request(url, headers={"User-Agent": user_agent})
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.status, r.read(max_bytes).decode("utf-8", "ignore"), dict(r.headers), None
-        except urllib.error.HTTPError as e:
-            try:
-                body = e.read(max_bytes).decode("utf-8", "ignore")
-            except Exception:
-                body = ""
-            return e.code, body, dict(e.headers or {}), str(e)
-        except Exception as e:
-            return None, "", {}, str(e)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
+if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
+    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
 
-# Weighted Answerability Schema by Page Type (Strictly Factual & Applicable Attributes)
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
+# Weighted Answerability Schema by Page Type (Structured & Measurable Material Attributes)
 ANSWERABILITY_WEIGHTS = {
     "product_detail": {
-        "product_name": (0.30, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
+        "product_name": (0.30, ["product", "item", "model", "sku", "title"]),
         "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
         "availability": (0.25, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock", "in_stock"]),
         "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
     },
+
     "product": {  # Alias for single product pages
         "product_name": (0.30, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
         "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
