@@ -5,3 +5,9 @@ __pycache__/
 *.pyo
 *.pyd
 .DS_Store
+.omo
+
+# Generated audit-report artifacts (runtime output, not part of the marketplace submission)
+frescopa-report.json
+report.json
+
