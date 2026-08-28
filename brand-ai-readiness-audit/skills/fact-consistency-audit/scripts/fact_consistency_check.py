@@ -170,6 +170,84 @@ def extract_internal_links(html_str, base_url, limit=2):
             break
     return links
 
+def normalize_price(raw):
+    """Normalize a price string to comparable digits (e.g. '₹5,499.00' -> '5499')."""
+    digits = re.sub(r"[^\d]", "", raw.split(".")[0])
+    return digits or None
+
+
+def extract_facts(html_str, url):
+    """Extract comparable first-party facts from one page (the fact ledger).
+
+    Only facts that are objectively comparable are extracted: prices,
+    contact emails, and phone numbers. Organizational/price claims that
+    require interpretation are deliberately excluded (they cannot be
+    adjudicated deterministically without generating false positives).
+    """
+    text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", html_str, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    facts = {"price": [], "email": [], "phone": []}
+
+    # Prices: currency symbol/code followed by an amount.
+    for m in re.finditer(
+        r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?([\d][\d,\.]*)", text, re.IGNORECASE
+    ):
+        norm = normalize_price(m.group(1))
+        if norm and len(norm) >= 2:
+            facts["price"].append(norm)
+
+    # Emails on the page (first-party contact facts).
+    for m in re.finditer(r"[\w.+-]+@[\w-]+\.[\w.-]+", html_str):
+        addr = m.group(0).strip(".").lower()
+        if not addr.endswith((".png", ".jpg", ".gif", ".webp", ".js", ".css")):
+            facts["email"].append(addr)
+
+    # Phone numbers: intl-format sequences of 8+ digits with separators.
+    for m in re.finditer(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}", text):
+        digits = re.sub(r"\D", "", m.group(0))
+        if 8 <= len(digits) <= 15:
+            facts["phone"].append(digits)
+
+    return {"url": url, "facts": {k: sorted(set(v)) for k, v in facts.items() if v}}
+
+
+def fact_ledger_check(page_facts):
+    """Cross-page fact ledger: a finding only when the SAME fact key holds
+    conflicting values across first-party pages (a verified inconsistency,
+    not an absence)."""
+    findings = []
+    ledger = {}
+    for page in page_facts:
+        for fact_key, values in page["facts"].items():
+            for value in values:
+                ledger.setdefault(fact_key, {}).setdefault(value, []).append(page["url"])
+
+    label = {"price": "Price", "email": "Contact email", "phone": "Phone number"}
+    for fact_key, value_map in ledger.items():
+        if len(value_map) < 2:
+            continue
+        detail = "; ".join(
+            f"{v} on {', '.join(urls)}" for v, urls in sorted(value_map.items())
+        )
+        n_urls = len({u for urls in value_map.values() for u in urls})
+        findings.append({
+            "category": "fact-consistency",
+            "title": f"{label.get(fact_key, fact_key)} differs across first-party pages",
+            "severity": "medium" if fact_key != "price" else "high",
+            "confidence": "high" if fact_key == "price" else "medium",
+            "root_cause": f"Multiple distinct {fact_key} values are published on the same site, so a retrieval system can extract contradictory facts for the same entity.",
+            "impact": f"AI assistants and users may quote an outdated or wrong {fact_key}; conflicting evidence also weakens corroboration.",
+            "evidence": f"{n_urls} page(s) carry conflicting values: {detail}",
+            "suggested_action": {
+                "summary": f"Establish one canonical {fact_key} and synchronize it across all pages and structured data; remove or update stale references.",
+                "priority": "medium" if fact_key != "price" else "high",
+                "verification": f"Re-crawl the affected URLs and confirm a single {fact_key} value appears everywhere."
+            }
+        })
+    return findings
+
+    return links
+
 
 def cross_page_check(home_result, home_url, fetched_pages):
     """Compare identity/maintenance signals across pages. Only a verified
@@ -220,12 +298,16 @@ def main():
             # Cross-page consistency: verify facts on a couple of internal pages.
             if not args.no_cross_page:
                 fetched = []
+                page_facts = [extract_facts(html, site_clean)]
                 for link in extract_internal_links(html, site_clean):
                     p_status, p_html = fetch_url(link)
                     if p_html:
                         _, _, p_result = audit_freshness(p_html, link)
                         fetched.append((link, p_result))
+                        page_facts.append(extract_facts(p_html, link))
                 findings.extend(cross_page_check(home_result, site_clean, fetched))
+                # Fact ledger: conflicting values for the same fact across pages.
+                findings.extend(fact_ledger_check(page_facts))
             print(json.dumps({"status": "ok", "findings": findings,
                               "recommendations": recommendations}, indent=2))
         else:
