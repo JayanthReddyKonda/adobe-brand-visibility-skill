@@ -38,6 +38,8 @@ import engagement_check
 import representation_check
 import orchestrator
 import validate_report
+import audit_db
+
 
 
 class TestSSRFAndSecurity(unittest.TestCase):
@@ -277,5 +279,96 @@ class TestOrchestratorAndSchemaValidation(unittest.TestCase):
         self.assertTrue(is_valid, f"Validation errors: {errors}")
 
 
+class TestResourceIsolationAndSitemaps(unittest.TestCase):
+    def test_sitemap_xml_never_audited_as_product_page(self):
+        """Invariant: Non-HTML resources (XML sitemaps) must NEVER enter page audits."""
+        inv = {
+            "base_url": "https://frescopa.coffee",
+            "infrastructure": {
+                "sitemaps_discovered": ["https://frescopa.coffee/sitemap.xml", "https://frescopa.coffee/sitemap-content.xml"],
+                "sitemaps_processed": 2
+            },
+            "pages": [
+                {
+                    "url": "https://frescopa.coffee/",
+                    "status": 200,
+                    "resource_type": "html",
+                    "page_type": "homepage",
+                    "html": "<html><head><title>Frescopa Specialty Coffee Roasters</title></head><body><h1>Frescopa Fresh Coffee</h1><p>Artisanal coffee freshly roasted in small batches.</p></body></html>"
+                },
+                {
+                    "url": "https://frescopa.coffee/sitemap-content.xml",
+                    "status": 200,
+                    "resource_type": "xml",
+                    "page_type": "product",
+                    "html": "<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'><url><loc>https://frescopa.coffee/products/espresso</loc></url></urlset>"
+                }
+            ]
+        }
+
+        # 1. Entity content check must ignore sitemap-content.xml
+        e_res = entity_content_check.audit("https://frescopa.coffee", "frescopa.coffee", inv=inv)
+        self.assertEqual(e_res["status"], "ok")
+        sitemap_findings = [f for f in e_res.get("findings", []) if "sitemap" in f.get("evidence", "").lower() or "sitemap" in f.get("title", "").lower()]
+        self.assertEqual(len(sitemap_findings), 0, "Sitemap XML was evaluated as a product page!")
+
+        # 2. Engagement check must ignore sitemap-content.xml
+        eng_res = engagement_check.audit("https://frescopa.coffee", "frescopa.coffee", inv=inv)
+        self.assertEqual(eng_res["status"], "ok")
+        sitemap_eng_findings = [f for f in eng_res.get("findings", []) if "sitemap" in f.get("evidence", "").lower() or "sitemap" in f.get("title", "").lower()]
+        self.assertEqual(len(sitemap_eng_findings), 0, "Sitemap XML was evaluated in engagement check!")
+
+
+class TestSQLiteAuditPersistence(unittest.TestCase):
+    def test_sqlite_save_and_retrieve(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tf:
+            db_path = tf.name
+
+
+        try:
+            report = {
+                "site": "example.com",
+                "audited_at": "2026-08-28T15:00:00Z",
+                "summary": {
+                    "total_findings": 1,
+                    "critical": 1,
+                    "high": 0,
+                    "medium": 0,
+                    "low": 0
+                },
+                "specialists": {
+                    "discoverability-audit": {"label": "Access", "status": "ok"}
+                },
+                "findings": [
+                    {
+                        "id": "F-001",
+                        "title": "Robots blocked",
+                        "severity": "critical",
+                        "confidence": "high",
+                        "evidence": "Disallow: /",
+                        "suggested_action": {"summary": "Allow crawlers"}
+                    }
+                ],
+                "audit_metrics": {
+                    "execution_time_seconds": 1.5,
+                    "answerability_index": 0.95
+                }
+            }
+
+            audit_id = audit_db.save_audit_report(report, db_path=db_path)
+            self.assertIsNotNone(audit_id)
+            self.assertGreater(audit_id, 0)
+
+            history = audit_db.list_recent_audits(db_path=db_path, limit=5)
+            self.assertEqual(len(history), 1)
+            self.assertEqual(history[0]["site"], "example.com")
+            self.assertEqual(history[0]["critical_count"], 1)
+        finally:
+            if os.path.exists(db_path):
+                os.unlink(db_path)
+
+
 if __name__ == "__main__":
     unittest.main()
+
+

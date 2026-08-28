@@ -6,6 +6,7 @@ Causal Root Causes:
   - EXPERIENCE.CONTINUITY: INTENT_TO_LANDING_MISMATCH, LOW_INFORMATION_SCENT, DESTINATION_NAVIGATION_FRICTION
 
 Evaluates the complete Intent -> Expected Facts -> Landing Page -> Information Scent -> Next Action journey.
+Enforces strict Resource Invariant: Only genuine HTML pages enter engagement audits.
 """
 import sys
 import os
@@ -40,7 +41,7 @@ GENERIC_H1_TERMS = {
     "welcome to our website", "welcome to our site", "main page", "overview"
 }
 
-CORE_DESTINATIONS = ["pricing", "product", "docs", "documentation", "about", "contact", "login", "signup"]
+CORE_DESTINATIONS = ["pricing", "product", "docs", "documentation", "about", "contact", "login", "signup", "shop", "store"]
 
 
 class EngagementDOMParser(HTMLParser):
@@ -72,7 +73,6 @@ class EngagementDOMParser(HTMLParser):
             href = attr_dict.get("href", "")
             if href:
                 self.nav_links.append(href)
-                # Check for CTA classes / roles
                 cls = attr_dict.get("class", "").lower()
                 role = attr_dict.get("role", "").lower()
                 if "btn" in cls or "button" in cls or "cta" in cls or role == "button":
@@ -105,7 +105,7 @@ class EngagementDOMParser(HTMLParser):
 
 
 def audit_page_engagement(html_content, url, page_type="other"):
-    """Evaluate 5-second orientation, information scent, and intent continuity."""
+    """Evaluate 5-second orientation, information scent, and intent continuity across multiple signals."""
     findings = []
     recommendations = []
     observations = []
@@ -118,25 +118,34 @@ def audit_page_engagement(html_content, url, page_type="other"):
 
     full_text = " ".join(dom.body_text)
     visible_words = len(full_text.split())
+    has_descriptive_title = len(dom.title.strip().split()) >= 3
+    has_subheadings = len(dom.h2_list) >= 1
 
-    # 1. 5-Second Orientation & Information Scent (H1 Analysis)
+    # 1. Multi-Signal 5-Second Orientation & Information Scent
     if not dom.h1_list:
-        if visible_words > 80:
+        if not has_descriptive_title and not has_subheadings and visible_words > 80:
             findings.append({
                 "category": "engagement",
-                "title": f"Missing primary H1 topic statement on content-bearing page ({url})",
+                "title": f"Weak first-visit orientation and missing primary topic statement ({url})",
                 "severity": "medium",
                 "confidence": "high",
-                "root_cause": "The page lacks a semantic <h1> element to establish immediate topic orientation for arriving visitors.",
+                "root_cause": "The page lacks both an <h1> heading and descriptive title/subheading markers, leaving arriving visitors unoriented.",
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "cause_id": "LOW_INFORMATION_SCENT",
-                "impact": "Visitors arriving from AI search answers cannot immediately confirm they have reached the right resource, increasing bounce risk.",
-                "evidence": f"Found 0 <h1> tags on {url} despite {visible_words} words of body text.",
+                "impact": "Visitors arriving from AI search answers cannot quickly verify the page purpose, increasing bounce probability.",
+                "evidence": f"Found 0 <h1> tags, 0 <h2> tags, and an uninformative <title> ('{dom.title}') on {url}.",
                 "suggested_action": {
-                    "summary": "Add a descriptive <h1> element above the fold clearly stating the product name or page topic.",
+                    "summary": "Add a descriptive <h1> headline above the fold clearly stating the offering name and value proposition.",
                     "priority": "medium",
-                    "verification": f"Confirm {url} contains an <h1> stating the core topic."
+                    "verification": f"Confirm {url} contains an <h1> stating the core offering topic."
                 }
+            })
+        elif visible_words > 80:
+            recommendations.append({
+                "title": f"Add semantic <h1> element on {url}",
+                "category": "engagement",
+                "rationale": f"Page provides context in <title> ('{dom.title}') but lacks an explicit <h1> heading for semantic structure.",
+                "suggested_action": "Add an <h1> heading matching the page title to strengthen heading information scent."
             })
     else:
         primary_h1 = dom.h1_list[0].strip()
@@ -153,7 +162,7 @@ def audit_page_engagement(html_content, url, page_type="other"):
                 "impact": "Visitors skimming above-the-fold content cannot determine the brand's core offering within 5 seconds.",
                 "evidence": f"Primary <h1> on {url} is '{primary_h1}'.",
                 "suggested_action": {
-                    "summary": "Revise the <h1> to include concrete product nouns and value verbs (e.g. 'Enterprise Cloud Storage Solutions').",
+                    "summary": "Revise the <h1> to include concrete product nouns and value verbs (e.g. 'Artisanal Fresh Roasted Specialty Coffee').",
                     "priority": "low",
                     "verification": "Confirm updated H1 contains descriptive brand or product terminology."
                 }
@@ -182,7 +191,7 @@ def audit_page_engagement(html_content, url, page_type="other"):
         })
 
     # 3. Intent-to-Landing Match for Specialized Pages
-    if page_type == "pricing" and not any(k in full_text.lower() for k in ("$", "₹", "usd", "inr", "free", "tier", "plan", "/mo")):
+    if page_type == "pricing" and not any(k in full_text.lower() for k in ("$", "₹", "usd", "inr", "eur", "£", "free", "tier", "plan", "/mo")):
         findings.append({
             "category": "intent-continuity",
             "title": f"Intent-to-landing mismatch: Pricing page omits transparent commercial terms ({url})",
@@ -216,27 +225,34 @@ def audit(base, domain, inv=None):
     observations = []
     page_metrics = []
 
+    html_pages = []
     if inv is not None:
         for p in inv.get("pages", []):
-            if p.get("html"):
-                p_findings, p_recs, p_data = audit_page_engagement(p["html"], p["url"], page_type=p.get("page_type", "other"))
-                findings.extend(p_findings)
-                recommendations.extend(p_recs)
-                page_metrics.append(p_data)
+            u = p.get("url", "")
+            raw_html = p.get("html", "")
+            if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
+                continue
+            if raw_html.strip().startswith("<?xml") or "<urlset" in raw_html.lower() or "<sitemapindex" in raw_html.lower():
+                continue
+            if raw_html:
+                html_pages.append(p)
     else:
         status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
         if html:
-            p_findings, p_recs, p_data = audit_page_engagement(html, base + "/", page_type="homepage")
-            findings.extend(p_findings)
-            recommendations.extend(p_recs)
-            page_metrics.append(p_data)
+            html_pages.append({"url": base + "/", "html": html, "page_type": "homepage"})
+
+    for p in html_pages:
+        p_findings, p_recs, p_data = audit_page_engagement(p["html"], p["url"], page_type=p.get("page_type", "other"))
+        findings.extend(p_findings)
+        recommendations.extend(p_recs)
+        page_metrics.append(p_data)
 
     if not page_metrics:
         return {
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
-            "error": f"could not retrieve content from {base}"
+            "error": f"could not retrieve HTML content from {base}"
         }
 
     return {
@@ -245,7 +261,7 @@ def audit(base, domain, inv=None):
         "recommendations": recommendations,
         "observations": observations,
         "coverage": {
-            "pages_evaluated": len(page_metrics),
+            "html_pages_evaluated": len(page_metrics),
             "page_details": page_metrics
         },
         "limitations": [
@@ -258,6 +274,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit on-site visitor orientation, heading hierarchies, and navigation.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -271,7 +288,8 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    print(json.dumps(audit(base, p.netloc, inv=inv), indent=2))
+    res = audit(base, p.netloc, inv=inv)
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

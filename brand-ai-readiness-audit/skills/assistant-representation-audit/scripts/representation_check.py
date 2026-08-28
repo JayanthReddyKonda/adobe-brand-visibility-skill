@@ -40,6 +40,9 @@ class TextDOMParser(HTMLParser):
         self.title = ""
         self.in_title = False
 
+    def handle_starttag(tag, attrs):
+        pass
+
     def handle_starttag(self, tag, attrs):
         if tag.lower() in ("script", "style", "noscript"):
             self.skip_depth += 1
@@ -60,9 +63,9 @@ class TextDOMParser(HTMLParser):
 
 
 def build_fact_snapshot(site, inv=None):
-    """Build a baseline first-party fact snapshot."""
+    """Build a baseline first-party fact snapshot from genuine HTML."""
     if inv is not None:
-        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and p.get("resource_type", "html") == "html"), None)
         html = home.get("html") if home else None
     else:
         status, html, _, err = safe_fetch(site, timeout=10, max_bytes=2*1024*1024)
@@ -209,6 +212,7 @@ def main():
     parser.add_argument("--site", required=True)
     parser.add_argument("--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check")
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -222,7 +226,8 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    print(json.dumps(audit(base, p.netloc, responses_file=args.responses, inv=inv), indent=2))
+    res = audit(base, p.netloc, responses_file=args.responses, inv=inv)
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

@@ -86,7 +86,7 @@ def audit(base, domain, inv=None):
 
     # 1. Fetch Homepage
     if inv is not None:
-        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and p.get("resource_type", "html") == "html"), None)
         html = home.get("html") if home else None
     else:
         status, html, _, err = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
@@ -111,7 +111,7 @@ def audit(base, domain, inv=None):
     # 2. Check declared authority links
     if not sameas_urls:
         recommendations.append({
-            "title": "Declare authoritative identity links (sameAs)",
+            "title": "Establish an integrated brand identity block with authoritative sameAs links",
             "category": "corroboration",
             "rationale": "No sameAs links were declared in JSON-LD. Declaring links to Wikidata, Wikipedia, Crunchbase, or official profiles helps AI models verify brand identity against independent authorities.",
             "suggested_action": "Add sameAs URLs to the Organization JSON-LD markup pointing to official profiles and third-party registries."
@@ -174,6 +174,7 @@ def main():
     parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -187,7 +188,8 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    print(json.dumps(audit(base, p.netloc, inv=inv), indent=2))
+    res = audit(base, p.netloc, inv=inv)
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

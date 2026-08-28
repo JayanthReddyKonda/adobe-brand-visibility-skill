@@ -158,14 +158,14 @@ def audit(base, domain, inv=None):
 
     # 1. Fetch Homepage & robots.txt via shared inventory or live probe
     if inv is not None:
-        home_page = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
+        home_page = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and p.get("resource_type", "html") == "html"), None)
         if not home_page and inv.get("pages"):
             home_page = inv["pages"][0]
         status = home_page.get("status") if home_page else None
         html = home_page.get("html", "") if home_page else ""
         headers = {}
         err = None
-        r_info = inv.get("robots") or {}
+        r_info = inv.get("robots") or (inv.get("infrastructure") or {}).get("robots") or {}
         r_status = r_info.get("status")
         robots_txt = r_info.get("text")
     else:
@@ -344,6 +344,7 @@ def main():
     parser = argparse.ArgumentParser(description="Access & discovery audit layer.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     base, domain = parse_domain(args.site)
     inv = None
@@ -353,7 +354,8 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    print(json.dumps(audit(base, domain, inv=inv), indent=2))
+    res = audit(base, domain, inv=inv)
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

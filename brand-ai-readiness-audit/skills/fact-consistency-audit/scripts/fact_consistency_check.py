@@ -335,8 +335,14 @@ def audit(base, domain, inv=None):
 
     if inv is not None:
         for p in inv.get("pages", []):
-            if p.get("html"):
-                page_fact_list.append(extract_scoped_facts(p["html"], p["url"]))
+            u = p.get("url", "")
+            raw_html = p.get("html", "")
+            if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
+                continue
+            if raw_html.strip().startswith("<?xml") or "<urlset" in raw_html.lower() or "<sitemapindex" in raw_html.lower():
+                continue
+            if raw_html:
+                page_fact_list.append(extract_scoped_facts(raw_html, u))
     else:
         status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
         if html:
@@ -359,7 +365,7 @@ def audit(base, domain, inv=None):
         "findings": findings,
         "recommendations": recommendations,
         "coverage": {
-            "pages_checked": len(page_fact_list),
+            "html_pages_checked": len(page_fact_list),
             "scoped_facts_recorded": sum(len(pf["scoped_prices"]) for pf in page_fact_list),
             "source": "shared-inventory" if inv is not None else "homepage-only"
         },
@@ -373,6 +379,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit fact freshness and consistency.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -386,7 +393,8 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    print(json.dumps(audit(base, p.netloc, inv=inv), indent=2))
+    res = audit(base, p.netloc, inv=inv)
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

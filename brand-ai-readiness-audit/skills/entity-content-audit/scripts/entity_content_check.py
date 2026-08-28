@@ -8,6 +8,9 @@ Causal Root Causes:
 
 Calculates the mathematically reproducible weighted Answerability Index:
   Index = sum(weight_i * present_i) / sum(weight_i)
+
+Enforces strict Resource Invariant:
+  - Only genuine HTML pages enter answerability audits (XML sitemaps and feeds are strictly excluded).
 """
 import sys
 import os
@@ -37,32 +40,28 @@ except ImportError:
         except Exception as e:
             return None, "", {}, str(e)
 
-# Weighted Answerability Schema by Page Type
+# Weighted Answerability Schema by Page Type (Factual Attributes Only)
 ANSWERABILITY_WEIGHTS = {
     "product": {
-        "product_name": (0.30, ["product", "item", "drone", "solution", "tool"]),
-        "price": (0.25, ["₹", "$", "usd", "inr", "price", "starts at", "per month"]),
+        "product_name": (0.35, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
+        "price": (0.30, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
         "availability": (0.20, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock"]),
-        "specifications": (0.15, ["specifications", "features", "battery", "dimensions", "weight", "capacity", "sla"]),
-        "purchase_cta": (0.10, ["buy", "order", "add to cart", "purchase", "get started", "request quote"])
+        "specifications": (0.15, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions"])
     },
     "pricing": {
-        "tier_names": (0.30, ["starter", "pro", "enterprise", "basic", "premium", "tier", "plan"]),
-        "price_figures": (0.30, ["₹", "$", "usd", "inr", "/mo", "/month", "/year", "free"]),
-        "feature_comparison": (0.20, ["features", "includes", "comparison", "unlimited", "storage", "users"]),
-        "conversion_cta": (0.20, ["sign up", "subscribe", "choose plan", "start free", "contact sales"])
+        "tier_names": (0.35, ["starter", "pro", "enterprise", "basic", "premium", "tier", "plan"]),
+        "price_figures": (0.35, ["₹", "$", "usd", "inr", "eur", "£", "/mo", "/month", "/year", "free"]),
+        "feature_comparison": (0.30, ["features", "includes", "comparison", "unlimited", "storage", "users"])
     },
     "service": {
-        "service_name": (0.35, ["service", "consulting", "managed", "solution"]),
-        "deliverables": (0.25, ["deliverables", "capabilities", "scope", "includes"]),
-        "engagement_model": (0.20, ["hourly", "retainer", "fixed", "timeline", "process"]),
-        "inquiry_cta": (0.20, ["contact us", "book consultation", "schedule call", "inquire"])
+        "service_name": (0.40, ["service", "consulting", "managed", "solution"]),
+        "deliverables": (0.30, ["deliverables", "capabilities", "scope", "includes"]),
+        "engagement_model": (0.30, ["hourly", "retainer", "fixed", "timeline", "process"])
     },
     "contact": {
-        "email_channel": (0.35, ["@", "mailto:", "support@", "sales@", "contact@"]),
-        "phone_channel": (0.30, ["tel:", "+", "call", "phone"]),
-        "physical_location": (0.20, ["street", "address", "suite", "floor", "city", "headquarters"]),
-        "business_hours": (0.15, ["hours", "mon-fri", "am", "pm", "24/7"])
+        "email_channel": (0.40, ["@", "mailto:", "support@", "sales@", "contact@"]),
+        "phone_channel": (0.35, ["tel:", "+", "call", "phone"]),
+        "physical_location": (0.25, ["street", "address", "suite", "floor", "city", "headquarters"])
     }
 }
 
@@ -188,26 +187,44 @@ def evaluate_page_answerability(page_type, html_content, dom, url):
 def audit(base, domain, inv=None):
     findings, recommendations, observations = [], [], []
 
-    # 1. Fetch Homepage
+    # 1. Filter genuine HTML pages from inventory
+    html_pages = []
     if inv is not None:
-        home_page = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage"), None)
-        if not home_page and inv.get("pages"):
-            home_page = inv["pages"][0]
-        html = home_page.get("html", "") if home_page else ""
+        for p in inv.get("pages", []):
+            u = p.get("url", "")
+            raw_html = p.get("html", "")
+            # Strict non-HTML / sitemap rejection
+            if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
+                continue
+            if raw_html.strip().startswith("<?xml") or "<urlset" in raw_html.lower() or "<sitemapindex" in raw_html.lower():
+                continue
+            if p.get("resource_type") == "html" or "<html" in raw_html.lower() or "<!doctype html" in raw_html.lower() or p.get("page_type") == "homepage":
+                html_pages.append(p)
     else:
-        _, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
+        status, html, headers, _ = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
+        if html:
+            html_pages.append({
+                "url": base + "/",
+                "status": status,
+                "resource_type": "html",
+                "page_type": "homepage",
+                "html": html
+            })
 
-    if not html:
+    if not html_pages:
         return {
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
-            "error": f"could not reach {base}"
+            "error": f"could not reach {base} or no HTML pages found"
         }
+
+    home_page = next((p for p in html_pages if p.get("page_type") == "homepage"), html_pages[0])
+    home_html = home_page.get("html", "")
 
     dom = EntityDOMParser()
     try:
-        dom.feed(html)
+        dom.feed(home_html)
     except Exception:
         pass
 
@@ -251,41 +268,40 @@ def audit(base, domain, inv=None):
                 "suggested_action": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles."
             })
 
-    # 3. Answerability Evaluation Across Sampled Pages
+    # 3. Answerability Evaluation Across Sampled HTML Pages (Excluding Homepage)
     answerability_evaluations = []
-    if inv is not None:
-        for p in inv.get("pages", []):
-            ptype = p.get("page_type")
-            phtml = p.get("html")
-            purl = p.get("url")
-            if ptype in ANSWERABILITY_WEIGHTS and phtml:
-                pdom = EntityDOMParser()
-                try:
-                    pdom.feed(phtml)
-                except Exception:
-                    pass
-                ans = evaluate_page_answerability(ptype, phtml, pdom, purl)
-                if ans:
-                    answerability_evaluations.append(ans)
-                    if ans["coverage_ratio"] < 0.60:
-                        findings.append({
-                            "category": "answerability",
-                            "title": f"Low factual answerability on {ptype} page ({purl})",
-                            "severity": "low",
-                            "confidence": "medium",
-                            "root_cause": f"The {ptype} page omits core factual attributes: {', '.join(ans['missing'])}.",
-                            "cause_family": "ENTITY.ANSWERABILITY",
-                            "cause_id": "MISSING_MATERIAL_FACT",
-                            "impact": "AI assistants querying for specific commercial terms cannot locate direct answers on this surface.",
-                            "evidence": f"Page covers only {int(ans['coverage_ratio']*100)}% of expected {ptype} facts. Missing: {', '.join(ans['missing'])}.",
-                            "suggested_action": {
-                                "summary": f"Expose missing {ptype} attributes ({', '.join(ans['missing'])}) in both visible body text and structured markup.",
-                                "priority": "low",
-                                "verification": f"Verify {purl} publishes explicit values for {', '.join(ans['missing'])}."
-                            }
-                        })
+    for p in html_pages:
+        ptype = p.get("page_type")
+        phtml = p.get("html")
+        purl = p.get("url")
+        if ptype in ANSWERABILITY_WEIGHTS and ptype != "homepage" and phtml:
+            pdom = EntityDOMParser()
+            try:
+                pdom.feed(phtml)
+            except Exception:
+                pass
+            ans = evaluate_page_answerability(ptype, phtml, pdom, purl)
+            if ans:
+                answerability_evaluations.append(ans)
+                if ans["coverage_ratio"] < 0.60:
+                    findings.append({
+                        "category": "answerability",
+                        "title": f"Low factual answerability on {ptype} page ({purl})",
+                        "severity": "low",
+                        "confidence": "medium",
+                        "root_cause": f"The {ptype} page omits core factual attributes: {', '.join(ans['missing'])}.",
+                        "cause_family": "ENTITY.ANSWERABILITY",
+                        "cause_id": "MISSING_MATERIAL_FACT",
+                        "impact": "AI assistants querying for specific commercial terms cannot locate direct answers on this surface.",
+                        "evidence": f"Page covers only {int(ans['coverage_ratio']*100)}% of expected {ptype} facts. Missing: {', '.join(ans['missing'])}.",
+                        "suggested_action": {
+                            "summary": f"Expose missing {ptype} attributes ({', '.join(ans['missing'])}) in both visible body text and structured markup.",
+                            "priority": "low",
+                            "verification": f"Verify {purl} publishes explicit values for {', '.join(ans['missing'])}."
+                        }
+                    })
 
-    # Calculate overall answerability index
+    # Calculate overall answerability index across evaluated pages
     if answerability_evaluations:
         avg_index = round(sum(a["coverage_ratio"] for a in answerability_evaluations) / len(answerability_evaluations), 2)
     else:
@@ -303,6 +319,7 @@ def audit(base, domain, inv=None):
             "title": dom.title
         },
         "coverage": {
+            "html_pages_evaluated": len(html_pages),
             "answerability_index": avg_index,
             "answerability_evaluations": answerability_evaluations,
             "json_ld_count": len(json_ld_entities)
@@ -317,6 +334,7 @@ def main():
     parser = argparse.ArgumentParser(description="Entity & content understanding audit layer.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -330,7 +348,8 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    print(json.dumps(audit(base, p.netloc, inv=inv), indent=2))
+    res = audit(base, p.netloc, inv=inv)
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":
