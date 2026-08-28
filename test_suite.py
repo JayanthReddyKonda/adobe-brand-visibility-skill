@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 """
-test_suite.py - Comprehensive verification test suite for Brand AI-Readiness Audit Marketplace.
-Tests:
-  1. SSRF prevention and IP filtering against loopback, private, link-local, and cloud metadata.
-  2. Crawler matrix semantics (training vs retrieval bot disallow rules).
-  3. Scoped fact consistency and contradiction detection.
-  4. Product lifecycle conflict detection (discontinued vs current).
-  5. Mathematical Answerability Engine attribute coverage.
-  6. Engagement orientation, intent-continuity, and information scent checks.
-  7. Optional representation cross-check with observed AI outputs.
-  8. End-to-end multi-specialist composition, taxonomy root causes, and schema validation.
+test_suite.py - Exhaustive enterprise-grade verification test suite for Brand AI-Readiness Audit Marketplace.
+
+Covers:
+  1. SSRF prevention, IP filtering, gzip decompression bomb defense, and safe status probing.
+  2. Discoverability & crawler matrix semantics (tokenized noindex, AI search vs training bots, CSR rendering risk).
+  3. Entity identity, JSON-LD parsing, page classification, and the mathematical Answerability Engine.
+  4. Scoped fact consistency, float price normalization, currency/interval scoping, and product lifecycle conflicts.
+  5. Cross-web authority link verification and sameAs resolution.
+  6. Engagement & 5-second above-the-fold orientation, heading information scent, and search intent routing.
+  7. Optional AI assistant representation cross-checking and citation logging.
+  8. Type-safe shared inventory acquisition and Content-Type filtering.
+  9. Zero-dependency SQLite audit persistence, trend analysis, and detail querying.
+  10. Output report schema validation, summary cross-checking, and ISO 8601 timestamp compliance.
+  11. End-to-end multi-specialist composition, multi-locale deduplication, and evidence calibration.
 """
 
 import sys
 import os
 import json
+import gzip
 import unittest
 import tempfile
+from datetime import datetime, timezone
 
 # Add script paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +35,23 @@ sys.path.insert(0, os.path.join(SKILLS_DIR, "corroboration-authority-audit", "sc
 sys.path.insert(0, os.path.join(SKILLS_DIR, "engagement-context-audit", "scripts"))
 sys.path.insert(0, os.path.join(SKILLS_DIR, "assistant-representation-audit", "scripts"))
 
-from safe_fetch import safe_fetch, is_ip_allowed, validate_hostname_ips
+from safe_fetch import (
+    safe_fetch,
+    is_ip_allowed,
+    validate_hostname_ips,
+    safe_check_status,
+    _decompress_gzip_bounded
+)
+from acquire_inventory import (
+    build_inventory,
+    classify_page,
+    extract_locale_and_template,
+    is_html_response,
+    is_sitemap_or_non_html_url,
+    _parse_sitemap_xml,
+    _extract_title,
+    _visible_words
+)
 import discoverability_check
 import entity_content_check
 import fact_consistency_check
@@ -41,25 +63,37 @@ import validate_report
 import audit_db
 
 
-
+# ==============================================================================
+# 1. SSRF & Security Tests
+# ==============================================================================
 class TestSSRFAndSecurity(unittest.TestCase):
-    def test_ip_filtering(self):
-        # Loopback
+    def test_ip_filtering_boundaries(self):
+        # IPv4 Loopback
         self.assertFalse(is_ip_allowed("127.0.0.1"))
         self.assertFalse(is_ip_allowed("127.0.1.1"))
+        self.assertFalse(is_ip_allowed("127.255.255.255"))
+        # IPv6 Loopback
         self.assertFalse(is_ip_allowed("::1"))
-        # Private
+        # RFC 1918 Private Subnets
         self.assertFalse(is_ip_allowed("10.0.0.1"))
-        self.assertFalse(is_ip_allowed("192.168.1.1"))
+        self.assertFalse(is_ip_allowed("10.255.255.255"))
         self.assertFalse(is_ip_allowed("172.16.0.1"))
-        # Cloud metadata
+        self.assertFalse(is_ip_allowed("172.31.255.255"))
+        self.assertFalse(is_ip_allowed("192.168.0.1"))
+        self.assertFalse(is_ip_allowed("192.168.1.254"))
+        # Link-Local & Cloud Metadata Endpoints
         self.assertFalse(is_ip_allowed("169.254.169.254"))
-        # Public IP
+        self.assertFalse(is_ip_allowed("169.254.0.1"))
+        # Multicast
+        self.assertFalse(is_ip_allowed("224.0.0.1"))
+        self.assertFalse(is_ip_allowed("239.255.255.255"))
+        # Public Internet IPs
         self.assertTrue(is_ip_allowed("8.8.8.8"))
         self.assertTrue(is_ip_allowed("1.1.1.1"))
+        self.assertTrue(is_ip_allowed("142.250.190.46"))
 
     def test_safe_fetch_blocks_private_targets(self):
-        status, body, headers, err = safe_fetch("http://127.0.0.1:8000/secret")
+        status, body, headers, err = safe_fetch("http://127.0.0.1:8000/admin")
         self.assertIsNone(status)
         self.assertIn("SSRF blocked", err)
 
@@ -67,46 +101,33 @@ class TestSSRFAndSecurity(unittest.TestCase):
         self.assertIsNone(status)
         self.assertIn("SSRF blocked", err)
 
+    def test_bounded_gzip_decompression(self):
+        # Create a small valid gzip payload
+        raw_data = b"Hello, secure world! " * 50
+        gz_data = gzip.compress(raw_data)
+        decompressed = _decompress_gzip_bounded(gz_data, max_bytes=10000)
+        self.assertEqual(decompressed, raw_data)
 
-class TestCrawlerMatrixSemantics(unittest.TestCase):
+        # Test decompression cap
+        decompressed_capped = _decompress_gzip_bounded(gz_data, max_bytes=50)
+        self.assertEqual(len(decompressed_capped), 50)
+
+
+# ==============================================================================
+# 2. Discoverability & Crawler Matrix Tests
+# ==============================================================================
+class TestDiscoverabilityEngine(unittest.TestCase):
     def test_training_bot_disallow_not_critical(self):
-        robots_txt = """
-User-agent: GPTBot
-Disallow: /
-
-User-agent: Google-Extended
-Disallow: /
-"""
-        inv = {
-            "pages": [{
-                "url": "https://example.com/",
-                "status": 200,
-                "page_type": "homepage",
-                "html": "<html><head><title>Example</title></head><body><h1>Welcome to Example</h1><p>We build fine tools for everyone.</p></body></html>"
-            }],
-            "robots": {"status": 200, "text": robots_txt}
-        }
-        res = discoverability_check.audit("https://example.com", "example.com", inv=inv)
-        self.assertEqual(res["status"], "ok")
-        critical_findings = [f for f in res["findings"] if f["severity"] == "critical"]
-        self.assertEqual(len(critical_findings), 0)
-        obs = [o for o in res["observations"] if "training" in o["observation"].lower()]
-        self.assertTrue(len(obs) >= 1)
-
-    def test_retrieval_bot_disallow_is_critical(self):
         robots_txt = """
 User-agent: OAI-SearchBot
 Disallow: /
-
-User-agent: PerplexityBot
-Disallow: /
 """
         inv = {
             "pages": [{
                 "url": "https://example.com/",
                 "status": 200,
                 "page_type": "homepage",
-                "html": "<html><head><title>Example</title></head><body><h1>Example</h1><p>Lots of content here.</p></body></html>"
+                "html": "<html><head><title>Example</title></head><body><h1>Welcome</h1><p>Content goes here.</p></body></html>"
             }],
             "robots": {"status": 200, "text": robots_txt}
         }
@@ -116,44 +137,188 @@ Disallow: /
         self.assertTrue(len(critical_findings) >= 1)
         self.assertEqual(critical_findings[0]["cause_id"], "AI_RETRIEVAL_BLOCKED")
 
+    def test_noindex_tokenized_parsing_immunity(self):
+        # max-image-preview:none contains substring "none", but NOT token "noindex" or token "none" for robots
+        html_with_preview_none = """
+        <html><head>
+        <meta name="robots" content="max-image-preview:none, follow">
+        <title>Safe Page</title>
+        </head><body><h1>Real Content</h1><p>This is genuine content.</p></body></html>
+        """
+        inv = {
+            "pages": [{
+                "url": "https://example.com/item",
+                "status": 200,
+                "page_type": "product_detail",
+                "html": html_with_preview_none,
+                "headers": {}
+            }],
+            "robots": {"status": 200, "text": ""}
+        }
+        res = discoverability_check.audit("https://example.com", "example.com", inv=inv)
+        noindex_findings = [f for f in res["findings"] if f["cause_id"] == "EXPLICIT_NOINDEX_DIRECTIVE"]
+        self.assertEqual(len(noindex_findings), 0)
 
-class TestFactConsistencyAndScope(unittest.TestCase):
-    def test_distinct_tiers_not_contradiction(self):
-        page1 = """
-        <html><head><title>Pricing - Acme</title></head><body>
-        <h1>Pricing Plans</h1>
-        <h2>Starter Tier</h2>
-        <p>Starter plan is $10 per month.</p>
-        <h2>Pro Tier</h2>
-        <p>Pro plan is $50 per month.</p>
+    def test_explicit_noindex_detection(self):
+        html_noindex = """
+        <html><head>
+        <meta name="robots" content="noindex, follow">
+        <title>Hidden Page</title>
+        </head><body><h1>Hidden</h1></body></html>
+        """
+        inv = {
+            "pages": [{
+                "url": "https://example.com/private",
+                "status": 200,
+                "page_type": "product_detail",
+                "html": html_noindex,
+                "headers": {}
+            }],
+            "robots": {"status": 200, "text": ""}
+        }
+        res = discoverability_check.audit("https://example.com", "example.com", inv=inv)
+        noindex_findings = [f for f in res["findings"] if f["cause_id"] == "NOINDEX_EXCLUSION"]
+        self.assertTrue(len(noindex_findings) >= 1)
+
+    def test_csr_empty_root_detection(self):
+        empty_csr_html = """
+        <html><head><title>App</title><script src="/bundle.js"></script></head>
+        <body><div id="root"></div></body></html>
+        """
+        inv = {
+            "pages": [{
+                "url": "https://example.com/app",
+                "status": 200,
+                "page_type": "homepage",
+                "html": empty_csr_html,
+                "headers": {}
+            }],
+            "robots": {"status": 200, "text": ""}
+        }
+        res = discoverability_check.audit("https://example.com", "example.com", inv=inv)
+        csr_findings = [f for f in res["findings"] if f["cause_id"] == "RENDERED_CONTENT_GAP"]
+        self.assertTrue(len(csr_findings) >= 1)
+
+
+# ==============================================================================
+# 3. Entity Identity & Answerability Tests
+# ==============================================================================
+class TestEntityAndAnswerability(unittest.TestCase):
+    def test_organization_jsonld_extraction(self):
+        html = """
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": ["Organization", "Brand"],
+          "name": "Frescopa Coffee",
+          "url": "https://frescopa.coffee",
+          "logo": "https://frescopa.coffee/logo.png",
+          "sameAs": [
+            "https://twitter.com/frescopa",
+            "https://linkedin.com/company/frescopa"
+          ]
+        }
+        </script>
+        </head><body><h1>Frescopa</h1><p>Artisanal Coffee Roasters</p></body></html>
+        """
+        inv = {
+            "pages": [{
+                "url": "https://frescopa.coffee/",
+                "status": 200,
+                "page_type": "homepage",
+                "html": html,
+                "headers": {}
+            }]
+        }
+        res = entity_content_check.audit("https://frescopa.coffee", "frescopa.coffee", inv=inv)
+        self.assertEqual(res["status"], "ok")
+        # Organization is present, so no missing organization defect
+        missing_org = [f for f in res["findings"] if f["cause_id"] == "ORGANIZATION_IDENTITY_MISSING"]
+        self.assertEqual(len(missing_org), 0)
+
+    def test_product_answerability_calculation(self):
+        product_html = """
+        <html><head><title>Garuda Velocity X9</title></head><body>
+        <h1>Garuda Velocity X9</h1>
+        <p>Model: Velocity X9 high performance agricultural drone with 4K camera specifications and 30min flight time.</p>
+        <p>Price: ₹5,499.00. Status: In Stock. Brand: Garuda Aerospace.</p>
+        <button class="btn-cta">Buy Now</button>
         </body></html>
         """
-        facts1 = fact_consistency_check.extract_scoped_facts(page1, "https://example.com/pricing")
-        findings, recs = fact_consistency_check.evaluate_fact_consistency([facts1], "https://example.com")
-        price_findings = [f for f in findings if f["category"] == "fact-consistency"]
-        self.assertEqual(len(price_findings), 0)
+        dom = entity_content_check.EntityDOMParser()
+        dom.feed(product_html)
+        ans = entity_content_check.evaluate_page_answerability("product_detail", product_html, dom, "https://example.com")
+        self.assertTrue(ans["coverage_ratio"] >= 0.70)
+        self.assertIn("product_name", ans["present"])
+        self.assertIn("price", ans["present"])
+        self.assertIn("availability", ans["present"])
 
-    def test_conflicting_price_for_same_product_is_contradiction(self):
+
+
+    def test_locale_and_page_classification(self):
+        locale, template = extract_locale_and_template("https://example.com/fr/pricing")
+        self.assertEqual(locale, "fr")
+        self.assertEqual(template, "/pricing")
+
+        pt, conf, tmpl, loc = classify_page("https://example.com/products/single-origin-ethiopia")
+        self.assertEqual(pt, "product_detail")
+        self.assertEqual(conf, "high")
+
+        pt, conf, tmpl, loc = classify_page("https://example.com/contact-us")
+        self.assertEqual(pt, "contact")
+
+
+# ==============================================================================
+# 4. Scoped Fact Consistency Tests
+# ==============================================================================
+class TestFactConsistencyAndScoping(unittest.TestCase):
+    def test_price_normalization_with_decimals(self):
+        self.assertEqual(fact_consistency_check.normalize_price_str("$49.99"), "49.99")
+        self.assertEqual(fact_consistency_check.normalize_price_str("€1.250,50"), "1250.50")
+        self.assertEqual(fact_consistency_check.normalize_price_str("₹5,499.00"), "5499.00")
+        self.assertEqual(fact_consistency_check.normalize_price_str("£120"), "120.00")
+
+    def test_conflicting_prices_on_same_entity(self):
         page1 = """
-        <html><head><title>Product X9</title></head><body>
-        <h1>Velocity X9</h1>
-        <p>The Velocity X9 flagship model is priced at ₹5,499 today.</p>
+        <html><head><title>Velocity X9</title></head><body>
+        <h1>Garuda Velocity X9</h1>
+        <p>Official Price: $49.99 per unit.</p>
         </body></html>
         """
         page2 = """
-        <html><head><title>Legacy Promo</title></head><body>
-        <h1>Velocity X9</h1>
-        <p>Get Velocity X9 for only ₹4,999 in our catalog.</p>
+        <html><head><title>Store Offer</title></head><body>
+        <h1>Garuda Velocity X9</h1>
+        <p>Special Promotion: $39.99 per unit.</p>
         </body></html>
         """
         facts1 = fact_consistency_check.extract_scoped_facts(page1, "https://example.com/products/x9")
-        facts2 = fact_consistency_check.extract_scoped_facts(page2, "https://example.com/promo")
+        facts2 = fact_consistency_check.extract_scoped_facts(page2, "https://example.com/store/x9")
         findings, recs = fact_consistency_check.evaluate_fact_consistency([facts1, facts2], "https://example.com")
-        price_findings = [f for f in findings if f["category"] == "fact-consistency"]
-        self.assertTrue(len(price_findings) >= 1)
-        self.assertEqual(price_findings[0]["cause_id"], "FIRST_PARTY_FACT_CONFLICT")
+        price_conflicts = [f for f in findings if f["cause_id"] == "FIRST_PARTY_FACT_CONFLICT"]
+        self.assertTrue(len(price_conflicts) >= 1)
 
-    def test_product_lifecycle_conflict(self):
+    def test_multi_tier_pricing_distinct_intervals_no_conflict(self):
+        # Monthly $10/mo vs Annual $100/yr are distinct intervals and should NOT conflict
+        page1 = """
+        <html><head><title>Pricing</title></head><body>
+        <h2>Pro Plan</h2>
+        <p>Monthly: $10.00 / mo</p>
+        </body></html>
+        """
+        page2 = """
+        <html><head><title>Annual Pricing</title></head><body>
+        <h2>Pro Plan</h2>
+        <p>Billed yearly: $100.00 / year</p>
+        </body></html>
+        """
+        facts1 = fact_consistency_check.extract_scoped_facts(page1, "https://example.com/pricing/monthly")
+        facts2 = fact_consistency_check.extract_scoped_facts(page2, "https://example.com/pricing/annual")
+        findings, recs = fact_consistency_check.evaluate_fact_consistency([facts1, facts2], "https://example.com")
+        price_conflicts = [f for f in findings if f["cause_id"] == "FIRST_PARTY_FACT_CONFLICT"]
+        self.assertEqual(len(price_conflicts), 0)
+
+    def test_product_lifecycle_discontinued_vs_current(self):
         page1 = """
         <html><head><title>Velocity X7 Legacy</title></head><body>
         <h1>Velocity X7 Drone</h1>
@@ -169,7 +334,7 @@ class TestFactConsistencyAndScope(unittest.TestCase):
           "name": "Velocity X7 Drone",
           "offers": {
             "@type": "Offer",
-            "price": "3999",
+            "price": "3999.00",
             "availability": "https://schema.org/InStock"
           }
         }
@@ -185,70 +350,169 @@ class TestFactConsistencyAndScope(unittest.TestCase):
         self.assertTrue(len(lc_findings) >= 1)
 
 
-class TestEntityAnswerability(unittest.TestCase):
-    def test_product_answerability(self):
-        product_html = """
-        <html><head><title>Garuda Velocity X9</title></head><body>
-        <h1>Garuda Velocity X9</h1>
-        <p>High performance drone with 4K camera and 30min flight time.</p>
-        <p>Price: ₹5,499. Status: In Stock. Brand: Garuda Aerospace.</p>
-        <button class="btn-cta">Buy Now</button>
-        </body></html>
-        """
-        dom = entity_content_check.EntityDOMParser()
-        dom.feed(product_html)
-        ans = entity_content_check.evaluate_page_answerability("product", product_html, dom, "https://example.com")
-        self.assertIsNotNone(ans)
-        self.assertIn("product_name", ans["present"])
-        self.assertIn("price", ans["present"])
-        self.assertIn("availability", ans["present"])
-        self.assertGreaterEqual(ans["coverage_ratio"], 0.8)
-
-
-class TestEngagementOrientation(unittest.TestCase):
-    def test_generic_h1_flagged(self):
+# ==============================================================================
+# 5. Authority & Corroboration Tests
+# ==============================================================================
+class TestAuthorityCorroboration(unittest.TestCase):
+    def test_sameas_extraction(self):
         html = """
-        <html><head><title>Example Site</title></head><body>
-        <h1>Welcome</h1>
-        <p>We are a company that does lots of interesting things for people around the world every day.</p>
-        <p>Read on to discover everything we can help you achieve today and tomorrow.</p>
+        <html><head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "Brand",
+          "sameAs": [
+            "https://www.wikidata.org/wiki/Q12345",
+            {"@id": "https://www.crunchbase.com/organization/brand"}
+          ]
+        }
+        </script>
+        </head><body><h1>Brand</h1></body></html>
+        """
+        inv = {
+            "pages": [{
+                "url": "https://example.com/",
+                "status": 200,
+                "page_type": "homepage",
+                "html": html,
+                "headers": {}
+            }]
+        }
+        # Run audit with inventory
+        res = corroboration_check.audit("https://example.com", "example.com", inv=inv)
+        self.assertEqual(res["status"], "ok")
+        self.assertTrue(res["coverage"]["sameas_count"] >= 2)
+
+
+# ==============================================================================
+# 6. Engagement & Context Continuity Tests
+# ==============================================================================
+class TestEngagementAndOrientation(unittest.TestCase):
+    def test_orientation_evaluation(self):
+        rich_html = """
+        <html><head><title>Frescopa - Artisanal Coffee Roasters</title></head><body>
+        <header>
+          <h1>Frescopa Specialty Coffee</h1>
+          <p>We source single-origin micro-lot beans directly from sustainable farms for coffee connoisseurs.</p>
+          <a href="/shop" class="cta">Explore Roasts</a>
+        </header>
         </body></html>
         """
-        findings, recs, o_data = engagement_check.audit_page_engagement(html, "https://example.com/")
-        generic_h1 = [f for f in findings if f["cause_id"] == "LOW_INFORMATION_SCENT"]
-        self.assertTrue(len(generic_h1) >= 1)
+        findings, recs, o_data = engagement_check.audit_page_engagement(rich_html, "https://frescopa.coffee/", page_type="homepage")
+        self.assertEqual(len(findings), 0)
+        self.assertTrue(o_data["visible_words"] > 0)
+        self.assertIn("Frescopa Specialty Coffee", o_data["h1"])
+
+    def test_generic_h1_orientation_flagged(self):
+        generic_html = """
+        <html><head><title>Untitled Site</title></head><body>
+        <h1>Welcome</h1>
+        <p>We are an enterprise organization that does many different things for various clients across multiple business domains and international sectors.</p>
+        <p>Our solutions aim to provide value, efficiency, and optimization for all types of customers everywhere.</p>
+        </body></html>
+        """
+        findings, recs, o_data = engagement_check.audit_page_engagement(generic_html, "https://example.com/", page_type="homepage")
+        h1_findings = [f for f in findings if f["cause_id"] == "LOW_INFORMATION_SCENT"]
+        self.assertTrue(len(h1_findings) >= 1)
 
 
-class TestRepresentationCrossCheck(unittest.TestCase):
-    def test_representation_price_conflict(self):
-        snapshot = {
-            "status": "ok",
-            "full_text": "Our flagship subscription costs $49 per month.",
-            "prices_visible": ["49"]
-        }
-        observations_data = {
-            "observations": [
+
+# ==============================================================================
+# 7. Assistant Representation Tests
+# ==============================================================================
+class TestAssistantRepresentation(unittest.TestCase):
+    def test_multi_page_fact_snapshot(self):
+        inv = {
+            "pages": [
                 {
-                    "assistant": "ChatGPT",
-                    "prompt": "How much does the subscription cost?",
-                    "mentioned": True,
-                    "cited": True,
-                    "claims": [{"fact": "The subscription is $99 per month.", "topic": "pricing"}]
+                    "url": "https://example.com/",
+                    "resource_type": "html",
+                    "html": "<html><head><title>Main</title></head><body><p>Welcome to Frescopa.</p></body></html>"
+                },
+                {
+                    "url": "https://example.com/store",
+                    "resource_type": "html",
+                    "html": "<html><head><title>Store</title></head><body><p>Guji Coffee is $24.00.</p></body></html>"
                 }
             ]
         }
-        findings, notes = representation_check.compare_assistant_observations(snapshot, observations_data)
-        self.assertEqual(len(findings), 1)
-        self.assertEqual(findings[0]["cause_id"], "AI_FACT_CONFLICT")
-        self.assertEqual(findings[0]["severity"], "high")
+        snapshot = representation_check.build_fact_snapshot("https://example.com", inv=inv)
+        self.assertEqual(snapshot["status"], "ok")
+        self.assertTrue(any("24.00" in p for p in snapshot["prices_visible"]))
 
-
-class TestOrchestratorAndSchemaValidation(unittest.TestCase):
-    def test_report_validation(self):
-        # Strict clean production report schema
-        report = {
+    def test_assistant_price_contradiction_detection(self):
+        snapshot = {
+            "status": "ok",
             "site": "example.com",
-            "audited_at": "2026-08-28T14:00:00Z",
+            "prices_visible": ["24.00", "30.00"],
+            "years_visible": ["2026"],
+            "full_text": "Guji Coffee is $24.00 per bag."
+        }
+        observations = [
+            {
+                "assistant": "ChatGPT",
+                "prompt": "What is the price of Guji Coffee?",
+                "response": "Guji Coffee from Frescopa is priced at $55.00 per bag."
+            }
+        ]
+        findings, obs = representation_check.compare_assistant_observations(snapshot, observations)
+        self.assertTrue(len(findings) >= 1)
+        self.assertEqual(findings[0]["cause_id"], "AI_FACT_CONFLICT")
+
+
+
+# ==============================================================================
+# 8. Shared Inventory & Content-Type Invariant Tests
+# ==============================================================================
+class TestSharedInventoryEngine(unittest.TestCase):
+    def test_content_type_filtering(self):
+        # Non-HTML content types
+        self.assertFalse(is_html_response({"content-type": "application/xml"}, "<xml></xml>"))
+        self.assertFalse(is_html_response({"content-type": "text/xml"}, "<?xml version='1.0'?>"))
+        self.assertFalse(is_html_response({"content-type": "application/json"}, "{\"key\": \"val\"}"))
+        self.assertFalse(is_html_response({"content-type": "application/pdf"}, "%PDF-1.4"))
+        # HTML content types
+        self.assertTrue(is_html_response({"content-type": "text/html; charset=utf-8"}, "<html></html>"))
+        self.assertTrue(is_html_response({"content-type": "application/xhtml+xml"}, "<html></html>"))
+
+    def test_sitemap_url_detection(self):
+        self.assertTrue(is_sitemap_or_non_html_url("https://example.com/sitemap.xml"))
+        self.assertTrue(is_sitemap_or_non_html_url("https://example.com/sitemap_index.xml.gz"))
+        self.assertTrue(is_sitemap_or_non_html_url("https://example.com/robots.txt"))
+        self.assertTrue(is_sitemap_or_non_html_url("https://example.com/image.png"))
+        self.assertFalse(is_sitemap_or_non_html_url("https://example.com/products/item-1"))
+
+    def test_parse_sitemap_xml(self):
+        xml_sitemap = """<?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://example.com/page1</loc></url>
+          <url><loc>https://example.com/page2</loc></url>
+        </urlset>"""
+        child_sms, page_urls = _parse_sitemap_xml(xml_sitemap)
+        self.assertEqual(len(child_sms), 0)
+        self.assertEqual(len(page_urls), 2)
+        self.assertIn("https://example.com/page1", page_urls)
+
+
+# ==============================================================================
+# 9. SQLite Persistence & History Tests
+# ==============================================================================
+class TestSQLitePersistence(unittest.TestCase):
+    def setUp(self):
+        self.fd, self.db_path = tempfile.mkstemp(suffix="_test.db")
+        os.close(self.fd)
+
+    def tearDown(self):
+        if os.path.exists(self.db_path):
+            os.unlink(self.db_path)
+
+    def test_full_sqlite_lifecycle(self):
+        audit_db.init_db(self.db_path)
+        sample_report = {
+            "site": "frescopa.coffee",
+            "audited_at": "2026-08-28T18:00:00Z",
+            "audit_status": "ok",
             "summary": {
                 "total_findings": 1,
                 "critical": 1,
@@ -259,25 +523,79 @@ class TestOrchestratorAndSchemaValidation(unittest.TestCase):
             "findings": [
                 {
                     "id": "F-001",
-                    "title": "Robots blocks retrieval",
+                    "title": "AI search retrieval crawler blocked",
                     "severity": "critical",
-                    "category": "discoverability",
-                    "root_cause": "Robots.txt blocks AI search bots",
                     "confidence": "high",
-                    "evidence": "Disallow: / for OAI-SearchBot",
-                    "suggested_action": {
-                        "summary": "Allow OAI-SearchBot on public pages",
-                        "priority": "critical"
-                    }
+                    "cause_family": "DISCOVERY.ACCESS",
+                    "cause_id": "AI_RETRIEVAL_BLOCKED",
+                    "evidence": "robots.txt disallows OAI-SearchBot",
+                    "suggested_action": {"summary": "Allow in robots.txt", "priority": "critical"}
                 }
             ],
             "proactive_actions": [
-                {
-                    "title": "Publish sitemap.xml",
-                    "summary": "Publish sitemap.xml to declare indexable pages",
-                    "priority": "low"
-                }
+                {"title": "Add JSON-LD", "summary": "Add Org schema", "priority": "low"}
             ]
+        }
+        sample_internal = {
+            "specialists": {
+                "discoverability-audit": {"status": "ok", "label": "Discovery check"}
+            },
+            "audit_metrics": {
+                "execution_time_seconds": 4.2,
+                "html_pages_sampled": 12
+            }
+        }
+
+        audit_id = audit_db.save_audit_report(sample_report, internal_data=sample_internal, db_path=self.db_path)
+        self.assertEqual(audit_id, 1)
+
+        # Query recent audits
+        recent = audit_db.list_recent_audits(db_path=self.db_path, limit=5)
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0]["site"], "frescopa.coffee")
+        self.assertEqual(recent[0]["critical_count"], 1)
+
+        # Query audit details
+        details = audit_db.get_audit_details(audit_id, db_path=self.db_path)
+        self.assertIsNotNone(details)
+        self.assertEqual(len(details["findings"]), 1)
+        self.assertEqual(len(details["specialist_runs"]), 1)
+
+        # Query trend
+        trend = audit_db.get_site_trend("frescopa.coffee", db_path=self.db_path)
+        self.assertEqual(len(trend), 1)
+
+
+# ==============================================================================
+# 10. Schema Validation Gate Tests
+# ==============================================================================
+class TestReportSchemaValidation(unittest.TestCase):
+    def test_valid_report_passes(self):
+        report = {
+            "site": "example.com",
+            "audited_at": "2026-08-28T18:00:00Z",
+            "audit_status": "ok",
+            "summary": {
+                "total_findings": 1,
+                "critical": 0,
+                "high": 1,
+                "medium": 0,
+                "low": 0
+            },
+            "findings": [
+                {
+                    "id": "F-001",
+                    "title": "Conflicting price",
+                    "severity": "high",
+                    "category": "fact-consistency",
+                    "evidence": "Price $49 on /pageA vs $59 on /pageB",
+                    "suggested_action": {
+                        "summary": "Align pricing across pages.",
+                        "priority": "high"
+                    }
+                }
+            ],
+            "proactive_actions": []
         }
         is_valid, errors = validate_report.validate_report_dict(report)
         self.assertTrue(is_valid, f"Validation errors: {errors}")

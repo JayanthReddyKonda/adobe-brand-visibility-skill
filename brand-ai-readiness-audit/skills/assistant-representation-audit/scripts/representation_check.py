@@ -139,9 +139,14 @@ def compare_assistant_observations(snapshot, observations_data):
                 "signal": "Brand was mentioned without a direct web citation link"
             })
 
-        for claim in obs.get("claims", []):
+        claims = obs.get("claims", [])
+        if not claims and (obs.get("response") or obs.get("text") or obs.get("answer")):
+            claims = [{"fact": obs.get("response") or obs.get("text") or obs.get("answer"), "topic": "general"}]
+
+        for claim in claims:
             fact_str = str(claim.get("fact") or claim.get("text") or "")
             topic = str(claim.get("topic") or "general")
+
 
             # Price contradiction check (using numerical float comparison)
             claim_prices = PRICE_PATTERN.findall(fact_str)

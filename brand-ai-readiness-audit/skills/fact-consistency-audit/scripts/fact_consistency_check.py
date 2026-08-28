@@ -45,13 +45,14 @@ def extract_currency(raw_str):
 
 def extract_interval(raw_str):
     s = (raw_str or "").lower()
-    if "/mo" in s or "per month" in s or "monthly" in s or "/month" in s:
+    if re.search(r'(\bmonthly\b|\bper\s+month\b|/\s*mo\b|/\s*month\b)', s):
         return "month"
-    if "/yr" in s or "per year" in s or "annual" in s or "/year" in s:
+    if re.search(r'(\bannually\b|\bannual\b|\byearly\b|\bper\s+year\b|/\s*yr\b|/\s*year\b)', s):
         return "year"
-    if "/wk" in s or "/week" in s or "weekly" in s:
+    if re.search(r'(\bweekly\b|\bper\s+week\b|/\s*wk\b|/\s*week\b)', s):
         return "week"
     return "one_time"
+
 
 
 def normalize_price_str(raw):
