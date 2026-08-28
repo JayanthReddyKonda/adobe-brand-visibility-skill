@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BrandAIReadinessAuditReport",
+  "type": "object",
+  "required": [
+    "site",
+    "audited_at",
+    "summary",
+    "findings"
+  ],
+  "properties": {
+    "site": {
+      "type": "string",
+      "description": "Target website domain or URL audited"
+    },
+    "audited_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of when the audit was performed"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "total_findings",
+        "critical",
+        "high",
+        "medium"
+      ],
+      "properties": {
+        "total_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "medium": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "low": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "severity",
+          "evidence",
+          "suggested_action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_-]+$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 5
+          },
+          "suggested_action": {
+            "type": "object",
+            "required": [
+              "summary",
+              "priority"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string",
+                "minLength": 5
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "implementation_guidance": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
