@@ -42,20 +42,3 @@ In any compatible agent (Antigravity, Claude Code, Junie, OpenHands, VS Code), p
 > *"Audit https://example.com for AI discoverability and on-site engagement and emit the final JSON report."*
 
 The agent discovers `audit-orchestrator` via `SKILL.md` description matching, activates the skill, executes the underlying specialist tools, and emits the schema-compliant report.
-
-### 3. Using Chat Slash Commands
-
-The skill ships two real slash commands (defined in `skills/audit-orchestrator/commands/`):
-
-- **`/audit <site-url-or-domain>`** — Run a full AI brand visibility and engagement audit:
-  ```text
-  /audit https://example.com
-  ```
-  Composes the specialist skills, reconciles findings, and emits the schema-compliant JSON report.
-
-- **`/validate <path-to-report.json>`** — Validate an existing audit report against the official schema:
-  ```text
-  /validate report.json
-  ```
-
-> Slash commands are surfaced by the agent client. If they don't appear in your client's `/` palette, ensure the skill is registered for discovery by that client (e.g. the `.agents/skills/` mirror for OMO/OpenCode), then restart the client so it re-scans the skill.

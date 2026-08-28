@@ -92,8 +92,6 @@ A JSON report matching the required schema:
   ```bash
   python3 skills/audit-orchestrator/scripts/validate_report.py report.json
   ```
-- **`commands/audit.md`** — Slash command `/audit`: run a full audit on a site and emit the JSON report.
-- **`commands/validate.md`** — Slash command `/validate`: check an existing report against the schema.
 - **`references/REPORT_SCHEMA.json`** — Formal JSON schema definition.
 - **`references/REPORT_SCHEMA.md`** — Field specifications and documentation.
 - **`references/COMPOSITION_GUIDELINES.md`** — Reconciliation and severity scoring rules.
