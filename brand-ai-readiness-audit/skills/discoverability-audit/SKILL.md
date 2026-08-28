@@ -50,3 +50,8 @@ evidence, suggested_action{summary, priority, verification}`.
 ## Gotchas
 - Network-unreachable targets must return `inconclusive`, not zero findings.
 - Only flag robots blocks you can quote verbatim from the fetched robots.txt.
+
+## References
+- Read `references/CHECK_CONTRACTS.md` before writing or judging any finding —
+  it defines exactly what each check measures, what counts as a defect, and
+  what does not.

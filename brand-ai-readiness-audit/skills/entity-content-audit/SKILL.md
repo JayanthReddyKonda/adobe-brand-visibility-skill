@@ -49,3 +49,8 @@ Findings use the rich model (category/confidence/root_cause/impact/verification)
 ## Gotchas
 - If the page is a CSR shell, entity analysis is meaningless — return
   `inconclusive` rather than "no identity found".
+
+## References
+- Read `references/CHECK_CONTRACTS.md` before writing or judging any finding —
+  it defines exactly what each check measures, what counts as a defect, and
+  what does not (notably: missing `sameAs` alone is never a defect).
