@@ -28,8 +28,11 @@ An agentic AI skill marketplace built in the standard [agentskills.io](https://a
 ### 1. Direct Command-Line Execution (Cross-Platform)
 
 ```bash
-# Run full composed audit in mock verification mode
-python3 brand-ai-readiness-audit/skills/audit-orchestrator/scripts/orchestrator.py --site example.com --mock --output report.json
+# Run full composed audit (real network checks) and write the JSON report
+python3 brand-ai-readiness-audit/skills/audit-orchestrator/scripts/orchestrator.py --site example.com --output report.json
+
+# To present the report in chat (stdout) without writing a file
+python3 brand-ai-readiness-audit/skills/audit-orchestrator/scripts/orchestrator.py --site example.com
 
 # Validate report against the official schema
 python3 brand-ai-readiness-audit/skills/audit-orchestrator/scripts/validate_report.py report.json

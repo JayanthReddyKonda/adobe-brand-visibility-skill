@@ -23,8 +23,7 @@ The central entrypoint skill of the Brand AI-Readiness Audit Marketplace. It com
 ## Inputs
 
 - **`site`** (string, required): The target domain or URL to audit (e.g., `example.com` or `https://example.com`).
-- **`mock`** (boolean, optional): Set to `true` to run offline verification using simulated signals.
-- **`output`** (string, optional): Target file path to write the final JSON report.
+- **`include_proactive`** (boolean, optional): Set to `false` to skip proactive improvement checks (default: enabled).
 
 ## Procedure
 

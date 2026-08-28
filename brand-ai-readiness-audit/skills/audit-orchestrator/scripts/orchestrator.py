@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 orchestrator.py - Entrypoint CLI for Brand AI-Readiness Audit Marketplace.
-Composes specialist audit checks, reconciles findings, deduplicates signals,
-and emits a strictly validated JSON audit report.
+Composes the marketplace's specialist audit skills, reconciles their
+evidence-backed findings, deduplicates overlapping signals, adds proactive
+improvement checks, and emits a strictly validated JSON audit report.
+
+All findings are derived from real, on-demand checks of the target site.
+No synthesized or fabricated findings are ever produced.
 
 Usage:
   python3 orchestrator.py --site example.com [--output report.json]
-  python3 orchestrator.py --site example.com --mock
 """
 
 import sys
@@ -15,6 +18,8 @@ import json
 import argparse
 from datetime import datetime, timezone
 import subprocess
+import urllib.request
+import urllib.error
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,8 +29,8 @@ def parse_args():
     )
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. example.com or https://example.com)")
     parser.add_argument("--output", "-o", help="Path to save the generated JSON report (defaults to stdout)")
-    parser.add_argument("--mock", action="store_true", help="Run a mock demonstration audit for testing and verification")
-    parser.add_argument("--include-proactive", action="store_true", default=True, help="Include proactive discoverability/engagement suggestions (default: True)")
+    parser.add_argument("--include-proactive", action="store_true", default=True,
+                        help="Run proactive discoverability/engagement checks (default: True)")
     return parser.parse_args()
 
 def normalize_target(site_input):
@@ -76,123 +81,153 @@ def run_specialist_tool(script_path, *args):
         sys.stderr.write(f"Warning: Failed to execute {script_path}: {e}\n")
         return []
 
-def generate_mock_findings(domain):
-    """Generate realistic audit findings for testing without live network."""
-    return [
-        {
-            "id": "CR-001",
-            "title": "Robots.txt blocks AI search indexing agents",
-            "severity": "critical",
-            "evidence": f"robots.txt on {domain} specifies 'User-agent: GPTBot Disallow: /' and 'User-agent: ClaudeBot Disallow: /'.",
-            "suggested_action": {
-                "summary": "Update robots.txt to explicitly allow GPTBot, ClaudeBot, and PerplexityBot to index public landing pages.",
-                "priority": "critical",
-                "implementation_guidance": "User-agent: GPTBot\nAllow: /\n\nUser-agent: ClaudeBot\nAllow: /"
-            }
-        },
-        {
-            "id": "CR-002",
-            "title": "Missing Schema.org Organization and Product JSON-LD markup",
-            "evidence": f"Crawled home and top 5 catalog pages on {domain}; 0/6 pages contain Schema.org structured data.",
-            "severity": "high",
-            "suggested_action": {
-                "summary": "Implement schema.org/Organization with sameAs social and Wikidata entity links on homepage, and schema.org/Product on item pages.",
-                "priority": "high",
-                "implementation_guidance": "Add <script type='application/ld+json'> with @context 'https://schema.org' and @type 'Organization'."
-            }
-        },
-        {
-            "id": "FC-001",
-            "title": "Outdated copyright timestamp and missing dateModified headers",
-            "severity": "medium",
-            "evidence": f"Footer copyright on {domain} displays '© 2022', and HTTP/HTML metadata lacks article:modified_time or dateModified.",
-            "suggested_action": {
-                "summary": "Automate footer copyright year and expose ISO 8601 dateModified in JSON-LD to signal active maintenance.",
-                "priority": "medium"
-            }
-        },
-        {
-            "id": "ENG-001",
-            "title": "Weak above-the-fold value proposition and missing H1 heading",
-            "severity": "high",
-            "evidence": "Landing page hero uses raw promotional banner graphics without machine-readable H1 text stating what the product does.",
-            "suggested_action": {
-                "summary": "Add a clear semantic H1 tag stating the core brand value proposition above the fold to orient both visitors and AI summarizers.",
-                "priority": "high"
-            }
-        },
-        {
-            "id": "PRO-001",
-            "title": "Proactive: Missing llms.txt standard documentation index",
+def http_get(url, timeout=8):
+    """Return (status, text) for a GET request, or (None, None) on failure."""
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="ignore")
+    except urllib.error.HTTPError as e:
+        return e.code, None
+    except Exception as e:
+        sys.stderr.write(f"Proactive fetch failed for {url}: {e}\n")
+        return None, None
+
+
+def proactive_checks(domain, base_url, include_proactive):
+    """Run non-defect improvement checks by probing the live site.
+
+    Returns proactive recommendations (low-priority suggestions) derived
+    from real network probes on the target site.
+    """
+    if not include_proactive:
+        return []
+    recommendations = []
+
+    # 1. llms.txt presence (machine-readable AI index)
+    status, body = http_get(f"{base_url}/llms.txt")
+    if status is None:
+        # Network/environment prevented the check; do not fabricate a conclusion.
+        recommendations.append({
+            "title": "Could not verify llms.txt (network/environment)",
             "severity": "low",
-            "evidence": f"No /llms.txt or /llms-full.txt endpoint found on {domain}.",
+            "evidence": f"Unable to fetch {base_url}/llms.txt from this environment; treat as inconclusive.",
             "suggested_action": {
-                "summary": "Publish a curated /llms.txt Markdown index listing key documentation and product capabilities for AI agents.",
+                "summary": "Re-run the audit from an environment with network access to confirm llms.txt status.",
                 "priority": "low"
             }
-        }
-    ]
+        })
+    elif status < 400 and body and body.strip():
+        recommendations.append({
+            "title": "llms.txt documentation index is already present",
+            "severity": "low",
+            "evidence": f"GET {base_url}/llms.txt returned HTTP {status} with content.",
+            "suggested_action": {
+                "summary": "Keep the llms.txt index current as you publish new docs and products.",
+                "priority": "low"
+            }
+        })
+    else:
+        status_full, body_full = http_get(f"{base_url}/llms-full.txt")
+        if status_full is not None and status_full < 400 and body_full and body_full.strip():
+            recommendations.append({
+                "title": "llms-full.txt documentation index is already present",
+                "severity": "low",
+                "evidence": f"GET {base_url}/llms-full.txt returned HTTP {status_full} with content.",
+                "suggested_action": {
+                    "summary": "Keep the llms-full.txt index current as you publish new docs and products.",
+                    "priority": "low"
+                }
+            })
+        else:
+            recommendations.append({
+                "title": "Proactive: consider publishing llms.txt to strengthen AI discoverability",
+                "severity": "low",
+                "evidence": f"Neither /llms.txt nor /llms-full.txt was found at {base_url} (llms.txt HTTP {status}).",
+                "suggested_action": {
+                    "summary": "Publish a curated /llms.txt Markdown index listing key documentation and capabilities.",
+                    "priority": "low"
+                }
+            })
 
-def compose_audit(site, mock=False):
-    """Compose the findings from specialist skills or mock generator."""
+    # 2. Sitemap presence (helps AI crawlers discover content)
+    status, _ = http_get(f"{base_url}/sitemap.xml")
+    if status is None:
+        pass  # inconclusive; skip to avoid noise
+    elif status >= 400:
+        recommendations.append({
+            "title": "Proactive: no sitemap.xml discovered",
+            "severity": "low",
+            "evidence": f"GET {base_url}/sitemap.xml returned HTTP {status}.",
+            "suggested_action": {
+                "summary": "Add an XML sitemap and reference it from robots.txt to help crawlers enumerate content.",
+                "priority": "low"
+            }
+        })
+
+    return recommendations
+
+def compose_audit(site, include_proactive=True):
+    """Compose findings from the specialist skills plus proactive checks."""
     domain, base_url = normalize_target(site)
     raw_findings = []
 
-    if mock:
-        raw_findings = generate_mock_findings(domain)
-    else:
-        # 1. Run crawl-render audit
-        crawl_script = find_specialist_script("crawl-render-audit", "crawl_render_check.py")
-        if crawl_script:
-            cr_findings = run_specialist_tool(crawl_script, "--site", base_url)
-            raw_findings.extend(cr_findings)
+    # 1. Run crawl-render audit
+    crawl_script = find_specialist_script("crawl-render-audit", "crawl_render_check.py")
+    if crawl_script:
+        raw_findings.extend(run_specialist_tool(crawl_script, "--site", base_url))
 
-        # 2. Run freshness-corroboration audit
-        freshness_script = find_specialist_script("freshness-corroboration", "freshness_check.py")
-        if freshness_script:
-            fc_findings = run_specialist_tool(freshness_script, "--site", base_url)
-            raw_findings.extend(fc_findings)
+    # 2. Run freshness-corroboration audit
+    freshness_script = find_specialist_script("freshness-corroboration", "freshness_check.py")
+    if freshness_script:
+        raw_findings.extend(run_specialist_tool(freshness_script, "--site", base_url))
 
-        # 3. Run engagement audit
-        engagement_script = find_specialist_script("engagement-audit", "engagement_check.py")
-        if engagement_script:
-            eng_findings = run_specialist_tool(engagement_script, "--site", base_url)
-            raw_findings.extend(eng_findings)
+    # 3. Run engagement audit
+    engagement_script = find_specialist_script("engagement-audit", "engagement_check.py")
+    if engagement_script:
+        raw_findings.extend(run_specialist_tool(engagement_script, "--site", base_url))
 
-        # Fall back to mock if network/sandbox prevented findings
-        if not raw_findings:
-            raw_findings = generate_mock_findings(domain)
+    # 4. Proactive improvement checks (optional)
+    if include_proactive:
+        raw_findings.extend(proactive_checks(domain, base_url, include_proactive=True))
 
-    # Normalize IDs into F-001, F-002, ...
+    # Normalize IDs into F-001, F-002, ... with deduplication
     final_findings = []
-    summary_counts = {"total_findings": 0, "critical": 0, "high": 0, "medium": 0, "low": 0}
-
-    # Deduplicate and sort by severity
+    seen_evidence = set()
     severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
     sorted_raw = sorted(raw_findings, key=lambda f: severity_order.get(f.get("severity", "medium"), 99))
 
     for idx, item in enumerate(sorted_raw, 1):
         sev = item.get("severity", "medium").lower()
-        if sev not in summary_counts:
+        if sev not in severity_order:
             sev = "medium"
+
+        evidence = item.get("evidence", "Observed during automated site audit.").strip()
+        evidence_key = evidence[:120]
+        if evidence_key in seen_evidence:
+            continue
+        seen_evidence.add(evidence_key)
 
         finding_entry = {
             "id": f"F-{idx:03d}",
             "title": item.get("title", f"Audit Finding {idx}"),
             "severity": sev,
-            "evidence": item.get("evidence", "Observed during automated site audit."),
+            "evidence": evidence,
             "suggested_action": {
                 "summary": item.get("suggested_action", {}).get("summary", "Review and resolve the identified defect."),
                 "priority": item.get("suggested_action", {}).get("priority", sev if sev in ["critical", "high", "medium", "low"] else "medium")
             }
         }
-        
-        if "implementation_guidance" in item.get("suggested_action", {}):
-            finding_entry["suggested_action"]["implementation_guidance"] = item["suggested_action"]["implementation_guidance"]
-
         final_findings.append(finding_entry)
-        summary_counts[sev] += 1
-        summary_counts["total_findings"] += 1
+
+    summary_counts = {"total_findings": len(final_findings), "critical": 0, "high": 0, "medium": 0, "low": 0}
+    for f in final_findings:
+        s = f["severity"]
+        if s in summary_counts:
+            summary_counts[s] += 1
 
     report = {
         "site": domain,
@@ -204,13 +239,12 @@ def compose_audit(site, mock=False):
 
 def main():
     args = parse_args()
-    report = compose_audit(args.site, mock=args.mock)
+    report = compose_audit(args.site, include_proactive=args.include_proactive)
     output_json = json.dumps(report, indent=2)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(output_json + "\n")
-        sys.stderr.write(f"Audit report saved to: {args.output}\n")
     else:
         print(output_json)
 
