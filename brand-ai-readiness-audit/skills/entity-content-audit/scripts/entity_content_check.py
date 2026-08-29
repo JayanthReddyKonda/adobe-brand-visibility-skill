@@ -137,24 +137,6 @@ class EntityDOMParser(HTMLParser):
                 self.text_content.append(data.strip())
 
 
-def parse_json_ld(raw_json_list):
-    """Extract Schema.org typed objects from JSON-LD scripts."""
-    entities = []
-    for raw in raw_json_list:
-        try:
-            data = json.loads(raw)
-            if isinstance(data, list):
-                entities.extend(data)
-            elif isinstance(data, dict):
-                if "@graph" in data and isinstance(data["@graph"], list):
-                    entities.extend(data["@graph"])
-                else:
-                    entities.append(data)
-        except Exception:
-            pass
-    return entities
-
-
 def matches_schema_type(entity, target_types):
     """Check if a JSON-LD entity matches target schema types (handling string or list @type)."""
     if not isinstance(entity, dict):
@@ -165,6 +147,66 @@ def matches_schema_type(entity, target_types):
     else:
         types = {str(raw_t).lower()}
     return bool(types.intersection({t.lower() for t in target_types}))
+
+
+def parse_json_ld(raw_json_list):
+    """Extract Schema.org typed objects and resolve decoupled @graph node references (@id linking)."""
+    raw_objects = []
+    for raw in raw_json_list:
+        try:
+            data = json.loads(raw)
+            to_process = data if isinstance(data, list) else [data]
+            for item in to_process:
+                if isinstance(item, dict) and "@graph" in item and isinstance(item["@graph"], list):
+                    raw_objects.extend(item["@graph"])
+                elif isinstance(item, dict):
+                    raw_objects.append(item)
+        except Exception:
+            pass
+
+
+    # 1. Index all entities by @id
+    id_map = {}
+    for obj in raw_objects:
+        if isinstance(obj, dict) and "@id" in obj and isinstance(obj["@id"], str):
+            id_map[obj["@id"].strip()] = obj
+
+    # 2. Resolve references (link Offer nodes, Brand nodes, etc.)
+    resolved_entities = []
+    for obj in raw_objects:
+        if not isinstance(obj, dict):
+            continue
+        entity = dict(obj)
+        if "offers" in entity:
+            offers = entity["offers"]
+            if isinstance(offers, dict) and "@id" in offers and offers["@id"] in id_map:
+                entity["offers"] = id_map[offers["@id"]]
+            elif isinstance(offers, list):
+                entity["offers"] = [id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o for o in offers]
+
+        for rel in ("brand", "manufacturer", "publisher", "provider", "author", "organizer"):
+            if rel in entity and isinstance(entity[rel], dict) and "@id" in entity[rel]:
+                target_id = entity[rel]["@id"]
+                if target_id in id_map:
+                    entity[rel] = id_map[target_id]
+
+        resolved_entities.append(entity)
+
+    # 3. Invert itemOffered references (link decoupled Offer back into target Product)
+    for obj in raw_objects:
+        if isinstance(obj, dict) and matches_schema_type(obj, ("offer", "aggregateoffer")):
+            item_offered = obj.get("itemOffered")
+            if isinstance(item_offered, dict) and "@id" in item_offered and item_offered["@id"] in id_map:
+                prod = id_map[item_offered["@id"]]
+                if "offers" not in prod:
+                    prod["offers"] = []
+                elif isinstance(prod["offers"], dict):
+                    prod["offers"] = [prod["offers"]]
+                if isinstance(prod["offers"], list) and obj not in prod["offers"]:
+                    prod["offers"].append(obj)
+
+    return resolved_entities
+
 
 
 def evaluate_page_answerability(page_type, html_content, dom, url):

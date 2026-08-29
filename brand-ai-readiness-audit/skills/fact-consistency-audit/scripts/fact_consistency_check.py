@@ -191,6 +191,53 @@ def is_valid_product_entity(name):
     return True
 
 
+def resolve_json_ld_graph(raw_json_list):
+    """Extract and resolve @graph node references (@id linking) in JSON-LD."""
+    raw_objects = []
+    for raw in raw_json_list:
+        try:
+            data = json.loads(raw)
+            to_process = data if isinstance(data, list) else [data]
+            for item in to_process:
+                if isinstance(item, dict) and "@graph" in item and isinstance(item["@graph"], list):
+                    raw_objects.extend(item["@graph"])
+                elif isinstance(item, dict):
+                    raw_objects.append(item)
+        except Exception:
+            pass
+
+
+    id_map = {obj["@id"].strip(): obj for obj in raw_objects if isinstance(obj, dict) and "@id" in obj and isinstance(obj["@id"], str)}
+    resolved = []
+    for obj in raw_objects:
+        if not isinstance(obj, dict):
+            continue
+        entity = dict(obj)
+        if "offers" in entity:
+            offers = entity["offers"]
+            if isinstance(offers, dict) and "@id" in offers and offers["@id"] in id_map:
+                entity["offers"] = id_map[offers["@id"]]
+            elif isinstance(offers, list):
+                entity["offers"] = [id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o for o in offers]
+        resolved.append(entity)
+
+    for obj in raw_objects:
+        if isinstance(obj, dict):
+            raw_t = obj.get("@type", "")
+            otypes = {str(t).lower() for t in raw_t} if isinstance(raw_t, list) else {str(raw_t).lower()}
+            if otypes.intersection({"offer", "aggregateoffer"}):
+                item_offered = obj.get("itemOffered")
+                if isinstance(item_offered, dict) and "@id" in item_offered and item_offered["@id"] in id_map:
+                    prod = id_map[item_offered["@id"]]
+                    if "offers" not in prod:
+                        prod["offers"] = []
+                    elif isinstance(prod["offers"], dict):
+                        prod["offers"] = [prod["offers"]]
+                    if isinstance(prod["offers"], list) and obj not in prod["offers"]:
+                        prod["offers"].append(obj)
+    return resolved
+
+
 def extract_scoped_facts(html_str, url):
     """Extract first-party facts with contextual scope, status, and lifecycle."""
     parser = FreshnessAnalyzer()
@@ -223,53 +270,46 @@ def extract_scoped_facts(html_str, url):
             pass
     facts["copyright_years"] = sorted(set(facts["copyright_years"]))
 
-    # 2. Structured Data extraction
-    for raw in parser.json_ld_contents:
-        try:
-            data = json.loads(raw)
-            objs = data if isinstance(data, list) else [data]
-            if isinstance(data, dict) and "@graph" in data:
-                objs = data["@graph"]
-            for o in objs:
-                raw_t = o.get("@type", "")
-                otypes = {str(t).lower() for t in raw_t} if isinstance(raw_t, list) else {str(raw_t).lower()}
-                if otypes.intersection({"organization", "brand", "corporation", "localbusiness"}):
-                    if o.get("name") and isinstance(o["name"], str):
-                        facts["brand_names"].append(o["name"].strip())
-                    if o.get("slogan") or o.get("alternateName"):
-                        facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
-                elif otypes.intersection({"product", "individualproduct", "productmodel", "softwareapplication", "service"}):
-                    pname = str(o.get("name") or "").strip()
-
-                    offers = o.get("offers") or {}
-                    offer_obj = offers[0] if isinstance(offers, list) and offers else offers
-                    if isinstance(offer_obj, dict):
-                        p_val = offer_obj.get("price") or offer_obj.get("lowPrice")
-                        p_curr = str(offer_obj.get("priceCurrency") or "USD").upper()
-                        avail = str(offer_obj.get("availability") or "").lower()
-                        status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else "current")
-                        if pname and is_valid_product_entity(pname):
-                            facts["products_with_status"].append({
-                                "name": pname,
-                                "status": status,
-                                "url": url
+    # 2. Structured Data extraction with @graph node resolution
+    resolved_json_ld = resolve_json_ld_graph(parser.json_ld_contents)
+    for o in resolved_json_ld:
+        raw_t = o.get("@type", "")
+        otypes = {str(t).lower() for t in raw_t} if isinstance(raw_t, list) else {str(raw_t).lower()}
+        if otypes.intersection({"organization", "brand", "corporation", "localbusiness"}):
+            if o.get("name") and isinstance(o["name"], str):
+                facts["brand_names"].append(o["name"].strip())
+            if o.get("slogan") or o.get("alternateName"):
+                facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
+        elif otypes.intersection({"product", "individualproduct", "productmodel", "softwareapplication", "service"}):
+            pname = str(o.get("name") or "").strip()
+            offers = o.get("offers") or {}
+            offer_obj = offers[0] if isinstance(offers, list) and offers else offers
+            if isinstance(offer_obj, dict):
+                p_val = offer_obj.get("price") or offer_obj.get("lowPrice")
+                p_curr = str(offer_obj.get("priceCurrency") or "USD").upper()
+                avail = str(offer_obj.get("availability") or "").lower()
+                status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else "current")
+                if pname and is_valid_product_entity(pname):
+                    facts["products_with_status"].append({
+                        "name": pname,
+                        "status": status,
+                        "url": url
+                    })
+                    if p_val:
+                        norm_p = normalize_price_str(str(p_val))
+                        if norm_p:
+                            facts["scoped_prices"].append({
+                                "entity": pname,
+                                "price": norm_p,
+                                "currency": p_curr,
+                                "interval": "one_time",
+                                "raw": f"{p_curr} {p_val}"
                             })
-                            if p_val:
-                                norm_p = normalize_price_str(str(p_val))
-                                if norm_p:
-                                    facts["scoped_prices"].append({
-                                        "entity": pname,
-                                        "price": norm_p,
-                                        "currency": p_curr,
-                                        "interval": "one_time",
-                                        "raw": f"{p_curr} {p_val}"
-                                    })
-                if "dateModified" in o and isinstance(o["dateModified"], str):
-                    facts["modification_dates"].append(o["dateModified"])
-                elif "datePublished" in o and isinstance(o["datePublished"], str):
-                    facts["modification_dates"].append(o["datePublished"])
-        except Exception:
-            pass
+        if "dateModified" in o and isinstance(o["dateModified"], str):
+            facts["modification_dates"].append(o["dateModified"])
+        elif "datePublished" in o and isinstance(o["datePublished"], str):
+            facts["modification_dates"].append(o["datePublished"])
+
 
     # Meta / OpenGraph update timestamps and brand/title facts
     for meta_key in ("article:modified_time", "og:updated_time", "last-modified"):
