@@ -17,28 +17,11 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
-if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
-    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
-try:
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read(max_bytes)
-                charset = resp.headers.get_content_charset() or "utf-8"
-                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
-        except Exception as e:
-            st = getattr(e, "code", None)
-            return st, "", {}, str(e)
-    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
-        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
-        return st
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
 
 
 CURRENT_YEAR = datetime.now().year
@@ -248,16 +231,16 @@ def extract_scoped_facts(html_str, url):
             if isinstance(data, dict) and "@graph" in data:
                 objs = data["@graph"]
             for o in objs:
-                if not isinstance(o, dict):
-                    continue
-                otype = str(o.get("@type", "")).lower()
-                if otype in ("organization", "brand", "corporation"):
+                raw_t = o.get("@type", "")
+                otypes = {str(t).lower() for t in raw_t} if isinstance(raw_t, list) else {str(raw_t).lower()}
+                if otypes.intersection({"organization", "brand", "corporation", "localbusiness"}):
                     if o.get("name") and isinstance(o["name"], str):
                         facts["brand_names"].append(o["name"].strip())
                     if o.get("slogan") or o.get("alternateName"):
                         facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
-                elif otype in ("product", "individualproduct"):
+                elif otypes.intersection({"product", "individualproduct", "productmodel", "softwareapplication", "service"}):
                     pname = str(o.get("name") or "").strip()
+
                     offers = o.get("offers") or {}
                     offer_obj = offers[0] if isinstance(offers, list) and offers else offers
                     if isinstance(offer_obj, dict):

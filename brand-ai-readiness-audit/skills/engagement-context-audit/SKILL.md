@@ -28,7 +28,7 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/check-contracts.md](references/check-contracts.md)**: Decision contracts for orientation, information scent, and navigation.
+- **[references/engagement-contracts.md](references/engagement-contracts.md)**: Decision contracts for orientation, information scent, and navigation.
 - **[references/5-second-orientation.md](references/5-second-orientation.md)**: The 4-question orientation framework and above-the-fold inspection criteria.
 - **[references/engagement-rubric.md](references/engagement-rubric.md)**: Severity calibration rubric for UX friction.
 - **[references/ai-snippet-guidelines.md](references/ai-snippet-guidelines.md)**: Information density and heading structure for snippet extractability.

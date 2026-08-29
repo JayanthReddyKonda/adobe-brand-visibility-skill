@@ -140,17 +140,19 @@ brand-ai-readiness-audit/
     ├── discoverability-audit/
     │   ├── SKILL.md
     │   ├── scripts/
-    │   │   └── discoverability_check.py
+    │   │   ├── discoverability_check.py
+    │   │   └── safe_fetch.py
     │   └── references/
-    │       ├── check-contracts.md
     │       ├── crawler-matrix-reference.md
+    │       ├── discoverability-contracts.md
     │       └── seo-foundations.md
     ├── entity-content-audit/
     │   ├── SKILL.md
     │   ├── scripts/
-    │   │   └── entity_content_check.py
+    │   │   ├── entity_content_check.py
+    │   │   └── safe_fetch.py
     │   └── references/
-    │       ├── check-contracts.md
+    │       ├── entity-contracts.md
     │       ├── no-jsonld.md
     │       ├── organization.yaml
     │       ├── product.yaml
@@ -158,10 +160,11 @@ brand-ai-readiness-audit/
     ├── fact-consistency-audit/
     │   ├── SKILL.md
     │   ├── scripts/
-    │   │   └── fact_consistency_check.py
+    │   │   ├── fact_consistency_check.py
+    │   │   └── safe_fetch.py
     │   └── references/
-    │       ├── check-contracts.md
     │       ├── entity-corroboration.md
+    │       ├── fact-contracts.md
     │       ├── fact-normalization.md
     │       ├── freshness-checklist.md
     │       ├── multi-tier-pricing.md
@@ -169,28 +172,32 @@ brand-ai-readiness-audit/
     ├── corroboration-authority-audit/
     │   ├── SKILL.md
     │   ├── scripts/
-    │   │   └── corroboration_check.py
+    │   │   ├── corroboration_check.py
+    │   │   └── safe_fetch.py
     │   └── references/
-    │       ├── check-contracts.md
+    │       ├── corroboration-contracts.md
     │       └── identity-vs-claim.md
     ├── engagement-context-audit/
     │   ├── SKILL.md
     │   ├── scripts/
-    │   │   └── engagement_check.py
+    │   │   ├── engagement_check.py
+    │   │   └── safe_fetch.py
     │   └── references/
     │       ├── 5-second-orientation.md
     │       ├── ai-snippet-guidelines.md
-    │       ├── check-contracts.md
+    │       ├── engagement-contracts.md
     │       ├── engagement-rubric.md
     │       ├── pricing-comparison.yaml
     │       └── product-purchase.yaml
     └── assistant-representation-audit/
         ├── SKILL.md
         ├── scripts/
-        │   └── representation_check.py
+        │   ├── representation_check.py
+        │   └── safe_fetch.py
         └── references/
-            ├── check-contracts.md
-            └── mention-vs-citation.md
+            ├── mention-vs-citation.md
+            └── representation-contracts.md
+
 ```
 
 ---

@@ -17,43 +17,69 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
-if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
-    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
-try:
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read(max_bytes)
-                charset = resp.headers.get_content_charset() or "utf-8"
-                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
-        except Exception as e:
-            st = getattr(e, "code", None)
-            return st, "", {}, str(e)
-    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
-        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
-        return st
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
-try:
-    from acquire_inventory import classify_page
-except ImportError:
-    def classify_page(url, title=""):
-        u = url.lower()
-        if any(p in u for p in ("/product/", "/products/", "/item/", "/shop/")):
-            return "product_detail", "high"
-        if any(p in u for p in ("/pricing", "/plans", "/billing")):
-            return "pricing_tier", "high"
-        if any(p in u for p in ("/contact", "/support", "/help")):
-            return "contact", "high"
-        if any(p in u for p in ("/about", "/team", "/company")):
-            return "about", "high"
-        return "other", "low"
+KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
+
+
+def extract_locale_and_path(url):
+    parsed = urlparse(url)
+    segments = [s for s in parsed.path.strip("/").split("/") if s]
+    locale = "default"
+    if segments and (segments[0].lower() in KNOWN_LOCALES or re.match(r'^[a-z]{2}(-[a-z]{2})?$', segments[0].lower())):
+        locale = segments[0].lower()
+        logical_path = "/" + "/".join(segments[1:])
+    else:
+        logical_path = parsed.path or "/"
+    return locale, logical_path
+
+
+def classify_page(url, title=""):
+    """Classify an HTML page with confidence and granular page types."""
+    locale, logical_path = extract_locale_and_path(url)
+    segments = [s for s in logical_path.strip("/").split("/") if s]
+    t_lower = (title or "").lower()
+
+    if not segments or logical_path == "/":
+        return "homepage", "high"
+    last_seg = segments[-1]
+    if last_seg in ("default", "placeholder", "template", "empty", "sample", "test"):
+        return "template", "high"
+    if len(segments) == 1 and segments[0] in ("products", "shop", "catalog", "store", "items"):
+        return "product_listing", "high"
+    if len(segments) >= 2 and segments[0] in ("products", "p", "product", "item", "items", "shop", "catalog") and segments[1] not in ("default", "all", "category", "categories"):
+        return "product_detail", "high"
+    if any(s in ("category", "categories", "collection", "collections", "browse") for s in segments):
+        return "category", "high"
+    if any(s in ("subscription", "subscribe", "club", "membership") for s in segments):
+        return "subscription_flow", "high"
+    if any(s in ("pricing", "prices", "plans", "billing", "pricing-plans") for s in segments):
+        return "pricing", "high"
+    if any(s in ("contact", "support", "help", "contact-us", "reach-us", "get-in-touch") for s in segments):
+        return "contact", "high"
+    if any(s in ("location", "locations", "stores", "store-locator", "where-to-buy", "branches") for s in segments):
+        return "location", "high"
+    if any(s in ("about", "about-us", "company", "our-team", "story", "mission", "who-we-are") for s in segments):
+        return "about", "high"
+    if any(s in ("docs", "documentation", "guide", "guides", "api", "developer", "manual") for s in segments):
+        return "documentation", "high"
+    if any(s in ("blog", "news", "article", "articles", "posts", "insights", "journal") for s in segments):
+        return "article", "high"
+    if re.search(r'\b(contact\s*(us|ez-nous)?|contáctenos|kontakt|お問い合わせ)\b', t_lower):
+        return "contact", "high"
+    if re.search(r'\b(pricing|plans|tarifs|preise)\b', t_lower):
+        return "pricing", "medium"
+    if re.search(r'\b(subscription|abonnement|suscripción|subscribe)\b', t_lower):
+        return "subscription_flow", "high"
+    if re.search(r'\b(products?|catalog|shop|boutique|tienda)\b', t_lower):
+        return "product_listing", "medium"
+    if re.search(r'\b(about\s*(us)?|notre\s*histoire|sobre\s*nosotros|company)\b', t_lower):
+        return "about", "medium"
+    return "other", "low"
+
 
 
 

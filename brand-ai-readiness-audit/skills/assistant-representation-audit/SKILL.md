@@ -29,7 +29,7 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/check-contracts.md](references/check-contracts.md)**: Empirical comparison decision rules and claim verification contracts.
+- **[references/representation-contracts.md](references/representation-contracts.md)**: Empirical comparison decision rules and claim verification contracts.
 - **[references/mention-vs-citation.md](references/mention-vs-citation.md)**: Distinguishing brand mentions from authoritative citation grounding.
 
 

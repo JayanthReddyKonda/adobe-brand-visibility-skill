@@ -16,28 +16,11 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "audit-orchestrator", "scripts"))
-if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
-    sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
-try:
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import urllib.request
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
-    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read(max_bytes)
-                charset = resp.headers.get_content_charset() or "utf-8"
-                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
-        except Exception as e:
-            st = getattr(e, "code", None)
-            return st, "", {}, str(e)
-    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
-        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
-        return st
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
 
 
 AI_BOTS = [
