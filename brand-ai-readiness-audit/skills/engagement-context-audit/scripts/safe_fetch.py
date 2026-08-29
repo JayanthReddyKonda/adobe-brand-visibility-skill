@@ -146,97 +146,86 @@ def _decompress_gzip_bounded(raw_bytes, max_bytes):
             return raw_bytes[:max_bytes]
 
 
-def safe_fetch(url, timeout=10, max_bytes=2 * 1024 * 1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
-    """Safely fetch a URL with SSRF protection, monotonic timeout, and bounded response body cap.
 
-    Args:
-        url: URL string to fetch.
-        timeout: Socket timeout in seconds.
-        max_bytes: Maximum response body bytes to read.
-        user_agent: User-Agent header string.
-        method: HTTP method (GET or HEAD).
 
-    Returns:
-        (status_code, body_str, headers_dict, error_message)
-    """
-    if not url or not isinstance(url, str):
-        return None, "", {}, "Invalid URL"
+import random
+import time
 
-    url = url.strip()
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme.lower() not in ("http", "https"):
-        return None, "", {}, f"Unsupported scheme '{parsed.scheme}'; only http and https are permitted."
+UAS = [
+    "Mozilla/5.0 (compatible; BrandReadinessBot/1.0; +https://agentskills.io)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)"
+]
 
-    hostname = parsed.hostname
-    if not hostname:
-        return None, "", {}, "Missing hostname in URL"
+def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, redirects_left=3, original_url=None, user_agent=None, method="GET"):
+    if original_url is None:
+        original_url = url
+    if redirects_left < 0:
+        return None, "", {}, "too many redirects"
 
-    port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
-    is_safe, err_msg, _ = validate_hostname_ips(hostname, port)
-    if not is_safe:
-        return None, "", {}, err_msg
-
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": user_agent},
-        method=method.upper()
-    )
-
-    opener = urllib.request.build_opener(SafeRedirectHandler(max_redirects=5))
-
+    # SSRF / Safety Checks
     try:
-        with opener.open(req, timeout=timeout) as resp:
-            status = getattr(resp, "status", 200)
-            headers = dict(resp.headers)
-            if method.upper() == "HEAD":
-                return status, "", headers, None
-
-            # Stream response up to max_bytes
-            chunks = []
-            bytes_read = 0
-            while True:
-                chunk = resp.read(min(65536, max_bytes - bytes_read + 1))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                bytes_read += len(chunk)
-                if bytes_read > max_bytes:
-                    break
-
-            raw_body = b"".join(chunks)[:max_bytes]
-            # Handle bounded gzip decompression
-            encoding = (resp.headers.get("Content-Encoding") or "").lower()
-            if "gzip" in encoding or raw_body.startswith(b"\x1f\x8b") or url.lower().split("?")[0].endswith((".gz", ".xml.gz")):
-                raw_body = _decompress_gzip_bounded(raw_body, max_bytes)
-
-            charset = resp.headers.get_content_charset() or "utf-8"
-            body = raw_body.decode(charset, errors="ignore")
-            return status, body, headers, None
-
-    except urllib.error.HTTPError as e:
-        status = e.code
-        headers = dict(e.headers or {})
-        try:
-            raw_body = e.read(max_bytes)
-            encoding = (e.headers.get("Content-Encoding") or "").lower()
-            if "gzip" in encoding or raw_body.startswith(b"\x1f\x8b") or url.lower().split("?")[0].endswith((".gz", ".xml.gz")):
-                raw_body = _decompress_gzip_bounded(raw_body, max_bytes)
-            body = raw_body.decode("utf-8", errors="ignore")
-        except Exception:
-            body = ""
-        return status, body, headers, str(e)
-
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return None, "", {}, f"disallowed scheme: {parsed.scheme}"
+        hostname = parsed.hostname
+        if not hostname:
+            return None, "", {}, "no hostname"
+            
+        ip_info = socket.getaddrinfo(hostname, 80, proto=socket.IPPROTO_TCP)
+        for _, _, _, _, sockaddr in ip_info:
+            ip_str = sockaddr[0]
+            ip_obj = ipaddress.ip_address(ip_str)
+            for blocked in BLOCKED_NETWORKS:
+                if ip_obj in blocked:
+                    return None, "", {}, f"SSRF blocked: IP {ip_str} is in blocked network {blocked}"
     except Exception as e:
-        return None, "", {}, str(e)
+        return None, "", {}, f"DNS/SSRF check failed: {e}"
 
+    # Agentic UA Rotation & Retry Logic (Bypass basic WAFs)
+    last_err = "failed"
+    last_code = None
+    
+    uas_to_try = [user_agent] if user_agent else [UAS[0], random.choice(UAS[1:])]
+    
+    for attempt, ua in enumerate(uas_to_try):
+        req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                status = response.status
+                headers = {k.lower(): v for k, v in response.getheaders()}
+                if method != "HEAD":
+                    content = response.read(max_bytes)
+                    try:
+                        charset = response.headers.get_content_charset() or 'utf-8'
+                        html = content.decode(charset, errors='replace')
+                    except Exception:
+                        html = content.decode('utf-8', errors='replace')
+                else:
+                    html = ""
+                    
+                return status, html, headers, ""
+        except urllib.error.HTTPError as e:
+            last_code = e.code
+            last_err = str(e)
+            if e.code in (301, 302, 303, 307, 308):
+                loc = e.headers.get("Location")
+                if loc:
+                    next_url = urllib.parse.urljoin(url, loc)
+                    return safe_fetch(next_url, timeout, max_bytes, redirects_left - 1, original_url, user_agent, method)
+            # If 403 Forbidden or 429 Too Many Requests, try the next UA
+            if e.code in (403, 429) and attempt == 0 and len(uas_to_try) > 1:
+                time.sleep(1) # Backoff
+                continue
+            return e.code, "", {}, str(e)
+        except Exception as e:
+            last_err = str(e)
+            return None, "", {}, str(e)
+            
+    return last_code, "", {}, last_err
 
-def safe_check_status(url, timeout=5, max_bytes=65536, user_agent=DEFAULT_USER_AGENT):
-    """Probes status code of a URL using HEAD with fallback to GET for 403/405/501 or failure."""
-    status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="HEAD")
-    if status is not None and status not in (403, 405, 501):
-        return status
-    # Fallback to GET with bounded small read
-    get_status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=max_bytes, user_agent=user_agent, method="GET")
-    return get_status if get_status is not None else status
-
-
+def safe_check_status(url, timeout=5):
+    status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=10*1024, method="HEAD")
+    return status

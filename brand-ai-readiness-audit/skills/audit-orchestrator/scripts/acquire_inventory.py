@@ -328,18 +328,15 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         except Exception:
             rp = None
 
-    for u in selected_urls:
-        if deadline and time.monotonic() >= deadline:
-            inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
-            break
+    def fetch_url(u):
         if rp and not rp.can_fetch(DEFAULT_USER_AGENT, u):
-            continue  # Respect robots.txt Disallow for crawler's own requests
-
+            return None
+        if deadline and time.monotonic() >= deadline:
+            return None
         p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
         if p_html and is_html_response(p_headers, p_html):
-            seen_urls.add(u.rstrip("/"))
             pt, pconf, ptmpl, ploc = classify_page(u, _extract_title(p_html))
-            inv["pages"].append({
+            return {
                 "url": u,
                 "status": p_status,
                 "resource_type": "html",
@@ -352,7 +349,21 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
                 "word_count": _visible_words(p_html),
                 "html": p_html,
                 "headers": p_headers
-            })
+            }
+        return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_url = {executor.submit(fetch_url, u): u for u in selected_urls}
+        for future in concurrent.futures.as_completed(future_to_url):
+            if deadline and time.monotonic() >= deadline:
+                if "Inventory crawl truncated when acquisition time budget was reached." not in inv["limitations"]:
+                    inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
+                executor.shutdown(wait=False, cancel_futures=True)
+                break
+            res = future.result()
+            if res:
+                seen_urls.add(res["url"].rstrip("/"))
+                inv["pages"].append(res)
 
     inv["elapsed_seconds"] = round(time.monotonic() - start_mono, 1)
 

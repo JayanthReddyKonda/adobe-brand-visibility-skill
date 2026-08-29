@@ -40,7 +40,8 @@ def parse_args():
     )
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. example.com or https://example.com)")
     parser.add_argument("--output", "-o", help="Path to save the generated JSON report (defaults to stdout)")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json",
+    parser.add_argument("--trace", help="Output path for Mermaid.js execution trace diagram")
+    parser.add_argument("--format", choices=["json", "markdown", "rich"], default="json",
                         help="Output format: json (default, machine-readable) or markdown")
     
     # Proactive recommendations flag pair
@@ -134,20 +135,51 @@ def run_specialist_tool(script_path, timeout_sec, *args):
 
 def proactive_checks(domain, base_url, inv_stats=None):
     recommendations = []
-    # If sitemaps were already discovered on the site, do not flag a false 404
+    
+    # 1. Sitemap check
+    has_sitemap = False
     if inv_stats and inv_stats.get("sitemaps_found", 0) > 0:
-        return recommendations
+        has_sitemap = True
+    else:
+        sitemap_status = safe_check_status(f"{base_url}/sitemap.xml", timeout=5)
+        if sitemap_status != 404:
+            has_sitemap = True
 
-    sitemap_status = safe_check_status(f"{base_url}/sitemap.xml", timeout=5)
-    if sitemap_status == 404:
+    if not has_sitemap:
         recommendations.append({
-            "title": "Establish an integrated XML sitemap and brand identity profile",
+            "title": "Publish a canonical XML Sitemap",
             "category": "discovery",
-            "rationale": f"GET {base_url}/sitemap.xml returned HTTP 404.",
-            "suggested_action": "Publish a canonical sitemap.xml listing all indexable URLs and declare it in robots.txt alongside Organization structured data."
+            "summary": "AI crawlers rely on XML sitemaps to efficiently discover brand pages without relying on deep HTML traversal.",
+            "priority": "medium"
         })
-    return recommendations
 
+    # 2. llms.txt (Emerging AI Standard)
+    llms_status = safe_check_status(f"{base_url}/llms.txt", timeout=5)
+    if llms_status == 404:
+        recommendations.append({
+            "title": "Publish an /llms.txt standard index",
+            "category": "ai-readiness",
+            "summary": "Implement the /llms.txt standard (a Markdown-based root file) to provide AI research agents (like Perplexity and OpenAI) with a clean, explicitly formatted summary of your brand's core facts, pricing, and documentation without HTML parsing friction.",
+            "priority": "low"
+        })
+        
+    # 3. OCR and Semantic Extractability (Addressing Appendix C and F)
+    recommendations.append({
+        "title": "Isolate substantive text from non-readable formats",
+        "category": "extractability",
+        "summary": "Ensure critical brand facts, pricing tiers, and contact details are explicitly stated in semantic HTML text (<article>, <main>). Avoid locking substantive information inside images without descriptive alt-text, as AI summarizers and basic crawlers often drop non-textual or boilerplate-heavy content.",
+        "priority": "low"
+    })
+    
+    # 4. IndexNow Protocol
+    recommendations.append({
+        "title": "Implement the IndexNow Protocol",
+        "category": "discovery",
+        "summary": "Proactively ping search engines (via IndexNow API) when brand content changes. Since Bing powers Copilot and integrates with ChatGPT, this reduces AI knowledge latency from weeks to minutes.",
+        "priority": "low"
+    })
+
+    return recommendations
 
 
 def deduplicate_recommendations(rec_list):
@@ -174,6 +206,77 @@ def deduplicate_recommendations(rec_list):
     return deduped
 
 
+
+import json
+
+def discover_plugins():
+    """Dynamic Plugin Discovery Kernel (Marketplace OS)"""
+    market_path = os.path.join(SCRIPT_DIR, "..", "..", "..", "marketplace.json")
+    if not os.path.exists(market_path):
+        market_path = os.path.join(SCRIPT_DIR, "..", "..", "marketplace.json")
+    
+    plugins = []
+    try:
+        with open(market_path, "r") as f:
+            manifest = json.load(f)
+        for skill in manifest.get("skills", []):
+            sid = skill.get("id")
+            if sid and not skill.get("entrypoint"):
+                base = sid.replace("-audit", "").replace("-", "_")
+                script_name = f"{base}_check.py"
+                if sid == "assistant-representation-audit": script_name = "representation_check.py"
+                elif sid == "fact-consistency-audit": script_name = "fact_consistency_check.py"
+                elif sid == "corroboration-authority-audit": script_name = "corroboration_check.py"
+                elif sid == "engagement-context-audit": script_name = "engagement_check.py"
+                elif sid == "discoverability-audit": script_name = "discoverability_check.py"
+                elif sid == "entity-content-audit": script_name = "entity_content_check.py"
+                
+                label = f"Dynamic execution of {sid}"
+                if "discoverability" in sid: label = "Access, robots.txt & rendering risk"
+                if "entity" in sid: label = "Entity identity & offer extractability"
+                if "fact" in sid: label = "Fact ledger & cross-page consistency"
+                if "corroboration" in sid: label = "Declared authority link verification"
+                if "engagement" in sid: label = "Orientation & journey continuity"
+                
+                plugins.append((sid, label, script_name, []))
+    except Exception as e:
+        pass
+    
+    if not plugins:
+        plugins = [
+            ("discoverability-audit", "Access, robots.txt & rendering risk", "discoverability_check.py", []),
+            ("entity-content-audit", "Entity identity & offer extractability", "entity_content_check.py", []),
+            ("fact-consistency-audit", "Fact ledger & cross-page consistency", "fact_consistency_check.py", []),
+            ("corroboration-authority-audit", "Declared authority link verification", "corroboration_check.py", []),
+            ("engagement-context-audit", "Orientation & journey continuity", "engagement_check.py", []),
+        ]
+    return plugins
+
+def apply_consensus_engine(consolidated_raw, all_observations):
+    """
+    Multi-Agent Consensus Engine:
+    Resolves conflicts between independent specialists to eliminate false positives.
+    """
+    has_structured_data = any(o.get("observation") == "Valid JSON-LD extracted" for o in all_observations)
+    has_html_content = any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in consolidated_raw)
+    
+    for item in consolidated_raw:
+        # If site is a CSR shell (Discoverability), but it has rich JSON-LD (Entity)
+        # We downgrade the CSR severity because AI can still read the structured data!
+        if item.get("cause_id") == "RENDERED_CONTENT_GAP" and has_structured_data:
+            item["severity"] = "medium"
+            item["confidence"] = "medium"
+            item["evidence"] += " [Consensus Engine: Downgraded to medium because rich JSON-LD structured data is present and extractable despite rendering gap.]"
+            
+        # If Fact Consistency flags a mismatch, but Engagement notes it's an archive page
+        if item.get("category") == "fact-consistency":
+            if any("archive" in o.get("observation", "").lower() for o in all_observations):
+                item["severity"] = "low"
+                item["evidence"] += " [Consensus Engine: Detected archive context; fact drift is expected.]"
+                
+    return consolidated_raw
+
+
 def compose_audit(site, include_proactive=True, with_representation=False,
                   responses_file=None, timeout_seconds=300, return_internal=False):
     start_mono = time.monotonic()
@@ -198,13 +301,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         all_limitations.append(f"Homepage unreachable ({inv_stats.get('error', 'Network error')}); inventory could not be built.")
 
     # 2. Parallel / Sequential Specialist Dispatch
-    specialist_runs = [
-        ("discoverability-audit", "Access, robots.txt & rendering risk", "discoverability_check.py", []),
-        ("entity-content-audit", "Entity identity & offer extractability", "entity_content_check.py", []),
-        ("fact-consistency-audit", "Fact ledger & cross-page consistency", "fact_consistency_check.py", []),
-        ("corroboration-authority-audit", "Declared authority link verification", "corroboration_check.py", []),
-        ("engagement-context-audit", "Orientation & journey continuity", "engagement_check.py", []),
-    ]
+    specialist_runs = discover_plugins()
 
     if with_representation:
         rep_args = []
@@ -428,6 +525,96 @@ def validation_gate(report):
         return False
 
 
+
+
+def generate_mermaid_trace(report, out_path):
+    """Deterministic State Telemetry: Generates a Mermaid.js execution graph."""
+    lines = [
+        "```mermaid",
+        "graph TD",
+        '    subgraph "Acquisition Phase"',
+        '        A[Master Orchestrator] -->|ThreadPool BFS| B(Shared Site Inventory)',
+        f'        B -->|Sampled {report.get("audit_metrics", {}).get("html_pages_sampled", 0)} pages| C{{Dispatcher}}',
+        '    end',
+        '    subgraph "Dynamic Specialist Plugins"'
+    ]
+    
+    specs = report.get("specialists", {})
+    for i, (sid, sdata) in enumerate(specs.items()):
+        status = sdata.get("status")
+        if status != "not_run":
+            lines.append(f'        C -->|Execute| S{i}[{sid}]')
+            lines.append(f'        S{i} -->|Status: {status}| D{{Consensus Engine}}')
+            
+    lines.append('    end')
+    lines.append('    subgraph "Synthesis Phase"')
+    lines.append('        D -->|Conflict Resolution| E[Final JSON Schema]')
+    
+    proactive = report.get("proactive_actions", [])
+    if proactive:
+        lines.append(f'        E -.->|Injected| P[{len(proactive)} Proactive Recommendations]')
+    lines.append('    end')
+    
+    lines.append('    classDef default fill:#f9f9f9,stroke:#333,stroke-width:1px;')
+    lines.append('    classDef agent fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px;')
+    lines.append('    class A,C,D,E agent')
+    lines.append("```")
+    
+    with open(out_path, "w") as f:
+        f.write("\n".join(lines))
+
+
+def format_rich_report(report):
+    # ANSI escape codes for gorgeous CLI output
+    C_RESET = "\033[0m"
+    C_BOLD = "\033[1m"
+    C_CYAN = "\033[96m"
+    C_GREEN = "\033[92m"
+    C_YELLOW = "\033[93m"
+    C_RED = "\033[91m"
+    C_DIM = "\033[2m"
+    C_BG_RED = "\033[41m\033[37m"
+    
+    site = report.get("site", "Target Site")
+    summary = report.get("summary", {})
+    metrics = report.get("audit_metrics", {})
+    
+    out = []
+    out.append(f"\n{C_BOLD}{C_CYAN}======================================================={C_RESET}")
+    out.append(f"{C_BOLD}{C_CYAN}  BRAND AI-READINESS AUDIT: {site.upper()}{C_RESET}")
+    out.append(f"{C_BOLD}{C_CYAN}======================================================={C_RESET}\n")
+    
+    out.append(f"{C_BOLD}► EXECUTION METRICS{C_RESET}")
+    out.append(f"  {C_DIM}Time:{C_RESET} {metrics.get('execution_time_seconds', 0)}s   {C_DIM}Pages Sampled:{C_RESET} {metrics.get('html_pages_sampled', 0)}   {C_DIM}Status:{C_RESET} {report.get('audit_status', 'ok')}\n")
+    
+    total = summary.get("total_findings", 0)
+    crit = summary.get("critical", 0)
+    high = summary.get("high", 0)
+    med = summary.get("medium", 0)
+    
+    out.append(f"{C_BOLD}► FINDINGS SUMMARY ({total} Total){C_RESET}")
+    out.append(f"  {C_BG_RED if crit > 0 else C_DIM} CRITICAL: {crit} {C_RESET}  {C_RED if high > 0 else C_DIM} HIGH: {high} {C_RESET}  {C_YELLOW if med > 0 else C_DIM} MEDIUM: {med} {C_RESET}\n")
+    
+    findings = report.get("findings", [])
+    if findings:
+        out.append(f"{C_BOLD}► TOP FINDINGS{C_RESET}")
+        for i, f in enumerate(findings[:5]):
+            sev = str(f.get("severity", "")).upper()
+            color = C_BG_RED if sev == "CRITICAL" else (C_RED if sev == "HIGH" else C_YELLOW)
+            out.append(f"  {color} {sev} {C_RESET} {C_BOLD}{f.get('title')}{C_RESET}")
+            out.append(f"    {C_DIM}Evidence:{C_RESET} {f.get('evidence')}")
+            out.append(f"    {C_DIM}Action:{C_RESET} {C_GREEN}{f.get('suggested_action', {}).get('summary', '')}{C_RESET}\n")
+            
+    proactive = report.get("proactive_actions", [])
+    if proactive:
+        out.append(f"{C_BOLD}► PROACTIVE AI-READINESS RECOMMENDATIONS{C_RESET}")
+        for p in proactive:
+            out.append(f"  {C_CYAN}💡 {p.get('title')}{C_RESET}")
+            out.append(f"    {C_DIM}{p.get('summary')}{C_RESET}\n")
+            
+    out.append(f"{C_BOLD}{C_CYAN}======================================================={C_RESET}\n")
+    return "\n".join(out)
+
 def format_markdown_report(report):
     lines = []
     site = report.get("site", "Target Site")
@@ -494,8 +681,16 @@ def main():
         except Exception as e:
             sys.stderr.write(f"SQLite save warning: {e}\n")
 
+    if args.trace:
+        try:
+            generate_mermaid_trace(report, args.trace)
+        except Exception as e:
+            sys.stderr.write(f"Trace generation warning: {e}\n")
+
     if args.format == "markdown":
         out_content = format_markdown_report(report)
+    elif args.format == "rich":
+        out_content = format_rich_report(report)
     else:
         out_content = json.dumps(report, indent=2)
 
