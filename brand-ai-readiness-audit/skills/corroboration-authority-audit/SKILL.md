@@ -29,8 +29,9 @@ Evaluates external entity authority by verifying that declared identity links (`
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Probing contracts and decision thresholds for authority links.
+- **[references/check-contracts.md](references/check-contracts.md)**: Probing contracts and decision thresholds for authority links.
 - **[references/identity-vs-claim.md](references/identity-vs-claim.md)**: Distinguishing identity link verification from external claim corroboration.
+
 
 ---
 

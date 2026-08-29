@@ -32,9 +32,10 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Formal check contracts, evidence criteria, and decision boundaries for discoverability.
+- **[references/check-contracts.md](references/check-contracts.md)**: Formal check contracts, evidence criteria, and decision boundaries for discoverability.
 - **[references/seo-foundations.md](references/seo-foundations.md)**: RFC 9309 rules, crawler syntax, canonical consolidation, and SSR vs CSR principles.
 - **[references/crawler-matrix-reference.md](references/crawler-matrix-reference.md)**: Exhaustive platform roles for OpenAI, Anthropic, Google, Perplexity, Apple, and Common Crawl.
+
 
 ---
 

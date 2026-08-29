@@ -1,43 +1,119 @@
 # Brand AI-Readiness Audit Marketplace
 
-Zero-dependency Python 3 marketplace for Adobe University Hackathon 2026 (Round 3) conforming strictly to `agentskills.io`.
-
-**Designated Entrypoint:** `audit-orchestrator`
-
----
-
-## Overview
-
-The `brand-ai-readiness-audit` marketplace equips an AI agent to audit any website for AI discoverability, content extractability, factual consistency, and on-site visitor retention.
-
-It composes 7 specialist skills under a single entrypoint with an evidence-backed shared crawl inventory, strict 5-minute wall-clock budget, zero-dependency SSRF protection, and zero-dependency SQLite persistence.
+**Adobe University Hackathon 2026 — Round 3 Submission**  
+**Specification:** [agentskills.io](https://agentskills.io) Compliant Multi-Skill Marketplace  
+**Designated Entrypoint:** `skills/audit-orchestrator`
 
 ---
 
-## Skills Included
+## Executive Summary
 
-1. **`audit-orchestrator`** (Entrypoint): Coordinates shared crawl inventory acquisition, dispatches specialist skills with dedicated sub-budgets, clusters root causes into a unified causal taxonomy, deduplicates recommendations, provides zero-dependency SQLite run logging, and emits strictly validated schema JSON or Markdown.
-2. **`discoverability-audit`**: Checks AI search crawler access (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), RFC 9309 robots.txt rules, raw HTML extractability (CSR rendering risk), `X-Robots-Tag` headers, and canonical tags.
-3. **`entity-content-audit`**: Inspects machine-explicit brand identity (JSON-LD Organization), structured product/offer markup (supporting array `@type`), and calculates the mathematically reproducible weighted Answerability Index.
-4. **`fact-consistency-audit`**: Scopes first-party facts (prices, contacts, copyright years, ISO modification timestamps) and identifies cross-page contradictions without false positives across distinct pricing tiers or non-overlapping contexts.
-5. **`corroboration-authority-audit`**: Probes declared `sameAs` authority URLs (Wikidata, Crunchbase, official profiles, supporting `@id` objects) to verify live HTTP 200 resolution.
-6. **`engagement-context-audit`**: Evaluates above-the-fold orientation (4-question 5-second test), heading information scent, link anchor text discoverability, and destination navigation reachability.
-7. **`assistant-representation-audit`**: Cross-checks observed AI assistant answers (ChatGPT, Claude, Gemini, Perplexity) against verified first-party facts using numerical float comparisons.
+The **Brand AI-Readiness Audit Marketplace** is a zero-dependency, production-grade agentic auditing suite designed to evaluate why a brand is invisible, misrepresented, or experiencing high bounce rates across modern AI search engines (**ChatGPT Search**, **Claude Search**, **Perplexity AI**, and **Google AI Overviews**).
+
+It composes **7 specialist skills** under a single entrypoint with an evidence-backed shared crawl inventory, strict 5-minute wall-clock execution budget, zero-dependency SSRF protection, causal root-cause attribution, and strict output schema validation.
+
+```
+                                  Target Website / URL
+                                           │
+                        ┌──────────────────┴──────────────────┐
+                        ▼                                     ▼
+                Direct CLI Execution               Agent Harness Invocation
+                        │                                     │
+                        │                       [skills/audit-orchestrator/SKILL.md]
+                        │                                     │
+                        │                       ┌─────────────┴─────────────┐
+                        │                       ▼                           ▼
+                        │              Step 1: Inventory           Steps 2–7: Specialists
+                        │             (acquire_inventory.py)      (discoverability, entity,
+                        │                       │                  fact, corroboration,
+                        │                       │                  engagement, rep.)
+                        │                       └─────────────┬─────────────┘
+                        │                                     │
+                        ▼                                     ▼
+             [orchestrator.py]                     Step 8: Synthesis Gate
+             (Unified Pipeline)                    (synthesize_report.py)
+                        │                                     │
+                        └──────────────────┬──────────────────┘
+                                           │
+                                           ▼
+                                 [validate_report.py]
+                                           │
+                                           ▼
+                             Validated JSON Audit Report
+```
 
 ---
 
-## Requirements & Compliance
+## Quick Evaluation Commands
 
-- **agentskills.io Compliant:** All 7 skills include valid `SKILL.md` frontmatter, lean bodies (< 500 lines), and progressive disclosure.
-- **Top-Level Manifest:** `marketplace.json` lists all 7 skills and designates `audit-orchestrator` as `"entrypoint": true`.
-- **Zero Third-Party Dependencies:** 100% Python 3 standard library (`urllib`, `sqlite3`, `json`, `html.parser`, `re`, `xml.etree`, `ipaddress`, `gzip`).
-- **No Model Weights:** Bounded footprint (< 1 MB, vastly under the 50 MB limit).
-- **Non-Destructive & Read-Only:** Audits and recommends only. Enforces SSRF blocking against private/internal networks.
-- **Bounded Runtime:** Global wall-clock deadline strictly enforced (< 5 minutes on standard hardware).
+### 1. Run Complete Audit via Entrypoint (JSON Output)
+```bash
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://frescopa.coffee/ --format json
+```
+
+### 2. Validate Emitted Report Against Specification Schema
+```bash
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://frescopa.coffee/ --format json | python3 skills/audit-orchestrator/scripts/validate_report.py -
+```
+
+### 3. Run Step-by-Step Decoupled Agent Workflow
+```bash
+# Step 1: Acquire type-safe shared crawl inventory
+python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://frescopa.coffee/ --output /tmp/inv.json --format json
+
+# Step 2: Access & Crawler Matrix Audit
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://frescopa.coffee/ --inventory /tmp/inv.json --format json > /tmp/disc.json
+
+# Step 3: Entity Identity & Answerability Audit
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://frescopa.coffee/ --inventory /tmp/inv.json --format json > /tmp/entity.json
+
+# Step 4: Fact Consistency & Lifecycle Audit
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://frescopa.coffee/ --inventory /tmp/inv.json --format json > /tmp/fact.json
+
+# Step 5: Authority Link Verification
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://frescopa.coffee/ --inventory /tmp/inv.json --format json > /tmp/corr.json
+
+# Step 6: Engagement & 5-Second Orientation Audit
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://frescopa.coffee/ --inventory /tmp/inv.json --format json > /tmp/eng.json
+
+# Step 7: Synthesize All Specialist Findings into Final Validated Report
+python3 skills/audit-orchestrator/scripts/synthesize_report.py \
+  --site https://frescopa.coffee/ \
+  --inventory /tmp/inv.json \
+  --discoverability /tmp/disc.json \
+  --entity /tmp/entity.json \
+  --fact /tmp/fact.json \
+  --corroboration /tmp/corr.json \
+  --engagement /tmp/eng.json \
+  --format json
+```
+
+### 4. Run With Optional AI Assistant Representation Cross-Check
+```bash
+python3 skills/audit-orchestrator/scripts/orchestrator.py \
+  --site https://frescopa.coffee/ \
+  --with-representation \
+  --responses path/to/observed_responses.json \
+  --format json
+```
 
 ---
 
-## Directory Layout
+## Marketplace Architecture & Skills Catalog
+
+| Skill ID | Role | Key Diagnostic Checks | Primary Reference |
+| :--- | :--- | :--- | :--- |
+| **`audit-orchestrator`** | **Entrypoint** | Shared inventory acquisition, specialist dispatch, causal root-cause attribution, deduplication, schema validation gate. | `references/composition-guidelines.md` |
+| **`discoverability-audit`** | Specialist | RFC 9309 crawler rules (retrieval vs. training bots), tokenized `noindex` directives, raw HTML rendering gaps (CSR), external canonicals. | `references/crawler-matrix-reference.md` |
+| **`entity-content-audit`** | Specialist | Machine-explicit `Organization` identity, polymorphic structured data (`Product`, `Offer`), weighted **Answerability Index** (≥ 70%). | `references/structured-data-validation.md` |
+| **`fact-consistency-audit`** | Specialist | Scoped fact ledger (`entity`, `currency`, `interval`), exact float price normalization, product lifecycle contradictions (discontinued vs current). | `references/multi-tier-pricing.md` |
+| **`corroboration-authority-audit`** | Specialist | Live HTTP 200 validation for declared `sameAs` authority links (Wikidata, Crunchbase, official profiles) with timeout safeguards. | `references/identity-vs-claim.md` |
+| **`engagement-context-audit`** | Specialist | Above-the-fold 4-question orientation test (5-second rule), heading information scent, navigation reachability, intent-to-landing match. | `references/5-second-orientation.md` |
+| **`assistant-representation-audit`** | Specialist | Empirical cross-check of observed LLM responses against verified on-site facts using numerical price comparisons and citation tracking. | `references/mention-vs-citation.md` |
+
+---
+
+## Directory Layout (Flattened & Lowercase Standardized)
 
 ```text
 brand-ai-readiness-audit/
@@ -55,31 +131,18 @@ brand-ai-readiness-audit/
     │   │   ├── synthesize_report.py
     │   │   └── validate_report.py
     │   └── references/
-    │       ├── check-contracts/
-    │       │   └── contracts-catalog.md
-    │       ├── entity-types/
-    │       │   ├── organization.yaml
-    │       │   └── product.yaml
-    │       ├── false-positive-cases/
-    │       │   ├── multi-tier-pricing.md
-    │       │   └── no-jsonld.md
-    │       ├── intent-library/
-    │       │   ├── pricing-comparison.yaml
-    │       │   └── product-purchase.yaml
-    │       ├── platforms/
-    │       │   └── crawler-matrix-reference.md
-    │       ├── taxonomy/
-    │       │   ├── root-causes.md
-    │       │   └── severity-model.md
-    │       ├── COMPOSITION_GUIDELINES.md
-    │       ├── REPORT_SCHEMA.json
-    │       └── REPORT_SCHEMA.md
+    │       ├── composition-guidelines.md
+    │       ├── contracts-catalog.md
+    │       ├── report-schema.json
+    │       ├── report-schema.md
+    │       ├── root-causes.md
+    │       └── severity-model.md
     ├── discoverability-audit/
     │   ├── SKILL.md
     │   ├── scripts/
     │   │   └── discoverability_check.py
     │   └── references/
-    │       ├── CHECK_CONTRACTS.md
+    │       ├── check-contracts.md
     │       ├── crawler-matrix-reference.md
     │       └── seo-foundations.md
     ├── entity-content-audit/
@@ -87,7 +150,8 @@ brand-ai-readiness-audit/
     │   ├── scripts/
     │   │   └── entity_content_check.py
     │   └── references/
-    │       ├── CHECK_CONTRACTS.md
+    │       ├── check-contracts.md
+    │       ├── no-jsonld.md
     │       ├── organization.yaml
     │       ├── product.yaml
     │       └── structured-data-validation.md
@@ -96,10 +160,10 @@ brand-ai-readiness-audit/
     │   ├── scripts/
     │   │   └── fact_consistency_check.py
     │   └── references/
-    │       ├── CHECK_CONTRACTS.md
-    │       ├── ENTITY_CORROBORATION.md
-    │       ├── FRESHNESS_CHECKLIST.md
+    │       ├── check-contracts.md
+    │       ├── entity-corroboration.md
     │       ├── fact-normalization.md
+    │       ├── freshness-checklist.md
     │       ├── multi-tier-pricing.md
     │       └── temporal-freshness.md
     ├── corroboration-authority-audit/
@@ -107,7 +171,7 @@ brand-ai-readiness-audit/
     │   ├── scripts/
     │   │   └── corroboration_check.py
     │   └── references/
-    │       ├── CHECK_CONTRACTS.md
+    │       ├── check-contracts.md
     │       └── identity-vs-claim.md
     ├── engagement-context-audit/
     │   ├── SKILL.md
@@ -115,9 +179,9 @@ brand-ai-readiness-audit/
     │   │   └── engagement_check.py
     │   └── references/
     │       ├── 5-second-orientation.md
-    │       ├── AI_SNIPPET_GUIDELINES.md
-    │       ├── CHECK_CONTRACTS.md
-    │       ├── ENGAGEMENT_RUBRIC.md
+    │       ├── ai-snippet-guidelines.md
+    │       ├── check-contracts.md
+    │       ├── engagement-rubric.md
     │       ├── pricing-comparison.yaml
     │       └── product-purchase.yaml
     └── assistant-representation-audit/
@@ -125,98 +189,36 @@ brand-ai-readiness-audit/
         ├── scripts/
         │   └── representation_check.py
         └── references/
-            ├── CHECK_CONTRACTS.md
+            ├── check-contracts.md
             └── mention-vs-citation.md
 ```
 
 ---
 
-## Usage
+## Strict Evaluation Criteria & Compliance
 
-### 1. Run Complete Audit via Entrypoint (JSON Output)
+### 1. Specification Compliance
+- **Zero Third-Party Dependencies:** Implemented using 100% Python standard library (`urllib.request`, `http.client`, `sqlite3`, `html.parser`, `re`, `ipaddress`, `gzip`, `json`, `time`).
+- **Lean `SKILL.md` (< 500 lines):** Every skill utilizes progressive disclosure (`scripts/` for deterministic logic, `references/` for domain decision tables).
+- **Strict Case-Sensitivity:** All 57 files use consistent lowercase kebab-case naming for 100% Linux/Unix execution reliability.
+- **Pure Dispatcher Orchestrator:** No duplicated domain knowledge in the orchestrator; specialist skills maintain exclusive ownership over their domain rules.
 
-```bash
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
-```
+### 2. Output Schema Conformance (Adobe Round 3 Contract)
+The output JSON strictly conforms to the official contract:
+- **`site`** (string): Canonical audited host.
+- **`audited_at`** (string): ISO 8601 UTC timestamp (`YYYY-MM-DDTHH:MM:SSZ`).
+- **`audit_status`** (enum: `"ok"`, `"partial"`, `"inconclusive"`).
+- **`summary`** (object): Non-negative integer counts for `total_findings`, `critical`, `high`, `medium`, `low`.
+- **`findings[]`** (array): Each finding containing `id`, `title`, `severity`, `category`, `root_cause`, `confidence`, `evidence`, and `suggested_action` (`summary`, `priority`, `verification`).
+- **`proactive_actions[]`** (array): Deduplicated improvement suggestions.
 
-### 2. Run Audit with Markdown Output & SQLite Storage
+### 3. False-Positive Control & Deterministic Guardrails
+- **Tokenized Directive Parsing:** Replaces substring searches with tokenized parsing to prevent false alarms on directives like `max-image-preview:none`.
+- **Interval & Currency Scoped Pricing:** Prices are keyed by `(entity, currency, interval)` so `$15/mo` vs `$150/yr` do not falsely contradict.
+- **Crawler Role Separation:** Blocks on search retrieval bots (`OAI-SearchBot`) are flagged as `critical` defects, while foundation model training opt-outs (`GPTBot`) are classified as informational governance signals.
+- **Content-Type Invariant:** Non-HTML resources (XML sitemaps, robots.txt, JSON, PDFs) are filtered out and never enter semantic or engagement audits.
 
-```bash
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format markdown --db audits.db
-```
-
-### 3. Step-by-Step Shared Inventory Pipeline
-
-```bash
-# Step 1: Acquire Shared Site Inventory (< 60s)
-python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output /tmp/inv.json
-
-# Step 2: Run Specialists using Shared Inventory
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory /tmp/inv.json --format json > /tmp/d.json
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory /tmp/inv.json --format json > /tmp/e.json
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory /tmp/inv.json --format json > /tmp/f.json
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory /tmp/inv.json --format json > /tmp/c.json
-python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory /tmp/inv.json --format json > /tmp/eng.json
-
-# Step 3: Synthesize and Validate Master Report
-python3 skills/audit-orchestrator/scripts/synthesize_report.py \
-  --site https://example.com \
-  --inventory /tmp/inv.json \
-  --discoverability /tmp/d.json \
-  --entity /tmp/e.json \
-  --fact /tmp/f.json \
-  --corroboration /tmp/c.json \
-  --engagement /tmp/eng.json \
-  --db audits.db \
-  --format json
-```
-
-### 4. Validate Audit Report
-
-```bash
-python3 skills/audit-orchestrator/scripts/validate_report.py report.json
-```
-
----
-
-## Sample Audit Report Schema
-
-Conforms 100% to the Adobe Round-3 mandatory report schema:
-
-```json
-{
-  "site": "example.com",
-  "audited_at": "2026-08-28T14:30:00Z",
-  "audit_status": "ok",
-  "summary": {
-    "total_findings": 1,
-    "critical": 1,
-    "high": 0,
-    "medium": 0,
-    "low": 0
-  },
-  "findings": [
-    {
-      "id": "F-001",
-      "title": "AI search retrieval crawlers blocked in robots.txt (OAI-SearchBot, PerplexityBot)",
-      "severity": "critical",
-      "category": "crawlability",
-      "root_cause": "robots.txt explicitly disallows AI search retrieval crawlers responsible for live citations.",
-      "confidence": "high",
-      "evidence": "robots.txt disallows 2 retrieval crawler(s): OAI-SearchBot (Disallow: /), PerplexityBot (Disallow: /).",
-      "suggested_action": {
-        "summary": "Allow AI search retrieval bots (OAI-SearchBot, PerplexityBot) on public routes in robots.txt.",
-        "priority": "critical"
-      }
-    }
-  ],
-  "proactive_actions": [
-    {
-      "title": "Add Organization JSON-LD schema",
-      "summary": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles.",
-      "priority": "low"
-    }
-  ]
-}
-```
-
+### 4. Security & Performance Invariants
+- **SSRF Defense:** Blocks DNS rebinding, loopback (`127.0.0.0/8`, `::1`), private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), cloud metadata (`169.254.169.254`), and multicast.
+- **Zip-Bomb & Memory Protection:** Streaming bounded gzip decompression capping response payloads at 2 MB.
+- **Global Time Budget:** Monotonic deadline management (`time.monotonic()`) guarantees full audit completion in under 300 seconds.

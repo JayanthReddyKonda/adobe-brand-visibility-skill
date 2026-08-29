@@ -9,5 +9,5 @@ __pycache__/
 # Generated audit-report artifacts (runtime output — the report is presented in chat, not stored)
 *.audit-report.json
 
-seo-mastery/
-__pycache__/
+brand-ai-readiness-audit.zip
+

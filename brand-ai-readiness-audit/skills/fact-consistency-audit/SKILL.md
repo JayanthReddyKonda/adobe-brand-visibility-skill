@@ -29,12 +29,13 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 ## References to Consult
 
 Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/CHECK_CONTRACTS.md](references/CHECK_CONTRACTS.md)**: Scoping rules and contradiction detection contracts.
+- **[references/check-contracts.md](references/check-contracts.md)**: Scoping rules and contradiction detection contracts.
 - **[references/fact-normalization.md](references/fact-normalization.md)**: Normalization rules for prices, taglines, specs, and contacts.
 - **[references/temporal-freshness.md](references/temporal-freshness.md)**: Currency signals, timestamp hierarchy, and lifecycle drift.
 - **[references/multi-tier-pricing.md](references/multi-tier-pricing.md)**: Decision table distinguishing tier pricing from authentic contradictions.
-- **[references/ENTITY_CORROBORATION.md](references/ENTITY_CORROBORATION.md)**: Cross-page entity resolution and identity corroboration rules.
-- **[references/FRESHNESS_CHECKLIST.md](references/FRESHNESS_CHECKLIST.md)**: Temporal freshness checklist and stale content detection thresholds.
+- **[references/entity-corroboration.md](references/entity-corroboration.md)**: Cross-page entity resolution and identity corroboration rules.
+- **[references/freshness-checklist.md](references/freshness-checklist.md)**: Temporal freshness checklist and stale content detection thresholds.
+
 
 ---
 
