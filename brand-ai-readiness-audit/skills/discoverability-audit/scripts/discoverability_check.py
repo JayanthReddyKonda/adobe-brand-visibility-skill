@@ -44,34 +44,83 @@ CRAWLER_SEMANTICS = {
 }
 
 
+SPA_ID_PATTERNS = re.compile(r'^(root|app|mount|__next|__nuxt|app-root|___gatsby|svelte|svelte-app|react-root|vue-app|app-container|main-app|application)$', re.I)
+SPA_CLASS_PATTERNS = re.compile(r'\b(react-root|vue-app|app-container|spa-container|application-root|mount-point)\b', re.I)
+
+
 class Dom(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.text, self.skip = [], 0
         self.canonical, self.meta_robots = None, None
-        self.links, self.spa_root = [], False
+        self.links = []
+        self.spa_root = False
+        self.spa_marker_name = None
+        self.in_noscript = False
+        self.noscript_requires_js = False
+        self.script_srcs = []
+        self.body_content_elements = 0
+        self.in_body = False
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         t = tag.lower()
-        if t in ("script", "style", "noscript"):
+        if t == "body":
+            self.in_body = True
+        if self.in_body and t not in ("script", "style", "noscript", "link", "meta", "head"):
+            self.body_content_elements += 1
+        if t == "script":
             self.skip += 1
+            if a.get("src"):
+                self.script_srcs.append(a.get("src"))
+        elif t == "style":
+            self.skip += 1
+        elif t == "noscript":
+            self.skip += 1
+            self.in_noscript = True
         if t == "link" and a.get("rel", "").lower() == "canonical":
             self.canonical = a.get("href")
         if t == "meta" and a.get("name", "").lower() == "robots":
             self.meta_robots = a.get("content", "")
-        if (t in ("div", "main", "section") and a.get("id") in ("root", "app", "__next", "__nuxt", "app-root", "___gatsby", "svelte-app")) or t == "app-root":
+        
+        # 1. Container ID / Class heuristics
+        cid = (a.get("id") or "").strip()
+        ccls = (a.get("class") or "").strip()
+        if t in ("div", "main", "section"):
+            if cid and (SPA_ID_PATTERNS.match(cid) or re.search(r'(react|vue|angular|svelte|spa)[-_](root|app|container)', cid, re.I)):
+                self.spa_root = True
+                self.spa_marker_name = f"<{t} id='{cid}'>"
+            elif ccls and (SPA_CLASS_PATTERNS.search(ccls) or re.search(r'(react|vue|angular|svelte)[-_](root|app|container)', ccls, re.I)):
+                self.spa_root = True
+                self.spa_marker_name = f"<{t} class='{ccls}'>"
+        elif t in ("app-root", "app-main", "ng-component", "router-outlet"):
             self.spa_root = True
+            self.spa_marker_name = f"<{t}>"
+        elif "data-reactroot" in a or "data-v-app" in a or "ng-app" in a:
+            self.spa_root = True
+            marker_attr = "data-reactroot" if "data-reactroot" in a else ("data-v-app" if "data-v-app" in a else "ng-app")
+            self.spa_marker_name = f"<{t} {marker_attr}>"
+
         if t == "a" and a.get("href"):
             self.links.append(a["href"])
 
     def handle_endtag(self, tag):
-        if tag.lower() in ("script", "style", "noscript") and self.skip:
+        t = tag.lower()
+        if t in ("script", "style") and self.skip:
             self.skip -= 1
+        elif t == "noscript" and self.skip:
+            self.skip -= 1
+            self.in_noscript = False
+        elif t == "body":
+            self.in_body = False
 
     def handle_data(self, data):
+        if self.in_noscript and re.search(r'\b(enable javascript|requires javascript|javascript to run|javascript enabled)\b', data, re.I):
+            self.noscript_requires_js = True
         if not self.skip and data.strip():
             self.text.append(data.strip())
+
+
 
 
 def parse_domain(site):
@@ -150,8 +199,10 @@ def audit(base, domain, inv=None):
         home_page = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and p.get("resource_type", "html") == "html"), None)
         if not home_page and inv.get("pages"):
             home_page = inv["pages"][0]
-        status = home_page.get("status") if home_page else None
+        status = home_page.get("status", 200 if (home_page and home_page.get("html")) else None) if home_page else None
         html = home_page.get("html", "") if home_page else ""
+
+
         headers = home_page.get("headers", {}) if home_page else {}
         if not headers and home_page and home_page.get("content_type"):
             headers = {"content-type": home_page.get("content_type")}
@@ -269,23 +320,37 @@ def audit(base, domain, inv=None):
 
     # Initial HTML Text & Rendering Risk Check
     visible_words = len(" ".join(dom.text).split())
-    if visible_words < 30 and dom.spa_root:
+    is_structural_js_shell = len(dom.script_srcs) >= 1 and dom.body_content_elements <= 8
+    
+    if visible_words < 25 and (dom.spa_root or dom.noscript_requires_js or is_structural_js_shell):
+        if dom.spa_marker_name:
+            marker = dom.spa_marker_name
+        elif dom.noscript_requires_js:
+            marker = "<noscript> (JavaScript requirement notice)"
+        elif is_structural_js_shell:
+            marker = f"empty body with {len(dom.script_srcs)} JS bundle script(s)"
+        else:
+            marker = "unrendered SPA container"
+
         findings.append({
             "category": "rendering",
             "title": "Primary copy missing from initial raw HTML (client-side rendering dependency)",
             "severity": "high",
-            "confidence": "medium",
-            "root_cause": "The initial HTML payload is an unrendered JavaScript single-page application shell containing fewer than 30 words.",
+            "confidence": "high" if (dom.spa_root or dom.noscript_requires_js) else "medium",
+            "root_cause": "The initial HTML payload is an unrendered JavaScript single-page application shell containing fewer than 25 words.",
             "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
             "cause_id": "RENDERED_CONTENT_GAP",
+
             "impact": "AI retrieval crawlers and summarizers evaluating the raw HTTP response cannot extract content without full browser execution.",
-            "evidence": f"Initial HTML contains only {visible_words} visible words and an unrendered SPA container (<div id='root|app'>).",
+            "evidence": f"Initial HTML contains only {visible_words} visible words and an unrendered client-side shell ({marker}).",
             "suggested_action": {
                 "summary": "Implement server-side rendering (SSR), static site generation (SSG), or dynamic pre-rendering for core text.",
                 "priority": "high",
                 "verification": "Fetch raw HTML without executing JavaScript and confirm primary headings and body text are present."
             }
         })
+
+
 
     # 3. robots.txt Analysis
     if r_status == 200 and robots_txt:
