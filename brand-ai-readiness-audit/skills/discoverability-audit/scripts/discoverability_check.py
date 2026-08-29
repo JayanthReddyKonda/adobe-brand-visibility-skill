@@ -46,6 +46,13 @@ CRAWLER_SEMANTICS = {
 
 SPA_ID_PATTERNS = re.compile(r'^(root|app|mount|__next|__nuxt|app-root|___gatsby|svelte|svelte-app|react-root|vue-app|app-container|main-app|application)$', re.I)
 SPA_CLASS_PATTERNS = re.compile(r'\b(react-root|vue-app|app-container|spa-container|application-root|mount-point)\b', re.I)
+THIRD_PARTY_SCRIPT_PATTERNS = re.compile(
+    r'(googletagmanager\.com|google-analytics\.com|analytics\.js|gtag/js|gtm\.js|clarity\.ms|'
+    r'hotjar\.com|intercom\.io|facebook\.net|fbevents\.js|segment\.com|stripe\.com|recaptcha|'
+    r'polyfill\.io|fontawesome|typekit|fonts\.googleapis\.com|cloudflareinsights\.com|'
+    r'cookiebot\.com|onetrust\.com|trustarc\.com|hubspot\.com|hs-scripts\.com|datadoghq)',
+    re.I
+)
 
 
 class Dom(HTMLParser):
@@ -58,21 +65,26 @@ class Dom(HTMLParser):
         self.spa_marker_name = None
         self.in_noscript = False
         self.noscript_requires_js = False
-        self.script_srcs = []
+        self.app_script_srcs = []
         self.body_content_elements = 0
+        self.headings_count = 0
+        self.paragraphs_count = 0
         self.in_body = False
+        self.current_tag = None
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
         t = tag.lower()
+        self.current_tag = t
         if t == "body":
             self.in_body = True
         if self.in_body and t not in ("script", "style", "noscript", "link", "meta", "head"):
             self.body_content_elements += 1
         if t == "script":
             self.skip += 1
-            if a.get("src"):
-                self.script_srcs.append(a.get("src"))
+            src = (a.get("src") or "").strip()
+            if src and not THIRD_PARTY_SCRIPT_PATTERNS.search(src):
+                self.app_script_srcs.append(src)
         elif t == "style":
             self.skip += 1
         elif t == "noscript":
@@ -113,12 +125,19 @@ class Dom(HTMLParser):
             self.in_noscript = False
         elif t == "body":
             self.in_body = False
+        self.current_tag = None
 
     def handle_data(self, data):
+        txt = data.strip()
         if self.in_noscript and re.search(r'\b(enable javascript|requires javascript|javascript to run|javascript enabled)\b', data, re.I):
             self.noscript_requires_js = True
-        if not self.skip and data.strip():
-            self.text.append(data.strip())
+        if not self.skip and txt:
+            self.text.append(txt)
+            if self.current_tag in ("h1", "h2", "h3", "h4"):
+                self.headings_count += 1
+            elif self.current_tag in ("p", "article", "li", "span"):
+                self.paragraphs_count += 1
+
 
 
 
@@ -320,27 +339,19 @@ def audit(base, domain, inv=None):
 
     # Initial HTML Text & Rendering Risk Check
     visible_words = len(" ".join(dom.text).split())
-    is_structural_js_shell = len(dom.script_srcs) >= 1 and dom.body_content_elements <= 8
-    
-    if visible_words < 25 and (dom.spa_root or dom.noscript_requires_js or is_structural_js_shell):
-        if dom.spa_marker_name:
-            marker = dom.spa_marker_name
-        elif dom.noscript_requires_js:
-            marker = "<noscript> (JavaScript requirement notice)"
-        elif is_structural_js_shell:
-            marker = f"empty body with {len(dom.script_srcs)} JS bundle script(s)"
-        else:
-            marker = "unrendered SPA container"
+    has_semantic_content = (dom.headings_count >= 1 and dom.paragraphs_count >= 1) or visible_words >= 15
 
+    # 1. Definite Framework / JS Dependency Shell (recognized framework container or explicit noscript requirement)
+    if visible_words < 25 and (dom.spa_root or dom.noscript_requires_js):
+        marker = dom.spa_marker_name or "<noscript> (JavaScript requirement notice)"
         findings.append({
             "category": "rendering",
             "title": "Primary copy missing from initial raw HTML (client-side rendering dependency)",
             "severity": "high",
-            "confidence": "high" if (dom.spa_root or dom.noscript_requires_js) else "medium",
+            "confidence": "high" if dom.noscript_requires_js else "medium",
             "root_cause": "The initial HTML payload is an unrendered JavaScript single-page application shell containing fewer than 25 words.",
             "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
             "cause_id": "RENDERED_CONTENT_GAP",
-
             "impact": "AI retrieval crawlers and summarizers evaluating the raw HTTP response cannot extract content without full browser execution.",
             "evidence": f"Initial HTML contains only {visible_words} visible words and an unrendered client-side shell ({marker}).",
             "suggested_action": {
@@ -349,6 +360,25 @@ def audit(base, domain, inv=None):
                 "verification": "Fetch raw HTML without executing JavaScript and confirm primary headings and body text are present."
             }
         })
+    # 2. Circumstantial Structural Fallback (NO framework marker, but empty body with app scripts and NO semantic content)
+    elif visible_words < 12 and len(dom.app_script_srcs) >= 1 and dom.body_content_elements <= 3 and not has_semantic_content and not dom.spa_root:
+        findings.append({
+            "category": "rendering",
+            "title": "Primary copy missing from initial raw HTML (unrendered application bundle)",
+            "severity": "medium",
+            "confidence": "medium",
+            "root_cause": "The initial HTML body contains minimal copy and an application JavaScript bundle without pre-rendered semantic content.",
+            "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
+            "cause_id": "RENDERED_CONTENT_GAP",
+            "impact": "AI retrieval crawlers may receive an unrendered page shell if the page relies on client-side mounting.",
+            "evidence": f"Initial HTML contains only {visible_words} visible words, no semantic headings/paragraphs, and {len(dom.app_script_srcs)} application script(s).",
+            "suggested_action": {
+                "summary": "Ensure critical landing copy is pre-rendered in the initial HTML payload.",
+                "priority": "medium",
+                "verification": "Fetch raw HTML without JavaScript execution and verify primary content is present."
+            }
+        })
+
 
 
 
