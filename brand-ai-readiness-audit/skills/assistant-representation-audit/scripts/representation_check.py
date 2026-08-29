@@ -18,7 +18,25 @@ ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "aud
 if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
     sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
 
-from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read(max_bytes)
+                charset = resp.headers.get_content_charset() or "utf-8"
+                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
+        except Exception as e:
+            st = getattr(e, "code", None)
+            return st, "", {}, str(e)
+    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
+        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
+        return st
+
 
 PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
 

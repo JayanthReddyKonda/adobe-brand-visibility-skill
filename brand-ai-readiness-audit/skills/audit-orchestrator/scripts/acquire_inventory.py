@@ -26,18 +26,6 @@ NON_HTML_EXTENSIONS = (
     ".gz", ".tar", ".ico", ".woff", ".woff2", ".ttf", ".eot"
 )
 
-PRIORITY_KEYWORDS = [
-    ("product", ["/product/", "/products/", "/p/", "/item/", "/store/", "/shop/"]),
-    ("pricing", ["/pricing", "/prices", "/plans", "/billing", "/subscription"]),
-    ("service", ["/service", "/services", "/solution", "/solutions", "/offering"]),
-    ("category", ["/category/", "/categories/", "/collection/", "/collections/", "/browse/"]),
-    ("contact", ["/contact", "/support", "/help", "/reach-us"]),
-    ("location", ["/location", "/locations", "/store-locator", "/where-to-buy"]),
-    ("about", ["/about", "/company", "/our-team", "/story", "/mission"]),
-    ("documentation", ["/docs", "/documentation", "/guide", "/api", "/developer"]),
-    ("article", ["/blog/", "/news/", "/article/", "/posts/", "/insights/"]),
-]
-
 
 def is_html_response(headers, body_snippet=""):
     ctype = ""

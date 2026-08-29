@@ -20,7 +20,25 @@ ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "aud
 if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
     sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
 
-from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read(max_bytes)
+                charset = resp.headers.get_content_charset() or "utf-8"
+                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
+        except Exception as e:
+            st = getattr(e, "code", None)
+            return st, "", {}, str(e)
+    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
+        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
+        return st
+
 
 AI_BOTS = [
     "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai",
@@ -338,6 +356,17 @@ def audit(base, domain, inv=None):
                 "observation": f"Site opts out of AI foundation model training for {len(blocked_training)} crawler(s): {', '.join(names)} ({rules_str}).",
                 "impact": "Content is excluded from foundation model pre-training datasets. (This is an intentional governance opt-out, not an AI search retrieval defect).",
                 "role": "training"
+            })
+
+    # 4. Proactive /llms.txt content manifest discovery
+    if inv is None:
+        llms_status = safe_check_status(f"{base}/llms.txt", timeout=5)
+        if llms_status == 404:
+            recommendations.append({
+                "title": "Publish an /llms.txt standard manifest for AI search crawlers",
+                "category": "discovery",
+                "rationale": f"GET {base}/llms.txt returned HTTP 404.",
+                "suggested_action": "Publish an /llms.txt markdown file providing clean, curated overview and documentation links for AI search and LLM inference agents."
             })
 
     return {

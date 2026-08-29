@@ -21,7 +21,40 @@ ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "aud
 if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
     sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
 
-from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read(max_bytes)
+                charset = resp.headers.get_content_charset() or "utf-8"
+                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
+        except Exception as e:
+            st = getattr(e, "code", None)
+            return st, "", {}, str(e)
+    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
+        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
+        return st
+
+try:
+    from acquire_inventory import classify_page
+except ImportError:
+    def classify_page(url, title=""):
+        u = url.lower()
+        if any(p in u for p in ("/product/", "/products/", "/item/", "/shop/")):
+            return "product_detail", "high"
+        if any(p in u for p in ("/pricing", "/plans", "/billing")):
+            return "pricing_tier", "high"
+        if any(p in u for p in ("/contact", "/support", "/help")):
+            return "contact", "high"
+        if any(p in u for p in ("/about", "/team", "/company")):
+            return "about", "high"
+        return "other", "low"
+
 
 
 GENERIC_H1_TERMS = {
@@ -29,7 +62,18 @@ GENERIC_H1_TERMS = {
     "welcome to our website", "welcome to our site", "main page", "overview"
 }
 
+VALID_CONTACT_TERMS = {
+    "contact", "contact us", "get in touch", "reach out", "support",
+    "contacto", "contáctenos", "contactez-nous", "kontakt", "kontaktiere uns",
+    "contatti", "fale conosco", "contato", "contate-nos", "contacteer ons",
+    "kontakt oss", "kontakt os", "ota yhteyttä", "kapcsolat", "kontaktujte nás",
+    "skontaktuj się z nami", "contactati-ne", "iletisim", "свяжитесь с нами",
+    "контакты", "اتصل بنا", "צור קשר", "संपर्क करें", "যোগাযোগ করুন",
+    "联系我们", "聯絡我們", "お問い合わせ", "문의하기", "hubungi kami", "liên hệ"
+}
+
 CORE_DESTINATIONS = ["pricing", "product", "docs", "documentation", "about", "contact", "login", "signup", "shop", "store"]
+
 
 
 class EngagementDOMParser(HTMLParser):
@@ -140,15 +184,19 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
     except Exception:
         pass
 
+    # Centralized, segment-exact page classifier
+    if not page_type or page_type == "other":
+        detected_type, _ = classify_page(url)
+        if detected_type and detected_type != "other":
+            page_type = detected_type
+
     full_text = " ".join(dom.body_text)
     visible_words = len(full_text.split())
     clean_title = dom.title.strip()
     has_descriptive_title = len(clean_title.split()) >= 3
     has_subheadings = len(dom.h2_list) >= 1
-    has_functional_context = (
-        page_type in ("subscription_flow", "product_detail", "product_listing", "checkout")
-        or any(k in url.lower() for k in ("subscription", "suscrip", "abonn", "pricing", "plans", "catalog", "shop", "store"))
-        or any(k in clean_title.lower() for k in ("subscription", "suscrip", "abonn", "pricing", "plans", "catalog", "shop", "store", "contact"))
+    has_functional_context = page_type in (
+        "subscription_flow", "product_detail", "product_listing", "checkout", "pricing_tier", "contact", "about"
     )
 
     # 1. Multi-Signal 5-Second Orientation & Information Scent
@@ -180,7 +228,7 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
     else:
         primary_h1 = dom.h1_list[0].strip()
         h1_clean = primary_h1.lower()
-        is_contact_page = page_type == "contact" or any(c in url.lower() for c in ("contact", "support", "touch"))
+        is_contact_page = (page_type == "contact")
 
         # Contact pages with "Contact us" or international translations are valid and should PASS
         if is_contact_page and any(term in h1_clean for term in VALID_CONTACT_TERMS):
@@ -191,6 +239,7 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
                 "title": f"Low-information generic headline on landing page ('{primary_h1}')",
                 "severity": "low",
                 "confidence": "medium",
+
                 "root_cause": f"The primary headline ('{primary_h1}') is generic and conveys weak information scent without title context.",
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "cause_id": "LOW_INFORMATION_SCENT",

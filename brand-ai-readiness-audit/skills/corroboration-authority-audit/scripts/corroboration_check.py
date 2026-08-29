@@ -18,7 +18,25 @@ ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "aud
 if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
     sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
 
-from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read(max_bytes)
+                charset = resp.headers.get_content_charset() or "utf-8"
+                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
+        except Exception as e:
+            st = getattr(e, "code", None)
+            return st, "", {}, str(e)
+    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
+        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
+        return st
+
 
 
 
@@ -126,12 +144,21 @@ def audit(base, domain, inv=None):
     checked = []
     broken = []
     for u in sameas_urls[:5]:
-        status, _, headers, err = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
+        status, resp_html, headers, err = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
         res_entry = {"url": u, "status": status, "error": err}
         checked.append(res_entry)
 
         if status is not None and (status >= 400 or status < 200):
             broken.append(f"{u} (HTTP {status})")
+        elif status == 200 and resp_html:
+            brand_token = domain.split(".")[0].lower()
+            if len(brand_token) >= 3 and brand_token not in resp_html.lower()[:2000]:
+                observations.append({
+                    "observation": f"Declared sameAs profile {u} resolved HTTP 200 but introductory text does not prominently reference brand token '{brand_token}'.",
+                    "impact": "Independent authority verification is stronger when the target registry explicitly corroborates the entity name.",
+                    "url": u
+                })
+
 
     if broken:
         findings.append({

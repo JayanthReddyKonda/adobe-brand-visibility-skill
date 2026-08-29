@@ -21,7 +21,25 @@ ORCHESTRATOR_SCRIPTS = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "aud
 if os.path.isdir(ORCHESTRATOR_SCRIPTS) and ORCHESTRATOR_SCRIPTS not in sys.path:
     sys.path.insert(0, ORCHESTRATOR_SCRIPTS)
 
-from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import urllib.request
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAIReadinessAudit/2.0; +https://agentskills.io)"
+    def safe_fetch(url, timeout=10, max_bytes=2*1024*1024, user_agent=DEFAULT_USER_AGENT, method="GET"):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": user_agent}, method=method)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read(max_bytes)
+                charset = resp.headers.get_content_charset() or "utf-8"
+                return resp.status, raw.decode(charset, errors="replace"), dict(resp.headers), None
+        except Exception as e:
+            st = getattr(e, "code", None)
+            return st, "", {}, str(e)
+    def safe_check_status(url, timeout=5, user_agent=DEFAULT_USER_AGENT):
+        st, _, _, _ = safe_fetch(url, timeout=timeout, user_agent=user_agent, method="HEAD")
+        return st
+
 
 CURRENT_YEAR = datetime.now().year
 PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
@@ -142,10 +160,52 @@ class FreshnessAnalyzer(HTMLParser):
 
 UTILITY_HEADINGS = {
     "contact", "contact us", "about", "about us", "privacy policy", "terms of service",
-    "terms & conditions", "cart", "shopping cart", "checkout", "login", "register",
-    "cookie policy", "faq", "frequently asked questions", "search", "menu", "navigation",
-    "home", "homepage", "welcome", "pricing", "plans", "subscription", "overview"
+    "terms & conditions", "cart", "shopping cart", "checkout", "login", "register", "sign in", "sign up",
+    "cookie policy", "faq", "faqs", "frequently asked questions", "search", "menu", "navigation",
+    "home", "homepage", "welcome", "pricing", "plans", "subscription", "overview", "details",
+    "features", "giving", "gives", "diversity", "impact", "donate", "donation", "usage",
+    "usage limit", "limits", "support", "help", "careers", "press", "news", "blog", "events",
+    "community", "resources", "general", "summary", "introduction", "conclusion", "table of contents",
+    "highlights", "compare", "comparison", "reviews", "testimonials", "questions", "answers"
 }
+
+
+def is_valid_product_entity(name):
+    """Validate whether a candidate heading or string is a plausible product/service entity name."""
+    if not name or not isinstance(name, str):
+        return False
+    clean = name.strip()
+    clean_lower = clean.lower()
+
+    # Length boundaries: product/plan names are typically 3 to 50 characters
+    if len(clean) < 3 or len(clean) > 50:
+        return False
+
+    # Must not end with question/colon punctuation (e.g. FAQ questions)
+    if clean.endswith("?") or clean.endswith(":"):
+        return False
+
+    # Must not contain question prefixes or FAQ phrases
+    question_prefixes = ("what ", "why ", "how ", "when ", "where ", "who ", "which ", "can ", "is ", "does ", "faq", "frequently ")
+    if clean_lower.startswith(question_prefixes):
+        return False
+
+    # Must not contain price tags, currency indicators, billing terms or math symbols
+    if any(sym in clean for sym in ("$", "€", "£", "₹", "¥")):
+        return False
+    if re.search(r'\b(usd|eur|gbp|inr|cad|aud|per\s+month|per\s+user|per\s+year|/\s*mo|/\s*yr|billed|billing|pricing|tier|tiers|cost|rate|fee|fees|discount|first\s+\d+)\b', clean_lower):
+        return False
+
+    # Must not contain large digit spans or raw numbers
+    if re.search(r'\d{2,}', clean):
+        return False
+
+    if clean_lower in UTILITY_HEADINGS:
+        return False
+    if any(k in clean_lower for k in ("cookie", "privacy", "terms", "navigation", "diversity", "giving", "usage limit", "frequently asked")):
+        return False
+
+    return True
 
 
 def extract_scoped_facts(html_str, url):
@@ -205,22 +265,22 @@ def extract_scoped_facts(html_str, url):
                         p_curr = str(offer_obj.get("priceCurrency") or "USD").upper()
                         avail = str(offer_obj.get("availability") or "").lower()
                         status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else "current")
-                        if pname:
+                        if pname and is_valid_product_entity(pname):
                             facts["products_with_status"].append({
                                 "name": pname,
                                 "status": status,
                                 "url": url
                             })
-                        if p_val and pname:
-                            norm_p = normalize_price_str(str(p_val))
-                            if norm_p:
-                                facts["scoped_prices"].append({
-                                    "entity": pname,
-                                    "price": norm_p,
-                                    "currency": p_curr,
-                                    "interval": "one_time",
-                                    "raw": f"{p_curr} {p_val}"
-                                })
+                            if p_val:
+                                norm_p = normalize_price_str(str(p_val))
+                                if norm_p:
+                                    facts["scoped_prices"].append({
+                                        "entity": pname,
+                                        "price": norm_p,
+                                        "currency": p_curr,
+                                        "interval": "one_time",
+                                        "raw": f"{p_curr} {p_val}"
+                                    })
                 if "dateModified" in o and isinstance(o["dateModified"], str):
                     facts["modification_dates"].append(o["dateModified"])
                 elif "datePublished" in o and isinstance(o["datePublished"], str):
@@ -236,50 +296,47 @@ def extract_scoped_facts(html_str, url):
     if "og:site_name" in parser.meta_tags:
         facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
 
-    # 3. Text-based product and offering names from prominent headings (filtered against utility terms)
+    # 3. Text-based product and offering names from prominent headings
     for h in parser.headings:
         htag, htxt = h
-        h_clean = htxt.lower().strip()
-        if len(htxt.split()) <= 8 and h_clean not in UTILITY_HEADINGS and not any(k in h_clean for k in ("cookie", "privacy", "terms", "navigation")):
-            if htag == "h1" and not any(p["name"].lower() == h_clean for p in facts["products_with_status"]):
+        if is_valid_product_entity(htxt):
+            if htag == "h1" and not any(p["name"].lower() == htxt.lower() for p in facts["products_with_status"]):
                 facts["products_with_status"].append({
-                    "name": htxt,
+                    "name": htxt.strip(),
                     "status": "current",
                     "url": url
                 })
 
-    # 4. Text-based scoped price extraction
+    # 4. Text-based scoped price extraction (ONLY within explicitly named, valid product sections)
     for ctx, txt in parser.text_with_context:
+        if not ctx or ctx == "General" or not is_valid_product_entity(ctx):
+            continue
         for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
             norm_p = normalize_price_str(m.group(1))
             if norm_p and float(norm_p) > 0:
-                section_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "")
-                s_clean = section_name.lower().strip()
-                if section_name and s_clean not in UTILITY_HEADINGS:
-                    curr = extract_currency(m.group(0))
-                    invl = extract_interval(txt)
-                    if not any(sp["price"] == norm_p and sp["entity"].lower() == s_clean and sp["currency"] == curr and sp["interval"] == invl for sp in facts["scoped_prices"]):
-                        facts["scoped_prices"].append({
-                            "entity": section_name,
-                            "price": norm_p,
-                            "currency": curr,
-                            "interval": invl,
-                            "raw": m.group(0)
-                        })
+                curr = extract_currency(m.group(0))
+                invl = extract_interval(txt)
+                if not any(sp["price"] == norm_p and sp["entity"].lower() == ctx.lower().strip() and sp["currency"] == curr and sp["interval"] == invl for sp in facts["scoped_prices"]):
+                    facts["scoped_prices"].append({
+                        "entity": ctx.strip(),
+                        "price": norm_p,
+                        "currency": curr,
+                        "interval": invl,
+                        "raw": m.group(0)
+                    })
 
     # 5. Discontinued / Lifecycle detection in prose (scoped to specific section/heading)
     for ctx, txt in parser.text_with_context:
         if DISCONTINUED_PATTERN.search(txt):
-            prod_name = ctx if ctx and ctx != "General" else (parser.headings[0][1] if parser.headings else "")
-            if prod_name and prod_name.lower().strip() not in UTILITY_HEADINGS:
+            if ctx and ctx != "General" and is_valid_product_entity(ctx):
                 matched = False
                 for p in facts["products_with_status"]:
-                    if p["name"].lower() == prod_name.lower():
+                    if p["name"].lower() == ctx.lower().strip():
                         p["status"] = "discontinued"
                         matched = True
                 if not matched:
                     facts["products_with_status"].append({
-                        "name": prod_name,
+                        "name": ctx.strip(),
                         "status": "discontinued",
                         "url": url
                     })
@@ -287,15 +344,15 @@ def extract_scoped_facts(html_str, url):
     for h in parser.headings:
         h_text = h[1]
         if DISCONTINUED_PATTERN.search(h_text):
-            if h_text.lower().strip() not in UTILITY_HEADINGS:
+            if is_valid_product_entity(h_text):
                 matched = False
                 for p in facts["products_with_status"]:
-                    if p["name"].lower() == h_text.lower():
+                    if p["name"].lower() == h_text.lower().strip():
                         p["status"] = "discontinued"
                         matched = True
                 if not matched:
                     facts["products_with_status"].append({
-                        "name": h_text,
+                        "name": h_text.strip(),
                         "status": "discontinued",
                         "url": url
                     })
@@ -327,72 +384,87 @@ def evaluate_fact_consistency(page_fact_list, base_url):
     recommendations = []
 
     # 1. Scoped Price Contradictions (entity + currency + interval)
+    # Price ledger: (entity, currency, interval) -> price -> set of URLs
     price_ledger = {}
     for pf in page_fact_list:
         for sp in pf["scoped_prices"]:
             ent = sp["entity"].lower().strip()
-            if len(ent) < 3 or ent in UTILITY_HEADINGS:
+            if not is_valid_product_entity(ent):
                 continue
             key = (ent, sp.get("currency", "USD"), sp.get("interval", "one_time"))
-            price_ledger.setdefault(key, {}).setdefault(sp["price"], []).append({
-                "url": pf["url"],
-                "raw": sp["raw"]
-            })
+            price_ledger.setdefault(key, {}).setdefault(sp["price"], set()).add(pf["url"])
 
     for (ent, curr, invl), val_map in price_ledger.items():
         if len(val_map) >= 2:
-            details = []
-            affected_urls = set()
-            for price_val, occurrences in val_map.items():
-                for occ in occurrences:
-                    details.append(f"{occ['raw']} on {occ['url']}")
-                    affected_urls.add(occ['url'])
+            # Map each URL to all prices it asserts for this entity
+            url_to_prices = {}
+            for price_val, urls in val_map.items():
+                for u in urls:
+                    url_to_prices.setdefault(u, set()).add(price_val)
 
-            findings.append({
-                "category": "fact-consistency",
-                "title": f"Conflicting pricing published for '{ent}'",
-                "severity": "high",
-                "confidence": "high",
-                "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
-                "cause_family": "FACT.CONSISTENCY",
-                "cause_id": "FIRST_PARTY_FACT_CONFLICT",
-                "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
-                "evidence": f"{len(affected_urls)} page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
-                "suggested_action": {
-                    "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
-                    "priority": "high",
-                    "verification": f"Re-crawl {', '.join(affected_urls)} and verify identical pricing appears on all pages."
-                }
-            })
+            # Filter for URLs that assert a single distinct price (eliminating tiered single-page listings)
+            clean_conflicts = {}
+            for price_val, urls in val_map.items():
+                single_price_urls = {u for u in urls if len(url_to_prices[u]) == 1}
+                if single_price_urls:
+                    clean_conflicts[price_val] = single_price_urls
+
+            # A true cross-page conflict requires at least 2 different prices on at least 2 distinct URLs
+            if len(clean_conflicts) >= 2:
+                all_affected_urls = set()
+                details = []
+                for pval, urls in clean_conflicts.items():
+                    all_affected_urls.update(urls)
+                    for u in sorted(urls):
+                        details.append(f"{curr} {pval} on {u}")
+
+                if len(all_affected_urls) >= 2:
+                    findings.append({
+                        "category": "fact-consistency",
+                        "title": f"Conflicting pricing published for '{ent}'",
+                        "severity": "high",
+                        "confidence": "high",
+                        "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
+                        "cause_family": "FACT.CONSISTENCY",
+                        "cause_id": "FIRST_PARTY_FACT_CONFLICT",
+                        "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
+                        "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
+                        "suggested_action": {
+                            "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
+                            "priority": "high",
+                            "verification": f"Re-crawl {', '.join(sorted(all_affected_urls))} and verify identical pricing appears on all pages."
+                        }
+                    })
 
     # 2. Product Lifecycle Conflicts (Discontinued vs Active)
     status_by_name = {}
     for pf in page_fact_list:
         for p in pf.get("products_with_status", []):
             name_clean = p["name"].lower().strip()
-            if len(name_clean) > 3 and name_clean not in UTILITY_HEADINGS:
+            if is_valid_product_entity(name_clean):
                 status_by_name.setdefault(name_clean, []).append((p["status"], p["url"]))
 
     for name, statuses in status_by_name.items():
         stat_types = {s[0] for s in statuses}
         if "discontinued" in stat_types and ("in_stock" in stat_types or "current" in stat_types):
             urls = {s[1] for s in statuses}
-            findings.append({
-                "category": "lifecycle",
-                "title": f"Product lifecycle conflict for '{name}' (discontinued vs current)",
-                "severity": "high",
-                "confidence": "high",
-                "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
-                "cause_family": "FACT.LIFECYCLE",
-                "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
-                "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
-                "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
-                "suggested_action": {
-                    "summary": f"Synchronize availability status for '{name}' across all product pages and structured data.",
-                    "priority": "high",
-                    "verification": f"Re-crawl {', '.join(urls)} and confirm consistent lifecycle badges."
-                }
-            })
+            if len(urls) >= 2:
+                findings.append({
+                    "category": "lifecycle",
+                    "title": f"Product lifecycle conflict for '{name}' (discontinued vs current)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
+                    "cause_family": "FACT.LIFECYCLE",
+                    "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
+                    "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
+                    "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
+                    "suggested_action": {
+                        "summary": f"Update all pages referencing '{name}' to consistently reflect its current product lifecycle status.",
+                        "priority": "high",
+                        "verification": f"Verify {', '.join(sorted(urls))} show consistent availability/discontinued markers."
+                    }
+                })
 
     # 3. Copyright Year Inconsistency (Signals legacy fact drift - emitted as proactive observation unless paired with conflict)
     c_years_by_url = {}

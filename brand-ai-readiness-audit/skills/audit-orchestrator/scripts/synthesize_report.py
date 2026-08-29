@@ -232,15 +232,43 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
         "low": sum(1 for f in final_findings if f["severity"] == "low")
     }
 
+    inv_cov = all_coverage.get("site_inventory", {})
+    audit_metrics = {
+        "execution_time_seconds": round(time.time() - start_time, 1) if start_time else 0.0,
+        "html_pages_sampled": inv_cov.get("html_pages_sampled", 0),
+        "sitemaps_processed": inv_cov.get("sitemaps_processed", 0),
+        "urls_discovered": inv_cov.get("urls_discovered", 0),
+        "page_types_covered": inv_cov.get("page_types", {}),
+        "critical_blockers": summary_counts["critical"]
+    }
+
+    # Determine audit_status
+    active_statuses = [info.get("status") for k, info in specialists.items() if info.get("status") != "not_run"]
+    if not inv or not inv.get("infrastructure", {}).get("homepage_reachable", True):
+        audit_status = "inconclusive" if not active_statuses or all(st == "inconclusive" for st in active_statuses) else "partial"
+    elif all(st == "inconclusive" for st in active_statuses):
+        audit_status = "inconclusive"
+    elif any(st in ("failed", "inconclusive") for st in active_statuses):
+        audit_status = "partial"
+    else:
+        audit_status = "ok"
+
     report = {
         "site": domain,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "audit_status": audit_status,
         "summary": summary_counts,
+        "specialists": specialists,
+        "audit_metrics": audit_metrics,
+        "coverage": all_coverage,
         "findings": final_findings,
-        "proactive_actions": deduped_recommendations
+        "proactive_actions": deduped_recommendations,
+        "observations": all_observations[:100],
+        "limitations": all_limitations
     }
 
     return report
+
 
 
 

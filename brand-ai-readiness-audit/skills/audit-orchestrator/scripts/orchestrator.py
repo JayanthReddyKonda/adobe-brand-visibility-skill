@@ -374,25 +374,32 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     else:
         audit_status = "ok"
 
+    audit_metrics = {
+        "execution_time_seconds": round(time.monotonic() - start_mono, 1),
+        "html_pages_sampled": inv_stats.get("html_pages_sampled", 0) if inv_stats else 0,
+        "sitemaps_processed": inv_stats.get("sitemaps_processed", 0) if inv_stats else 0,
+        "urls_discovered": inv_stats.get("urls_discovered", 0) if inv_stats else 0,
+        "page_types_covered": inv_stats.get("page_types", {}) if inv_stats else {},
+        "critical_blockers": summary_counts["critical"]
+    }
+
     report = {
         "site": domain,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "audit_status": audit_status,
         "summary": summary_counts,
+        "specialists": specialists,
+        "audit_metrics": audit_metrics,
+        "coverage": all_coverage,
         "findings": final_findings,
-        "proactive_actions": deduped_recommendations
+        "proactive_actions": deduped_recommendations,
+        "observations": all_observations[:100],
+        "limitations": all_limitations
     }
 
     internal_telemetry = {
         "specialists": specialists,
-        "audit_metrics": {
-            "execution_time_seconds": round(time.monotonic() - start_mono, 1),
-            "html_pages_sampled": inv_stats.get("html_pages_sampled", 1) if inv_stats else 1,
-            "sitemaps_processed": inv_stats.get("sitemaps_processed", 0) if inv_stats else 0,
-            "urls_discovered": inv_stats.get("urls_discovered", 0) if inv_stats else 0,
-            "page_types_covered": inv_stats.get("page_types", {}) if inv_stats else {},
-            "critical_blockers": summary_counts["critical"]
-        },
+        "audit_metrics": audit_metrics,
         "coverage": all_coverage,
         "limitations": all_limitations,
         "observations": all_observations[:100]
@@ -401,6 +408,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     if return_internal:
         return report, internal_telemetry
     return report
+
 
 
 
