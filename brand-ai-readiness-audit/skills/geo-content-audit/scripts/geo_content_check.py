@@ -148,6 +148,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", required=True)
+    parser.add_argument("--format", default="json")
     args = parser.parse_args()
     
     with open(args.inventory, "r", encoding="utf-8") as f:

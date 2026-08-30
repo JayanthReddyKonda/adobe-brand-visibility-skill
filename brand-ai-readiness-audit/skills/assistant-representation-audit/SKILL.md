@@ -10,6 +10,9 @@ metadata:
   role: specialist
   parent: audit-orchestrator
   version: "3.0.0"
+tools:
+  - run_command
+  - view_file
 ---
 
 # Assistant Representation Audit Skill (Enrichment Layer)
@@ -20,7 +23,7 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
 ## When to Use
 
@@ -34,7 +37,8 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md`).
+> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
+> `skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 

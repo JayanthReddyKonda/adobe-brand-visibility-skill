@@ -11,6 +11,9 @@ metadata:
   role: specialist
   parent: audit-orchestrator
   version: "3.0.0"
+tools:
+  - run_command
+  - view_file
 ---
 
 # Entity & Content Audit Skill
@@ -21,7 +24,7 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
 ## When to Use
 
@@ -35,7 +38,8 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat skills/entity-content-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/entity-content-audit/references/KNOWLEDGE_BASE.md`).
+> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
+> `skills/entity-content-audit/references/KNOWLEDGE_BASE.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 

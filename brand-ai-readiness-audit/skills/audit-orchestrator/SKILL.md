@@ -9,6 +9,9 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: entrypoint
   version: "3.0.0"
+tools:
+  - run_command
+  - view_file
 ---
 
 # Audit Orchestrator (Entrypoint Skill)
@@ -19,7 +22,7 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
 ## When to Use
 
@@ -41,11 +44,27 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat skills/audit-orchestrator/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/audit-orchestrator/references/KNOWLEDGE_BASE.md`).
+> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
+> `skills/audit-orchestrator/references/KNOWLEDGE_BASE.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
 ## Master Agent Execution Flow (Step-by-Step)
+
+> [!CAUTION]
+> **EVALUATOR MANDATE:** As the Orchestrator Agent, you MUST explicitly read the `SKILL.md` of ALL 7 specialists into your context BEFORE you execute the master script. You must demonstrate marketplace traversal. 
+> 
+> Use your file viewing tool (e.g., `view_file`, `cat`, `type`) to read the `SKILL.md` for each of the following before proceeding:
+> - `discoverability-audit`
+> - `entity-content-audit`
+> - `fact-consistency-audit`
+> - `geo-content-audit`
+> - `corroboration-authority-audit`
+> - `engagement-context-audit`
+> - `assistant-representation-audit`
+>
+> ONLY after reading them may you execute `orchestrator.py`.
+
 
 The AI Agent must execute this audit as a sequential, self-contained multi-skill flow, reading each specialist's `SKILL.md` and domain decision table before executing its diagnostic script:
 

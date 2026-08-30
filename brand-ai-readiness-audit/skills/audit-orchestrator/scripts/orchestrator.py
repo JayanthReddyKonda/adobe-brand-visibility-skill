@@ -470,7 +470,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
             "title": item.get("title", "Audit Finding"),
             "severity": sev,
             "category": item.get("category", "general"),
-            "root_cause": item.get("root_cause") or item.get("title", "Underlying architectural root cause."),
+            "root_cause": item.get("cause_id", item.get("root_cause", item.get("title", "UNKNOWN"))),
             "confidence": confidence,
             "evidence": evidence,
             "suggested_action": {
