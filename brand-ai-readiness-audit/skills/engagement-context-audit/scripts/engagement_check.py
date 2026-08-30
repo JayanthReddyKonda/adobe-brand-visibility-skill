@@ -8,6 +8,7 @@ Causal Root Causes:
 Evaluates the complete Intent -> Expected Facts -> Landing Page -> Information Scent -> Next Action journey.
 Enforces strict Resource Invariant: Only genuine HTML pages enter engagement audits.
 """
+from fact_extractor import extract_scoped_facts
 import sys
 import os
 import re
@@ -20,21 +21,11 @@ from urllib.parse import urlparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
-SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
-if SHARED_CORE not in sys.path:
-    sys.path.insert(0, SHARED_CORE)
+
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
-# Connect to Canonical Fact Ledger for Semantic Intent Graph
-FACT_MODULE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "fact-consistency-audit", "scripts")
-if FACT_MODULE_DIR not in sys.path:
-    sys.path.insert(0, FACT_MODULE_DIR)
 
-try:
-    from fact_consistency_check import extract_scoped_facts
-except ImportError:
-    extract_scoped_facts = None
 
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}

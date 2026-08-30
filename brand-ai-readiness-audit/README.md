@@ -99,3 +99,7 @@ brand-ai-readiness-audit/           # Main Hackathon Submission Payload
     ├── geo-content-audit/          # Generative Engine Optimization check
     └── assistant-representation-audit/ # Output Enrichment layer
 ```
+
+
+## Note on Architectural Duplication
+Per the strict `agentskills.io` portability specification, each skill MUST be fully self-contained without relying on cross-directory dependencies (such as a shared core library). For this reason, helper modules like `safe_fetch.py` and `fact_extractor.py` are deliberately duplicated into each skill's `scripts/` directory to ensure each skill can be extracted and run in total isolation.
