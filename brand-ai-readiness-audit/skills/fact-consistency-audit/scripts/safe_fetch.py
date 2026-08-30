@@ -8,10 +8,10 @@ import ipaddress
 import urllib.request
 import urllib.parse
 import urllib.error
+import http.client
+import ssl
 import time
-import gzip
 import zlib
-import threading
 from io import BytesIO
 
 DEFAULT_USER_AGENT = "Brand-AI-Readiness-Audit/2.0"
@@ -28,28 +28,13 @@ BLOCKED_NETWORKS = [
     ipaddress.ip_network("fe80::/10"),
 ]
 
-_orig_getaddrinfo = socket.getaddrinfo
-_dns_pinning = threading.local()
-
-def _safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-    cache = getattr(_dns_pinning, "cache", {})
-    if host in cache:
-        results = []
-        for sf in cache[host]:
-            ip = sf[4][0]
-            if len(sf[4]) == 2:
-                sockaddr = (ip, port)
-            else:
-                sockaddr = (ip, port, sf[4][2], sf[4][3])
-            results.append((sf[0], sf[1], sf[2], sf[3], sockaddr))
-        return results
-    return _orig_getaddrinfo(host, port, family, type, proto, flags)
-
-socket.getaddrinfo = _safe_getaddrinfo
-
 def _is_safe_host(hostname):
     try:
-        ip_info = _orig_getaddrinfo(hostname, 80, proto=socket.IPPROTO_TCP)
+        # Prevent malformed hostnames from reaching DNS
+        if not hostname or " " in hostname:
+            return False, "Malformed hostname", []
+            
+        ip_info = socket.getaddrinfo(hostname, 80, proto=socket.IPPROTO_TCP)
         safe_ips = []
         for sf in ip_info:
             ip_obj = ipaddress.ip_address(sf[4][0])
@@ -69,8 +54,34 @@ def _is_safe_host(hostname):
     except Exception as e:
         return False, f"DNS resolution failed: {e}", []
 
+class SafeHTTPConnection(http.client.HTTPConnection):
+    def connect(self):
+        is_safe, err, safe_ips = _is_safe_host(self.host)
+        if not is_safe:
+            raise urllib.error.URLError(f"SSRF blocked: {err}")
+        self.sock = socket.create_connection((safe_ips[0][4][0], self.port), self.timeout, self.source_address)
+
+class SafeHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self):
+        is_safe, err, safe_ips = _is_safe_host(self.host)
+        if not is_safe:
+            raise urllib.error.URLError(f"SSRF blocked: {err}")
+        self.sock = socket.create_connection((safe_ips[0][4][0], self.port), self.timeout, self.source_address)
+        if self._tunnel_host:
+            self.sock = self.sock
+            self._tunnel()
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.host)
+
+class SafeHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(SafeHTTPConnection, req)
+
+class SafeHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(SafeHTTPSConnection, req, context=ssl.create_default_context())
+
 class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def __init__(self, max_redirects=3):
+    def __init__(self, max_redirects=5):
         self.max_redirects = max_redirects
         self.redirects = 0
 
@@ -82,13 +93,10 @@ class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
         if parsed.scheme not in ("http", "https"):
             raise urllib.error.URLError(f"Disallowed redirect scheme: {parsed.scheme}")
             
-        is_safe, err, safe_ips = _is_safe_host(parsed.hostname)
+        is_safe, err, _ = _is_safe_host(parsed.hostname)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked on redirect: {err}")
             
-        if not hasattr(_dns_pinning, "cache"): _dns_pinning.cache = {}
-        _dns_pinning.cache[parsed.hostname] = safe_ips
-        
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 def _decompress_bounded(response, max_bytes):
@@ -97,6 +105,8 @@ def _decompress_bounded(response, max_bytes):
         decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
     elif encoding == "deflate":
         decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
+    elif encoding == "zstd" or encoding == "br":
+        raise urllib.error.URLError(f"Unsupported encoding: {encoding}")
     else:
         return response.read(max_bytes)
         
@@ -106,14 +116,14 @@ def _decompress_bounded(response, max_bytes):
         if not chunk:
             break
         try:
-            decompressed = decompressor.decompress(chunk)
+            # decompress with max_length to prevent gzip bombs
+            decompressed = decompressor.decompress(chunk, max_length=max_bytes - len(out) + 1)
             out.extend(decompressed)
             if len(out) >= max_bytes:
                 return bytes(out[:max_bytes])
         except Exception:
             break
     return bytes(out)
-
 
 def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, user_agent=None, method="GET", deadline=None):
     if deadline:
@@ -125,16 +135,12 @@ def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, user_agent=None, method="
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return None, "", {}, f"Disallowed scheme: {parsed.scheme}"
-    
-    is_safe, err, safe_ips = _is_safe_host(parsed.hostname)
-    if not is_safe:
-        return None, "", {}, f"SSRF blocked: {err}"
-        
-    if not hasattr(_dns_pinning, "cache"): _dns_pinning.cache = {}
-    _dns_pinning.cache[parsed.hostname] = safe_ips
 
-    opener = urllib.request.build_opener(SafeRedirectHandler(max_redirects=3))
-    urllib.request.install_opener(opener)
+    opener = urllib.request.build_opener(
+        SafeHTTPHandler(), 
+        SafeHTTPSHandler(), 
+        SafeRedirectHandler(max_redirects=5)
+    )
     
     ua = user_agent if user_agent else DEFAULT_USER_AGENT
     headers = {
@@ -145,7 +151,7 @@ def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, user_agent=None, method="
     req = urllib.request.Request(url, headers=headers, method=method)
     
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
+        with opener.open(req, timeout=timeout) as response:
             status = response.status
             resp_headers = {k.lower(): v for k, v in response.getheaders()}
             
@@ -168,4 +174,6 @@ def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, user_agent=None, method="
 
 def safe_check_status(url, timeout=5, deadline=None):
     status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=1024, method="HEAD", deadline=deadline)
+    if status in (403, 405, 501):
+        status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=1024, method="GET", deadline=deadline)
     return status

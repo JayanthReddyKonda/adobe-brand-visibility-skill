@@ -210,35 +210,36 @@ def parse_json_ld(raw_json_list):
 
 
 def evaluate_page_answerability(page_type, html_content, dom, url, structured_entities):
-    """
-    Evidence Model: Product fact extraction. 
-    Stop using lexical keyword matching. Use actual extracted schema properties.
-    """
-    if page_type not in ("product_detail", "product"):
+    if page_type not in ("product_detail", "product", "product_listing"):
         return None
 
     products = [e for e in structured_entities if matches_schema_type(e, ["Product"])]
     if not products:
         return {"status": "missing_entity"}
         
-    p = products[0]
-    
-    facts = {
-        "price": False,
-        "availability": False,
-        "sku": bool(p.get("sku")),
-        "description": bool(p.get("description"))
-    }
-    
-    offers = p.get("offers", {})
-    if isinstance(offers, dict):
-        if offers.get("price"): facts["price"] = True
-        if offers.get("availability"): facts["availability"] = True
-    elif isinstance(offers, list):
-        if any(isinstance(o, dict) and o.get("price") for o in offers): facts["price"] = True
-        if any(isinstance(o, dict) and o.get("availability") for o in offers): facts["availability"] = True
+    results = []
+    for p in products:
+        facts = {
+            "price": False,
+            "availability": False,
+            "specifications": bool(p.get("sku") or p.get("model") or p.get("weight")),
+            "description": bool(p.get("description"))
+        }
         
-    return {"status": "present", "facts": facts}
+        offers = p.get("offers", {})
+        if isinstance(offers, dict):
+            if offers.get("price"): facts["price"] = True
+            if offers.get("availability"): facts["availability"] = True
+        elif isinstance(offers, list):
+            if any(isinstance(o, dict) and o.get("price") for o in offers): facts["price"] = True
+            if any(isinstance(o, dict) and o.get("availability") for o in offers): facts["availability"] = True
+            
+        weights = {"price": 0.25, "availability": 0.25, "specifications": 0.20, "description": 0.30}
+        score = sum(weights[k] for k, v in facts.items() if v)
+        
+        results.append({"status": "present", "facts": facts, "score": round(score, 2)})
+        
+    return {"status": "present", "results": results}
 
 def audit(base, domain, inv=None):
     findings, recommendations, observations = [], [], []
@@ -337,19 +338,25 @@ def audit(base, domain, inv=None):
                 pass
             typed_objects = parse_json_ld(pdom.json_ld_contents)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
-            if ans and ans.get("status") == "present":
-                missing = [k for k, v in ans["facts"].items() if not v]
+        if ans and ans.get("status") == "present":
+            for res in ans.get("results", []):
+                answerability_evaluations.append(res)
+                missing = [k for k, v in res["facts"].items() if not v]
                 if missing:
                     findings.append({
-                        "category": "entity",
-                        "title": "Incomplete Product Entity Attributes",
+                        "category": "product-answerability",
+                        "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
                         "severity": "medium",
                         "confidence": "high",
-                        "cause_id": "INCOMPLETE_OFFER_ATTRIBUTES",
-                        "evidence": f"Product on {purl} lacks explicit structured data for: {', '.join(missing)}.",
+                        "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
+                        "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
+                        "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                        "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
+                        "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
                         "suggested_action": {
-                            "summary": "Ensure Product schema explicitly defines price, availability, sku, and description.",
-                            "priority": "medium"
+                            "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
+                            "priority": "medium",
+                            "verification": "Check the Google Rich Results Test to confirm the properties are populated."
                         }
                     })
 

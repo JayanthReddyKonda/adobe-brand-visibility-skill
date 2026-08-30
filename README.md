@@ -12,19 +12,19 @@ This submission was aggressively engineered to meet and exceed the strict constr
 * Handles HTTP/HTTPS, custom timeouts, and decompression natively via `urllib` and `gzip`.
 
 ### 2. Zero-Trust Security & Adversarial Resilience
-* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions. It actively patches `socket.getaddrinfo` per-thread to pin the resolved IPs, definitively blocking DNS-rebinding Time-Of-Check-to-Time-Of-Use (TOCTOU) exploits.
-* **Bounded Deadlines & Memory:** Guarantees execution completes within the strict <5-minute limit, gracefully degrading to "partial" results rather than hanging. Implements bounded gzip decompression to prevent memory exhaustion exploits.
+* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions. It uses a custom `HTTPConnection` class to pin resolved IPs and enforce URL bounds without globally patching the process, attempting to block DNS-rebinding TOCTOU exploits.
+* **Bounded Deadlines & Memory:** Attempts to ensure execution completes within the strict <5-minute limit, gracefully degrading to "partial" results rather than hanging. Implements bounded gzip decompression to prevent memory exhaustion exploits.
 
 ### 3. "God Tier" Exclusives (Beyond Generic SEO)
-* **Generative Engine Optimization (GEO):** Evaluates pages for *Statistical Density* and *Tabular/List Data Extraction*—features mathematically proven to increase LLM synthesis likelihood.
-* **Variant-Aware Contradiction Engine:** Parses `sku` and `name` variants inside product ledgers to definitively eliminate false-positive pricing contradictions across multi-variant product pages.
+* **Generative Engine Optimization (GEO):** Evaluates pages for *Statistical Density* and *Tabular/List Data Extraction*—features theorized by early GEO research to increase LLM synthesis likelihood.
+* **Variant-Aware Contradiction Engine:** Parses `sku` and `name` variants inside product ledgers to reduce false-positive pricing contradictions across multi-variant product pages.
 * **Bounded Claim Corroboration:** Cross-references internal identity claims by resolving and parsing external authority links (e.g., social profiles via `sameAs`) in real-time.
 
 ---
 
 ## 🧠 The Marketplace Specialists & Architecture
 
-This architecture utilizes a decentralized marketplace of 7 specialist skills composed by a central entrypoint (`audit-orchestrator`). 
+This architecture utilizes a decentralized marketplace of 7 skills (1 entrypoint + 6 specialists) composed by a central entrypoint (`audit-orchestrator`). 
 
 ### 🛡️ Why 7 Specialists? (Genuine Separation of Concerns)
 This architecture strictly enforces the **Principle of Least Privilege** and avoids artificial skill padding. 
@@ -36,11 +36,11 @@ Decomposing the logic in this way ensures that if an agent wants to only check f
 ### The Skills:
 1. **`audit-orchestrator` (Entrypoint):** Coordinates the audit, enforces global time limits, executes the specialists, and synthesizes cross-skill findings to eliminate duplicate root causes.
 2. **`discoverability-audit`:** Diagnoses AI-crawler accessibility, `robots.txt` parsing, Canonical/Hreflang validation, and `/llms.txt` proactive discovery.
-3. **`entity-content-audit`:** Extracts structured JSON-LD. Evaluates if the AI can definitively understand *Who* the brand is and *What* it sells.
+3. **`entity-content-audit`:** Extracts structured JSON-LD. Evaluates if the AI can understand *Who* the brand is and *What* it sells.
 4. **`fact-consistency-audit`:** Constructs a variant-aware temporal ledger of facts (prices, hours) across the domain to detect hallucination-inducing contradictions.
 5. **`geo-content-audit`:** Evaluates text for Generative Engine Optimization (GEO) metrics, including statistical density and tabular extraction likelihood.
 6. **`engagement-context-audit`:** Maps semantic page types to expected human intents, verifying that necessary UI elements exist for AI-referred traffic to prevent bounce.
-7. **`corroboration-authority-audit`:** Performs bounded validation of external identity claims to establish LLM E-E-A-T.
+7. **`corroboration-authority-audit`:** Performs bounded validation of external identity claims to strengthen entity identity and independent source corroboration.
 8. **`assistant-representation-audit`:** (Optional Enrichment) Cross-checks observed external LLM citations against the brand's verified internal fact ledger.
 
 ---
@@ -65,10 +65,9 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 
 ## 🧪 Production-Grade Test Suite
 
-The repository ships with an aggressively hostile adversarial test suite guaranteeing zero-error probability under extreme conditions.
+
 
 ```bash
-python3 test_suite.py
 ```
 
 **Includes 38 Zero-Trust Adversarial Tests:**
@@ -87,13 +86,12 @@ brand-ai-readiness-audit/
 ├── marketplace.json                # Master Marketplace Skills Manifest
 ├── README.md                       # Evaluator & Hackathon Documentation
 ├── LICENSE                         # Open-source MIT License
-├── test_suite.py                   # 38-Test Automated Verification Suite
 └── skills/
     ├── audit-orchestrator/         # Entrypoint Skill (Orchestrator)
     ├── discoverability-audit/      # Accessibility & Indexing check
     ├── entity-content-audit/       # Structured Knowledge check
     ├── fact-consistency-audit/     # Temporal Ledger & Contradiction check
-    ├── corroboration-authority-audit/# E-E-A-T Claim check
+    ├── corroboration-authority-audit/# External Claim check
     ├── engagement-context-audit/   # Visitor Orientation & Continuity check
     ├── geo-content-audit/          # Generative Engine Optimization check
     └── assistant-representation-audit/ # Output Enrichment layer

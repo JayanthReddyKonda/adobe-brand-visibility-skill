@@ -334,7 +334,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             return None
         if deadline and time.monotonic() >= deadline:
             return None
-        p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024)
+        p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024, deadline=deadline)
         if p_html and is_html_response(p_headers, p_html):
             pt, pconf, ptmpl, ploc = classify_page(u, _extract_title(p_html))
             return {
@@ -367,10 +367,13 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
                 seen_urls.add(res["url"].rstrip("/"))
                 inv["pages"].append(res)
     except concurrent.futures.TimeoutError:
-        inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
+        if "Inventory crawl truncated when acquisition time budget was reached." not in inv["limitations"]:
+            inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
     finally:
-        executor.shutdown(wait=False, cancel_futures=True)
-
+        try:
+            executor.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            executor.shutdown(wait=False)
     inv["elapsed_seconds"] = round(time.monotonic() - start_mono, 1)
 
     stats = {

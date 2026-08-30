@@ -37,14 +37,14 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 > [!CAUTION]
 > **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
 > You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
-> `<MARKETPLACE_ROOT>/skills/engagement-context-audit/references/KNOWLEDGE_BASE.md` (or the equivalent path in your environment).
+> `<MARKETPLACE_ROOT>/skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md` (or the equivalent path in your environment).
 > Failure to read the exact causal taxonomies from this file will cause schema validation failures.
 
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
 > Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/engagement-context-audit/references/KNOWLEDGE_BASE.md`
+> `<MARKETPLACE_ROOT>/skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -53,7 +53,7 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 Execute the engagement and intent continuity script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory <inventory.yaml> --format json
 ```
 
 Direct standalone execution:

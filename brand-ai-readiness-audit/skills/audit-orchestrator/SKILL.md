@@ -45,7 +45,7 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
 > Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/audit-orchestrator/references/KNOWLEDGE_BASE.md`
+> `<MARKETPLACE_ROOT>/skills/audit-orchestrator/references/audit-orchestrator-knowledge-base.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 

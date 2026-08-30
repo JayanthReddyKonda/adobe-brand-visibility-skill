@@ -12,6 +12,7 @@ import sys
 import os
 import re
 import json
+import yaml
 import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -111,14 +112,14 @@ class SemanticIntentEngine:
 
     def _load_intents(self):
         import glob
-        json_files = glob.glob(os.path.join(self.references_dir, "*.json"))
-        for f in json_files:
+        yaml_files = glob.glob(os.path.join(self.references_dir, "*.yaml"))
+        for f in yaml_files:
             try:
                 with open(f, "r") as fp:
-                    data = json.load(fp)
+                    data = yaml.safe_load(fp)
                     if "intent_family" in data:
                         self.intents[data["intent_family"]] = data
-            except Exception:
+            except yaml.YAMLError:
                 pass
 
     def get_required_facts(self, page_classification):
@@ -316,7 +317,7 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
     if page_type in intent_map:
         profile = intent_map[page_type]
         action_found = False
-        nav_text = " ".join([text.lower() for text, _ in dom.nav_links])
+        nav_text = " ".join([text.lower() for text in dom.nav_link_texts])
         for expected in profile["expected_actions"]:
             if expected in nav_text or expected in " ".join(dom.body_text).lower():
                 action_found = True
@@ -351,7 +352,7 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
             }
         })
         
-    return findings, recommendations, {'visible_words': 100, 'h1': True, 'navigation_links_found': 5}
+    return findings, recommendations, {'visible_words': len(' '.join(dom.body_text).split()), 'h1': len(dom.h1_list) > 0, 'navigation_links_found': len(dom.nav_links)}
 
 def audit(base, domain, inv=None):
     findings = []

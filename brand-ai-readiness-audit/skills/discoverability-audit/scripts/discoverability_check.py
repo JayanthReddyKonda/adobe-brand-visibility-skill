@@ -24,14 +24,24 @@ from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 
 AI_BOTS = [
-    "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai",
+    "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "Claude-User", "Perplexity-User",
     "ChatGPT-User",
-
-    "GPTBot", "ClaudeBot", "Google-Extended", "Applebot-Extended", "CCBot"
+    "GPTBot", "ClaudeBot", "Applebot-Extended", "CCBot"
 ]
 
 CRAWLER_SEMANTICS = {
     "OAI-SearchBot": {"role": "retrieval", "platform": "OpenAI / SearchGPT", "impact_desc": "Live web search & citation generation in ChatGPT Search."},
+    "Claude-SearchBot": {"role": "retrieval", "platform": "Anthropic / Claude", "impact_desc": "Live web search and real-time grounding in Claude."},
+    "PerplexityBot": {"role": "retrieval", "platform": "Perplexity AI", "impact_desc": "Direct citation and source index for Perplexity AI answers."},
+    "Claude-User": {"role": "user_fetch", "platform": "Anthropic / Claude", "impact_desc": "User-directed web fetch via Claude."},
+    "Perplexity-User": {"role": "user_fetch", "platform": "Perplexity AI", "impact_desc": "User-directed web fetch via Perplexity."},
+    "ChatGPT-User": {"role": "user_fetch", "platform": "OpenAI", "impact_desc": "On-demand URL fetch triggered directly by an end-user conversation."},
+    "GPTBot": {"role": "training", "platform": "OpenAI", "impact_desc": "Model pre-training and offline dataset collection."},
+    "ClaudeBot": {"role": "training", "platform": "Anthropic", "impact_desc": "Model training dataset collection for Claude foundation models."},
+    "Google-Extended": {"role": "training", "platform": "Google", "impact_desc": "Training token for Gemini and Vertex AI foundation models (robots.txt only)."},
+    "Applebot-Extended": {"role": "training", "platform": "Apple", "impact_desc": "Training data collection for Apple Intelligence models."},
+    "CCBot": {"role": "training", "platform": "Common Crawl", "impact_desc": "Open foundation model pre-training corpus."},
+},
     "Claude-SearchBot": {"role": "retrieval", "platform": "Anthropic / Claude", "impact_desc": "Live web search and real-time grounding in Claude."},
     "PerplexityBot": {"role": "retrieval", "platform": "Perplexity AI", "impact_desc": "Direct citation and source index for Perplexity AI answers."},
     "anthropic-ai": {"role": "retrieval", "platform": "Anthropic", "impact_desc": "Anthropic AI retrieval and search crawler."},
@@ -268,6 +278,8 @@ def audit(base, domain, inv=None):
     if inv is None or status == 200:
         bot_ua = "Mozilla/5.0 (compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)"
         bot_status, _, _, _ = safe_fetch(base + "/", timeout=6, max_bytes=65536, user_agent=bot_ua, method="HEAD")
+        if bot_status in (403, 405, 501):
+            bot_status, _, _, _ = safe_fetch(base + "/", timeout=6, max_bytes=65536, user_agent=bot_ua, method="GET")
         if bot_status in (403, 401, 503) and status == 200:
             findings.append({
                 "category": "crawlability",
@@ -326,7 +338,7 @@ def audit(base, domain, inv=None):
             if code and code != "x-default":
                 parts = code.split("-")
                 lang = parts[0]
-                if lang in ("eng", "jp", "zh-tw", "zh-cn", "iw", "in"):
+                if lang in ("eng", "jp"):
                     invalid_langs.append(code)
                 elif len(parts) > 1 and parts[1].upper() == "UK":
                     invalid_langs.append(code)
@@ -386,7 +398,7 @@ def audit(base, domain, inv=None):
             "root_cause": "The initial HTML payload is an unrendered JavaScript single-page application shell containing fewer than 25 words.",
             "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
             "cause_id": "RENDERED_CONTENT_GAP",
-            "impact": "AI retrieval crawlers and summarizers evaluating the raw HTTP response cannot extract content without full browser execution.",
+            "impact": "Some retrieval clients may receive materially incomplete content from the initial HTML representation.",
             "evidence": f"Initial HTML contains only {visible_words} visible words and an unrendered client-side shell ({marker}).",
             "suggested_action": {
                 "summary": "Implement server-side rendering (SSR), static site generation (SSG), or dynamic pre-rendering for core text.",
@@ -474,11 +486,10 @@ def audit(base, domain, inv=None):
     if inv is None:
         llms_status = safe_check_status(f"{base}/llms.txt", timeout=5)
         if llms_status == 404:
-            recommendations.append({
-                "title": "Publish an /llms.txt standard manifest for AI search crawlers",
-                "category": "discovery",
-                "rationale": f"GET {base}/llms.txt returned HTTP 404.",
-                "suggested_action": "Publish an /llms.txt markdown file providing clean, curated overview and documentation links for AI search and LLM inference agents."
+            observations.append({
+                "observation": "No /llms.txt standard manifest found.",
+                "impact": "While not required for AI Overviews, providing an /llms.txt file gives AI research agents a clean, curated summary of brand facts without HTML parsing friction.",
+                "role": "informational"
             })
 
     return {

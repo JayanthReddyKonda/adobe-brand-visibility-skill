@@ -26,7 +26,7 @@ from urllib.parse import urlparse, urljoin
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
-VALIDATOR = os.path.join(SCRIPT_DIR, "contract_validator.py")
+VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 from acquire_inventory import build_inventory, classify_page, normalize_target, is_html_response
@@ -251,7 +251,7 @@ def discover_plugins():
             manifest = json.load(f)
         for skill in manifest.get("skills", []):
             sid = skill.get("id")
-            if sid and not skill.get("entrypoint"):
+            if sid and not skill.get("entrypoint") and not skill.get("optional"):
                 base = sid.replace("-audit", "").replace("-", "_")
 
                 # Dynamically resolve script name instead of hardcoding
@@ -470,7 +470,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
             "title": item.get("title", "Audit Finding"),
             "severity": sev,
             "category": item.get("category", "general"),
-            "root_cause": item.get("cause_id", item.get("root_cause", item.get("title", "UNKNOWN"))),
+            "root_cause": item.get("root_cause", item.get("title", "UNKNOWN")),
             "confidence": confidence,
             "evidence": evidence,
             "suggested_action": {
