@@ -28,12 +28,11 @@ Evaluates external entity authority by verifying that declared identity links (`
 
 ## References to Consult
 
-Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/corroboration-contracts.md](references/corroboration-contracts.md)**: Probing contracts and decision thresholds for authority links.
-- **[references/identity-vs-claim.md](references/identity-vs-claim.md)**: Distinguishing identity link verification from external claim corroboration.
+> [!IMPORTANT]
+> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
+> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
-
----
 
 ## Mandatory Execution Command
 

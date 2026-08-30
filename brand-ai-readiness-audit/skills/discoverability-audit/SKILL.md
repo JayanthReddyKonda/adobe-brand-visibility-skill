@@ -31,13 +31,11 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 
 ## References to Consult
 
-Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/discoverability-contracts.md](references/discoverability-contracts.md)**: Formal check contracts, evidence criteria, and decision boundaries for discoverability.
-- **[references/seo-foundations.md](references/seo-foundations.md)**: RFC 9309 rules, crawler syntax, canonical consolidation, and SSR vs CSR principles.
-- **[references/crawler-matrix-reference.md](references/crawler-matrix-reference.md)**: Exhaustive platform roles for OpenAI, Anthropic, Google, Perplexity, Apple, and Common Crawl.
+> [!IMPORTANT]
+> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
+> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
-
----
 
 ## Mandatory Execution Command
 

@@ -28,12 +28,11 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 
 ## References to Consult
 
-Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/representation-contracts.md](references/representation-contracts.md)**: Empirical comparison decision rules and claim verification contracts.
-- **[references/mention-vs-citation.md](references/mention-vs-citation.md)**: Distinguishing brand mentions from authoritative citation grounding.
+> [!IMPORTANT]
+> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
+> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
-
----
 
 ## Mandatory Execution Command
 

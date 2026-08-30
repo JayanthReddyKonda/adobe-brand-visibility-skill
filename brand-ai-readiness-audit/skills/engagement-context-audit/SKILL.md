@@ -27,16 +27,11 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 
 ## References to Consult
 
-Before drawing conclusions, the Agent should consult the following domain references:
-- **[references/engagement-contracts.md](references/engagement-contracts.md)**: Decision contracts for orientation, information scent, and navigation.
-- **[references/5-second-orientation.md](references/5-second-orientation.md)**: The 4-question orientation framework and above-the-fold inspection criteria.
-- **[references/engagement-rubric.md](references/engagement-rubric.md)**: Severity calibration rubric for UX friction.
-- **[references/ai-snippet-guidelines.md](references/ai-snippet-guidelines.md)**: Information density and heading structure for snippet extractability.
-- **[references/pricing-comparison.yaml](references/pricing-comparison.yaml)**: Pricing query intent expectations.
-- **[references/product-purchase.yaml](references/product-purchase.yaml)**: Product purchase query intent expectations.
+> [!IMPORTANT]
+> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
+> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
-
----
 
 ## Mandatory Execution Command
 

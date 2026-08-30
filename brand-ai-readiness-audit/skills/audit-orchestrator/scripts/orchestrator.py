@@ -253,15 +253,16 @@ def discover_plugins():
             sid = skill.get("id")
             if sid and not skill.get("entrypoint"):
                 base = sid.replace("-audit", "").replace("-", "_")
-                script_name = f"{base}_check.py"
-                if sid == "assistant-representation-audit": script_name = "representation_check.py"
-                elif sid == "fact-consistency-audit": script_name = "fact_consistency_check.py"
-                elif sid == "corroboration-authority-audit": script_name = "corroboration_check.py"
-                elif sid == "engagement-context-audit": script_name = "engagement_check.py"
-                elif sid == "discoverability-audit": script_name = "discoverability_check.py"
-                elif sid == "entity-content-audit": script_name = "entity_content_check.py"
-                elif sid == "geo-content-audit": script_name = "geo_content_check.py"
-                
+
+                # Dynamically resolve script name instead of hardcoding
+                import glob
+                script_dir = os.path.join(os.path.dirname(os.path.dirname(SCRIPT_DIR)), sid, "scripts")
+                possible_scripts = glob.glob(os.path.join(script_dir, "*_check.py"))
+                if possible_scripts:
+                    script_name = os.path.basename(possible_scripts[0])
+                else:
+                    script_name = f"{sid.replace('-audit', '').replace('-', '_')}_check.py"
+
                 label = f"Dynamic execution of {sid}"
                 if "discoverability" in sid: label = "Access, robots.txt & rendering risk"
                 if "entity" in sid: label = "Entity identity & offer extractability"
