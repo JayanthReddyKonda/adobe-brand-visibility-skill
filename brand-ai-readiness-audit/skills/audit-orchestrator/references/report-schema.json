@@ -58,6 +58,58 @@
       },
       "additionalProperties": false
     },
+    "proactive_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "category",
+          "summary",
+          "priority"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "technical_fix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "creative_fix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "verification": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "findings": {
       "type": "array",
       "items": {
@@ -84,8 +136,7 @@
               "critical",
               "high",
               "medium",
-              "low",
-              
+              "low"
             ]
           },
           "category": {
@@ -95,7 +146,44 @@
             "type": "string"
           },
           "evidence": {
-            "type": "string"
+            "type": "object",
+            "required": [
+              "summary",
+              "scope",
+              "sources"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "url",
+                    "type",
+                    "observation"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "observation": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
           },
           "suggested_action": {
             "type": "object",
@@ -107,11 +195,35 @@
               "summary": {
                 "type": "string"
               },
+              "technical_fix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "creative_fix": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "priority": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "verification": {
                 "type": "string"
               }
             },
             "additionalProperties": false
+          },
+          "impact": {
+            "type": "string"
           }
         },
         "additionalProperties": false

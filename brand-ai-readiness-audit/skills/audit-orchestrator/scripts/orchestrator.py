@@ -138,7 +138,6 @@ def run_specialist_tool(script_path, timeout_sec, *args):
 def proactive_checks(domain, base_url, inv_stats=None):
     recommendations = []
     
-    # 1. Sitemap check
     has_sitemap = False
     if inv_stats and inv_stats.get("sitemaps_found", 0) > 0:
         has_sitemap = True
@@ -149,38 +148,51 @@ def proactive_checks(domain, base_url, inv_stats=None):
 
     if not has_sitemap:
         recommendations.append({
+            "id": "P-001",
             "title": "Publish a canonical XML Sitemap",
             "category": "discovery",
             "summary": "AI crawlers rely on XML sitemaps to efficiently discover brand pages without relying on deep HTML traversal.",
-            "priority": "medium"
+            "technical_fix": "Generate an XML sitemap listing all canonical public URLs and submit it via robots.txt.",
+            "creative_fix": None,
+            "priority": "medium",
+            "verification": "Verify /sitemap.xml exists and returns valid XML."
         })
 
-    # 2. llms.txt (Emerging AI Standard)
     llms_status = safe_check_status(f"{base_url}/llms.txt", timeout=5)
     if llms_status == 404:
         recommendations.append({
+            "id": "P-002",
             "title": "Publish an /llms.txt standard index",
             "category": "ai-readiness",
-            "summary": "Implement the /llms.txt standard (a Markdown-based root file) to provide AI research agents (like Perplexity and OpenAI) with a clean, explicitly formatted summary of your brand's core facts, pricing, and documentation without HTML parsing friction.",
-            "priority": "low"
+            "summary": "The /llms.txt standard provides AI research agents with a clean, explicitly formatted summary of your brand's core facts.",
+            "technical_fix": "Serve a Markdown file at /llms.txt outlining brand identity, core facts, and links to official documentation.",
+            "creative_fix": "Draft concise, declarative facts in the markdown file prioritizing high-value answers for AI.",
+            "priority": "low",
+            "verification": "Verify /llms.txt returns HTTP 200 with valid markdown."
         })
         
-    # 3. OCR and Semantic Extractability (Addressing Appendix C and F)
     recommendations.append({
+        "id": "P-003",
         "title": "Isolate substantive text from non-readable formats",
         "category": "extractability",
-        "summary": "Ensure critical brand facts, pricing tiers, and contact details are explicitly stated in semantic HTML text (<article>, <main>). Avoid locking substantive information inside images without descriptive alt-text, as AI summarizers and basic crawlers often drop non-textual or boilerplate-heavy content.",
-        "priority": "low"
+        "summary": "Ensure critical brand facts are explicitly stated in semantic HTML text. Avoid locking substantive information inside images without descriptive alt-text.",
+        "technical_fix": "Ensure critical text is rendered via HTML tags (<article>, <p>) rather than baked into images.",
+        "creative_fix": "Rewrite image-embedded text into standard body copy or provide high-fidelity alt-text.",
+        "priority": "low",
+        "verification": "Disable images and verify page content remains fully comprehensible."
     })
     
-    # 4. IndexNow Protocol
     recommendations.append({
+        "id": "P-004",
         "title": "Implement the IndexNow Protocol",
         "category": "discovery",
-        "summary": "Proactively ping search engines (via IndexNow API) when brand content changes. Since Bing powers Copilot and integrates with ChatGPT, this reduces AI knowledge latency from weeks to minutes.",
-        "priority": "low"
+        "summary": "Proactively ping search engines (via IndexNow API) when brand content changes to accelerate change notification.",
+        "technical_fix": "Integrate IndexNow API calls into the CMS deployment pipeline to broadcast URL changes.",
+        "creative_fix": None,
+        "priority": "low",
+        "verification": "Monitor IndexNow dashboard or trigger a change and verify the ping is transmitted."
     })
-
+    
     return recommendations
 
 
@@ -311,28 +323,39 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     elif inv_stats and not inv_stats.get("homepage_reachable", True):
         all_limitations.append(f"Homepage unreachable ({inv_stats.get('error', 'Network error')}); inventory could not be built.")
 
-    # 2. Parallel / Sequential Specialist Dispatch
-    specialist_runs = discover_plugins()
+    # 2. Sequential Stateful Graph Execution
+    import tempfile
+    state_fd, state_path = tempfile.mkstemp(suffix=".json")
+    os.close(state_fd)
+    with open(state_path, "w") as f:
+        json.dump({}, f)
 
-    if with_representation:
-        rep_args = []
-        if responses_file and os.path.exists(responses_file):
-            rep_args = ["--responses", responses_file]
-        specialist_runs.append(
-            ("assistant-representation-audit", "Observed assistant representation cross-check", "representation_check.py", rep_args)
-        )
-    else:
-        specialists["assistant-representation-audit"] = {
-            "label": "Observed assistant representation cross-check",
-            "status": "not_run",
-            "reason": "Optional representation layer disabled (run with --with-representation to enable)"
-        }
+    # Strictly enforced causal pipeline order
+    pipeline_order = [
+        ("discoverability-audit", "discoverability_check.py"),
+        ("entity-content-audit", "entity_content_check.py"),
+        ("fact-consistency-audit", "fact_consistency_check.py"),
+        ("corroboration-authority-audit", "corroboration_check.py"),
+        ("geo-content-audit", "geo_content_check.py"),
+        ("engagement-context-audit", "engagement_check.py")
+    ]
+    
+    available_plugins = {s[0]: s for s in discover_plugins()}
+    
+    rep_args = []
+    if responses_file and os.path.exists(responses_file):
+        rep_args = ["--responses", responses_file]
 
-    for idx, (skill_name, label, filename, extra_args) in enumerate(specialist_runs):
+    for idx, (skill_name, script_name) in enumerate(pipeline_order):
         now = time.monotonic()
         remaining_time = monotonic_deadline - now
-        remaining_specialists = len(specialist_runs) - idx
+        remaining_specialists = len(pipeline_order) - idx
 
+        if skill_name not in available_plugins:
+            continue
+            
+        label = available_plugins[skill_name][1]
+        
         if remaining_time <= 5:
             specialists[skill_name] = {
                 "label": label,
@@ -344,14 +367,15 @@ def compose_audit(site, include_proactive=True, with_representation=False,
 
         spec_timeout = max(10, min(40, int((remaining_time - 5) / max(1, remaining_specialists))))
 
-        script = find_specialist_script(skill_name, filename)
-        args = ["--site", base_url, "--format", "json"]
+        script = find_specialist_script(skill_name, script_name)
+        args = ["--site", base_url, "--format", "json", "--state", state_path]
         if inventory_path:
             args += ["--inventory", inventory_path]
-        args += extra_args
+            
+        if skill_name == "fact-consistency-audit" and rep_args:
+            args += rep_args
 
-        status, findings, recs, error, observations, coverage, limitations = \
-            run_specialist_tool(script, spec_timeout, *args)
+        status, findings, recs, error, observations, coverage, limitations =             run_specialist_tool(script, spec_timeout, *args)
 
         specialists[skill_name] = {"label": label, "status": status}
         if error:
@@ -364,6 +388,13 @@ def compose_audit(site, include_proactive=True, with_representation=False,
                 all_observations.append(obs)
         raw_findings.extend(findings)
         specialist_recommendations.extend(recs)
+        
+    try:
+        with open(state_path, "r") as f:
+            final_knowledge_graph = json.load(f)
+        os.unlink(state_path)
+    except Exception:
+        final_knowledge_graph = {}
 
     if inventory_path:
         try:
@@ -371,12 +402,10 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         except OSError:
             pass
 
-    # 3. Proactive Improvement Checks
     all_recommendations = list(specialist_recommendations)
     if include_proactive:
         all_recommendations.extend(proactive_checks(domain, base_url, inv_stats=inv_stats))
 
-    # 4. Multi-Locale Finding Consolidation & Deduplication Gate
     clustered_groups = {}
     for item in raw_findings:
         if not isinstance(item, dict):
@@ -389,24 +418,28 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     consolidated_raw = []
     for cluster_key, group in clustered_groups.items():
         if len(group) == 1:
-            item = dict(group[0])
-            if "scope" not in item:
-                item["scope"] = "site" if any(k in item.get("title", "").lower() for k in ("homepage", "robots.txt", "organization")) else "page"
-            consolidated_raw.append(item)
-        else:
-            first = group[0]
-            consolidated = dict(first)
-            consolidated["scope"] = "page_group"
-            base_title = re.sub(r'\s*\([^\)]*\)', '', first.get("title", "")).strip()
-            consolidated["title"] = f"{base_title} (across {len(group)} routes)"
-            loc_evidences = [g.get("evidence", "") for g in group if g.get("evidence")]
-            consolidated["evidence"] = " | ".join(loc_evidences[:4])
-            consolidated_raw.append(consolidated)
+            consolidated_raw.append(group[0])
+            continue
+            
+        merged = dict(group[0])
+        all_evidence = set()
+        for f in group:
+            ev = f.get("evidence")
+            if ev:
+                all_evidence.add(ev.strip())
+                
+        if len(all_evidence) > 1:
+            merged["evidence"] = " | ".join(sorted(all_evidence)[:4])
+            merged["title"] = f"{merged['title']} (Multiple Occurrences)"
+            
+        consolidated_raw.append(merged)
 
     final_findings = []
     seen_fps = set()
     demoted = []
-
+    
+    # We define a minimal SEVERITY_ORDER for sorting
+    SEVERITY_ORDER = {"critical": 1, "high": 2, "medium": 3, "low": 4, "info": 5}
     sorted_raw = sorted(consolidated_raw, key=lambda f: SEVERITY_ORDER.get(f.get("severity", "medium") if isinstance(f, dict) else "medium", 99))
 
     for item in sorted_raw:
@@ -421,99 +454,93 @@ def compose_audit(site, include_proactive=True, with_representation=False,
             continue
         seen_fps.add(fp)
 
-        evidence = str(item.get("evidence", "")).strip()
-        if len(evidence) < 5:
-            demoted.append(dict(
-                title=item.get("title", "Audit observation"),
-                category=item.get("category", "general"),
-                summary=f"Specialist noted '{item.get('title', '')}' without citing concrete evidence.",
-                priority="low"
-            ))
-            continue
+        # Parse raw evidence string into evidence object if needed
+        raw_evidence = item.get("evidence", "")
+        if isinstance(raw_evidence, dict):
+            evidence_obj = raw_evidence
+        else:
+            evidence_str = str(raw_evidence).strip()
+            if len(evidence_str) < 5:
+                continue
+            evidence_obj = {
+                "summary": evidence_str,
+                "sources": [{"url": base_url, "type": "first_party", "observation": evidence_str}],
+                "scope": item.get("scope", "site")
+            }
 
         if sev in ("critical", "high") and confidence == "low":
-            demoted.append(dict(
-                title=item.get("title", "Audit observation"),
-                category=item.get("category", "general"),
-                summary=f"Reported with severity '{sev}' but low confidence; held as suggestion pending verification.",
-                priority="low"
-            ))
             continue
 
         action = item.get("suggested_action", {})
         action_summary = action.get("summary") if isinstance(action, dict) else str(action)
         action_priority = action.get("priority", sev if sev != "info" else "low") if isinstance(action, dict) else sev
+        
+        suggested_action = {
+            "summary": action_summary,
+            "priority": action_priority
+        }
+        
+        if isinstance(action, dict):
+            if "technical_fix" in action: suggested_action["technical_fix"] = action["technical_fix"]
+            if "creative_fix" in action: suggested_action["creative_fix"] = action["creative_fix"]
+            if "verification" in action: suggested_action["verification"] = action["verification"]
 
         finding_entry = {
             "id": f"F-{len(final_findings) + 1:03d}",
             "title": item.get("title", "Audit Finding"),
             "severity": sev,
             "category": item.get("category", "general"),
-            "root_cause": item.get("root_cause", item.get("title", "UNKNOWN")),
+            "root_cause": item.get("root_cause", "Auditor identified an architectural or content constraint."),
             "confidence": confidence,
-            "evidence": evidence,
-            "suggested_action": {
-                "summary": action_summary or "Review and resolve the identified defect.",
-                "priority": action_priority
-            }
+            "evidence": evidence_obj,
+            "suggested_action": suggested_action
         }
-
+        
+        if "impact" in item:
+            finding_entry["impact"] = item["impact"]
+            
         final_findings.append(finding_entry)
 
-    final_findings = group_findings(final_findings)
-    all_recommendations.extend(demoted)
-    deduped_recommendations = deduplicate_recommendations(all_recommendations)
+    total_findings = len(final_findings)
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    for f in final_findings:
+        sev = f.get("severity", "medium")
+        if sev in counts:
+            counts[sev] += 1
 
-    summary_counts = {
-        "total_findings": len(final_findings),
-        "critical": sum(1 for f in final_findings if f["severity"] == "critical"),
-        "high": sum(1 for f in final_findings if f["severity"] == "high"),
-        "medium": sum(1 for f in final_findings if f["severity"] == "medium"),
-        "low": sum(1 for f in final_findings if f["severity"] == "low")
-    }
-
-    # Determine audit_status
-    active_statuses = [info.get("status") for k, info in specialists.items() if info.get("status") != "not_run"]
-    if not inv_stats or not inv_stats.get("homepage_reachable", True):
+    audit_status = "complete"
+    failed_specs = [name for name, sp in specialists.items() if sp.get("status") in ("failed", "not_run")]
+    if len(failed_specs) == len(specialists) and len(specialists) > 0:
+        audit_status = "failed"
+    elif failed_specs:
         audit_status = "partial"
-    elif all(st == "inconclusive" for st in active_statuses):
-        audit_status = "partial"
-    elif any(st in ("failed", "inconclusive") for st in active_statuses):
-        audit_status = "partial"
-    else:
-        audit_status = "ok"
 
-    audit_metrics = {
-        "execution_time_seconds": round(time.monotonic() - start_mono, 1),
-        "html_pages_sampled": inv_stats.get("html_pages_sampled", 0) if inv_stats else 0,
-        "sitemaps_processed": inv_stats.get("sitemaps_processed", 0) if inv_stats else 0,
-        "urls_discovered": inv_stats.get("urls_discovered", 0) if inv_stats else 0,
-        "page_types_covered": inv_stats.get("page_types", {}) if inv_stats else {},
-        "critical_blockers": summary_counts["critical"]
-    }
-
-    report = {
-        "site": domain,
+    final_report = {
+        "site": base_url,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "audit_status": audit_status,
-        "summary": summary_counts,
-        "findings": final_findings
+        "summary": {
+            "total_findings": total_findings,
+            "critical": counts["critical"],
+            "high": counts["high"],
+            "medium": counts["medium"],
+            "low": counts["low"]
+        },
+        "findings": final_findings,
+        "proactive_actions": all_recommendations,
+        
     }
 
-    internal_telemetry = {
+    internal_trace = {
         "specialists": specialists,
-        "audit_metrics": audit_metrics,
+        "observations": all_observations,
         "coverage": all_coverage,
-        "limitations": all_limitations,
-        "observations": all_observations[:100]
+        "limitations": all_limitations
     }
 
     if return_internal:
-        return report, internal_telemetry
-    return report
-
-
-
+        return final_report, internal_trace
+    return final_report
 
 def validation_gate(report):
     try:

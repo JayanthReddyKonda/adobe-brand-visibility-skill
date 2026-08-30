@@ -213,7 +213,7 @@ def robots_access(groups, ua, path="/"):
     return best[0], best[1]
 
 
-def audit(base, domain, inv=None):
+def audit(base, domain, inv=None, state_file=None):
     findings, recommendations, observations = [], [], []
 
     # 1. Fetch Homepage & robots.txt via shared inventory or live probe
@@ -237,7 +237,11 @@ def audit(base, domain, inv=None):
         r_status, robots_txt, _, _ = safe_fetch(base + "/robots.txt", timeout=8, max_bytes=512*1024)
 
     if status is None:
-        return {
+        if state_file:
+            with open(state_file, "w") as f:
+                json.dump(state, f)
+            
+    return {
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
@@ -262,7 +266,11 @@ def audit(base, domain, inv=None):
                 "verification": f"Send GET {base}/ and confirm HTTP 200 is returned."
             }
         })
-        return {"status": "ok", "findings": findings, "recommendations": []}
+        if state_file:
+            with open(state_file, "w") as f:
+                json.dump(state, f)
+            
+    return {"status": "ok", "findings": findings, "recommendations": []}
 
     # Check Contract C3: Differential AI Crawler Access / WAF Block Probe
     if inv is None or status == 200:
@@ -482,6 +490,10 @@ def audit(base, domain, inv=None):
                 "role": "informational"
             })
 
+        if state_file:
+            with open(state_file, "w") as f:
+                json.dump(state, f)
+            
     return {
         "status": "ok",
         "findings": findings,
@@ -503,6 +515,7 @@ def main():
     parser = argparse.ArgumentParser(description="Access & discovery audit layer.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     base, domain = parse_domain(args.site)
@@ -513,7 +526,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, domain, inv=inv)
+    res = audit(base, domain, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 
 

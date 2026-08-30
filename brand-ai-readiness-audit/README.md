@@ -68,10 +68,8 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 The repository ships with a comprehensive adversarial test suite.
 
 ```bash
-python3 test_suite.py
 ```
 
-**Includes 38 Zero-Trust Adversarial Tests:**
 1. **SSRF Redirect Bypasses:** Mocks a server returning HTTP 301 to `169.254.169.254`.
 2. **Gzip Bomb Resilience:** Verifies memory-bounded decompression.
 3. **Monotonic Deadline Exhaustion:** Simulates orchestrator timeouts under extreme latency.

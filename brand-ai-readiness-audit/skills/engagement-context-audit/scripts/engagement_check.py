@@ -13,7 +13,6 @@ import sys
 import os
 import re
 import json
-import json
 import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -301,7 +300,14 @@ def infer_site_type(html_pages):
     return best_match, destinations.get(best_match, ["products", "services", "pricing", "about", "contact"])
 
 
-def audit_page_engagement(html_content, url, page_type="other"):
+def audit_page_engagement(html_content, url, page_type="other", state=None):
+    state = {}
+    if state_file and os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+        except Exception as e:
+            print(f"Parser error: {e}"); continue
     findings = []
     recommendations = []
 
@@ -340,16 +346,42 @@ def audit_page_engagement(html_content, url, page_type="other"):
                 }
             })
 
-    # 2. Early-page orientation (No longer called 5-second test)
+    # 2. Entity-to-Heading Anchor (Information Scent)
     if not dom.h1_list:
         recommendations.append({
             "summary": "Ensure every page provides a clear <h1> describing its specific value proposition or content.",
             "priority": "low"
         })
+    elif state and "entities" in state and url in state["entities"]:
+        entities = state["entities"][url]
+        h1_text = " ".join(dom.h1_list).lower()
+        anchor_found = any(ent.lower() in h1_text for ent in entities if len(ent) > 2)
+        if entities and not anchor_found:
+            findings.append({
+                "category": "engagement",
+                "title": "Broken Information Scent: Entity not anchored in primary heading",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "The page's primary <h1> does not contain the name of the canonical entity, leading to user disorientation upon arrival.",
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "cause_id": "LOW_INFORMATION_SCENT",
+                "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
+                "suggested_action": {
+                    "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
+                    "priority": "medium"
+                }
+            })
         
     return findings, recommendations, {'visible_words': len(' '.join(dom.body_text).split()), 'h1': len(dom.h1_list) > 0, 'anchor_links_found': len(dom.nav_links)}
 
-def audit(base, domain, inv=None):
+def audit(base, domain, inv=None, state_file=None):
+    state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
+    if state_file and os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+        except Exception as e:
+            print(f"Parser error: {e}"); continue
     findings = []
     recommendations = []
     observations = []
@@ -398,7 +430,7 @@ def audit(base, domain, inv=None):
         "coverage": {
             "html_pages_evaluated": len(html_pages),
             "site_type_inferred": site_type,
-            "applicable_destinations": applicable_destinations[:6],
+            
             "average_visible_words": round(sum(pm["visible_words"] for pm in page_metrics) / max(1, len(page_metrics)), 1),
             "pages_with_h1": sum(1 for pm in page_metrics if pm["h1"]),
             "pages_with_navigation": sum(1 for pm in page_metrics if pm["navigation_links_found"] > 0)
@@ -413,6 +445,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit on-site visitor orientation, heading hierarchies, and navigation.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -427,7 +460,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, inv=inv)
+    res = audit(base, p.netloc, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 
 

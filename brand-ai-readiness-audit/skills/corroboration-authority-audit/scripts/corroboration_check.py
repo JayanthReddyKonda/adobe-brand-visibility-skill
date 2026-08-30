@@ -75,7 +75,7 @@ def extract_sameas_links(html):
     return sorted(links)
 
 
-def audit(base, domain, inv=None):
+def audit(base, domain, inv=None, state_file=None):
     findings = []
     recommendations = []
     observations = []
@@ -211,6 +211,7 @@ def main():
     parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -225,7 +226,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, inv=inv)
+    res = audit(base, p.netloc, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 
 

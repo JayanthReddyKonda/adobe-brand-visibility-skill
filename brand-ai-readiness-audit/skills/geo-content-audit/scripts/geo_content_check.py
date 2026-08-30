@@ -68,7 +68,7 @@ class GEODOMParser(HTMLParser):
 def _word_count(text: str) -> int:
     return len(_WORD_RE.findall(text))
 
-def audit(base, domain, inv=None):
+def audit(base, domain, inv=None, state_file=None):
     findings = []
     recommendations = []
     observations = []
@@ -95,10 +95,40 @@ def audit(base, domain, inv=None):
             pass
         
         full_text = " ".join(parser.text_blocks)
-        words = _word_count(full_text)
-        stats = len(_STAT_RE.findall(full_text))
         
-        density = (stats / max(words, 1)) * 100
+        # P0 Semantic GEO: AutoGEO Metrics
+        
+        # 1. In-Depth Mechanisms ('how', 'why', 'because', 'therefore')
+        mechanism_words = ['how', 'why', 'because', 'therefore', 'allows', 'enables', 'mechanism', 'results in']
+        depth_score = sum(1 for w in mechanism_words if w in full_text.lower())
+        
+        if depth_score < 2:
+            findings.append({
+                "category": "content",
+                "title": "Content lacks explanatory depth mechanisms",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "The page fails to provide in-depth mechanistic explanations ('how' and 'why'), which Generative Engines heavily prioritize.",
+                "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                "cause_id": "MISSING_IN_DEPTH_MECHANISMS",
+                "evidence": f"Page {url} lacks causal conjunctions or explanatory depth markers.",
+                "impact": "Generative Engines prefer to cite sources that offer deep explanatory context rather than surface-level statements.",
+                "suggested_action": {
+                    "summary": "Expand the content to explain the underlying mechanisms and context ('how' and 'why').",
+                    "priority": "medium"
+                }
+            })
+            
+        # 2. Specific Evidence (digits, quantifiable facts)
+        has_evidence = len(_STAT_RE.findall(full_text)) > 0
+        if not has_evidence:
+            recommendations.append({
+                "summary": f"Substantiate claims on {url} with specific, verifiable data, statistics, or named examples to improve AutoGEO preference.",
+                "priority": "low"
+            })
+
+        
+        
         
         has_questions = any(QUESTION_RE.search(h) for h in parser.headings)
         
@@ -131,6 +161,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", required=True)
+    parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--format", required=False)
     args = parser.parse_args()
     

@@ -555,7 +555,7 @@ def compare_ai_observations(fact_ledger, responses_file):
         
     return findings, notes
 
-def audit(base, domain, responses_file=None, inv=None):
+def audit(base, domain, responses_file=None, inv=None, state_file=None):
     findings = []
     recommendations = []
     page_fact_list = []
@@ -613,6 +613,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit fact freshness and consistency.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
@@ -628,7 +629,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, responses_file=args.responses, inv=inv)
+    res = audit(base, p.netloc, responses_file=args.responses, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 
 

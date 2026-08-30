@@ -162,8 +162,8 @@ def parse_json_ld(raw_json_list):
                     raw_objects.extend(item["@graph"])
                 elif isinstance(item, dict):
                     raw_objects.append(item)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Parser error: {e}"); continue
 
 
     # 1. Index all entities by @id
@@ -242,7 +242,14 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
         
     return {"status": "present", "results": results}
 
-def audit(base, domain, inv=None):
+def audit(base, domain, inv=None, state_file=None):
+    state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
+    if state_file and os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+        except Exception as e:
+            print(f"Parser error: {e}"); continue
     findings, recommendations, observations = [], [], []
 
     # 1. Filter genuine HTML pages from inventory
@@ -362,6 +369,22 @@ def audit(base, domain, inv=None):
                             }
                         })
 
+    if state_file:
+        if "entities" not in state:
+            state["entities"] = {}
+        for p in entity_facts:
+            u = p.get("url", "")
+            if u not in state["entities"]:
+                state["entities"][u] = []
+            for o in p.get("json_ld", []):
+                if isinstance(o, dict) and o.get("name"):
+                    state["entities"][u].append(o["name"])
+        import tempfile, shutil
+            fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
+            with os.fdopen(fd, "w") as f:
+                json.dump(state, f)
+            os.replace(tmp, state_file)
+            
     return {
         "status": "ok",
         "findings": findings,
@@ -388,6 +411,7 @@ def main():
     parser = argparse.ArgumentParser(description="Entity & content understanding audit layer.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -402,7 +426,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, inv=inv)
+    res = audit(base, p.netloc, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 
 
