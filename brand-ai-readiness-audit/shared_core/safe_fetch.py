@@ -38,6 +38,8 @@ def _is_safe_host(hostname):
         safe_ips = []
         for sf in ip_info:
             ip_obj = ipaddress.ip_address(sf[4][0])
+            if getattr(ip_obj, "ipv4_mapped", None):
+                ip_obj = ip_obj.ipv4_mapped
             is_blocked = False
             for blocked in BLOCKED_NETWORKS:
                 if ip_obj in blocked:
@@ -106,7 +108,7 @@ def _decompress_bounded(response, max_bytes):
     elif encoding == "deflate":
         decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
     elif encoding == "zstd" or encoding == "br":
-        raise urllib.error.URLError(f"Unsupported encoding: {encoding}")
+        raise ValueError(f"Unsupported encoding: {encoding}")
     else:
         return response.read(max_bytes)
         
@@ -116,13 +118,14 @@ def _decompress_bounded(response, max_bytes):
         if not chunk:
             break
         try:
-            # decompress with max_length to prevent gzip bombs
-            decompressed = decompressor.decompress(chunk, max_length=max_bytes - len(out) + 1)
+            # strictly limit decompression output
+            remaining = max_bytes - len(out)
+            decompressed = decompressor.decompress(chunk, max_length=remaining)
             out.extend(decompressed)
-            if len(out) >= max_bytes:
+            if decompressor.unconsumed_tail or len(out) >= max_bytes:
                 return bytes(out[:max_bytes])
-        except Exception:
-            break
+        except Exception as e:
+            raise ValueError(f"Decompression error: {e}")
     return bytes(out)
 
 def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, user_agent=None, method="GET", deadline=None):
@@ -158,7 +161,10 @@ def safe_fetch(url, timeout=10, max_bytes=5*1024*1024, user_agent=None, method="
             if method == "HEAD":
                 return status, "", resp_headers, ""
                 
-            content = _decompress_bounded(response, max_bytes)
+            try:
+                content = _decompress_bounded(response, max_bytes)
+            except ValueError as e:
+                return status, "", resp_headers, str(e)
             
             try:
                 charset = response.headers.get_content_charset() or 'utf-8'

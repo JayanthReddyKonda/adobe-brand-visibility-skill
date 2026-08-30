@@ -10,7 +10,7 @@ metadata:
   role: specialist
   parent: audit-orchestrator
   version: "3.0.0"
-tools:
+allowed-tools:
   - run_command
   - view_file
 ---

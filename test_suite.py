@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 
 # Add script paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SKILLS_DIR = os.path.join(BASE_DIR, "skills")
+SKILLS_DIR = os.path.join(BASE_DIR, "brand-ai-readiness-audit", "skills")
 sys.path.insert(0, os.path.join(SKILLS_DIR, "audit-orchestrator", "scripts"))
 sys.path.insert(0, os.path.join(SKILLS_DIR, "discoverability-audit", "scripts"))
 sys.path.insert(0, os.path.join(SKILLS_DIR, "entity-content-audit", "scripts"))
@@ -895,7 +895,7 @@ class TestArchitectureIntegrity(unittest.TestCase):
     def test_safe_fetch_copies_are_synced(self):
         import glob
         import hashlib
-        base_dir = os.path.join(BASE_DIR, "skills")
+        base_dir = SKILLS_DIR
         fetches = glob.glob(f"{base_dir}/*/scripts/safe_fetch.py")
         hashes = set()
         for f in fetches:

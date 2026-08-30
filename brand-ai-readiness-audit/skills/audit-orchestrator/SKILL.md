@@ -9,7 +9,7 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: entrypoint
   version: "3.0.0"
-tools:
+allowed-tools:
   - run_command
   - view_file
 ---

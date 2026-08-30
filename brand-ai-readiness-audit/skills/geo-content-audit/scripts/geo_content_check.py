@@ -15,6 +15,9 @@ from html.parser import HTMLParser
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
+if SHARED_CORE not in sys.path:
+    sys.path.insert(0, SHARED_CORE)
 
 from safe_fetch import safe_fetch
 
@@ -73,11 +76,11 @@ def audit(base, domain, inv=None):
     observations = []
 
     if not inv or not inv.get("pages"):
-        return {"status": "not_run", "findings": [], "recommendations": []}
+        return {"status": "inconclusive", "findings": [], "recommendations": []}
 
     html_pages = [p for p in inv["pages"] if p.get("html")]
     if not html_pages:
-        return {"status": "not_run"}
+        return {"status": "inconclusive"}
 
     # We only audit 'product_detail' or 'article' pages for GEO optimizations
     target_pages = [p for p in html_pages if p.get("page_type") in ("product_detail", "article", "pricing")]
@@ -101,40 +104,22 @@ def audit(base, domain, inv=None):
         
         has_questions = any(QUESTION_RE.search(h) for h in parser.headings)
         
-        # Product detail pages MUST have tables/lists for specs
+        # P0-6 & P0-7: Advisory GEO Metrics
         if ptype == "product_detail" and parser.tables == 0 and parser.lists == 0:
-            findings.append({
-                "category": "content",
-                "title": "Product specifications lack LLM-optimized structured markup (tables/lists)",
-                "severity": "medium",
-                "confidence": "high",
-                "root_cause": "Product features are presented as unstructured prose without data tables or definition lists.",
-                "cause_family": "CONTENT.POOR_DATA_DENSITY",
-                "cause_id": "MISSING_SPECIFICATION_TABLES",
-                "evidence": f"Product page {url} contains 0 tables or structured lists.",
-                "impact": "Generative models strongly prefer tabular data for extracting technical specifications. Unstructured prose reduces extraction accuracy.",
-                "suggested_action": {
-                    "summary": "Convert prose product specifications into HTML <table> or <dl> formats.",
-                    "priority": "medium"
-                }
+            recommendations.append({
+                "summary": f"Product page {url} contains no semantic tables or lists. If material attributes are genuinely hard to isolate, structuring them may aid deterministic extraction.",
+                "priority": "low"
             })
 
         # Articles / Information pages need statistical density and clear answer blocks
         if ptype == "article":
-            if density < 0.2:
-                recommendations.append({
-                    "title": "Improve GEO Statistical Density",
-                    "category": "content",
-                    "rationale": f"Article {url} has low statistical density ({density:.2f} stats per 100 words). Research indicates generative engines prefer data-dense claims.",
-                    "suggested_action": "Incorporate explicit numeric statistics, pricing, or percentages to anchor LLM synthesis."
-                })
             
             if not has_questions:
                 recommendations.append({
                     "title": "Incorporate Direct Question Headings (FAQ formatting)",
                     "category": "content",
-                    "rationale": f"Article {url} lacks explicit question headings (H2/H3). Question-and-answer pairs match LLM retrieval intents natively.",
-                    "suggested_action": "Add explicit 'What is...', 'How to...', or 'Why...' headings followed immediately by 50-word answer paragraphs."
+                    "rationale": f"Article {url} lacks explicit question headings (H2/H3). Adding question-oriented headings can serve as an optimization opportunity for conversational queries.",
+                    "suggested_action": "Add explicit 'What is...', 'How to...', or 'Why...' headings followed immediately by concise answer paragraphs."
                 })
                 
     return {
@@ -148,6 +133,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", required=True)
+    parser.add_argument("--format", required=False)
     args = parser.parse_args()
     
     with open(args.inventory, "r", encoding="utf-8") as f:

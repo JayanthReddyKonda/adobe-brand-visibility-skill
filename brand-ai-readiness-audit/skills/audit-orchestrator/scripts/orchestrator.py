@@ -26,6 +26,9 @@ from urllib.parse import urlparse, urljoin
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
+if SHARED_CORE not in sys.path:
+    sys.path.insert(0, SHARED_CORE)
 VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
@@ -70,6 +73,7 @@ def parse_args():
 def write_inventory_file(inv):
     try:
         fd, path = tempfile.mkstemp(suffix="_inventory.json", prefix="brand_audit_")
+        os.chmod(path, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(inv, f)
         return path
@@ -284,29 +288,6 @@ def discover_plugins():
         ]
     return plugins
 
-def apply_consensus_engine(consolidated_raw, all_observations):
-    """
-    Multi-Agent Consensus Engine:
-    Resolves conflicts between independent specialists to eliminate false positives.
-    """
-    has_structured_data = any(o.get("observation") == "Valid JSON-LD extracted" for o in all_observations)
-    has_html_content = any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in consolidated_raw)
-    
-    for item in consolidated_raw:
-        # If site is a CSR shell (Discoverability), but it has rich JSON-LD (Entity)
-        # We downgrade the CSR severity because AI can still read the structured data!
-        if item.get("cause_id") == "RENDERED_CONTENT_GAP" and has_structured_data:
-            item["severity"] = "medium"
-            item["confidence"] = "medium"
-            item["evidence"] += " [Consensus Engine: Downgraded to medium because rich JSON-LD structured data is present and extractable despite rendering gap.]"
-            
-        # If Fact Consistency flags a mismatch, but Engagement notes it's an archive page
-        if item.get("category") == "fact-consistency":
-            if any("archive" in o.get("observation", "").lower() for o in all_observations):
-                item["severity"] = "low"
-                item["evidence"] += " [Consensus Engine: Detected archive context; fact drift is expected.]"
-                
-    return consolidated_raw
 
 
 def compose_audit(site, include_proactive=True, with_representation=False,
@@ -496,9 +477,9 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     # Determine audit_status
     active_statuses = [info.get("status") for k, info in specialists.items() if info.get("status") != "not_run"]
     if not inv_stats or not inv_stats.get("homepage_reachable", True):
-        audit_status = "inconclusive"
+        audit_status = "partial"
     elif all(st == "inconclusive" for st in active_statuses):
-        audit_status = "inconclusive"
+        audit_status = "partial"
     elif any(st in ("failed", "inconclusive") for st in active_statuses):
         audit_status = "partial"
     else:
@@ -686,6 +667,19 @@ def format_markdown_report(report):
     return "\n".join(lines)
 
 
+
+# State Mapping Contract:
+# Specialist Internal States:
+#  - "ok": Analyzed successfully.
+#  - "inconclusive": Lacked evidence to make a full determination (e.g., missing HTML).
+#  - "failed": Internal error or timeout.
+#  - "not_run": Orchestrator deliberately skipped execution (e.g., timeout).
+#
+# Orchestrator Public Report States:
+#  - "complete": All mandatory specialists returned "ok".
+#  - "partial": At least one mandatory specialist returned "inconclusive" or "failed".
+#  - "failed": Critical orchestration failure, preventing audit execution.
+
 def main():
     args = parse_args()
     report, internal_data = compose_audit(
@@ -700,13 +694,6 @@ def main():
     if not validation_gate(report):
         sys.exit(1)
 
-    # Save to SQLite if requested
-    if args.db:
-        try:
-            from audit_db import save_audit_report
-            save_audit_report(report, internal_data=internal_data, db_path=args.db)
-        except Exception as e:
-            sys.stderr.write(f"SQLite save warning: {e}\n")
 
     if args.trace:
         try:

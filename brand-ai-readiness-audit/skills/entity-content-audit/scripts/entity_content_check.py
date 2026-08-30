@@ -6,7 +6,7 @@ Causal Root Causes:
   - ENTITY.IDENTITY: MATERIAL_ENTITY_AMBIGUITY, WEAK_IDENTITY_SIGNALS
   - ENTITY.ANSWERABILITY: INCOMPLETE_OFFER_ATTRIBUTES, MISSING_MATERIAL_FACT, WEAK_ANSWER_SURFACE
 
-Calculates the mathematically reproducible weighted Answerability Index:
+Calculates the mathematically reproducible weighted Weighted material-attribute coverage:
   Index = sum(weight_i * present_i) / sum(weight_i)
 
 Enforces strict Resource Invariant:
@@ -23,24 +23,27 @@ from urllib.parse import urlparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
+if SHARED_CORE not in sys.path:
+    sys.path.insert(0, SHARED_CORE)
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 
 
 # Weighted Answerability Schema by Page Type (Structured & Measurable Material Attributes)
-ANSWERABILITY_WEIGHTS = {
+MATERIAL_ATTRIBUTE_WEIGHTS = {
     "product_detail": {
         "product_name": (0.30, ["product", "item", "model", "sku", "title"]),
         "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
-        "availability": (0.25, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock", "in_stock"]),
+        "availability": (0.25, ["schema.org/instock", "schema.org/outofstock", "schema.org/preorder", "availability"]),
         "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
     },
 
     "product": {  # Alias for single product pages
-        "product_name": (0.30, ["product", "item", "drone", "solution", "tool", "coffee", "roast", "blend", "model"]),
+        "product_identity": (0.30, ["brand", "manufacturer", "sku", "mpn", "gtin", "model"]),
         "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
-        "availability": (0.25, ["in stock", "available", "ships in", "out of stock", "pre-order", "schema.org/instock", "in_stock"]),
+        "availability": (0.25, ["schema.org/instock", "schema.org/outofstock", "schema.org/preorder", "availability"]),
         "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
     },
     "product_listing": {
@@ -331,7 +334,7 @@ def audit(base, domain, inv=None):
         phtml = p.get("html")
         purl = p.get("url")
         ans = None
-        if ptype in ANSWERABILITY_WEIGHTS and ptype != "homepage" and phtml:
+        if ptype in MATERIAL_ATTRIBUTE_WEIGHTS and ptype != "homepage" and phtml:
             pdom = EntityDOMParser()
             try:
                 pdom.feed(phtml)

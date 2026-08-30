@@ -19,6 +19,9 @@ from urllib.parse import urlparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
+if SHARED_CORE not in sys.path:
+    sys.path.insert(0, SHARED_CORE)
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
@@ -278,15 +281,17 @@ def extract_scoped_facts(html_str, url):
         if otypes.intersection({"organization", "brand", "corporation", "localbusiness"}):
             if o.get("name") and isinstance(o["name"], str):
                 facts["brand_names"].append(o["name"].strip())
-            if o.get("slogan") or o.get("alternateName"):
-                facts["taglines"].append(str(o.get("slogan") or o.get("alternateName")).strip())
+            if o.get("slogan"):
+                facts["taglines"].append(str(o.get("slogan")).strip())
+            if o.get("alternateName"):
+                facts["brand_names"].append(str(o.get("alternateName")).strip())
         elif otypes.intersection({"product", "individualproduct", "productmodel", "softwareapplication", "service"}):
             pname = str(o.get("name") or "").strip()
             offers = o.get("offers") or {}
             offer_obj = offers[0] if isinstance(offers, list) and offers else offers
             if isinstance(offer_obj, dict):
-                p_val = offer_obj.get("price") or offer_obj.get("lowPrice")
-                p_curr = str(offer_obj.get("priceCurrency") or "USD").upper()
+                p_val = offer_obj.get("price") if offer_obj.get("price") is not None else offer_obj.get("lowPrice")
+                p_curr = str(offer_obj.get("priceCurrency") or "UNKNOWN").upper()
                 avail = str(offer_obj.get("availability") or "").lower()
                 p_variant = str(offer_obj.get("sku") or offer_obj.get("name") or o.get("sku") or "default").strip()
                 status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else ("preorder" if "preorder" in avail else "unknown"))
@@ -297,7 +302,7 @@ def extract_scoped_facts(html_str, url):
                         "url": url
                     })
                     if p_val:
-                        norm_p = normalize_price_str(str(p_val))
+                        norm_p = normalize_price_str(str(p_val), p_curr)
                         if norm_p:
                             facts["scoped_prices"].append({
                                 "entity": pname,
@@ -328,7 +333,7 @@ def extract_scoped_facts(html_str, url):
         if not ctx or ctx == "General" or not is_valid_product_entity(ctx):
             continue
         for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
-            norm_p = normalize_price_str(m.group(1))
+            norm_p = normalize_price_str(m.group(1), curr)
             if norm_p and float(norm_p) > 0:
                 curr = extract_currency(m.group(0))
                 invl = extract_interval(txt)
@@ -342,22 +347,7 @@ def extract_scoped_facts(html_str, url):
                         "raw": m.group(0)
                     })
 
-    # 5. Discontinued / Lifecycle detection in prose (scoped to specific section/heading)
-    for ctx, txt in parser.text_with_context:
-        if DISCONTINUED_PATTERN.search(txt):
-            if ctx and ctx != "General" and is_valid_product_entity(ctx):
-                matched = False
-                for p in facts["products_with_status"]:
-                    if p["name"].lower() == ctx.lower().strip():
-                        p["status"] = "discontinued"
-                        matched = True
-                if not matched:
-                    facts["products_with_status"].append({
-                        "name": ctx.strip(),
-                        "status": "discontinued",
-                        "url": url
-                    })
-
+    # 5. Lifecycle text detection (Removed to prevent false positives)
     for h in parser.headings:
         h_text = h[1]
         if DISCONTINUED_PATTERN.search(h_text):
@@ -505,7 +495,69 @@ def evaluate_fact_consistency(page_fact_list, base_url):
 
 
 
-def audit(base, domain, inv=None):
+
+def compare_ai_observations(fact_ledger, responses_file):
+    findings = []
+    notes = []
+    
+    if not responses_file or not os.path.exists(responses_file):
+        return findings, notes
+        
+    try:
+        with open(responses_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        obs_list = data.get("observations") or data.get("responses") or []
+        if isinstance(data, list):
+            obs_list = data
+            
+        for idx, obs in enumerate(obs_list):
+            assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx+1}"
+            mentioned = obs.get("mentioned") is True
+            cited = obs.get("cited") is True
+            
+            if not mentioned:
+                notes.append(f"{assistant_name} omitted brand.")
+                continue
+                
+            for claim in obs.get("claims", []):
+                c_entity = str(claim.get("entity", "")).lower()
+                c_attr = str(claim.get("attribute", "")).lower()
+                c_val = str(claim.get("value", ""))
+                
+                if c_attr == "price":
+                    claim_num = normalize_price_str(c_val, "UNKNOWN")
+                    if claim_num is not None:
+                        found_match = False
+                        entity_prices = []
+                        for page_facts in fact_ledger:
+                            for sp in page_facts.get("scoped_prices", []):
+                                if sp["entity"].lower() == c_entity:
+                                    found_match = True
+                                    site_num = normalize_price_str(sp["price"], sp["currency"])
+                                    if site_num is not None:
+                                        entity_prices.append(float(site_num))
+                        
+                        if found_match and entity_prices:
+                            # P0-48 & P0-24 & P0-25: Entity bound global price checking
+                            if not any(abs(float(claim_num) - sv) < 0.01 for sv in entity_prices):
+                                findings.append({
+                                    "category": "representation",
+                                    "title": f"{assistant_name} states conflicting pricing for '{claim.get('entity')}'",
+                                    "severity": "high",
+                                    "confidence": "high",
+                                    "root_cause": f"The AI asserts a price ({c_val}) for '{claim.get('entity')}' that contradicts its canonical on-site representation.",
+                                    "cause_family": "REPRESENTATION.ACCURACY",
+                                    "cause_id": "AI_FACT_CONFLICT",
+                                    "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
+                                    "suggested_action": {"summary": "Publish canonical pricing.", "priority": "high"}
+                                })
+    except Exception:
+        pass
+        
+    return findings, notes
+
+def audit(base, domain, responses_file=None, inv=None):
     findings = []
     recommendations = []
     page_fact_list = []
@@ -534,6 +586,8 @@ def audit(base, domain, inv=None):
         }
 
     f_findings, f_recs = evaluate_fact_consistency(page_fact_list, base)
+    ai_findings, ai_notes = compare_ai_observations(page_fact_list, responses_file)
+    f_findings.extend(ai_findings)
     findings.extend(f_findings)
     recommendations.extend(f_recs)
 
@@ -561,6 +615,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit fact freshness and consistency.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
+    parser.add_argument("--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -575,7 +630,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, inv=inv)
+    res = audit(base, p.netloc, responses_file=args.responses, inv=inv)
     print(json.dumps(res, indent=2))
 
 

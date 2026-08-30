@@ -18,6 +18,9 @@ from urllib.parse import urlparse, urljoin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
+    SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
+if SHARED_CORE not in sys.path:
+    sys.path.insert(0, SHARED_CORE)
 from safe_fetch import safe_fetch, DEFAULT_USER_AGENT
 
 

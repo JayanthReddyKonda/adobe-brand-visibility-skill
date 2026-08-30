@@ -12,7 +12,7 @@ import sys
 import os
 import re
 import json
-import yaml
+import json
 import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -20,8 +20,22 @@ from urllib.parse import urlparse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
+SHARED_CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "shared_core")
+if SHARED_CORE not in sys.path:
+    sys.path.insert(0, SHARED_CORE)
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
+# Connect to Canonical Fact Ledger for Semantic Intent Graph
+FACT_MODULE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR))), "fact-consistency-audit", "scripts")
+if FACT_MODULE_DIR not in sys.path:
+    sys.path.insert(0, FACT_MODULE_DIR)
+
+try:
+    from fact_consistency_check import extract_scoped_facts
+except ImportError:
+    extract_scoped_facts = None
+
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
 
@@ -99,7 +113,6 @@ VALID_CONTACT_TERMS = {
     "联系我们", "聯絡我們", "お問い合わせ", "문의하기", "hubungi kami", "liên hệ"
 }
 
-CORE_DESTINATIONS = ["pricing", "product", "docs", "documentation", "about", "contact", "login", "signup", "shop", "store"]
 
 
 
@@ -112,14 +125,14 @@ class SemanticIntentEngine:
 
     def _load_intents(self):
         import glob
-        yaml_files = glob.glob(os.path.join(self.references_dir, "*.yaml"))
+        yaml_files = glob.glob(os.path.join(self.references_dir, "*.json"))
         for f in yaml_files:
             try:
                 with open(f, "r") as fp:
-                    data = yaml.safe_load(fp)
+                    data = json.load(fp)
                     if "intent_family" in data:
                         self.intents[data["intent_family"]] = data
-            except yaml.YAMLError:
+            except Exception:
                 pass
 
     def get_required_facts(self, page_classification):
@@ -245,7 +258,7 @@ import math
 from collections import Counter
 
 # Elite Pre-computed TF-IDF Centroids for Zero-Dependency Semantic Intent Mapping
-TFIDF_CENTROIDS = {
+SITE_TYPE_CENTROIDS = {
     "ecommerce_retail": {"shop": 0.5, "cart": 0.4, "product": 0.3, "price": 0.3, "shipping": 0.2, "return": 0.2, "store": 0.2, "buy": 0.3, "apparel": 0.2, "coffee": 0.1},
     "saas_developer": {"api": 0.5, "docs": 0.4, "platform": 0.3, "pricing": 0.3, "cloud": 0.2, "software": 0.2, "developer": 0.3, "login": 0.2, "dashboard": 0.2},
     "media_content": {"news": 0.5, "article": 0.4, "author": 0.3, "read": 0.3, "publish": 0.2, "journal": 0.2, "magazine": 0.2, "blog": 0.3},
@@ -280,7 +293,7 @@ def infer_site_type(html_pages):
     best_match = "general_business"
     best_score = 0.01  # Minimum threshold for confidence
     
-    for category, centroid in TFIDF_CENTROIDS.items():
+    for category, centroid in SITE_TYPE_CENTROIDS.items():
         score = cosine_similarity(tf_vector, centroid)
         if score > best_score:
             best_score = score
@@ -297,7 +310,7 @@ def infer_site_type(html_pages):
     return best_match, destinations.get(best_match, ["products", "services", "pricing", "about", "contact"])
 
 
-def audit_page_engagement(html_content, url, page_type="other", applicable_destinations=None):
+def audit_page_engagement(html_content, url, page_type="other"):
     findings = []
     recommendations = []
 
@@ -307,52 +320,43 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
     except Exception:
         pass
 
-    # The Evidence Model: Intent -> Required Facts -> Destination -> Action
-    intent_map = {
-        "product_detail": {"intent": "purchase/evaluate", "expected_actions": ["buy", "add to cart", "get", "subscribe", "download", "contact"]},
-        "pricing": {"intent": "compare_plans", "expected_actions": ["sign up", "start", "choose", "contact", "subscribe"]},
-        "article": {"intent": "learn", "expected_actions": ["read more", "subscribe", "share", "next"]}
-    }
+    # Build local fact ledger for true semantic evaluation
+    facts = {}
+    if extract_scoped_facts:
+        facts = extract_scoped_facts(html_content, url)
     
-    if page_type in intent_map:
-        profile = intent_map[page_type]
-        action_found = False
-        nav_text = " ".join([text.lower() for text in dom.nav_link_texts])
-        for expected in profile["expected_actions"]:
-            if expected in nav_text or expected in " ".join(dom.body_text).lower():
-                action_found = True
-                break
-                
+    nav_text_lower = " ".join(dom.nav_link_texts).lower()
+    
+    # 1. Product Pricing Intent Graph
+    # Intent: "How much does Product X cost?"
+    # Required Facts: Product Entity, Price, Currency
+    # Action: Buy, Subscribe, Contact Sales
+    if facts.get("scoped_prices"):
+        # The page successfully satisfied the information requirement for the pricing intent.
+        # Now evaluate continuity: Does it offer the next logical step?
+        action_found = any(cta in nav_text_lower for cta in ["buy", "cart", "subscribe", "contact", "order", "get"])
         if not action_found:
             findings.append({
-                "title": f"Missing explicit next-action for '{profile['intent']}' intent",
-                "severity": "high",
+                "title": "Pricing intent journey lacks explicit commercial continuation",
+                "severity": "medium",
                 "category": "engagement",
                 "cause_id": "INTENT_TO_LANDING_MISMATCH",
                 "confidence": "high",
-                "evidence": f"Page type '{page_type}' implies '{profile['intent']}' intent, but expected CTAs ({', '.join(profile['expected_actions'])[:30]}...) are missing.",
+                "evidence": f"Page {url} provides explicit commercial facts (pricing for '{facts['scoped_prices'][0]['entity']}'), satisfying a bottom-funnel intent, but provides no clear transactional or sales-contact navigation.",
                 "suggested_action": {
-                    "summary": f"Add explicit, high-visibility CTAs aligning with the {profile['intent']} intent to preserve continuity.",
-                    "priority": "high"
+                    "summary": "Add explicit CTA (e.g., 'Buy', 'Contact Sales') immediately following the pricing facts to preserve task continuity.",
+                    "priority": "medium"
                 }
             })
 
-    # P1.7: Change "5-second test" to "early-page orientation"
+    # 2. Early-page orientation (No longer called 5-second test)
     if not dom.h1_list:
-        findings.append({
-            "title": "Missing early-page orientation (H1)",
-            "severity": "medium",
-            "category": "engagement",
-            "cause_id": "LOW_INFORMATION_SCENT",
-            "confidence": "high",
-            "evidence": "No <h1> element was found to orient the visitor.",
-            "suggested_action": {
-                "summary": "Ensure every page provides a clear <h1> describing its specific value proposition or content.",
-                "priority": "medium"
-            }
+        recommendations.append({
+            "summary": "Ensure every page provides a clear <h1> describing its specific value proposition or content.",
+            "priority": "low"
         })
         
-    return findings, recommendations, {'visible_words': len(' '.join(dom.body_text).split()), 'h1': len(dom.h1_list) > 0, 'navigation_links_found': len(dom.nav_links)}
+    return findings, recommendations, {'visible_words': len(' '.join(dom.body_text).split()), 'h1': len(dom.h1_list) > 0, 'anchor_links_found': len(dom.nav_links)}
 
 def audit(base, domain, inv=None):
     findings = []
@@ -376,12 +380,12 @@ def audit(base, domain, inv=None):
         if html:
             html_pages.append({"url": base + "/", "html": html, "page_type": "homepage"})
 
-    site_type, applicable_destinations = infer_site_type(html_pages)
+    site_type = infer_site_type(html_pages)[0]
     for p in html_pages:
         p_findings, p_recs, p_data = audit_page_engagement(
             p["html"], p["url"],
             page_type=p.get("page_type", "other"),
-            applicable_destinations=applicable_destinations
+            
         )
         findings.extend(p_findings)
         recommendations.extend(p_recs)

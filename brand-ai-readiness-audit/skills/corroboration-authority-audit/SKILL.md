@@ -1,7 +1,7 @@
 ---
-name: corroboration-authority-audit
+name: identity-corroboration-audit
 description: >
-  Cross-web authority & corroboration layer. Distinguishes identity link verification
+  Cross-web identity-link authority layer. Distinguishes identity link verification
   (verifying declared sameAs URLs resolve with HTTP 200) from external claim corroboration.
   A declared authority link that is provably broken (4xx/5xx) is a finding; absence of links is a recommendation.
 license: MIT
@@ -10,7 +10,7 @@ metadata:
   role: specialist
   parent: audit-orchestrator
   version: "3.0.0"
-tools:
+allowed-tools:
   - run_command
   - view_file
 ---
