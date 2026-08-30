@@ -1,7 +1,6 @@
 {
   "name": "brand-ai-readiness-audit",
-  "version": "3.0.0",
-  "description": "Forensic AI-readiness auditor: evidence-backed diagnosis of why a brand is invisible, misrepresented, or abandoned by AI assistants and AI-referred visitors.",
+  "version": "1.0.0",
   "skills": [
     {
       "id": "audit-orchestrator",
@@ -29,14 +28,8 @@
       "path": "skills/engagement-context-audit"
     },
     {
-      "id": "assistant-representation-audit",
-      "path": "skills/assistant-representation-audit",
-      "optional": true
-    },
-    {
       "id": "geo-content-audit",
       "path": "skills/geo-content-audit"
     }
-  ],
-  "specialists": []
+  ]
 }

@@ -1,5 +1,5 @@
 ---
-name: identity-corroboration-audit
+name: corroboration-authority-audit
 description: >
   Cross-web identity-link authority layer. Distinguishes identity link verification
   (verifying declared sameAs URLs resolve with HTTP 200) from external claim corroboration.

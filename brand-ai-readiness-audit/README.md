@@ -1,6 +1,6 @@
 # Brand AI-Readiness & Visibility Marketplace
 
-A comprehensive, zero-trust marketplace of specialized AI-readiness auditors. This system replaces generic, superficial SEO scorecards with a forensic **Evidence Model** to diagnose why a brand is invisible, misrepresented, or abandoned by Generative AI assistants (like ChatGPT, Gemini, Copilot) and AI-referred visitors.
+A comprehensive, zero-trust marketplace of specialized AI-readiness auditors. This system replaces generic, superficial SEO scorecards with a forensic **Stateful Knowledge Graph Architecture** to diagnose why a brand is invisible, misrepresented, or abandoned by Generative AI assistants (like ChatGPT, Gemini, Copilot) and AI-referred visitors.
 
 ## 🏆 Evaluator's Guide (Adobe Round 3 Alignment)
 
@@ -12,36 +12,31 @@ This submission was aggressively engineered to meet and exceed the strict constr
 * Handles HTTP/HTTPS, custom timeouts, and decompression natively via `urllib` and `gzip`.
 
 ### 2. Zero-Trust Security & Adversarial Resilience
-* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions. It uses a custom `HTTPConnection` class to pin resolved IPs and enforce URL bounds without globally patching the process, attempting to block DNS-rebinding Time-Of-Check-to-Time-Of-Use (TOCTOU) exploits.
-* **Bounded Deadlines & Memory:** Attempts to ensure execution completes within the strict <5-minute limit, gracefully degrading to "partial" results rather than hanging. Implements bounded gzip decompression to prevent memory exhaustion exploits.
+* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, Loopback, and IPv4-mapped IPv6 resolutions (e.g. `::ffff:127.0.0.1`). It uses a custom `HTTPConnection` class to pin resolved IPs and enforce URL bounds without globally patching the process, attempting to block DNS-rebinding Time-Of-Check-to-Time-Of-Use (TOCTOU) exploits.
+* **Bounded Deadlines & Memory:** Ensures execution completes within the strict global time limit, gracefully degrading to "partial" results rather than hanging. Implements bounded gzip decompression to prevent memory exhaustion exploits.
 
 ### 3. "God Tier" Exclusives (Beyond Generic SEO)
-* **Generative Engine Optimization (GEO):** Evaluates pages for *Statistical Density* and *Tabular/List Data Extraction*—features theorized by early GEO research to increase LLM synthesis likelihood.
-* **Variant-Aware Contradiction Engine:** Parses `sku` and `name` variants inside product ledgers to reduce false-positive pricing contradictions across multi-variant product pages.
-* **Bounded Claim Corroboration:** Cross-references internal identity claims by resolving and parsing external authority links (e.g., social profiles via `sameAs`) in real-time.
+* **Semantic GEO (AutoGEO Research):** Evaluates text for Generative Engine Optimization (GEO) metrics using proven research dimensions. We discarded primitive HTML tag counting (`<table>`, `<ul>`) in favor of evaluating "In-Depth Mechanisms" (causal conjunctions) and "Specific Evidence" (digits/substantiation).
+* **Context-Window Retrieval (C-SEO Bench):** Explicitly evaluates Title tags and Canonical URLs based on research proving that traditional SEO retrieval signals dictate LLM context-window placement.
+* **Information Scent Anchoring:** Validates that the Canonical Entity extracted from the Knowledge Graph perfectly matches the anchor text used in the `<h1>` tag, measuring true semantic orientation for AI-referred visitors.
 
 ---
 
 ## 🧠 The Marketplace Specialists & Architecture
 
-This architecture utilizes a decentralized marketplace of 8 skills (1 entrypoint + 7 specialists) composed by a central entrypoint (`audit-orchestrator`). 
+This architecture utilizes a decentralized marketplace of 7 skills (1 entrypoint + 6 specialists) composed by a central entrypoint (`audit-orchestrator`). 
 
-### 🛡️ Why 7 Specialists? (Genuine Separation of Concerns)
-This architecture strictly enforces the **Principle of Least Privilege** and avoids artificial skill padding. 
-- `corroboration-authority-audit` is the *only* skill allowed to make outbound network calls to 3rd-party domains, isolating SSRF risk. 
-- `fact-consistency-audit` is the *only* skill that retains cross-page state (ledgering).
-- `discoverability-audit` strictly focuses on crawler access rules (robots.txt, canonicals).
-Decomposing the logic in this way ensures that if an agent wants to only check facts, it does not need to spin up the dangerous networking module.
+### 🛡️ The Stateful Knowledge Graph
+Instead of executing sequential, disconnected heuristic scans, the orchestrator constructs and passes an atomic, concurrency-safe `state.json` contract across the exact causal execution pipeline: `Discoverability -> Entity -> Fact -> Corroboration -> GEO -> Engagement`.
 
 ### The Skills:
-1. **`audit-orchestrator` (Entrypoint):** Coordinates the audit, enforces global time limits, executes the specialists, and synthesizes cross-skill findings to eliminate duplicate root causes.
-2. **`discoverability-audit`:** Diagnoses AI-crawler accessibility, `robots.txt` parsing, Canonical/Hreflang validation, and `/llms.txt` proactive discovery.
-3. **`entity-content-audit`:** Extracts structured JSON-LD. Evaluates if the AI can understand *Who* the brand is and *What* it sells.
-4. **`fact-consistency-audit`:** Constructs a variant-aware temporal ledger of facts (prices, hours) across the domain to detect hallucination-inducing contradictions.
-5. **`geo-content-audit`:** Evaluates text for Generative Engine Optimization (GEO) metrics, including statistical density and tabular extraction likelihood.
-6. **`engagement-context-audit`:** Maps semantic page types to expected human intents, verifying that necessary UI elements exist for AI-referred traffic to prevent bounce.
-7. **`corroboration-authority-audit`:** Performs bounded validation of external identity claims to strengthen entity identity and independent source corroboration.
-8. **`assistant-representation-audit`:** (Optional Enrichment) Cross-checks observed external LLM citations against the brand's verified internal fact ledger.
+1. **`audit-orchestrator` (Entrypoint):** Coordinates the audit, enforces global time limits, manages the Stateful Knowledge Graph, executes the specialists, and synthesizes findings into a strict schema-compliant public JSON report.
+2. **`discoverability-audit`:** Diagnoses AI-crawler accessibility, `robots.txt` parsing, Canonical URL routing, and `/llms.txt` proactive discovery.
+3. **`entity-content-audit`:** Extracts structured JSON-LD and raw HTML semantics. Evaluates if the AI can understand *Who* the brand is and *What* it sells, seeding the Knowledge Graph.
+4. **`fact-consistency-audit`:** Cross-references pricing, contact, and lifecycle facts across the internal graph to detect contradiction-inducing fragmentation. (Also integrates representation verification).
+5. **`corroboration-authority-audit`:** Performs bounded validation of external identity claims by resolving declared authority links (`sameAs`) in real-time.
+6. **`geo-content-audit`:** Evaluates text for Generative Engine Optimization (GEO) dimensions: Causal Mechanisms and Specific Evidence.
+7. **`engagement-context-audit`:** Maps semantic page types to expected human intents, verifying Information Scent continuity (Entity-to-Heading anchoring) to prevent AI-referred bounce.
 
 ---
 
@@ -49,9 +44,9 @@ Decomposing the logic in this way ensures that if an agent wants to only check f
 
 We strictly prohibit "cosmetic" SEO defects. Every finding must establish a defensible causal chain to an AI-retrieval failure.
 
-* **Missing JSON-LD** is not flagged as a fatal error; it is a **Proactive Recommendation** to improve extraction confidence.
-* **Missing `sameAs` links** are not fatal; they represent a **Claim Corroboration Gap**.
-* Findings sharing the identical `cause_id` across 50 localized URLs are **synthesized by the orchestrator** into a single, high-signal finding to prevent JSON bloat.
+* **No Heuristic Defects:** Heuristics (like missing `<table>` tags or missing `<h1>` tags) do NOT alone trigger defect-level findings. They are reported strictly as proactive recommendations.
+* **Schema Contract Rigidity:** Findings are strictly delineated into `technical_fix` and `creative_fix` pathways to address root causes systematically.
+* **Inconclusive Parsers:** Parsing failures (e.g. malformed HTML) safely degrade to an `inconclusive` status, preventing empty states from hallucinating successful audits.
 
 ---
 
@@ -60,29 +55,12 @@ We strictly prohibit "cosmetic" SEO defects. Every finding must establish a defe
 Execute the orchestrator. It will dynamically load all specialists and output a minimalist, schema-valid JSON report to `stdout`.
 
 ```bash
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com
 ```
-
-## 🧪 Production-Grade Test Suite
-
-The repository ships with a comprehensive adversarial test suite.
-
-```bash
-```
-
-1. **SSRF Redirect Bypasses:** Mocks a server returning HTTP 301 to `169.254.169.254`.
-2. **Gzip Bomb Resilience:** Verifies memory-bounded decompression.
-3. **Monotonic Deadline Exhaustion:** Simulates orchestrator timeouts under extreme latency.
-4. **Hreflang ISO Poisoning:** Parses maliciously malformed region/language tags.
-5. **Variant Ledger Contradictions:** Feeds overlapping SKU prices to prove the contradiction engine handles standard e-commerce architectures flawlessly.
-
----
 
 ## 📁 Repository Structure
 
 ```text
-test_suite.py                       # 36-Test Automated Verification Suite
-ARCHITECTURE.md                     # Technical Architecture & Flow Documentation
 brand-ai-readiness-audit/           # Main Hackathon Submission Payload
 ├── marketplace.json                # Master Marketplace Skills Manifest
 ├── README.md                       # Evaluator & Hackathon Documentation
@@ -94,10 +72,8 @@ brand-ai-readiness-audit/           # Main Hackathon Submission Payload
     ├── fact-consistency-audit/     # Temporal Ledger & Contradiction check
     ├── corroboration-authority-audit/# E-E-A-T Claim check
     ├── engagement-context-audit/   # Visitor Orientation & Continuity check
-    ├── geo-content-audit/          # Generative Engine Optimization check
-    └── assistant-representation-audit/ # Output Enrichment layer
+    └── geo-content-audit/          # Generative Engine Optimization check
 ```
-
 
 ## Note on Architectural Duplication
 Per the strict `agentskills.io` portability specification, each skill MUST be fully self-contained without relying on cross-directory dependencies (such as a shared core library). For this reason, helper modules like `safe_fetch.py` and `fact_extractor.py` are deliberately duplicated into each skill's `scripts/` directory to ensure each skill can be extracted and run in total isolation.

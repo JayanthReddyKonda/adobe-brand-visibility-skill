@@ -301,21 +301,15 @@ def infer_site_type(html_pages):
 
 
 def audit_page_engagement(html_content, url, page_type="other", state=None):
-    state = {}
-    if state_file and os.path.exists(state_file):
-        try:
-            with open(state_file, "r") as f:
-                state = json.load(f)
-        except Exception as e:
-            print(f"Parser error: {e}"); continue
+    state = state or {}
     findings = []
     recommendations = []
 
     dom = EngagementDOMParser()
     try:
         dom.feed(html_content)
-    except Exception:
-        pass
+    except Exception as e:
+        return [{"title": "HTML parsing failed", "severity": "info", "category": "extraction", "root_cause": "Malformed HTML", "evidence": str(e), "suggested_action": {"summary": "Fix HTML syntax", "priority": "low"}}], [], {"visible_words": 0, "h1": False, "navigation_links_found": 0}
 
     # Build local fact ledger for true semantic evaluation
     facts = {}
@@ -380,8 +374,8 @@ def audit(base, domain, inv=None, state_file=None):
         try:
             with open(state_file, "r") as f:
                 state = json.load(f)
-        except Exception as e:
-            print(f"Parser error: {e}"); continue
+        except Exception:
+            pass
     findings = []
     recommendations = []
     observations = []

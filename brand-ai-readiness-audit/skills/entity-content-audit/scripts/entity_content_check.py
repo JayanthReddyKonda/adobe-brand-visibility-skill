@@ -162,8 +162,8 @@ def parse_json_ld(raw_json_list):
                     raw_objects.extend(item["@graph"])
                 elif isinstance(item, dict):
                     raw_objects.append(item)
-        except Exception as e:
-            print(f"Parser error: {e}"); continue
+        except Exception:
+            pass
 
 
     # 1. Index all entities by @id
@@ -248,8 +248,8 @@ def audit(base, domain, inv=None, state_file=None):
         try:
             with open(state_file, "r") as f:
                 state = json.load(f)
-        except Exception as e:
-            print(f"Parser error: {e}"); continue
+        except Exception:
+            pass
     findings, recommendations, observations = [], [], []
 
     # 1. Filter genuine HTML pages from inventory
