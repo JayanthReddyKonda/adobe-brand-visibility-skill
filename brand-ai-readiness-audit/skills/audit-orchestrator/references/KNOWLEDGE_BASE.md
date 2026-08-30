@@ -28,6 +28,7 @@ AUDIT TAXONOMY
 │   ├── DISCOVERY_PATH
 │   │   ├── CANONICAL_FRAGMENTATION         (Canonical consolidation points away from indexable content)
 │   │   ├── ORPHANED_CONTENT_PATH           (Critical pages unlinked from site navigation or sitemaps)
+│   │   └── LOCALE_MISCONFIGURATION         (Invalid hreflang codes causing regional surfacing errors)
 │   │   └── SITEMAP_INDEXING_GAP            (Absence of sitemap for large multi-page catalog)
 │   └── REPRESENTATION_AVAILABILITY
 │       └── RENDERED_CONTENT_GAP            (Core textual content omitted from initial raw HTML payload)
@@ -90,7 +91,11 @@ AUDIT TAXONOMY
 | `EXPERIENCE.CONTINUITY` | `INTENT_TO_LANDING_MISMATCH` | Landing page omits answers to referral query intent above the fold. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `LOW_INFORMATION_SCENT` | Primary H1 uses generic filler words ("Welcome", "Home") lacking information scent. | `low` |
 | `EXPERIENCE.CONTINUITY` | `DESTINATION_NAVIGATION_FRICTION` | Landing page lacks navigation links to core brand destinations. | `medium` |
+| `CONTENT.RETRIEVAL_OPTIMIZATION` | `POOR_DATA_DENSITY` | Page relies solely on unstructured prose, missing required semantic lists or tables. | `medium` |
+| `CONTENT.RETRIEVAL_OPTIMIZATION` | `GEO_UNOPTIMIZED` | Low statistical density reduces the probability an LLM will select this page for factual grounding. | `low` |
 | `REPRESENTATION.ACCURACY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
+| `CONTENT.RETRIEVAL_OPTIMIZATION` | `POOR_DATA_DENSITY` | Page relies solely on unstructured prose, missing required semantic lists or tables. | `medium` |
+| `CONTENT.RETRIEVAL_OPTIMIZATION` | `GEO_UNOPTIMIZED` | Low statistical density reduces the probability an LLM will select this page for factual grounding. | `low` |
 | `REPRESENTATION.ACCURACY` | `AI_UNSUPPORTED_CLAIM` | Observed AI assistant asserts ungrounded claims about brand capabilities. | `medium` |
 
 

@@ -10,7 +10,7 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "2.1.0"
+  version: "3.0.0"
 ---
 
 # Entity & Content Audit Skill
@@ -18,6 +18,10 @@ metadata:
 Evaluates whether an AI search system can resolve the brand's entity identity (`Organization`) and extract its commercial offerings (`Product`, `Offer`, `Service`). Computes the mathematically reproducible weighted **Answerability Index** across sampled HTML pages.
 
 ---
+
+
+> [!TIP]
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
 
 ## When to Use
 
@@ -31,7 +35,7 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Execute: `cat skills/entity-content-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/entity-content-audit/references/KNOWLEDGE_BASE.md`).
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -40,12 +44,12 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 Execute the deterministic entity and answerability script with `--format json`:
 
 ```bash
-python3 scripts/entity_content_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/entity_content_check.py --site https://example.com --format json
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json
 ```
 
 

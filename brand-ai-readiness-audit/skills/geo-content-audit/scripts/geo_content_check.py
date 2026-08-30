@@ -109,8 +109,8 @@ def audit(base, domain, inv=None):
                 "severity": "medium",
                 "confidence": "high",
                 "root_cause": "Product features are presented as unstructured prose without data tables or definition lists.",
-                "cause_family": "CONTENT.POOR_DATA_DENSITY",
-                "cause_id": "MISSING_SPECIFICATION_TABLES",
+                "cause_family": "CONTENT.RETRIEVAL_OPTIMIZATION",
+                "cause_id": "POOR_DATA_DENSITY",
                 "evidence": f"Product page {url} contains 0 tables or structured lists.",
                 "impact": "Generative models strongly prefer tabular data for extracting technical specifications. Unstructured prose reduces extraction accuracy.",
                 "suggested_action": {

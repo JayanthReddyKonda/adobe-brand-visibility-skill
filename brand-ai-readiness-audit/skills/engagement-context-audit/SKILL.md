@@ -8,7 +8,7 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "2.1.0"
+  version: "3.0.0"
 ---
 
 # Engagement & Context Continuity Audit Skill
@@ -16,6 +16,10 @@ metadata:
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.
 
 ---
+
+
+> [!TIP]
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
 
 ## When to Use
 
@@ -29,7 +33,7 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Execute: `cat skills/engagement-context-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/engagement-context-audit/references/KNOWLEDGE_BASE.md`).
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -38,12 +42,12 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 Execute the engagement and intent continuity script with `--format json`:
 
 ```bash
-python3 scripts/engagement_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/engagement_check.py --site https://example.com --format json
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --format json
 ```
 
 

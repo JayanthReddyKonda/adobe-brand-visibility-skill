@@ -905,7 +905,7 @@ class TestGeoContentAudit(unittest.TestCase):
         res = geo_content_check.audit("https://frescopa.coffee", "frescopa.coffee", mock_inv)
         findings = res.get("findings", [])
         self.assertEqual(len(findings), 1)
-        self.assertEqual(findings[0]["cause_id"], "MISSING_SPECIFICATION_TABLES")
+        self.assertEqual(findings[0]["cause_id"], "POOR_DATA_DENSITY")
 
 
 class TestOrchestratorAdversarial(unittest.TestCase):

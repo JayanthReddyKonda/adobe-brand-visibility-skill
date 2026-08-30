@@ -327,7 +327,7 @@ def audit_page_engagement(html_content, url, page_type="other", applicable_desti
                 "title": f"Missing explicit next-action for '{profile['intent']}' intent",
                 "severity": "high",
                 "category": "engagement",
-                "cause_id": "INTENT_LANDING_MISMATCH",
+                "cause_id": "INTENT_TO_LANDING_MISMATCH",
                 "confidence": "high",
                 "evidence": f"Page type '{page_type}' implies '{profile['intent']}' intent, but expected CTAs ({', '.join(profile['expected_actions'])[:30]}...) are missing.",
                 "suggested_action": {

@@ -9,7 +9,7 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "2.1.0"
+  version: "3.0.0"
 ---
 
 # Assistant Representation Audit Skill (Enrichment Layer)
@@ -17,6 +17,10 @@ metadata:
 Cross-checks observed AI assistant outputs (supplied via `--responses` or `--observations` JSON) against the brand's verified first-party on-site facts. Detects empirical pricing hallucinations, ungrounded capability claims, and citation omissions.
 
 ---
+
+
+> [!TIP]
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
 
 ## When to Use
 
@@ -30,7 +34,7 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Execute: `cat skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md`).
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -39,12 +43,12 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 Execute the representation cross-check script with `--responses` and `--format json`:
 
 ```bash
-python3 scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory <inventory.json> --format json
+python3 skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory <inventory.json> --format json
 ```
 
 Baseline fact snapshot generation (without observed answers):
 ```bash
-python3 scripts/representation_check.py --site https://example.com --format json
+python3 skills/assistant-representation-audit/scripts/representation_check.py --site https://example.com --format json
 ```
 
 

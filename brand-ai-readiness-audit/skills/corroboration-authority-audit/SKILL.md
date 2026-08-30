@@ -9,7 +9,7 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "2.1.0"
+  version: "3.0.0"
 ---
 
 # Corroboration & Authority Audit Skill
@@ -17,6 +17,10 @@ metadata:
 Evaluates external entity authority by verifying that declared identity links (`sameAs` in Organization JSON-LD pointing to Wikidata, Crunchbase, Wikipedia, and official social channels) resolve cleanly with HTTP 200 without broken redirect loops or 4xx/5xx HTTP errors.
 
 ---
+
+
+> [!TIP]
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
 
 ## When to Use
 
@@ -30,7 +34,7 @@ Evaluates external entity authority by verifying that declared identity links (`
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Execute: `cat skills/corroboration-authority-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/corroboration-authority-audit/references/KNOWLEDGE_BASE.md`).
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -39,12 +43,12 @@ Evaluates external entity authority by verifying that declared identity links (`
 Execute the authority link verification script with `--format json`:
 
 ```bash
-python3 scripts/corroboration_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/corroboration_check.py --site https://example.com --format json
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json
 ```
 
 

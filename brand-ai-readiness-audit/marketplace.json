@@ -1,6 +1,6 @@
 {
   "name": "brand-ai-readiness-audit",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Forensic AI-readiness auditor: evidence-backed diagnosis of why a brand is invisible, misrepresented, or abandoned by AI assistants and AI-referred visitors.",
   "skills": [
     {

@@ -9,7 +9,7 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "2.1.0"
+  version: "3.0.0"
 ---
 
 # Fact Consistency & Lifecycle Audit Skill
@@ -17,6 +17,10 @@ metadata:
 Constructs a multi-attribute first-party fact ledger across sampled website pages. Detects verified commercial contradictions, product lifecycle conflicts (discontinued vs current), and legacy fact propagation.
 
 ---
+
+
+> [!TIP]
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
 
 ## When to Use
 
@@ -30,7 +34,7 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Execute: `cat skills/fact-consistency-audit/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/fact-consistency-audit/references/KNOWLEDGE_BASE.md`).
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -39,12 +43,12 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 Execute the fact ledger and consistency script with `--format json`:
 
 ```bash
-python3 scripts/fact_consistency_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory <inventory.json> --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/fact_consistency_check.py --site https://example.com --format json
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json
 ```
 
 

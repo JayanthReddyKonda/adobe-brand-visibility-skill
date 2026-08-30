@@ -8,7 +8,7 @@ license: MIT
 compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
 metadata:
   role: entrypoint
-  version: "2.2.0"
+  version: "3.0.0"
 ---
 
 # Audit Orchestrator (Entrypoint Skill)
@@ -16,6 +16,10 @@ metadata:
 The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordinates a bounded, SSRF-safe shared inventory crawl, loads specialist skill contexts and references sequentially into agent memory, executes self-contained diagnostic scripts with `--format json`, reconciles multi-signal evidence, eliminates false positives, maps root causes to a unified causal taxonomy, and emits a strictly validated JSON audit report conforming to the Adobe Round 3 schema.
 
 ---
+
+
+> [!TIP]
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory.
 
 ## When to Use
 
@@ -37,7 +41,7 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Execute: `cat references/KNOWLEDGE_BASE.md` (or use your file reader tool on `references/KNOWLEDGE_BASE.md`).
+> Execute: `cat skills/audit-orchestrator/references/KNOWLEDGE_BASE.md` (or use your file reader tool on `skills/audit-orchestrator/references/KNOWLEDGE_BASE.md`).
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 

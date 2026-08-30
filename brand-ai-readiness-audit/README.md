@@ -84,7 +84,7 @@ The repository ships with an aggressively hostile adversarial test suite guarant
 python3 test_suite.py
 ```
 
-**Includes 37 Zero-Trust Adversarial Tests:**
+**Includes 38 Zero-Trust Adversarial Tests:**
 1. **SSRF Redirect Bypasses:** Mocks a server returning HTTP 301 to `169.254.169.254`.
 2. **Gzip Bomb Resilience:** Verifies memory-bounded decompression.
 3. **Monotonic Deadline Exhaustion:** Simulates orchestrator timeouts under extreme latency.
