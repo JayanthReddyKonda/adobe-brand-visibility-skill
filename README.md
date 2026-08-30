@@ -83,11 +83,12 @@ python3 test_suite.py
 ## 📁 Repository Structure
 
 ```text
-brand-ai-readiness-audit/
+test_suite.py                       # 36-Test Automated Verification Suite
+ARCHITECTURE.md                     # Technical Architecture & Flow Documentation
+brand-ai-readiness-audit/           # Main Hackathon Submission Payload
 ├── marketplace.json                # Master Marketplace Skills Manifest
 ├── README.md                       # Evaluator & Hackathon Documentation
 ├── LICENSE                         # Open-source MIT License
-├── test_suite.py                   # 38-Test Automated Verification Suite
 └── skills/
     ├── audit-orchestrator/         # Entrypoint Skill (Orchestrator)
     ├── discoverability-audit/      # Accessibility & Indexing check
