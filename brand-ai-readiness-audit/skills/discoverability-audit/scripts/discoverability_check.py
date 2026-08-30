@@ -60,6 +60,7 @@ class Dom(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.text, self.skip = [], 0
         self.canonical, self.meta_robots = None, None
+        self.hreflangs = []
         self.links = []
         self.spa_root = False
         self.spa_marker_name = None
@@ -90,6 +91,8 @@ class Dom(HTMLParser):
         elif t == "noscript":
             self.skip += 1
             self.in_noscript = True
+        if t == "link" and a.get("rel", "").lower() == "alternate" and a.get("hreflang"):
+            self.hreflangs.append({"lang": a.get("hreflang"), "href": a.get("href")})
         if t == "link" and a.get("rel", "").lower() == "canonical":
             self.canonical = a.get("href")
         if t == "meta" and a.get("name", "").lower() == "robots":
@@ -314,6 +317,37 @@ def audit(base, domain, inv=None):
         })
 
 
+
+    # Hreflang Validation Check
+    if dom.hreflangs:
+        invalid_langs = []
+        for hl in dom.hreflangs:
+            code = str(hl.get("lang", "")).lower().strip()
+            if code and code != "x-default":
+                parts = code.split("-")
+                lang = parts[0]
+                if lang in ("eng", "jp", "zh-tw", "zh-cn", "iw", "in"):
+                    invalid_langs.append(code)
+                elif len(parts) > 1 and parts[1].upper() == "UK":
+                    invalid_langs.append(code)
+        
+        if invalid_langs:
+            findings.append({
+                "category": "locale",
+                "title": "Invalid hreflang ISO codes (locale misconfiguration)",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "The page declares hreflang tags using invalid ISO 639-1 or ISO 3166-1 codes.",
+                "cause_family": "DISCOVERY.DISCOVERY_PATH",
+                "cause_id": "LOCALE_MISCONFIGURATION",
+                "impact": "Search engines and AI indexers may misinterpret the language or regional targeting, surfacing the wrong locale.",
+                "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(invalid_langs)}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
+                "suggested_action": {
+                    "summary": "Fix hreflang codes to strictly follow ISO 639-1 (language) and ISO 3166-1 Alpha-2 (region).",
+                    "priority": "medium",
+                    "verification": "Verify all <link rel='alternate' hreflang='...'> tags use valid ISO codes."
+                }
+            })
 
     # Canonical Check
     if dom.canonical:

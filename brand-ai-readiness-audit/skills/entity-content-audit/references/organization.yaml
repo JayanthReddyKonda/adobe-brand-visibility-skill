@@ -11,22 +11,22 @@ core_attributes:
   - name: name
     type: string
     description: "Official legal or commercial brand name"
-    required: true
+    required: false
     high_representation_risk: true
   - name: url
     type: URL string
     description: "Canonical website domain"
-    required: true
+    required: false
     high_representation_risk: true
   - name: logo
     type: Image URL string
     description: "Direct link to canonical SVG/PNG logo asset"
-    required: true
+    required: false
     high_representation_risk: true
   - name: sameAs
     type: list of URL strings
     description: "Authoritative external profiles (Wikidata, Crunchbase, LinkedIn, X, GitHub)"
-    required: true
+    required: false
     high_representation_risk: true
   - name: description
     type: string

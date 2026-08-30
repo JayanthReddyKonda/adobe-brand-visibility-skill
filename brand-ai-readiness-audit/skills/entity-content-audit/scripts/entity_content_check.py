@@ -209,45 +209,36 @@ def parse_json_ld(raw_json_list):
 
 
 
-def evaluate_page_answerability(page_type, html_content, dom, url):
-    """Calculate mathematically reproducible weighted Answerability Index."""
-    weights_map = ANSWERABILITY_WEIGHTS.get(page_type)
-    if not weights_map:
+def evaluate_page_answerability(page_type, html_content, dom, url, structured_entities):
+    """
+    Evidence Model: Product fact extraction. 
+    Stop using lexical keyword matching. Use actual extracted schema properties.
+    """
+    if page_type not in ("product_detail", "product"):
         return None
 
-    full_text = " ".join(dom.text_content)
-    headings_text = " ".join(h[1] for h in dom.headings)
-    search_space = f"{full_text} {headings_text}"
-
-    present_attributes = []
-    missing_attributes = []
-    earned_weight = 0.0
-    total_weight = sum(w for w, _ in weights_map.values())
-
-    for attr_name, (weight, patterns) in weights_map.items():
-        found = False
-        for pat in patterns:
-            # Word boundary regex search to prevent substring pollution
-            if re.search(r'\b' + re.escape(pat) + r'\b', search_space, re.I) or (len(pat) > 3 and pat.lower() in search_space.lower()):
-                found = True
-                break
-        if found:
-            present_attributes.append(attr_name)
-            earned_weight += weight
-        else:
-            missing_attributes.append(attr_name)
-
-    coverage_ratio = round(earned_weight / total_weight, 2) if total_weight > 0 else 1.0
-
-    return {
-        "page_type": page_type,
-        "url": url,
-        "coverage_ratio": coverage_ratio,
-        "present": present_attributes,
-        "missing": missing_attributes,
-        "weights": {k: v[0] for k, v in weights_map.items()}
+    products = [e for e in structured_entities if matches_schema_type(e, ["Product"])]
+    if not products:
+        return {"status": "missing_entity"}
+        
+    p = products[0]
+    
+    facts = {
+        "price": False,
+        "availability": False,
+        "sku": bool(p.get("sku")),
+        "description": bool(p.get("description"))
     }
-
+    
+    offers = p.get("offers", {})
+    if isinstance(offers, dict):
+        if offers.get("price"): facts["price"] = True
+        if offers.get("availability"): facts["availability"] = True
+    elif isinstance(offers, list):
+        if any(isinstance(o, dict) and o.get("price") for o in offers): facts["price"] = True
+        if any(isinstance(o, dict) and o.get("availability") for o in offers): facts["availability"] = True
+        
+    return {"status": "present", "facts": facts}
 
 def audit(base, domain, inv=None):
     findings, recommendations, observations = [], [], []
@@ -344,32 +335,22 @@ def audit(base, domain, inv=None):
                 pdom.feed(phtml)
             except Exception:
                 pass
-            ans = evaluate_page_answerability(ptype, phtml, pdom, purl)
-            if ans:
-                answerability_evaluations.append(ans)
-                if ans["coverage_ratio"] < 0.60:
+            ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
+            if ans and ans.get("status") == "present":
+                missing = [k for k, v in ans["facts"].items() if not v]
+                if missing:
                     findings.append({
-                        "category": "answerability",
-                        "title": f"Low factual answerability on {ptype} page ({purl})",
-                        "severity": "low",
-                        "confidence": "medium",
-                        "root_cause": f"The {ptype} page omits core factual attributes: {', '.join(ans['missing'])}.",
-                        "cause_family": "ENTITY.ANSWERABILITY",
-                        "cause_id": "MISSING_MATERIAL_FACT",
-                        "impact": "AI assistants querying for specific commercial terms cannot locate direct answers on this surface.",
-                        "evidence": f"Page covers only {int(ans['coverage_ratio']*100)}% of expected {ptype} facts. Missing: {', '.join(ans['missing'])}.",
+                        "category": "entity",
+                        "title": "Incomplete Product Entity Attributes",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "cause_id": "INCOMPLETE_OFFER_ATTRIBUTES",
+                        "evidence": f"Product on {purl} lacks explicit structured data for: {', '.join(missing)}.",
                         "suggested_action": {
-                            "summary": f"Expose missing {ptype} attributes ({', '.join(ans['missing'])}) in both visible body text and structured markup.",
-                            "priority": "low",
-                            "verification": f"Verify {purl} publishes explicit values for {', '.join(ans['missing'])}."
+                            "summary": "Ensure Product schema explicitly defines price, availability, sku, and description.",
+                            "priority": "medium"
                         }
                     })
-
-    # Calculate overall answerability index across evaluated pages
-    if answerability_evaluations:
-        avg_index = round(sum(a["coverage_ratio"] for a in answerability_evaluations) / len(answerability_evaluations), 2)
-    else:
-        avg_index = 1.0
 
     return {
         "status": "ok",
@@ -384,7 +365,6 @@ def audit(base, domain, inv=None):
         },
         "coverage": {
             "html_pages_evaluated": len(html_pages),
-            "answerability_index": avg_index,
             "answerability_evaluations": answerability_evaluations,
             "json_ld_count": len(json_ld_entities)
         },

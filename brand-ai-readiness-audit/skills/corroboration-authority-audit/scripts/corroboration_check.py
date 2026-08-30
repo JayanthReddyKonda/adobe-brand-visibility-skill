@@ -106,42 +106,56 @@ def audit(base, domain, inv=None):
 
     sameas_urls = extract_sameas_links(html)
 
-    # 2. Check declared authority links
+    # 2. Extract Brand Name Claim for Corroboration
+    brand_name = None
+    import re
+    title_match = re.search(r'<title>(.*?)</title>', html, re.I)
+    if title_match:
+        brand_name = title_match.group(1).split('|')[0].split('-')[0].strip()
+
+    # 3. Check declared authority links and perform Bounded Claim Corroboration
     if not sameas_urls:
         recommendations.append({
             "title": "Establish an integrated brand identity block with authoritative sameAs links",
             "category": "corroboration",
-            "rationale": "No sameAs links were declared in JSON-LD. Declaring links to Wikidata, Wikipedia, Crunchbase, or official profiles helps AI models verify brand identity against independent authorities.",
-            "suggested_action": "Add sameAs URLs to the Organization JSON-LD markup pointing to official profiles and third-party registries."
+            "rationale": "No sameAs links were declared. Adding them enables bounded claim corroboration.",
+            "suggested_action": "Add sameAs URLs to Organization JSON-LD."
         })
         return {
             "status": "ok",
-            "findings": [],
+            "findings": findings,
             "recommendations": recommendations,
-            "observations": observations,
-            "coverage": {"sameas_count": 0, "probed": 0},
-            "limitations": []
+            "observations": observations
         }
 
-    # 3. Probe up to 5 declared links
     checked = []
     broken = []
+    
     for u in sameas_urls[:5]:
-        status, resp_html, headers, err = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
-        res_entry = {"url": u, "status": status, "error": err}
-        checked.append(res_entry)
-
-        if status is not None and (status >= 400 or status < 200):
+        if u.startswith(base):
+            continue
+            
+        checked.append(u)
+        status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
+        if status != 200:
             broken.append(f"{u} (HTTP {status})")
-        elif status == 200 and resp_html:
-            brand_token = domain.split(".")[0].lower()
-            if len(brand_token) >= 3 and brand_token not in resp_html.lower()[:2000]:
-                observations.append({
-                    "observation": f"Declared sameAs profile {u} resolved HTTP 200 but introductory text does not prominently reference brand token '{brand_token}'.",
-                    "impact": "Independent authority verification is stronger when the target registry explicitly corroborates the entity name.",
-                    "url": u
+        elif brand_name and ext_html:
+            # Bounded Claim Corroboration: Does the external authority corroborate the identity claim?
+            if brand_name.lower() not in ext_html.lower():
+                findings.append({
+                    "title": f"Authority link fails to corroborate brand identity claim",
+                    "severity": "medium",
+                    "category": "corroboration",
+                    "cause_id": "CLAIM_CORROBORATION_GAP",
+                    "confidence": "medium",
+                    "evidence": f"The declared sameAs link {u} is reachable, but does not contain the brand name claim '{brand_name}'.",
+                    "suggested_action": {
+                        "summary": f"Ensure the external authority page at {urlparse(u).hostname} explicitly states the canonical brand name.",
+                        "priority": "medium"
+                    }
                 })
-
+            else:
+                observations.append({"observation": f"Successfully corroborated brand name '{brand_name}' on external authority {u}."})
 
     if broken:
         findings.append({
@@ -175,7 +189,6 @@ def audit(base, domain, inv=None):
             "Probed declared sameAs authority URLs; full web-wide claim corroboration was bounded to declared links."
         ]
     }
-
 
 def main():
     parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")

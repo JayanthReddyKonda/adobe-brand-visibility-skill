@@ -11,34 +11,34 @@ core_attributes:
   - name: name
     type: string
     description: "Official canonical name of the product"
-    required: true
+    required: false
     high_representation_risk: true
   - name: brand
     type: Organization | Brand | string
     description: "Manufacturing or publishing brand entity"
-    required: true
+    required: false
     high_representation_risk: true
   - name: price
     type: numeric | string
     description: "Current retail or commercial price"
-    required: true
+    required: false
     volatile: true
     high_representation_risk: true
   - name: currency
     type: ISO-4217 string (e.g. USD, INR, EUR)
     description: "Currency code for the offered price"
-    required: true
+    required: false
     high_representation_risk: true
   - name: availability
     type: string (InStock | OutOfStock | PreOrder)
     description: "Current inventory availability state"
-    required: true
+    required: false
     volatile: true
     high_representation_risk: true
   - name: description
     type: string
     description: "Concise summary of product capabilities and purpose"
-    required: true
+    required: false
     high_representation_risk: false
   - name: sku
     type: string

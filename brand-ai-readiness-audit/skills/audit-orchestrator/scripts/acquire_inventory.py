@@ -13,6 +13,7 @@ import time
 import argparse
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+import concurrent.futures
 from urllib.parse import urlparse, urljoin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -352,18 +353,23 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             }
         return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        future_to_url = {executor.submit(fetch_url, u): u for u in selected_urls}
-        for future in concurrent.futures.as_completed(future_to_url):
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+    future_to_url = {executor.submit(fetch_url, u): u for u in selected_urls}
+    
+    try:
+        for future in concurrent.futures.as_completed(future_to_url, timeout=deadline - time.monotonic() if deadline else None):
             if deadline and time.monotonic() >= deadline:
                 if "Inventory crawl truncated when acquisition time budget was reached." not in inv["limitations"]:
                     inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
-                executor.shutdown(wait=False, cancel_futures=True)
                 break
             res = future.result()
             if res:
                 seen_urls.add(res["url"].rstrip("/"))
                 inv["pages"].append(res)
+    except concurrent.futures.TimeoutError:
+        inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     inv["elapsed_seconds"] = round(time.monotonic() - start_mono, 1)
 

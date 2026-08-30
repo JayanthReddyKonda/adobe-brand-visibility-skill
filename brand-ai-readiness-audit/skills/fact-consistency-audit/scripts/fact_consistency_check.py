@@ -288,7 +288,8 @@ def extract_scoped_facts(html_str, url):
                 p_val = offer_obj.get("price") or offer_obj.get("lowPrice")
                 p_curr = str(offer_obj.get("priceCurrency") or "USD").upper()
                 avail = str(offer_obj.get("availability") or "").lower()
-                status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else "current")
+                p_variant = str(offer_obj.get("sku") or offer_obj.get("name") or o.get("sku") or "default").strip()
+                status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else ("preorder" if "preorder" in avail else "unknown"))
                 if pname and is_valid_product_entity(pname):
                     facts["products_with_status"].append({
                         "name": pname,
@@ -303,6 +304,7 @@ def extract_scoped_facts(html_str, url):
                                 "price": norm_p,
                                 "currency": p_curr,
                                 "interval": "one_time",
+                                "variant": p_variant,
                                 "raw": f"{p_curr} {p_val}"
                             })
         if "dateModified" in o and isinstance(o["dateModified"], str):
@@ -319,16 +321,7 @@ def extract_scoped_facts(html_str, url):
     if "og:site_name" in parser.meta_tags:
         facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
 
-    # 3. Text-based product and offering names from prominent headings
-    for h in parser.headings:
-        htag, htxt = h
-        if is_valid_product_entity(htxt):
-            if htag == "h1" and not any(p["name"].lower() == htxt.lower() for p in facts["products_with_status"]):
-                facts["products_with_status"].append({
-                    "name": htxt.strip(),
-                    "status": "current",
-                    "url": url
-                })
+
 
     # 4. Text-based scoped price extraction (ONLY within explicitly named, valid product sections)
     for ctx, txt in parser.text_with_context:
@@ -345,6 +338,7 @@ def extract_scoped_facts(html_str, url):
                         "price": norm_p,
                         "currency": curr,
                         "interval": invl,
+                        "variant": "default",
                         "raw": m.group(0)
                     })
 
@@ -414,10 +408,10 @@ def evaluate_fact_consistency(page_fact_list, base_url):
             ent = sp["entity"].lower().strip()
             if not is_valid_product_entity(ent):
                 continue
-            key = (ent, sp.get("currency", "USD"), sp.get("interval", "one_time"))
+            key = (ent, sp.get("currency", "USD"), sp.get("interval", "one_time"), sp.get("variant", "default"))
             price_ledger.setdefault(key, {}).setdefault(sp["price"], set()).add(pf["url"])
 
-    for (ent, curr, invl), val_map in price_ledger.items():
+    for (ent, curr, invl, var), val_map in price_ledger.items():
         if len(val_map) >= 2:
             # Map each URL to all prices it asserts for this entity
             url_to_prices = {}

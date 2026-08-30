@@ -26,7 +26,7 @@ from urllib.parse import urlparse, urljoin
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
-VALIDATOR = os.path.join(SCRIPT_DIR, "validate_report.py")
+VALIDATOR = os.path.join(SCRIPT_DIR, "contract_validator.py")
 
 from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 from acquire_inventory import build_inventory, classify_page, normalize_target, is_html_response
@@ -182,6 +182,36 @@ def proactive_checks(domain, base_url, inv_stats=None):
     return recommendations
 
 
+def group_findings(raw_findings):
+    groups = {}
+    for f in raw_findings:
+        cid = f.get("cause_id", "UNKNOWN_CAUSE")
+        severity = f.get("severity", "medium")
+        key = f"{cid}_{severity}"
+        if key not in groups:
+            groups[key] = {
+                "base_finding": f,
+                "urls": set()
+            }
+        
+        # Extract URL if present in evidence
+        evidence = f.get("evidence", "")
+        import re
+        url_match = re.search(r'(https?://[^\s,]+)', evidence)
+        if url_match:
+            groups[key]["urls"].add(url_match.group(1))
+
+    final = []
+    for g in groups.values():
+        finding = g["base_finding"]
+        urls = g["urls"]
+        if len(urls) > 1:
+            finding["evidence"] = f"{finding['evidence']} (Note: this pattern was observed across {len(urls)} pages, e.g. {list(urls)[0]})."
+            finding["title"] = f"{finding['title']} (Multiple Pages)"
+        final.append(finding)
+    return final
+
+
 def deduplicate_recommendations(rec_list):
     seen = {}
     deduped = []
@@ -230,6 +260,7 @@ def discover_plugins():
                 elif sid == "engagement-context-audit": script_name = "engagement_check.py"
                 elif sid == "discoverability-audit": script_name = "discoverability_check.py"
                 elif sid == "entity-content-audit": script_name = "entity_content_check.py"
+                elif sid == "geo-content-audit": script_name = "geo_content_check.py"
                 
                 label = f"Dynamic execution of {sid}"
                 if "discoverability" in sid: label = "Access, robots.txt & rendering risk"
@@ -449,6 +480,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
 
         final_findings.append(finding_entry)
 
+    final_findings = group_findings(final_findings)
     all_recommendations.extend(demoted)
     deduped_recommendations = deduplicate_recommendations(all_recommendations)
 
@@ -485,13 +517,8 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "audit_status": audit_status,
         "summary": summary_counts,
-        "specialists": specialists,
-        "audit_metrics": audit_metrics,
-        "coverage": all_coverage,
         "findings": final_findings,
-        "proactive_actions": deduped_recommendations,
-        "observations": all_observations[:100],
-        "limitations": all_limitations
+        "proactive_actions": deduped_recommendations
     }
 
     internal_telemetry = {
@@ -527,19 +554,19 @@ def validation_gate(report):
 
 
 
-def generate_mermaid_trace(report, out_path):
+def generate_mermaid_trace(report, out_path, internal_data=None):
     """Deterministic State Telemetry: Generates a Mermaid.js execution graph."""
     lines = [
         "```mermaid",
         "graph TD",
         '    subgraph "Acquisition Phase"',
         '        A[Master Orchestrator] -->|ThreadPool BFS| B(Shared Site Inventory)',
-        f'        B -->|Sampled {report.get("audit_metrics", {}).get("html_pages_sampled", 0)} pages| C{{Dispatcher}}',
+        f'        B -->|Sampled {(internal_data or {}).get("audit_metrics", {}).get("html_pages_sampled", 0)} pages| C{{Dispatcher}}',
         '    end',
         '    subgraph "Dynamic Specialist Plugins"'
     ]
     
-    specs = report.get("specialists", {})
+    specs = (internal_data or {}).get("specialists", {})
     for i, (sid, sdata) in enumerate(specs.items()):
         status = sdata.get("status")
         if status != "not_run":
@@ -564,7 +591,7 @@ def generate_mermaid_trace(report, out_path):
         f.write("\n".join(lines))
 
 
-def format_rich_report(report):
+def format_rich_report(report, internal_data=None):
     # ANSI escape codes for gorgeous CLI output
     C_RESET = "\033[0m"
     C_BOLD = "\033[1m"
@@ -577,7 +604,7 @@ def format_rich_report(report):
     
     site = report.get("site", "Target Site")
     summary = report.get("summary", {})
-    metrics = report.get("audit_metrics", {})
+    metrics = (internal_data or {}).get("audit_metrics", {})
     
     out = []
     out.append(f"\n{C_BOLD}{C_CYAN}======================================================={C_RESET}")
@@ -683,14 +710,14 @@ def main():
 
     if args.trace:
         try:
-            generate_mermaid_trace(report, args.trace)
+            generate_mermaid_trace(report, args.trace, internal_data)
         except Exception as e:
             sys.stderr.write(f"Trace generation warning: {e}\n")
 
     if args.format == "markdown":
         out_content = format_markdown_report(report)
     elif args.format == "rich":
-        out_content = format_rich_report(report)
+        out_content = format_rich_report(report, internal_data)
     else:
         out_content = json.dumps(report, indent=2)
 
