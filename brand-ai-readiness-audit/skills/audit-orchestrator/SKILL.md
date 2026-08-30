@@ -22,7 +22,7 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** DO NOT assume your working directory contains a `<MARKETPLACE_ROOT>/skills/` folder directly. The marketplace might be installed in a nested directory like `.agents/skills/`. You MUST use absolute paths. Before executing any scripts, find the absolute path to the marketplace root and use it to construct all command paths. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system.
 
 ## When to Use
 
@@ -45,7 +45,7 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
 > Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `skills/audit-orchestrator/references/KNOWLEDGE_BASE.md`
+> `<MARKETPLACE_ROOT>/skills/audit-orchestrator/references/KNOWLEDGE_BASE.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -71,63 +71,63 @@ The AI Agent must execute this audit as a sequential, self-contained multi-skill
 ### Step 1: Inventory Acquisition
 Acquire the type-safe shared inventory (homepage + robots.txt + sitemaps -> HTML pages):
 ```bash
-python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site <target_url> --output /tmp/inv.json --format json
+python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/acquire_inventory.py --site <target_url> --output /tmp/inv.json --format json
 ```
 
 ### Step 2: Discoverability & Retrieval Audit
-1. **Load Context:** Read `skills/discoverability-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/discoverability-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_disc.json
+   python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_disc.json
    ```
 
 ### Step 3: Entity Identity & Answerability Audit
-1. **Load Context:** Read `skills/entity-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/entity-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_entity.json
+   python3 <MARKETPLACE_ROOT>/skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_entity.json
    ```
 
 ### Step 4: Fact Consistency & Lifecycle Audit
-1. **Load Context:** Read `skills/fact-consistency-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/fact-consistency-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_fact.json
+   python3 <MARKETPLACE_ROOT>/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_fact.json
    ```
 
 
 ### Step 5: Generative Engine Optimization (GEO) Audit
-1. **Load Context:** Read `skills/geo-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/geo-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 skills/geo-content-audit/scripts/geo_content_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_geo.json
+   python3 <MARKETPLACE_ROOT>/skills/geo-content-audit/scripts/geo_content_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_geo.json
    ```
 
 ### Step 6: Authority & SameAs Corroboration Audit
-1. **Load Context:** Read `skills/corroboration-authority-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/corroboration-authority-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_corr.json
+   python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_corr.json
    ```
 
 ### Step 7: Engagement & Context Continuity Audit
-1. **Load Context:** Read `skills/engagement-context-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/engagement-context-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_eng.json
+   python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory /tmp/inv.json --format json > /tmp/res_eng.json
    ```
 
 ### Step 8 (Optional): Assistant Representation Audit
-1. **Load Context:** Read `skills/assistant-representation-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/assistant-representation-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script (if responses provided):**
    ```bash
-   python3 skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory /tmp/inv.json --format json > /tmp/res_rep.json
+   python3 <MARKETPLACE_ROOT>/skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory /tmp/inv.json --format json > /tmp/res_rep.json
    ```
 
 ### Step 9: Master Evidence Synthesis & Schema Validation Gate
 The audit pipeline synthesizes specialist findings, assigns root causes from [references/root-causes.md](references/root-causes.md), deduplicates recommendations, and validates against [references/report-schema.json](references/report-schema.json):
 ```bash
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site <target_url> --format json
+python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/orchestrator.py --site <target_url> --format json
 ```
 All specialist checks, shared inventory acquisition, multi-signal evidence reconciliation, and strict schema validation are executed sequentially within the 300s monotonic deadline.
 
@@ -154,12 +154,9 @@ All specialist checks, shared inventory acquisition, multi-signal evidence recon
 ## Output Report Format & Strict Mandate
 
 > [!IMPORTANT]
-> **STRICT OUTPUT MANDATE (ZERO PROSE / ZERO EXPLANATION):**
-> The final output emitted by this skill MUST be **MANDATORILY VALID JSON ONLY** conforming to the Adobe Round 3 schema.
-> - **ZERO** conversational prose, preamble, or markdown summaries outside the JSON.
-> - **ZERO** conversational explanation or extra text before or after the JSON payload.
-> - **NOT A SINGLE EXTRA CHARACTER** outside the JSON object.
-> - All evidence, findings, root causes, metrics, recommendations, and limitations must be structured strictly within their respective JSON properties.
+> **STRICT OUTPUT MANDATE:**
+> The final output emitted by this skill MUST be the exact JSON report generated by `orchestrator.py`.
+> To prevent syntax errors, do not manually reconstruct the JSON. Copy the exact `stdout` string from the script and wrap it in a standard markdown json code block (````json ... ````).
 
 ---
 

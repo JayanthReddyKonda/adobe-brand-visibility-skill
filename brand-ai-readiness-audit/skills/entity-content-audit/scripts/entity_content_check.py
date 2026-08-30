@@ -335,7 +335,7 @@ def audit(base, domain, inv=None):
                 pdom.feed(phtml)
             except Exception:
                 pass
-            typed_objects = parse_json_ld(pdom.jsonld_blocks)
+            typed_objects = parse_json_ld(pdom.json_ld_contents)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
             if ans and ans.get("status") == "present":
                 missing = [k for k, v in ans["facts"].items() if not v]

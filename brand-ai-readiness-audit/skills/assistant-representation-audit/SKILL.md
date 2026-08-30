@@ -35,10 +35,17 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 
 ## References to Consult
 
+> [!CAUTION]
+> **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
+> You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
+> `<MARKETPLACE_ROOT>/skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md` (or the equivalent path in your environment).
+> Failure to read the exact causal taxonomies from this file will cause schema validation failures.
+
+
 > [!IMPORTANT]
 > **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
 > Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md`
+> `<MARKETPLACE_ROOT>/skills/assistant-representation-audit/references/KNOWLEDGE_BASE.md`
 > Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
 
 
@@ -47,12 +54,12 @@ Cross-checks observed AI assistant outputs (supplied via `--responses` or `--obs
 Execute the representation cross-check script with `--responses` and `--format json`:
 
 ```bash
-python3 skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory <inventory.json> --format json
+python3 <MARKETPLACE_ROOT>/skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory <inventory.json> --format json
 ```
 
 Baseline fact snapshot generation (without observed answers):
 ```bash
-python3 skills/assistant-representation-audit/scripts/representation_check.py --site https://example.com --format json
+python3 <MARKETPLACE_ROOT>/skills/assistant-representation-audit/scripts/representation_check.py --site https://example.com --format json
 ```
 
 
