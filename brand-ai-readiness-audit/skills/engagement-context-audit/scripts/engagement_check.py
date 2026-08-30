@@ -102,6 +102,63 @@ CORE_DESTINATIONS = ["pricing", "product", "docs", "documentation", "about", "co
 
 
 
+
+class SemanticIntentEngine:
+    def __init__(self, references_dir):
+        self.references_dir = references_dir
+        self.intents = {}
+        self._load_intents()
+
+    def _load_intents(self):
+        import glob
+        json_files = glob.glob(os.path.join(self.references_dir, "*.json"))
+        for f in json_files:
+            try:
+                with open(f, "r") as fp:
+                    data = json.load(fp)
+                    if "intent_family" in data:
+                        self.intents[data["intent_family"]] = data
+            except Exception:
+                pass
+
+    def get_required_facts(self, page_classification):
+        if page_classification == "pricing" and "pricing_comparison" in self.intents:
+            return self.intents["pricing_comparison"].get("required_on_page_facts", [])
+        if page_classification == "product_detail" and "product_purchase" in self.intents:
+            return self.intents["product_purchase"].get("required_on_page_facts", [])
+        return []
+
+    def check_facts_in_text(self, text, required_facts):
+        text_lower = text.lower()
+        missing = []
+        for fact in required_facts:
+            # Heuristic mapping for facts
+            if fact == "tier_names":
+                if not re.search(r'(starter|pro|enterprise|basic|premium|free|standard|advanced|tier|plan)', text_lower):
+                    missing.append(fact)
+            elif fact == "billing_interval":
+                if not re.search(r'(month|year|annual|mo|yr|monthly|annually)', text_lower):
+                    missing.append(fact)
+            elif fact == "tier_prices":
+                if not re.search(r'(\$|€|£|¥|\d+\.\d{2})', text_lower):
+                    missing.append(fact)
+            elif fact == "feature_matrix":
+                if not re.search(r'(feature|compare|include|matrix|custom)', text_lower):
+                    missing.append(fact)
+            elif fact == "signup_or_trial_cta":
+                if not re.search(r'(sign up|try|trial|get started|start|subscribe)', text_lower):
+                    missing.append(fact)
+            elif fact == "product_name":
+                pass # Already extracted via schema usually
+            elif fact == "availability":
+                if not re.search(r'(stock|sold out|available|backorder)', text_lower):
+                    missing.append(fact)
+            elif fact == "add_to_cart_or_buy_cta":
+                if not re.search(r'(add to cart|buy|purchase|checkout)', text_lower):
+                    missing.append(fact)
+        return missing
+
+
 class EngagementDOMParser(HTMLParser):
     def __init__(self):
         super().__init__()

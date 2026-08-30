@@ -294,7 +294,7 @@ def audit(base, domain, inv=None):
             break
 
     og_site_name = dom.og_tags.get("og:site_name")
-    brand_name = (org_entity.get("name") if org_entity and isinstance(org_entity.get("name"), str) else None) or og_site_name or dom.title.split("-")[0].split("|")[0].strip()
+    brand_name = (org_entity.get("name") if org_entity and isinstance(org_entity.get("name"), str) else None) or og_site_name or dom.title.replace(" - ", "|").replace(" | ", "|").split("|")[0].split("|")[0].strip()
 
     if not org_entity:
         if not og_site_name and not dom.title:

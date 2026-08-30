@@ -177,7 +177,7 @@ def synthesize(site_input, inv=None, d_res=None, e_res=None, f_res=None, c_res=N
         if sev not in SEVERITY_ORDER:
             sev = "medium"
         confidence = str(item.get("confidence", "medium")).lower()
-        fp = f"{item.get('category', '')}:{item.get('title', '')}"
+        fp = f"{item.get('category', '')}:{' '.join(item.get('title', '').lower().split())}"
         if fp in seen_fps:
             continue
         seen_fps.add(fp)

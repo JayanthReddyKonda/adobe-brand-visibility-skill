@@ -1,0 +1,25 @@
+{
+  "intent_family": "product_purchase",
+  "description": "Visitor arriving from an AI recommendation to evaluate or purchase a specific product.",
+  "question_patterns": [
+    "buy {product}",
+    "{product} specifications",
+    "is {product} in stock"
+  ],
+  "required_on_page_facts": [
+    "product_name",
+    "price",
+    "availability",
+    "specifications",
+    "add_to_cart_or_buy_cta"
+  ],
+  "preferred_target_surfaces": [
+    "/products/",
+    "/item/"
+  ],
+  "continuity_failure_indicators": [
+    "Out of stock without clear backorder date",
+    "Add to cart button missing",
+    "Vague product specifications"
+  ]
+}

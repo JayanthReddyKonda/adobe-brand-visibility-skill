@@ -923,6 +923,19 @@ class TestOrchestratorAdversarial(unittest.TestCase):
         finally:
             sys.argv = old_argv
 
+
+class TestArchitectureIntegrity(unittest.TestCase):
+    def test_safe_fetch_copies_are_synced(self):
+        import glob
+        import hashlib
+        base_dir = os.path.join(BASE_DIR, "brand-ai-readiness-audit", "skills")
+        fetches = glob.glob(f"{base_dir}/*/scripts/safe_fetch.py")
+        hashes = set()
+        for f in fetches:
+            with open(f, "rb") as fh:
+                hashes.add(hashlib.md5(fh.read()).hexdigest())
+        self.assertEqual(len(hashes), 1, "Not all safe_fetch.py copies are identical! Architectural drift detected.")
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -111,7 +111,7 @@ def audit(base, domain, inv=None):
     import re
     title_match = re.search(r'<title>(.*?)</title>', html, re.I)
     if title_match:
-        brand_name = title_match.group(1).split('|')[0].split('-')[0].strip()
+        brand_name = title_match.group(1).split('|')[0].replace(' - ', '|').replace(' | ', '|').split('|')[0].strip()
 
     # 3. Check declared authority links and perform Bounded Claim Corroboration
     if not sameas_urls:
@@ -139,23 +139,39 @@ def audit(base, domain, inv=None):
         status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
         if status != 200:
             broken.append(f"{u} (HTTP {status})")
+
         elif brand_name and ext_html:
             # Bounded Claim Corroboration: Does the external authority corroborate the identity claim?
-            if brand_name.lower() not in ext_html.lower():
-                findings.append({
-                    "title": f"Authority link fails to corroborate brand identity claim",
-                    "severity": "medium",
-                    "category": "corroboration",
-                    "cause_id": "CLAIM_CORROBORATION_GAP",
-                    "confidence": "medium",
-                    "evidence": f"The declared sameAs link {u} is reachable, but does not contain the brand name claim '{brand_name}'.",
-                    "suggested_action": {
-                        "summary": f"Ensure the external authority page at {urlparse(u).hostname} explicitly states the canonical brand name.",
-                        "priority": "medium"
-                    }
-                })
+            # We specifically look for the brand name in the external page's <title> or <meta property="og:site_name">
+            ext_title = ""
+            ext_title_match = re.search(r'<title>(.*?)</title>', ext_html, re.I)
+            if ext_title_match: ext_title = ext_title_match.group(1).lower()
+            
+            og_match = re.search(r'<meta[^>]*property=["\']og:site_name["\'][^>]*content=["\']([^"\']+)["\']', ext_html, re.I)
+            og_site_name = og_match.group(1).lower() if og_match else ""
+            
+            brand_lower = brand_name.lower()
+            
+            # If the external authority explicitly mentions the brand in its most critical identity fields
+            if brand_lower in ext_title or brand_lower in og_site_name:
+                observations.append({"observation": f"Successfully corroborated brand name '{brand_name}' via <title>/og:site_name on external authority {u}."})
             else:
-                observations.append({"observation": f"Successfully corroborated brand name '{brand_name}' on external authority {u}."})
+                # We check full text as a weak fallback
+                if brand_lower not in ext_html.lower():
+                    findings.append({
+                        "title": f"Authority link fails to corroborate brand identity claim",
+                        "severity": "medium",
+                        "category": "corroboration",
+                        "cause_id": "CLAIM_CORROBORATION_GAP",
+                        "confidence": "high",
+                        "evidence": f"The declared sameAs link {u} is reachable, but neither its title, og:site_name, nor body text explicitly state the brand name '{brand_name}'.",
+                        "suggested_action": {
+                            "summary": f"Ensure the external authority page at {urlparse(u).hostname} explicitly claims the canonical brand name.",
+                            "priority": "medium"
+                        }
+                    })
+
+
 
     if broken:
         findings.append({

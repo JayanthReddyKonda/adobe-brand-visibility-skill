@@ -384,6 +384,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         "page_types": {t: sum(1 for p in inv["pages"] if p.get("page_type") == t)
                        for t in {p.get("page_type") for p in inv["pages"] if p.get("page_type")}}
     }
+    inv.setdefault("infrastructure", {})["homepage_reachable"] = stats.get("homepage_reachable", True)
     return inv, stats
 
 

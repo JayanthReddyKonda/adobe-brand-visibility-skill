@@ -14,7 +14,7 @@ This submission was aggressively engineered to meet and exceed the strict constr
 * Handles HTTP/HTTPS, custom timeouts, and decompression natively via `urllib` and `gzip`.
 
 ### 2. Zero-Trust Security & Adversarial Resilience
-* **SSRF Protection:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions.
+* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions. It actively patches `socket.getaddrinfo` per-thread to pin the resolved IPs, definitively blocking DNS-rebinding Time-Of-Check-to-Time-Of-Use (TOCTOU) exploits.
 * **Redirect Bypasses Blocked:** Custom `SafeRedirectHandler` prevents malicious servers from bypassing the initial IP check via HTTP 301 redirects to internal metadata servers (e.g., AWS `169.254.169.254`).
 * **Gzip Bomb Mitigation:** Implements bounded decompression (`max_bytes`), ensuring malicious servers cannot exhaust orchestrator memory.
 * **Global Monotonic Deadlines:** Guarantees execution completes within the **strict <5-minute limit**, gracefully degrading to "partial" results rather than hanging.
@@ -27,9 +27,9 @@ This submission was aggressively engineered to meet and exceed the strict constr
 
 ---
 
-## 🧠 The 8 Marketplace Specialists
+## 🧠 The Marketplace Specialists
 
-The architecture utilizes a decentralized marketplace of 8 skills. The Orchestrator dynamically loads non-entrypoint skills via `marketplace.json` and runs them concurrently against the acquired inventory.
+The architecture utilizes a decentralized marketplace of 7 specialist skills composed by a central orchestrator. The Orchestrator dynamically loads non-entrypoint skills via `marketplace.json` and runs them concurrently against the acquired inventory.
 
 1. **`audit-orchestrator` (Entrypoint):** Discovers plugins, acquires XML/HTML inventory, enforces global time limits, and synthesizes cross-skill findings to eliminate duplicate root causes.
 2. **`discoverability-audit`:** Diagnoses AI-crawler accessibility, `robots.txt` longest-match wildcard parsing, Canonical/Hreflang validation, and `/llms.txt` proactive discovery.
