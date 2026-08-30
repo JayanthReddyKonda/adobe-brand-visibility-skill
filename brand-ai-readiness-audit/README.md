@@ -12,7 +12,7 @@ This submission was aggressively engineered to meet and exceed the strict constr
 * Handles HTTP/HTTPS, custom timeouts, and decompression natively via `urllib` and `gzip`.
 
 ### 2. Zero-Trust Security & Adversarial Resilience
-* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions. It uses a custom `HTTPConnection` class to pin resolved IPs and enforce URL bounds without globally patching the process, attempting to block DNS-rebinding TOCTOU exploits.
+* **SSRF Protection & DNS TOCTOU Defense:** A custom `safe_fetch.py` strictly blocks all RFC-1918, Link-Local, and Loopback IP resolutions. It uses a custom `HTTPConnection` class to pin resolved IPs and enforce URL bounds without globally patching the process, attempting to block DNS-rebinding Time-Of-Check-to-Time-Of-Use (TOCTOU) exploits.
 * **Bounded Deadlines & Memory:** Attempts to ensure execution completes within the strict <5-minute limit, gracefully degrading to "partial" results rather than hanging. Implements bounded gzip decompression to prevent memory exhaustion exploits.
 
 ### 3. "God Tier" Exclusives (Beyond Generic SEO)
@@ -24,7 +24,7 @@ This submission was aggressively engineered to meet and exceed the strict constr
 
 ## 🧠 The Marketplace Specialists & Architecture
 
-This architecture utilizes a decentralized marketplace of 7 skills (1 entrypoint + 6 specialists) composed by a central entrypoint (`audit-orchestrator`). 
+This architecture utilizes a decentralized marketplace of 8 skills (1 entrypoint + 7 specialists) composed by a central entrypoint (`audit-orchestrator`). 
 
 ### 🛡️ Why 7 Specialists? (Genuine Separation of Concerns)
 This architecture strictly enforces the **Principle of Least Privilege** and avoids artificial skill padding. 
@@ -65,9 +65,10 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 
 ## 🧪 Production-Grade Test Suite
 
-
+The repository ships with a comprehensive adversarial test suite.
 
 ```bash
+python3 test_suite.py
 ```
 
 **Includes 38 Zero-Trust Adversarial Tests:**
@@ -86,12 +87,13 @@ brand-ai-readiness-audit/
 ├── marketplace.json                # Master Marketplace Skills Manifest
 ├── README.md                       # Evaluator & Hackathon Documentation
 ├── LICENSE                         # Open-source MIT License
+├── test_suite.py                   # 38-Test Automated Verification Suite
 └── skills/
     ├── audit-orchestrator/         # Entrypoint Skill (Orchestrator)
     ├── discoverability-audit/      # Accessibility & Indexing check
     ├── entity-content-audit/       # Structured Knowledge check
     ├── fact-consistency-audit/     # Temporal Ledger & Contradiction check
-    ├── corroboration-authority-audit/# External Claim check
+    ├── corroboration-authority-audit/# E-E-A-T Claim check
     ├── engagement-context-audit/   # Visitor Orientation & Continuity check
     ├── geo-content-audit/          # Generative Engine Optimization check
     └── assistant-representation-audit/ # Output Enrichment layer

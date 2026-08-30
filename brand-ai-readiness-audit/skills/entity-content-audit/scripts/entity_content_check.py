@@ -330,6 +330,7 @@ def audit(base, domain, inv=None):
         ptype = p.get("page_type")
         phtml = p.get("html")
         purl = p.get("url")
+        ans = None
         if ptype in ANSWERABILITY_WEIGHTS and ptype != "homepage" and phtml:
             pdom = EntityDOMParser()
             try:
@@ -338,27 +339,27 @@ def audit(base, domain, inv=None):
                 pass
             typed_objects = parse_json_ld(pdom.json_ld_contents)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
-        if ans and ans.get("status") == "present":
-            for res in ans.get("results", []):
-                answerability_evaluations.append(res)
-                missing = [k for k, v in res["facts"].items() if not v]
-                if missing:
-                    findings.append({
-                        "category": "product-answerability",
-                        "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
-                        "severity": "medium",
-                        "confidence": "high",
-                        "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
-                        "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
-                        "cause_id": "ATTRIBUTE_INCOMPLETENESS",
-                        "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
-                        "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
-                        "suggested_action": {
-                            "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
-                            "priority": "medium",
-                            "verification": "Check the Google Rich Results Test to confirm the properties are populated."
-                        }
-                    })
+            if ans and ans.get("status") == "present":
+                for res in ans.get("results", []):
+                    answerability_evaluations.append(res)
+                    missing = [k for k, v in res["facts"].items() if not v]
+                    if missing:
+                        findings.append({
+                            "category": "product-answerability",
+                            "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
+                            "severity": "medium",
+                            "confidence": "high",
+                            "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
+                            "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
+                            "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                            "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
+                            "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
+                            "suggested_action": {
+                                "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
+                                "priority": "medium",
+                                "verification": "Check the Google Rich Results Test to confirm the properties are populated."
+                            }
+                        })
 
     return {
         "status": "ok",

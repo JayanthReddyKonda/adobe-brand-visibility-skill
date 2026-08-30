@@ -518,8 +518,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         "audited_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "audit_status": audit_status,
         "summary": summary_counts,
-        "findings": final_findings,
-        "proactive_actions": deduped_recommendations
+        "findings": final_findings
     }
 
     internal_telemetry = {

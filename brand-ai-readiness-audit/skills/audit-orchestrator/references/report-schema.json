@@ -5,18 +5,25 @@
   "required": [
     "site",
     "audited_at",
+    "audit_status",
     "summary",
     "findings"
   ],
   "properties": {
     "site": {
-      "type": "string",
-      "description": "Target website domain or URL audited"
+      "type": "string"
     },
     "audited_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "ISO 8601 UTC timestamp of when the audit was performed"
+      "format": "date-time"
+    },
+    "audit_status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "failed"
+      ]
     },
     "summary": {
       "type": "object",
@@ -24,31 +31,32 @@
         "total_findings",
         "critical",
         "high",
-        "medium"
+        "medium",
+        "low"
       ],
       "properties": {
-        "total_findings": { "type": "integer", "minimum": 0 },
-        "critical": { "type": "integer", "minimum": 0 },
-        "high": { "type": "integer", "minimum": 0 },
-        "medium": { "type": "integer", "minimum": 0 },
-        "low": { "type": "integer", "minimum": 0 }
+        "total_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "high": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "medium": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "low": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "additionalProperties": false
-    },
-    "specialists": {
-      "type": "object",
-      "description": "Execution status and metadata per specialist audit skill",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["status"],
-        "properties": {
-          "label": { "type": "string" },
-          "status": { "type": "string", "enum": ["ok", "inconclusive", "failed", "not_run"] },
-          "error": { "type": "string" },
-          "reason": { "type": "string" }
-        },
-        "additionalProperties": false
-      }
     },
     "findings": {
       "type": "array",
@@ -58,86 +66,56 @@
           "id",
           "title",
           "severity",
+          "category",
+          "root_cause",
           "evidence",
           "suggested_action"
         ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Z0-9_-]+$" },
-          "title": { "type": "string", "minLength": 3 },
-          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
-          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
-          "category": { "type": "string" },
-          "root_cause": { "type": "string" },
-          "cause_family": { "type": "string" },
-          "cause_id": { "type": "string" },
-          "impact": { "type": "string" },
-          "evidence": { "type": "string", "minLength": 5 },
-          "verification": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "root_cause": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
           "suggested_action": {
             "type": "object",
-            "required": ["summary", "priority"],
+            "required": [
+              "summary",
+              "priority"
+            ],
             "properties": {
-              "summary": { "type": "string", "minLength": 5 },
-              "priority": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
-              "verification": { "type": "string" },
-              "implementation_guidance": { "type": "string" }
+              "summary": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string"
+              }
             },
-            "additionalProperties": true
+            "additionalProperties": false
           }
         },
         "additionalProperties": true
       }
-    },
-    "root_causes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["cause_family", "cause_id", "root_cause", "finding_ids", "max_severity"],
-        "properties": {
-          "cause_family": { "type": "string" },
-          "cause_id": { "type": "string" },
-          "root_cause": { "type": "string" },
-          "finding_ids": { "type": "array", "items": { "type": "string" } },
-          "max_severity": { "type": "string" },
-          "suggested_priority": { "type": "string" }
-        },
-        "additionalProperties": false
-      }
-    },
-    "audit_metrics": {
-      "type": "object",
-      "properties": {
-        "execution_time_seconds": { "type": "number" },
-        "pages_sampled": { "type": "integer" },
-        "page_types_covered": { "type": "object" },
-        "critical_blockers": { "type": "integer" },
-        "confidence_distribution": {
-          "type": "object",
-          "properties": {
-            "high": { "type": "integer" },
-            "medium": { "type": "integer" },
-            "low": { "type": "integer" }
-          },
-          "additionalProperties": false
-        },
-        "answerability_index": { "type": "number" }
-      },
-      "additionalProperties": true
-    },
-    "observations": {
-      "type": "array",
-      "items": { "type": "object" }
-    },
-    "coverage": {
-      "type": "object"
-    },
-    "limitations": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "proactive_actions": {
-      "type": "array",
-      "items": { "type": "object" }
     }
   },
   "additionalProperties": false

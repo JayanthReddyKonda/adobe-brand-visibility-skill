@@ -32,6 +32,10 @@
       "id": "assistant-representation-audit",
       "path": "skills/assistant-representation-audit",
       "optional": true
+    },
+    {
+      "id": "geo-content-audit",
+      "path": "skills/geo-content-audit"
     }
   ]
 }
