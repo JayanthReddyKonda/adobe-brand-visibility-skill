@@ -380,10 +380,10 @@ def audit(base, domain, inv=None, state_file=None):
                 if isinstance(o, dict) and o.get("name"):
                     state["entities"][u].append(o["name"])
         import tempfile, shutil
-            fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
-            with os.fdopen(fd, "w") as f:
-                json.dump(state, f)
-            os.replace(tmp, state_file)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
+        with os.fdopen(fd, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp, state_file)
             
     return {
         "status": "ok",

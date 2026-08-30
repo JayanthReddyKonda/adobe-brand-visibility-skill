@@ -41,6 +41,8 @@ def _is_safe_host(hostname):
             if getattr(ip_obj, "ipv4_mapped", None):
                 ip_obj = ip_obj.ipv4_mapped
             is_blocked = False
+            if ip_obj.is_multicast or getattr(ip_obj, "is_reserved", False) or ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+                is_blocked = True
             for blocked in BLOCKED_NETWORKS:
                 if ip_obj in blocked:
                     is_blocked = True

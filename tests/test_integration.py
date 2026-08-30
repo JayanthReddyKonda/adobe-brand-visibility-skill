@@ -5,8 +5,8 @@ import json
 
 class TestIntegration(unittest.TestCase):
     def setUp(self):
-        self.orchestrator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../skills/audit-orchestrator/scripts/orchestrator.py"))
-        self.validator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../skills/audit-orchestrator/scripts/validate_report.py"))
+        self.orchestrator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../brand-ai-readiness-audit/skills/audit-orchestrator/scripts/orchestrator.py"))
+        self.validator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../brand-ai-readiness-audit/skills/audit-orchestrator/scripts/validate_report.py"))
 
     def test_example_com_audit(self):
         # Run orchestrator against example.com

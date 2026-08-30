@@ -226,14 +226,15 @@ def group_findings(raw_findings):
     return final
 
 
-def deduplicate_recommendations(rec_list):
+def deduplicate_recommendations(rec_list, start_idx=1):
     seen = {}
     deduped = []
     for r in rec_list:
         if not isinstance(r, dict):
             continue
-        title = r.get("title", "").strip()
+        title = r.get("title", "Optimization Opportunity").strip()
         summary = r.get("summary") or r.get("suggested_action") or r.get("rationale") or "Implement proactive site improvement."
+        category = r.get("category", "general")
         priority = str(r.get("priority", "low")).lower()
         if priority not in ("critical", "high", "medium", "low"):
             priority = "low"
@@ -242,11 +243,19 @@ def deduplicate_recommendations(rec_list):
             continue
         item = {
             "title": title,
+            "category": category,
             "summary": summary,
             "priority": priority
         }
+        if "technical_fix" in r: item["technical_fix"] = r["technical_fix"]
+        if "creative_fix" in r: item["creative_fix"] = r["creative_fix"]
+        if "verification" in r: item["verification"] = r["verification"]
+        
         seen[key] = item
         deduped.append(item)
+        
+    for i, item in enumerate(deduped):
+        item["id"] = f"P-{(start_idx + i):03d}"
     return deduped
 
 
@@ -402,9 +411,20 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         except OSError:
             pass
 
-    all_recommendations = list(specialist_recommendations)
+    # Deduplicate specialist recommendations
+    deduped_specialist = deduplicate_recommendations(list(specialist_recommendations), start_idx=1)
+    
+    # Proactive checks already have valid IDs, just append them or re-number
+    proactive = []
     if include_proactive:
-        all_recommendations.extend(proactive_checks(domain, base_url, inv_stats=inv_stats))
+        proactive = proactive_checks(domain, base_url, inv_stats=inv_stats)
+        
+    # Re-number proactive to follow specialist
+    start_idx = len(deduped_specialist) + 1
+    for i, p in enumerate(proactive):
+        p["id"] = f"P-{(start_idx + i):03d}"
+        
+    all_recommendations = deduped_specialist + proactive
 
     clustered_groups = {}
     for item in raw_findings:
