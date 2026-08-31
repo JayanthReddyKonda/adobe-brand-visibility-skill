@@ -197,36 +197,6 @@ def proactive_checks(domain, base_url, inv_stats=None):
     return recommendations
 
 
-def group_findings(raw_findings):
-    groups = {}
-    for f in raw_findings:
-        cid = f.get("cause_id", "UNKNOWN_CAUSE")
-        severity = f.get("severity", "medium")
-        key = f"{cid}_{severity}"
-        if key not in groups:
-            groups[key] = {
-                "base_finding": f,
-                "urls": set()
-            }
-        
-        # Extract URL if present in evidence
-        evidence = f.get("evidence", "")
-        import re
-        url_match = re.search(r'(https?://[^\s,]+)', evidence)
-        if url_match:
-            groups[key]["urls"].add(url_match.group(1))
-
-    final = []
-    for g in groups.values():
-        finding = g["base_finding"]
-        urls = g["urls"]
-        if len(urls) > 1:
-            finding["evidence"] = f"{finding['evidence']} (Note: this pattern was observed across {len(urls)} pages, e.g. {list(urls)[0]})."
-            finding["title"] = f"{finding['title']} (Multiple Pages)"
-        final.append(finding)
-    return final
-
-
 def deduplicate_recommendations(rec_list, start_idx=1):
     seen = {}
     deduped = []
@@ -587,7 +557,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
 def validation_gate(report):
     try:
         proc = subprocess.run(
-            [sys.executable, VALIDATOR, "-", "--quiet"],
+            [sys.executable, VALIDATOR, "-"],
             input=json.dumps(report), capture_output=True, text=True, timeout=30
         )
         if proc.returncode == 0:

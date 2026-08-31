@@ -5,16 +5,30 @@ import os
 import re
 
 def validate_type(instance, schema, path="root"):
-    if "type" in schema:
-        expected_type = schema["type"]
-        if expected_type == "object" and not isinstance(instance, dict):
-            return f"{path}: Expected object, got {type(instance).__name__}"
-        elif expected_type == "array" and not isinstance(instance, list):
-            return f"{path}: Expected array, got {type(instance).__name__}"
-        elif expected_type == "string":
-            if not isinstance(instance, str):
-                return f"{path}: Expected string, got {type(instance).__name__}"
-            # P0-50: Strictly enforce date-time format
+    expected_type = schema.get("type")
+    if expected_type:
+        type_list = expected_type if isinstance(expected_type, list) else [expected_type]
+        type_map = {
+            "object": dict,
+            "array": list,
+            "string": str,
+            "integer": int,
+            "number": (int, float),
+            "boolean": bool,
+            "null": type(None)
+        }
+        valid = False
+        for t in type_list:
+            if t in type_map and isinstance(instance, type_map[t]):
+                if t == "integer" and type(instance) is bool:
+                    continue  # bool is a subclass of int, but we want strict checking
+                valid = True
+                break
+        
+        if not valid:
+            return f"{path}: Expected {type_list}, got {type(instance).__name__}"
+
+        if "string" in type_list and isinstance(instance, str):
             if schema.get("format") == "date-time":
                 import datetime
                 try:
@@ -22,20 +36,16 @@ def validate_type(instance, schema, path="root"):
                     datetime.datetime.fromisoformat(dt_str)
                 except ValueError:
                     return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
-        elif expected_type == "integer" and not isinstance(instance, int):
-            return f"{path}: Expected integer, got {type(instance).__name__}"
-        elif expected_type == "number" and not isinstance(instance, (int, float)):
-            return f"{path}: Expected number, got {type(instance).__name__}"
-            
+
     if "enum" in schema:
         if instance not in schema["enum"]:
             return f"{path}: Value {repr(instance)} not in allowed enum {schema['enum']}"
-            
+
     if "minLength" in schema and isinstance(instance, str):
         if len(instance) < schema["minLength"]:
             return f"{path}: String too short, expected at least {schema['minLength']} chars"
 
-    if expected_type == "object":
+    if isinstance(instance, dict):
         if "required" in schema:
             for req in schema["required"]:
                 if req not in instance:
@@ -48,7 +58,7 @@ def validate_type(instance, schema, path="root"):
             elif schema.get("additionalProperties") is False:
                 return f"{path}: Additional property '{k}' not allowed"
 
-    elif expected_type == "array":
+    elif isinstance(instance, list):
         if "items" in schema:
             for i, item in enumerate(instance):
                 err = validate_type(item, schema["items"], path=f"{path}[{i}]")

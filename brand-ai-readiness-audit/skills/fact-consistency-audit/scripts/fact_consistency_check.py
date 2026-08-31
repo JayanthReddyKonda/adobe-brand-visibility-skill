@@ -57,7 +57,7 @@ def extract_interval(raw_str):
 
 
 
-def normalize_price_str(raw):
+def normalize_price_str(raw, currency=None):
     """Normalize price string to standardized float string representation (e.g. '$49.99' -> '49.99', '€1.250,50' -> '1250.50', '₹5,499' -> '5499.00')."""
     if not raw:
         return None
@@ -331,9 +331,9 @@ def extract_scoped_facts(html_str, url):
         if not ctx or ctx == "General" or not is_valid_product_entity(ctx):
             continue
         for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
+            curr = extract_currency(m.group(0))
             norm_p = normalize_price_str(m.group(1), curr)
             if norm_p and float(norm_p) > 0:
-                curr = extract_currency(m.group(0))
                 invl = extract_interval(txt)
                 if not any(sp["price"] == norm_p and sp["entity"].lower() == ctx.lower().strip() and sp["currency"] == curr and sp["interval"] == invl for sp in facts["scoped_prices"]):
                     facts["scoped_prices"].append({

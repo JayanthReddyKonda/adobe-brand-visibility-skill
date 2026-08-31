@@ -91,11 +91,11 @@ class Dom(HTMLParser):
         elif t == "noscript":
             self.skip += 1
             self.in_noscript = True
-        if t == "link" and a.get("rel", "").lower() == "alternate" and a.get("hreflang"):
+        if t == "link" and (a.get("rel") or "").lower() == "alternate" and a.get("hreflang"):
             self.hreflangs.append({"lang": a.get("hreflang"), "href": a.get("href")})
-        if t == "link" and a.get("rel", "").lower() == "canonical":
+        if t == "link" and (a.get("rel") or "").lower() == "canonical":
             self.canonical = a.get("href")
-        if t == "meta" and a.get("name", "").lower() == "robots":
+        if t == "meta" and (a.get("name") or "").lower() == "robots":
             self.meta_robots = a.get("content", "")
         
         # 1. Container ID / Class heuristics
@@ -230,18 +230,36 @@ def audit(base, domain, inv=None, state_file=None):
             headers = {"content-type": home_page.get("content_type")}
         err = None
         r_info = inv.get("robots") or (inv.get("infrastructure") or {}).get("robots") or {}
-        r_status = r_info.get("status")
-        robots_txt = r_info.get("text")
+        if isinstance(r_info, dict):
+            r_status = r_info.get("status")
+            robots_txt = r_info.get("text")
+        else:
+            r_status = None
+            robots_txt = None
+        # Also check top-level robots_txt string (common inventory format)
+        if not robots_txt and isinstance(inv.get("robots_txt"), str):
+            robots_txt = inv["robots_txt"]
+            r_status = 200
     else:
         status, html, headers, err = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
         r_status, robots_txt, _, _ = safe_fetch(base + "/robots.txt", timeout=8, max_bytes=512*1024)
 
+    state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
+    if state_file and os.path.exists(state_file):
+        try:
+            with open(state_file, "r") as f:
+                state = json.load(f)
+        except Exception:
+            pass
+
     if status is None:
         if state_file:
-            with open(state_file, "w") as f:
+            import tempfile as _tf
+            _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(state_file))
+            with os.fdopen(_fd, "w") as f:
                 json.dump(state, f)
-            
-    return {
+            os.replace(_tmp, state_file)
+        return {
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
@@ -266,11 +284,6 @@ def audit(base, domain, inv=None, state_file=None):
                 "verification": f"Send GET {base}/ and confirm HTTP 200 is returned."
             }
         })
-        if state_file:
-            with open(state_file, "w") as f:
-                json.dump(state, f)
-            
-    return {"status": "ok", "findings": findings, "recommendations": []}
 
     # Check Contract C3: Differential AI Crawler Access / WAF Block Probe
     if inv is None or status == 200:
@@ -490,10 +503,13 @@ def audit(base, domain, inv=None, state_file=None):
                 "role": "informational"
             })
 
-        if state_file:
-            with open(state_file, "w") as f:
-                json.dump(state, f)
-            
+    if state_file:
+        import tempfile as _tf
+        _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(state_file))
+        with os.fdopen(_fd, "w") as f:
+            json.dump(state, f)
+        os.replace(_tmp, state_file)
+
     return {
         "status": "ok",
         "findings": findings,

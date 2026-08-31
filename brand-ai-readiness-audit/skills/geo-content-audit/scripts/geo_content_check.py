@@ -78,7 +78,7 @@ def audit(base, domain, inv=None, state_file=None):
 
     html_pages = [p for p in inv["pages"] if p.get("html")]
     if not html_pages:
-        return {"status": "inconclusive"}
+        return {"status": "inconclusive", "findings": [], "recommendations": []}
 
     # We only audit 'product_detail' or 'article' pages for GEO optimizations
     target_pages = [p for p in html_pages if p.get("page_type") in ("product_detail", "article", "pricing")]
