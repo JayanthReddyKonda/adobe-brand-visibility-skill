@@ -224,6 +224,14 @@
           },
           "impact": {
             "type": "string"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
           }
         },
         "additionalProperties": false

@@ -372,13 +372,22 @@ def audit(base, domain, inv=None, state_file=None):
     if state_file:
         if "entities" not in state:
             state["entities"] = {}
-        for p in entity_facts:
+        for p in html_pages:
             u = p.get("url", "")
             if u not in state["entities"]:
                 state["entities"][u] = []
-            for o in p.get("json_ld", []):
-                if isinstance(o, dict) and o.get("name"):
-                    state["entities"][u].append(o["name"])
+            phtml = p.get("html", "")
+            if phtml:
+                pdom = EntityDOMParser()
+                try:
+                    pdom.feed(phtml)
+                except Exception:
+                    pass
+                for o in parse_json_ld(pdom.json_ld_contents):
+                    if isinstance(o, dict) and o.get("name") and o.get("name") not in state["entities"][u]:
+                        state["entities"][u].append(o["name"])
+            if brand_name and brand_name not in state["entities"][u]:
+                state["entities"][u].append(brand_name)
         import tempfile, shutil
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
         with os.fdopen(fd, "w") as f:

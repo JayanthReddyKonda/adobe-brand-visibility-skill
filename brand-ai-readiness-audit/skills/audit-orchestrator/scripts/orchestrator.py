@@ -56,6 +56,7 @@ def parse_args():
                         help="Run optional assistant-representation-audit skill to cross-check observed AI assistant answers")
     parser.add_argument("--responses", "--observations", dest="responses_file",
                         help="Path to JSON file containing observed AI assistant outputs")
+    parser.add_argument("--inventory", help="Path to pre-acquired site-inventory JSON (bypasses acquisition)")
 
     # Global time limit
     parser.add_argument("--timeout-seconds", type=int, default=300,
@@ -310,7 +311,8 @@ def discover_plugins():
 
 
 def compose_audit(site, include_proactive=True, with_representation=False,
-                  responses_file=None, timeout_seconds=300, return_internal=False):
+                  responses_file=None, timeout_seconds=300, return_internal=False,
+                  inventory_file=None):
     start_mono = time.monotonic()
     monotonic_deadline = start_mono + timeout_seconds
     domain, base_url = normalize_target(site)
@@ -320,11 +322,29 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     all_observations = []
     all_coverage = {}
     all_limitations = []
+    cleanup_inventory = True
 
     # 1. Acquisition Phase (Type-Safe Shared Inventory) - max 60s
-    acquisition_deadline = min(monotonic_deadline, start_mono + 60)
-    inventory, inv_stats = build_inventory(base_url, deadline=acquisition_deadline)
-    inventory_path = write_inventory_file(inventory) if inventory else None
+    if inventory_file and os.path.exists(inventory_file):
+        try:
+            with open(inventory_file, "r", encoding="utf-8") as f:
+                inventory = json.load(f)
+            inv_stats = {
+                "pages_discovered": len(inventory.get("pages", [])),
+                "html_pages_sampled": len([p for p in inventory.get("pages", []) if p.get("resource_type") == "html" or "html" in str(p.get("content_type", "")) or p.get("html")]),
+                "sitemaps_found": len(inventory.get("sitemaps", [])),
+                "robots_txt_found": bool(inventory.get("robots_txt")),
+                "homepage_reachable": True
+            }
+            inventory_path = inventory_file
+            cleanup_inventory = False
+        except Exception:
+            inventory = None
+            inventory_path = None
+    else:
+        acquisition_deadline = min(monotonic_deadline, start_mono + 60)
+        inventory, inv_stats = build_inventory(base_url, deadline=acquisition_deadline)
+        inventory_path = write_inventory_file(inventory) if inventory else None
 
     if inventory_path:
         all_coverage["site_inventory"] = inv_stats
@@ -466,8 +486,8 @@ def compose_audit(site, include_proactive=True, with_representation=False,
         if not isinstance(item, dict):
             continue
         sev = str(item.get("severity", "medium")).lower()
-        if sev not in SEVERITY_ORDER:
-            sev = "medium"
+        if sev == "info" or sev not in ("critical", "high", "medium", "low"):
+            sev = "low"
         confidence = str(item.get("confidence", "medium")).lower()
         fp = f"{item.get('category', '')}:{item.get('title', '')}"
         if fp in seen_fps:
@@ -493,7 +513,9 @@ def compose_audit(site, include_proactive=True, with_representation=False,
 
         action = item.get("suggested_action", {})
         action_summary = action.get("summary") if isinstance(action, dict) else str(action)
-        action_priority = action.get("priority", sev if sev != "info" else "low") if isinstance(action, dict) else sev
+        action_priority = str(action.get("priority", sev)).lower() if isinstance(action, dict) else sev
+        if action_priority == "info" or action_priority not in ("critical", "high", "medium", "low"):
+            action_priority = "low" 
         
         suggested_action = {
             "summary": action_summary,
@@ -733,7 +755,8 @@ def main():
         with_representation=args.with_representation,
         responses_file=args.responses_file,
         timeout_seconds=args.timeout_seconds,
-        return_internal=True
+        return_internal=True,
+        inventory_file=args.inventory
     )
 
     if not validation_gate(report):

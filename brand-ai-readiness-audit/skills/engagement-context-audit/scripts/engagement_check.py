@@ -366,7 +366,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 }
             })
         
-    return findings, recommendations, {'visible_words': len(' '.join(dom.body_text).split()), 'h1': len(dom.h1_list) > 0, 'anchor_links_found': len(dom.nav_links)}
+    return findings, recommendations, {'visible_words': len(' '.join(dom.body_text).split()), 'h1': len(dom.h1_list) > 0, 'navigation_links_found': len(dom.nav_links), 'anchor_links_found': len(dom.nav_links)}
 
 def audit(base, domain, inv=None, state_file=None):
     state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
@@ -427,7 +427,7 @@ def audit(base, domain, inv=None, state_file=None):
             
             "average_visible_words": round(sum(pm["visible_words"] for pm in page_metrics) / max(1, len(page_metrics)), 1),
             "pages_with_h1": sum(1 for pm in page_metrics if pm["h1"]),
-            "pages_with_navigation": sum(1 for pm in page_metrics if pm["navigation_links_found"] > 0)
+            "pages_with_navigation": sum(1 for pm in page_metrics if pm.get("navigation_links_found", pm.get("anchor_links_found", 0)) > 0)
         },
         "limitations": [
             "Engagement and orientation analysis is based on static HTML layout semantics; dynamic client-rendered overlays were not evaluated."
