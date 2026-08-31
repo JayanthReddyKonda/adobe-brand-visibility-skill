@@ -1,3 +1,4 @@
+import json
 #!/usr/bin/env python3
 """
 orchestrator.py - Entrypoint CLI for Brand AI-Readiness Audit Marketplace.
@@ -15,7 +16,6 @@ Enforces strict Resource-Type / Content-Type invariants:
 import sys
 import os
 import re
-import json
 import time
 import argparse
 import tempfile
@@ -231,7 +231,6 @@ def deduplicate_recommendations(rec_list, start_idx=1):
 
 
 
-import json
 
 def discover_plugins():
     """Dynamic Plugin Discovery Kernel (Marketplace OS)"""

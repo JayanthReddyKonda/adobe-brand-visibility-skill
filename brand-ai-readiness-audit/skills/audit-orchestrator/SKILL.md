@@ -61,7 +61,6 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 > - `geo-content-audit`
 > - `corroboration-authority-audit`
 > - `engagement-context-audit`
-> - `assistant-representation-audit`
 >
 > ONLY after reading them may you execute `orchestrator.py`.
 
@@ -95,18 +94,18 @@ python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/acquire_inventory.p
    ```
 
 
-### Step 5: Generative Engine Optimization (GEO) Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/geo-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
-2. **Execute Diagnostic Script:**
-   ```bash
-   python3 <MARKETPLACE_ROOT>/skills/geo-content-audit/scripts/geo_content_check.py --site <target_url> --inventory inv.json --format json
-   ```
-
-### Step 6: Authority & SameAs Corroboration Audit
+### Step 5: Authority & SameAs Corroboration Audit
 1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/corroboration-authority-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
    python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
+   ```
+
+### Step 6: Generative Engine Optimization (GEO) Audit
+1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/geo-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
+2. **Execute Diagnostic Script:**
+   ```bash
+   python3 <MARKETPLACE_ROOT>/skills/geo-content-audit/scripts/geo_content_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 ### Step 7: Engagement & Context Continuity Audit
@@ -116,14 +115,7 @@ python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/acquire_inventory.p
    python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
    ```
 
-### Step 8 (Optional): Assistant Representation Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/assistant-representation-audit/SKILL.md` (which contains the unified knowledge base pointer).
-2. **Execute Diagnostic Script (if responses provided):**
-   ```bash
-   python3 <MARKETPLACE_ROOT>/skills/assistant-representation-audit/scripts/representation_check.py --site <target_url> --responses <responses.json> --inventory inv.json --format json
-   ```
-
-### Step 9: Master Evidence Synthesis & Schema Validation Gate
+### Step 8: Master Evidence Synthesis & Schema Validation Gate
 The audit pipeline synthesizes specialist findings, assigns root causes from [references/root-causes.md](references/root-causes.md), deduplicates recommendations, and validates against [references/report-schema.json](references/report-schema.json):
 ```bash
 python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/orchestrator.py --site <target_url> --format json

@@ -82,7 +82,7 @@ python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_
 4. **Canonical Consolidation (`DISCOVERY.DISCOVERY_PATH.CANONICAL_FRAGMENTATION`):**
    - If `<link rel="canonical">` points to an external un-audited host -> `medium` finding.
 5. **Initial HTML Extractability (`DISCOVERY.REPRESENTATION_AVAILABILITY.RENDERED_CONTENT_GAP`):**
-   - If visible text in raw HTML < 30 words and an unrendered SPA root (`<div id="root|app">`) is present -> `high` severity rendering risk indicator.
+   - If visible text in raw HTML < 25 words and an unrendered SPA root (`<div id="root|app">`) is present -> `high` severity rendering risk indicator.
 
 ---
 

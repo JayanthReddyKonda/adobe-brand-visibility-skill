@@ -53,12 +53,12 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 Execute the engagement and intent continuity script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory <inventory.yaml> --format json
+python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --format json
+python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 

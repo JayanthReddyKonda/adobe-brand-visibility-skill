@@ -282,8 +282,7 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
 | :--- | :--- | :--- | :--- |
 | `id` | String | Yes | Unique finding identifier (e.g., `F-001`, `F-002`) |
 | `title` | String | Yes | Concise, human-readable summary of the defect |
-| `severity` | Enum | Yes | `critical` \| `high` \| `medium` \| `low` \| `info` |
-| `evidence` | String | Yes | Concrete data, observed metrics, or reproduction steps verifying the finding |
+| `severity` | Enum | Yes | `critical` \| `high` \| `medium` \| `low` \| `evidence` | String | Yes | Concrete data, observed metrics, or reproduction steps verifying the finding |
 | `suggested_action` | Object | Yes | Actionable, mechanism-sound remediation plan |
 | `confidence` | Enum | No | `high` \| `medium` \| `low` |
 | `category` | String | No | Functional category (e.g. `access`, `entity-integrity`, `fact-consistency`, `orientation`) |
@@ -389,7 +388,6 @@ Severity reflects the direct impact of a defect on AI discovery, knowledge extra
 | `high` | **Material Retrieval / Factual Degradation**: Directly leads to corrupted facts, omitted products, or severe rendering extraction failure. | • Core text missing from initial HTML (< 30 words in SPA container).<br>• Conflicting prices published for the same product across first-party pages.<br>• AI assistant quotes wrong pricing due to ambiguous markup.<br>• WAF blocking crawler User-Agents. |
 | `medium` | **Corroboration & Orientation Degradation**: Degrades entity clarity, navigation, or cross-web trust anchors. | • Broken `sameAs` authority profile URLs (HTTP 404).<br>• No machine-explicit Organization identity.<br>• Content page lacks `<h1>` or internal navigation menus.<br>• Copyright years vary significantly across site pages. |
 | `low` | **Extractability Polish & Minor Signal Gaps**: Minor improvements that make fact extraction easier but do not block ingestion. | • Incomplete Product schema attributes (e.g. missing sku).<br>• Low-information H1 heading (e.g. "Welcome").<br>• Missing dateModified timestamps on static pages. |
-| `info` | **Observational & Governance Signals**: Deliberate business choices or observational facts that are explicitly NOT site defects. | • robots.txt blocks training-only crawlers (intentional training opt-out).<br>• Brand mentioned without a direct citation link. |
 
 ---
 

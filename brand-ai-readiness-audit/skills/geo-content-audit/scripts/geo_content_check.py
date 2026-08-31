@@ -100,7 +100,7 @@ def audit(base, domain, inv=None, state_file=None):
         
         # 1. In-Depth Mechanisms ('how', 'why', 'because', 'therefore')
         mechanism_words = ['how', 'why', 'because', 'therefore', 'allows', 'enables', 'mechanism', 'results in']
-        depth_score = sum(1 for w in mechanism_words if w in full_text.lower())
+        import re; depth_score = sum(1 for w in mechanism_words if re.search(rf"\b{w}\b", full_text.lower()))
         
         if depth_score < 2:
             findings.append({
@@ -168,7 +168,8 @@ def main():
     with open(args.inventory, "r", encoding="utf-8") as f:
         inv = json.load(f)
     
-    res = audit(args.site, args.site, inv)
+    from urllib.parse import urlparse
+    res = audit(args.site, urlparse(args.site).netloc, inv)
     print(json.dumps(res, indent=2))
 
 if __name__ == "__main__":

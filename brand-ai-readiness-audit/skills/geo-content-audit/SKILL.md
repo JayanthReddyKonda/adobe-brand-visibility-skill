@@ -7,7 +7,10 @@ compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (sta
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "3.0.0"
+allowed-tools:
+  - run_command
+  - view_file
 ---
 
 > [!TIP]
