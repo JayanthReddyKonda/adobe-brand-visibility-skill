@@ -195,6 +195,14 @@ def main():
     
     from urllib.parse import urlparse
     res = audit(args.site, urlparse(args.site).netloc, inv)
+    # ARCHITECTURE REDESIGN: Strip pre-baked findings. The AI Agent does the reasoning.
+    if "findings" in res:
+        del res["findings"]
+    if "recommendations" in res:
+        del res["recommendations"]
+    if "observations" in res:
+        del res["observations"]
+    
     print(json.dumps(res, indent=2))
 
 if __name__ == "__main__":
