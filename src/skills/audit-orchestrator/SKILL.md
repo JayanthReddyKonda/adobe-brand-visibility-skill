@@ -32,12 +32,23 @@ Execute each of the specialist tools sequentially. Each returns a `TelemetryResp
 5. **GEO Content:** `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory /tmp/inv.json`
 6. **Engagement Context:** `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory /tmp/inv.json`
 
-### Step 3: AI Cognitive Reasoning
+
+### Step 3: Knowledge Base Ingestion
+Before you synthesize the final report, you MUST read the authoritative knowledge bases to ground your recommendations in our strict standards. Use `cat` or your file viewing tool to read at least the following:
+- `skills/audit-orchestrator/references/audit-orchestrator-knowledge-base.md`
+- `skills/discoverability-audit/references/discoverability-audit-knowledge-base.md`
+- `skills/entity-content-audit/references/entity-content-audit-knowledge-base.md`
+- `skills/geo-content-audit/references/geo-content-audit-knowledge-base.md`
+- `skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md`
+- `skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md`
+- `skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md`
+
+### Step 4: AI Cognitive Reasoning
 1. **Analyze:** Review the `raw_extracted_facts` and `telemetry` from all tools.
 2. **Synthesize Findings:** For each problematic fact (e.g., missing schema, blocked crawlers, shallow mechanisms), deduce the `severity`, `root_cause`, and `impact`.
 3. **Tailor Recommendations:** Write bespoke `technical_fix` and `creative_fix` solutions that perfectly match the brand's context.
 
-### Step 4: Output Synthesis & Validation
+### Step 5: Output Synthesis & Validation
 Construct the final Draft-07 schema-compliant JSON report.
 Save it to `/tmp/final_report.json` and validate:
 ```bash
