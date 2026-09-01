@@ -52,18 +52,14 @@ Every check in this skill follows this contract. Findings are only emitted
 when the DEFECT conditions are met with direct evidence; everything else is
 either INCONCLUSIVE or a proactive recommendation.
 
-## CHECK 1: Outbound corroboration links
+## CHECK 1: Identity Profile Verification (`sameAs` resolution)
 
-- **Measures**: Whether the site links out to authoritative third-party
-  sources (standards bodies, registries, publications) that support its claims.
-- **Evidence required**: Anchor inventory of fetched page(s).
-- **Defect**: Site makes strong factual claims ("award-winning", "#1",
-  certifications) with zero outbound or citation support.
-- **NOT a defect**: Few outbound links on a page that makes few factual claims.
-  Marketing pages legitimately link sparingly.
-- **Severity conditions**: high only when specific unsupported factual claims
-  are extractable from the text; otherwise low / recommendation.
-- **Remediation**: Add citations or evidence pages behind the claims.
+- **Measures**: Whether declared `sameAs` authority links in Schema.org `Organization` resolve cleanly with HTTP 200.
+- **Evidence required**: Bounded SSRF-safe probe of declared `sameAs` URLs.
+- **Defect**: Declared authority profile returns HTTP 4xx or 5xx (`BROKEN_AUTHORITY_ANCHOR`).
+- **NOT a defect**: Absence of declared `sameAs` links (emitted as a proactive recommendation, never a defect). Timeout or rate-limit recorded as `inconclusive`.
+- **Severity conditions**: `medium` severity, `high` confidence when declared authority links provably fail.
+- **Remediation**: Update dead `sameAs` URLs to live canonical profile links or remove broken references.
 
 ## CHECK 2: Identity consistency for corroboration
 

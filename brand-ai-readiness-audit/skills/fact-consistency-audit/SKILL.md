@@ -54,7 +54,7 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 Execute the fact ledger and consistency script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 <MARKETPLACE_ROOT>/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:

@@ -57,7 +57,7 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 Execute the deterministic extraction script using the shared inventory and `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:

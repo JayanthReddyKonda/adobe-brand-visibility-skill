@@ -91,12 +91,9 @@ AUDIT TAXONOMY
 | `EXPERIENCE.CONTINUITY` | `INTENT_TO_LANDING_MISMATCH` | Landing page omits answers to referral query intent above the fold. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `LOW_INFORMATION_SCENT` | Primary H1 uses generic filler words ("Welcome", "Home") lacking information scent. | `low` |
 | `EXPERIENCE.CONTINUITY` | `DESTINATION_NAVIGATION_FRICTION` | Landing page lacks navigation links to core brand destinations. | `medium` |
-| `CONTENT.RETRIEVAL_OPTIMIZATION` | `POOR_DATA_DENSITY` | Page relies solely on unstructured prose, missing required semantic lists or tables. | `medium` |
-| `CONTENT.RETRIEVAL_OPTIMIZATION` | `GEO_UNOPTIMIZED` | Low statistical density reduces the probability an LLM will select this page for factual grounding. | `low` |
-| `REPRESENTATION.ACCURACY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
-| `CONTENT.RETRIEVAL_OPTIMIZATION` | `POOR_DATA_DENSITY` | Page relies solely on unstructured prose, missing required semantic lists or tables. | `medium` |
-| `CONTENT.RETRIEVAL_OPTIMIZATION` | `GEO_UNOPTIMIZED` | Low statistical density reduces the probability an LLM will select this page for factual grounding. | `low` |
-| `REPRESENTATION.ACCURACY` | `AI_UNSUPPORTED_CLAIM` | Observed AI assistant asserts ungrounded claims about brand capabilities. | `medium` |
+| `CONTENT.SHALLOW_COVERAGE` | `MISSING_IN_DEPTH_MECHANISMS` | Content lacks explanatory mechanisms ('how' and 'why') prioritized by generative search. | `medium` |
+| `CONTENT.RETRIEVAL_OPTIMIZATION` | `LACK_OF_SPECIFIC_EVIDENCE` | Content lacks concrete statistics, numbers, or verifiable metrics. | `low` |
+| `FACT.CONSISTENCY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
 
 
 ========================================================================
@@ -128,7 +125,7 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 - **Family:** `DISCOVERY.REPRESENTATION_AVAILABILITY`
 - **Purpose:** Detect when initial unrendered HTML payload carries insufficient text.
 - **Input:** Raw HTTP response body word count.
-- **Decision:** Finding triggered IF visible word count < 30 words AND empty SPA root marker (`<div id="root">`, `<div id="app">`) is present.
+- **Decision:** Finding triggered IF visible word count < 25 words AND empty SPA root marker (`<div id="root">`, `<div id="app">`) is present.
 - **Exclusion:** Do NOT report if visible words ≥ 30 words or if the page is an API endpoint.
 - **Severity:** `high`.
 - **Confidence:** `medium` (risk indicator; modern search engines may execute JS).
@@ -208,8 +205,8 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 ---
 
 ## 8. `AI_FACT_CONFLICT`
-- **Skill:** `assistant-representation-audit`
-- **Family:** `REPRESENTATION.ACCURACY`
+- **Skill:** `fact-consistency-audit`
+- **Family:** `FACT.CONSISTENCY`
 - **Purpose:** Identify when an AI assistant quotes prices that contradict on-site reality.
 - **Input:** Observed AI assistant claims vs first-party fact snapshot.
 - **Decision:** Finding triggered IF assistant states a price that is absent from all on-site listings.
@@ -221,17 +218,17 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 
 ---
 
-## 9. `CONTENT.POOR_DATA_DENSITY`
+## 9. `MISSING_IN_DEPTH_MECHANISMS`
 - **Skill:** `geo-content-audit`
-- **Family:** `CONTENT.RETRIEVAL_OPTIMIZATION`
-- **Purpose:** Detect when substantive content lacks the statistical density and formatting required for AI retrieval.
-- **Input:** Raw visible text, tabular elements (`<table>`), and list elements (`<ul>`, `<ol>`).
-- **Decision:** Finding triggered IF pages lack tabular/list structures or contain low statistical density, reducing LLM extraction likelihood.
+- **Family:** `CONTENT.SHALLOW_COVERAGE`
+- **Purpose:** Detect when substantive content lacks the causal/explanatory depth required for AI citation.
+- **Input:** Tokenized visible text across substantive product and content routes.
+- **Decision:** Finding triggered IF depth score < 2 (fewer than 2 causal conjunctions: 'how', 'why', 'because', 'therefore', 'allows', 'enables').
 - **Exclusion:** Do NOT report on purely transactional pages (login, cart).
 - **Severity:** `medium`.
 - **Confidence:** `high`.
-- **Remediation:** Refactor key text into explicit Q&A headers (`<h2>`), bulleted lists, and structured tables.
-- **Verification:** Confirm presence of dense structural elements (tables/lists) and statistical data.
+- **Remediation:** Refactor key text to explain underlying mechanisms, operational workflows, and causal benefits.
+- **Verification:** Confirm presence of explanatory conjunctions and depth markers in visible text.
 
 
 ========================================================================
@@ -250,15 +247,10 @@ This document specifies the structure, validation constraints, and field semanti
 | :--- | :--- | :--- | :--- |
 | `site` | String | Yes | Target domain or URL (e.g., `example.com` or `https://example.com`) |
 | `audited_at` | String (ISO 8601) | Yes | UTC timestamp in ISO 8601 format (e.g., `2026-09-20T14:32:00Z`) |
-| `summary` | Object | Yes | Aggregate counts of findings categorized by severity |
-| `findings` | Array | Yes | Ordered list of detected defects with supporting evidence |
-| `specialists` | Object | No | Execution status (`ok`, `failed`, `inconclusive`, `not_run`) and diagnostics per specialist |
-| `audit_metrics` | Object | No | Objective audit measurements (`pages_sampled`, `page_types_covered`, `critical_blockers`, `confidence_distribution`, `answerability_index`) |
-| `root_causes` | Array | No | Clustered root causes mapped to standardized taxonomy families (`cause_family`, `cause_id`) |
-| `proactive_actions` | Array | No | Deduplicated proactive opportunities (e.g. sitemap creation, /llms.txt experiments) |
-| `observations` | Array | No | Evidence ledger entries (e.g. crawler matrix breakdown, answerability ratios) |
-| `coverage` | Object | No | Sampled URLs and extraction metadata per specialist |
-| `limitations` | Array | No | Explicit scope constraints noted during the run |
+| `audit_status` | String (Enum) | Yes | Audit completion status: `complete`, `partial`, `failed` |
+| `summary` | Object | Yes | Aggregate counts of findings categorized by severity (`critical`, `high`, `medium`, `low`) |
+| `findings` | Array | Yes | Ordered list of verified defects with supporting evidence and suggested actions |
+| `proactive_actions` | Array | No | Deduplicated proactive opportunities (e.g. sitemap creation, llms.txt, JSON-LD) |
 
 ---
 
@@ -385,7 +377,7 @@ Severity reflects the direct impact of a defect on AI discovery, knowledge extra
 | Severity | Criteria | Examples |
 | :--- | :--- | :--- |
 | `critical` | **Total Exclusion / Hard Outage**: Prevents AI retrieval engines from crawling or indexing public content. | • `Disallow: /` for AI search retrieval crawlers (`OAI-SearchBot`, `PerplexityBot`).<br>• `<meta name="robots" content="noindex">` on landing page.<br>• HTTP 5xx/4xx on root URL. |
-| `high` | **Material Retrieval / Factual Degradation**: Directly leads to corrupted facts, omitted products, or severe rendering extraction failure. | • Core text missing from initial HTML (< 30 words in SPA container).<br>• Conflicting prices published for the same product across first-party pages.<br>• AI assistant quotes wrong pricing due to ambiguous markup.<br>• WAF blocking crawler User-Agents. |
+| `high` | **Material Retrieval / Factual Degradation**: Directly leads to corrupted facts, omitted products, or severe rendering extraction failure. | • Core text missing from initial HTML (< 25 words in SPA container).<br>• Conflicting prices published for the same product across first-party pages.<br>• AI assistant quotes wrong pricing due to ambiguous markup.<br>• WAF blocking crawler User-Agents. |
 | `medium` | **Corroboration & Orientation Degradation**: Degrades entity clarity, navigation, or cross-web trust anchors. | • Broken `sameAs` authority profile URLs (HTTP 404).<br>• No machine-explicit Organization identity.<br>• Content page lacks `<h1>` or internal navigation menus.<br>• Copyright years vary significantly across site pages. |
 | `low` | **Extractability Polish & Minor Signal Gaps**: Minor improvements that make fact extraction easier but do not block ingestion. | • Incomplete Product schema attributes (e.g. missing sku).<br>• Low-information H1 heading (e.g. "Welcome").<br>• Missing dateModified timestamps on static pages. |
 
@@ -426,7 +418,6 @@ methodology, not three opinions.
 | `corroboration-authority-audit` | Independent source verification of first-party claims (sameAs, external profiles) | First-party content quality |
 | `engagement-context-audit` | Intent orientation (5-second test), heading information scent, navigation continuity on landing pages | Technical crawlability |
 | `geo-content-audit` | Generative Engine Optimization (GEO), statistical density, Q&A formatting, structured tabular/list content | Semantic engagement continuity |
-| `assistant-representation-audit` | Cross-checking *observed* AI assistant outputs against first-party facts (opt-in enrichment) | Site-side crawl rules |
 
 ---
 

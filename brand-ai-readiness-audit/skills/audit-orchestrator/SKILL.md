@@ -39,7 +39,7 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 - **`--output` / `-o`** (string, optional): Path to save the generated JSON audit report (default: stdout).
 - **`--format`** (string, optional): Output format: `json` (default, machine-readable) or `markdown`.
 - **`--include-proactive` / `--no-proactive`** (flag, optional): Include or suppress proactive improvement recommendations (default: True).
-- **`--with-representation`** (flag, optional): Enable the `assistant-representation-audit` enrichment layer.
+- **`--responses` / `--observations`** (string, optional): Path to JSON file of observed AI assistant claims to cross-verify via `fact-consistency-audit`.
 ## References to Consult
 
 > [!IMPORTANT]
@@ -116,7 +116,7 @@ python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/acquire_inventory.p
    ```
 
 ### Step 8: Master Evidence Synthesis & Schema Validation Gate
-The audit pipeline synthesizes specialist findings, assigns root causes from [references/root-causes.md](references/root-causes.md), deduplicates recommendations, and validates against [references/report-schema.json](references/report-schema.json):
+The audit pipeline synthesizes specialist findings, assigns root causes from [references/audit-orchestrator-knowledge-base.md](references/audit-orchestrator-knowledge-base.md), deduplicates recommendations, and validates against [references/report-schema.json](references/report-schema.json):
 ```bash
 python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/orchestrator.py --site <target_url> --format json
 ```

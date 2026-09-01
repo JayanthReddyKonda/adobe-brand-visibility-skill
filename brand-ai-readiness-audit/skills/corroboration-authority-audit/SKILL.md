@@ -54,7 +54,7 @@ Evaluates external entity authority by verifying that declared identity links (`
 Execute the authority link verification script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:

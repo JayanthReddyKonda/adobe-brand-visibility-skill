@@ -94,7 +94,7 @@ Formal check contracts, decision thresholds, and evidence criteria for engagemen
 
 ## C1. 5-Second Orientation & Heading Information Scent
 - **Measures:** Presence and clarity of primary heading (`<h1>`), page `<title>`, and structural subheadings (`<h2>`) against the 4-question orientation framework (What is this? Who is it for? Why is it relevant? What can I do next?).
-- **Defect:** Content-rich page (>150 words) with missing or empty `<h1>`, uninformative `<title>`, and zero `<h2>` subheadings (`LOW_INFORMATION_SCENT`, Severity: `medium`). Generic single-word heading like "Welcome" with low information scent (`LOW_INFORMATION_SCENT`, Severity: `low`).
+- **Decision:** If primary H1 is missing or generic (e.g. "Welcome", "Home"), emit a proactive **recommendation** (`LOW_INFORMATION_SCENT`, Priority: `low`). Heuristic heading absence alone never creates a high-severity defect finding per the "No Heuristic Defects" rule.
 - **Not a defect:** Clean, self-explanatory pages where `<title>`, hero copy, and interactive options orient the user immediately. Dedicated contact pages with standard headers ("Contact us", "Contáctenos") in any language.
 
 ---

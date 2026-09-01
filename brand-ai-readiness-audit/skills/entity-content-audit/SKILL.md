@@ -55,7 +55,7 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 Execute the deterministic entity and answerability script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory <inventory.json> --format json
+python3 <MARKETPLACE_ROOT>/skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:

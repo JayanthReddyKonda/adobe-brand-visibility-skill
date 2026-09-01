@@ -70,7 +70,7 @@ brand-ai-readiness-audit/           # Main Hackathon Submission Payload
     ├── discoverability-audit/      # Accessibility & Indexing check
     ├── entity-content-audit/       # Structured Knowledge check
     ├── fact-consistency-audit/     # Temporal Ledger & Contradiction check
-    ├── corroboration-authority-audit/# E-E-A-T Claim check
+    ├── corroboration-authority-audit/ # Authority & sameAs Link check
     ├── engagement-context-audit/   # Visitor Orientation & Continuity check
     └── geo-content-audit/          # Generative Engine Optimization check
 ```
