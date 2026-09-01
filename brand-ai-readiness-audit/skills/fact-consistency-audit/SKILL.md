@@ -33,7 +33,7 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
-## When to Use
+## When to use
 
 - Verify that prices, specifications, and commercial terms are consistent across all brand pages.
 - Detect when obsolete or discontinued products are erroneously advertised as active or in-stock.
@@ -41,18 +41,26 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 
 ---
 
+## Inputs
+- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
+- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
+- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
+- `--format json`: Machine-readable JSON output mode
+
 ## References & Documentation Library
 
 Load these resources as needed during factual consistency checks:
 
 ### Core Knowledge Base (Load First)
 - [📖 Fact Consistency Knowledge Base](references/fact-consistency-audit-knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
-## Mandatory Execution Command
+## Procedure
+
+### Step 1: Execution Command
 
 Execute the fact ledger and consistency script with `--format json`:
 
 ```bash
-python3 scripts/fact_consistency_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
@@ -63,7 +71,7 @@ python3 scripts/fact_consistency_check.py --site https://example.com --format js
 
 ---
 
-## Decision Protocol & Check Logic
+### Step 2: Decision Protocol & Check Logic
 
 1. **Scoped Price Contradictions (`FACT.CONSISTENCY.FIRST_PARTY_FACT_CONFLICT`):**
    - Flag a defect ONLY when two or more first-party pages state conflicting prices for the **same scoped entity** (e.g. "Velocity X9" is \$5,499 on `/product/x9` but \$4,999 on `/promo`).

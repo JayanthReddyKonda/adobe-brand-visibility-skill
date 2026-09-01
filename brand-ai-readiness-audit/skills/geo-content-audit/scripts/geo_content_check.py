@@ -164,15 +164,34 @@ def audit(base, domain, inv=None, state_file=None):
     }
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", required=True)
+    parser = argparse.ArgumentParser(description="Generative Engine Optimization (GEO) audit layer.")
+    parser.add_argument("--site", required=True, help="Target website URL")
+    parser.add_argument("--inventory", required=False, help="Path to pre-acquired site inventory JSON")
     parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument("--format", required=False)
+    parser.add_argument("--format", required=False, help="Output format (json)")
     args = parser.parse_args()
     
-    with open(args.inventory, "r", encoding="utf-8") as f:
-        inv = json.load(f)
+    if args.inventory and os.path.exists(args.inventory):
+        try:
+            with open(args.inventory, "r", encoding="utf-8") as f:
+                inv = json.load(f)
+        except Exception:
+            inv = None
+    else:
+        status, html, _, _ = safe_fetch(args.site)
+        if status == 200 and html:
+            inv = {
+                "site": args.site,
+                "pages": [{
+                    "url": args.site,
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": html
+                }]
+            }
+        else:
+            inv = {"site": args.site, "pages": []}
     
     from urllib.parse import urlparse
     res = audit(args.site, urlparse(args.site).netloc, inv)

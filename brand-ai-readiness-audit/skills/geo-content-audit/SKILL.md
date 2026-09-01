@@ -32,13 +32,19 @@ Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) 
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
-## When to Use
+## When to use
 
 - Diagnose why an AI search assistant (ChatGPT Search, Perplexity, Claude) fails to cite or summarize a brand's product or service pages.
 - Evaluate whether marketing copy relies on superficial assertions rather than in-depth mechanistic explanations ("how" and "why").
 - Identify opportunities to structure unstructured prose into machine-citable tables, definition lists, and direct Q&A answer blocks.
 
 ---
+
+## Inputs
+- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
+- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
+- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
+- `--format json`: Machine-readable JSON output mode
 
 ## References & Documentation Library
 
@@ -51,12 +57,14 @@ Load these resources as needed during GEO content checks:
 - [✍️ AI Writing Detection & Natural Content Patterns](references/ai-writing-detection.md): Read when evaluating content quality to eliminate em dash overuse, buzzword fluff, and empty intensifiers in favor of mechanistic depth.
 ---
 
-## Mandatory Execution Command
+## Procedure
+
+### Step 1: Execution Command
 
 Execute the deterministic GEO evaluation script using the shared inventory and `--format json`:
 
 ```bash
-python3 scripts/geo_content_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
@@ -66,7 +74,7 @@ python3 scripts/geo_content_check.py --site https://example.com --format json
 
 ---
 
-## Decision Protocol & Check Logic
+### Step 2: Decision Protocol & Check Logic
 
 1. **In-Depth Causal Mechanisms (`CONTENT.SHALLOW_COVERAGE.MISSING_IN_DEPTH_MECHANISMS`):**
    - Evaluates content pages (`product_detail`, `article`, `pricing`) for word-bounded causal conjunctions (`\bhow\b`, `\bwhy\b`, `\bbecause\b`, `\btherefore\b`, `\ballows\b`, `\benables\b`, `\bresults in\b`).

@@ -33,13 +33,19 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
-## When to Use
+## When to use
 
 - High bounce rates observed for visitors referred from AI search engines (SearchGPT, Claude, Perplexity).
 - Evaluate whether landing pages immediately answer the 4-question orientation test (What is this? Who is it for? Why is it relevant? What can I do next?).
 - Audit heading hierarchies and navigation reachability to core brand destinations.
 
 ---
+
+## Inputs
+- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
+- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
+- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
+- `--format json`: Machine-readable JSON output mode
 
 ## References & Documentation Library
 
@@ -51,12 +57,14 @@ Load these resources as needed during engagement context checks:
 ### Reference Page Schemas
 - [💳 Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
 - [🛒 Product Purchase Template](references/product-purchase.json): Standard conversion and purchase handoff structure.
-## Mandatory Execution Command
+## Procedure
+
+### Step 1: Execution Command
 
 Execute the engagement and intent continuity script with `--format json`:
 
 ```bash
-python3 scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
@@ -67,7 +75,7 @@ python3 scripts/engagement_check.py --site https://example.com --inventory inv.j
 
 ---
 
-## Decision Protocol & Check Logic
+### Step 2: Decision Protocol & Check Logic
 
 1. **Multi-Signal 5-Second Orientation (`EXPERIENCE.CONTINUITY.LOW_INFORMATION_SCENT`):**
    - If a content-bearing page lacks an `<h1>`, lacks descriptive subheadings (`<h2>`), AND has an uninformative `<title>` -> flag `LOW_INFORMATION_SCENT` (Severity: `medium`).

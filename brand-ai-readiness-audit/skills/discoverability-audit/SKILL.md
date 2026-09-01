@@ -33,7 +33,7 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
-## When to Use
+## When to use
 
 - Diagnose why AI search assistants cannot retrieve or cite a site's pages.
 - Verify crawler access rules in `robots.txt`, distinguishing real-time retrieval bots from training dataset collectors.
@@ -41,6 +41,12 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 - Validate canonical link consolidation and noindex directives.
 
 ---
+
+## Inputs
+- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
+- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
+- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
+- `--format json`: Machine-readable JSON output mode
 
 ## References & Documentation Library
 
@@ -51,12 +57,14 @@ Load these resources as needed during discoverability checks:
 
 ### Specialized Reference Guides (Load on Condition)
 - [🌐 International SEO & Localization](references/international-seo.md): Read when auditing multi-lingual or multi-region websites to verify hreflang reciprocity, x-default tags, and ISO 639-1 / ISO 3166-1 Alpha 2 codes.
-## Mandatory Execution Command
+## Procedure
+
+### Step 1: Execution Command
 
 Execute the deterministic extraction script using the shared inventory and `--format json`:
 
 ```bash
-python3 scripts/discoverability_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
@@ -67,7 +75,7 @@ python3 scripts/discoverability_check.py --site https://example.com --format jso
 
 ---
 
-## Decision Protocol & Check Logic
+### Step 2: Decision Protocol & Check Logic
 
 1. **HTTP Status Verification (`DISCOVERY.ACCESS.AI_RETRIEVAL_BLOCKED`):**
    - If root landing URL returns HTTP 4xx or 5xx: report `critical` severity.

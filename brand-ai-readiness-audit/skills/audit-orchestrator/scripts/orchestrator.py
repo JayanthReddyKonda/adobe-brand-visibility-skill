@@ -131,19 +131,11 @@ def parse_args():
     parser.add_argument("--no-proactive", dest="include_proactive", action="store_false",
                         help="Disable proactive improvement recommendations")
 
-    # Optional assistant representation flags
-    parser.add_argument("--with-representation", action="store_true", default=False,
-                        help="Run optional assistant-representation-audit skill to cross-check observed AI assistant answers")
-    parser.add_argument("--responses", "--observations", dest="responses_file",
-                        help="Path to JSON file containing observed AI assistant outputs")
     parser.add_argument("--inventory", help="Path to pre-acquired site-inventory JSON (bypasses acquisition)")
 
     # Global time limit
     parser.add_argument("--timeout-seconds", type=int, default=300,
                         help="Maximum total audit wall-clock runtime in seconds (default: 300s)")
-
-    # SQLite persistence
-    parser.add_argument("--db", help="Path to SQLite database to record audit history (optional)")
 
     return parser.parse_args()
 
@@ -342,6 +334,7 @@ def discover_plugins():
                 if "fact" in sid: label = "Fact ledger & cross-page consistency"
                 if "corroboration" in sid: label = "Declared authority link verification"
                 if "engagement" in sid: label = "Orientation & journey continuity"
+                if "geo" in sid: label = "Generative engine optimization & causal depth"
                 
                 plugins.append((sid, label, script_name, []))
     except Exception as e:
@@ -353,6 +346,7 @@ def discover_plugins():
             ("entity-content-audit", "Entity identity & offer extractability", "entity_content_check.py", []),
             ("fact-consistency-audit", "Fact ledger & cross-page consistency", "fact_consistency_check.py", []),
             ("corroboration-authority-audit", "Declared authority link verification", "corroboration_check.py", []),
+            ("geo-content-audit", "Generative engine optimization & causal depth", "geo_content_check.py", []),
             ("engagement-context-audit", "Orientation & journey continuity", "engagement_check.py", []),
         ]
     return plugins
@@ -811,8 +805,6 @@ def main():
     report, internal_data = compose_audit(
         args.site,
         include_proactive=args.include_proactive,
-        with_representation=args.with_representation,
-        responses_file=args.responses_file,
         timeout_seconds=args.timeout_seconds,
         return_internal=True,
         inventory_file=args.inventory

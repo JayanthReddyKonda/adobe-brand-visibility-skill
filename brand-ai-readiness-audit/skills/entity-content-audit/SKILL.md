@@ -33,13 +33,19 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
-## When to Use
+## When to use
 
 - A brand is described vaguely or misattributed by AI assistants.
 - Key products, services, or pricing tiers exist on the website but are omitted from AI search answers.
 - Assess machine-explicit JSON-LD structured data and material attribute completeness.
 
 ---
+
+## Inputs
+- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
+- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
+- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
+- `--format json`: Machine-readable JSON output mode
 
 ## References & Documentation Library
 
@@ -51,12 +57,14 @@ Load these resources as needed during entity analysis:
 ### Schema.org Reference Templates
 - [🏢 Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
 - [📦 Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
-## Mandatory Execution Command
+## Procedure
+
+### Step 1: Execution Command
 
 Execute the deterministic entity and answerability script with `--format json`:
 
 ```bash
-python3 scripts/entity_content_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
@@ -67,7 +75,7 @@ python3 scripts/entity_content_check.py --site https://example.com --format json
 
 ---
 
-## Decision Protocol & Check Logic
+### Step 2: Decision Protocol & Check Logic
 
 1. **Organization Entity Resolution (`ENTITY.IDENTITY.MATERIAL_ENTITY_AMBIGUITY`):**
    - Extract JSON-LD (`Organization`, `Brand`, `Corporation`), OpenGraph (`og:site_name`), and `<title>`.

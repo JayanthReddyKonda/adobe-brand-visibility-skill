@@ -33,7 +33,7 @@ Evaluates external entity authority by verifying that declared identity links (`
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
 
-## When to Use
+## When to use
 
 - Diagnose why an AI model lacks confidence in an entity's existence or identity.
 - Verify that third-party authority links declared by the brand are live, canonical, and functional.
@@ -41,18 +41,26 @@ Evaluates external entity authority by verifying that declared identity links (`
 
 ---
 
+## Inputs
+- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
+- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
+- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
+- `--format json`: Machine-readable JSON output mode
+
 ## References & Documentation Library
 
 Load these resources as needed during authority corroboration checks:
 
 ### Core Knowledge Base (Load First)
 - [📖 Corroboration Authority Knowledge Base](references/corroboration-authority-audit-knowledge-base.md): External sameAs probing protocols, bounded HTTP verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
-## Mandatory Execution Command
+## Procedure
+
+### Step 1: Execution Command
 
 Execute the authority link verification script with `--format json`:
 
 ```bash
-python3 scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
@@ -63,7 +71,7 @@ python3 scripts/corroboration_check.py --site https://example.com --format json
 
 ---
 
-## Decision Protocol & Check Logic
+### Step 2: Decision Protocol & Check Logic
 
 1. **Identity Link Verification (`AUTHORITY.IDENTITY_CORROBORATION.BROKEN_AUTHORITY_ANCHOR`):**
    - Extract declared `sameAs` URLs from Organization schema.
