@@ -5,7 +5,7 @@ import os
 
 class TestGeoContentAudit(unittest.TestCase):
     def setUp(self):
-        self.script_path = "brand-ai-readiness-audit/skills/geo-content-audit/scripts/geo_content_check.py"
+        self.script_path = "src/skills/geo-content-audit/scripts/geo_content_check.py"
         self.test_inv = "/tmp/test_geo_inv.json"
         self.test_state = "/tmp/test_geo_state.json"
         

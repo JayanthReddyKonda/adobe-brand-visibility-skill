@@ -19,7 +19,7 @@ from urllib.parse import urlparse, urljoin
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
     
-from safe_fetch import safe_fetch, DEFAULT_USER_AGENT
+from fetcher import safe_fetch, DEFAULT_USER_AGENT
 
 
 NON_HTML_EXTENSIONS = (

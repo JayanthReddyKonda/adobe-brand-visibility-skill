@@ -21,7 +21,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+from fetcher import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 
 

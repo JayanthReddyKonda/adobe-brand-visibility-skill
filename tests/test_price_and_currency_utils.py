@@ -1,7 +1,7 @@
 import unittest
 import sys
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/fact-consistency-audit/scripts")
+sys.path.insert(0, "src/skills/fact-consistency-audit/scripts")
 import fact_consistency_check
 
 class TestPriceAndCurrencyUtils(unittest.TestCase):

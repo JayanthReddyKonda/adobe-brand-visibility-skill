@@ -1,7 +1,7 @@
 import unittest
 import sys
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/engagement-context-audit/scripts")
+sys.path.insert(0, "src/skills/engagement-context-audit/scripts")
 import fact_extractor
 
 class TestFactExtractorDeep(unittest.TestCase):

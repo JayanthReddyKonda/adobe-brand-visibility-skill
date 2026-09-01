@@ -30,7 +30,7 @@ def build():
         
         # Bundle Core Library into the skill's scripts/ directory to make it self-contained
         os.makedirs(f"{skill_out}/scripts", exist_ok=True)
-        for core_file in ["http.py", "telemetry.py", "dom.py"]:
+        for core_file in ["fetcher.py", "telemetry.py", "dom.py"]:
             if os.path.exists(f"src/core/{core_file}"):
                 shutil.copy(f"src/core/{core_file}", f"{skill_out}/scripts/{core_file}")
                 

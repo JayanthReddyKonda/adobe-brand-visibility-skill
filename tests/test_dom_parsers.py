@@ -2,16 +2,16 @@ import unittest
 import sys
 import os
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/discoverability-audit/scripts")
+sys.path.insert(0, "src/skills/discoverability-audit/scripts")
 import discoverability_check
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/entity-content-audit/scripts")
+sys.path.insert(0, "src/skills/entity-content-audit/scripts")
 import entity_content_check
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/fact-consistency-audit/scripts")
+sys.path.insert(0, "src/skills/fact-consistency-audit/scripts")
 import fact_consistency_check
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/geo-content-audit/scripts")
+sys.path.insert(0, "src/skills/geo-content-audit/scripts")
 import geo_content_check
 
 class TestDOMParsers(unittest.TestCase):
