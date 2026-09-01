@@ -431,7 +431,7 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                         "confidence": "high",
                         "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
                         "cause_family": "FACT.CONSISTENCY",
-                        "cause_id": "FIRST_PARTY_FACT_CONFLICT",
+                        "id": "FIRST_PARTY_FACT_CONFLICT", "cause_id": "FIRST_PARTY_FACT_CONFLICT",
                         "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
                         "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
                         "suggested_action": {
@@ -461,7 +461,7 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                     "confidence": "high",
                     "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
                     "cause_family": "FACT.LIFECYCLE",
-                    "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
+                    "id": "DISCONTINUED_VS_CURRENT_CONFLICT", "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
                     "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
                     "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
                     "suggested_action": {
@@ -545,8 +545,8 @@ def compare_ai_observations(fact_ledger, responses_file):
                                     "severity": "high",
                                     "confidence": "high",
                                     "root_cause": f"The AI asserts a price ({c_val}) for '{claim.get('entity')}' that contradicts its canonical on-site representation.",
-                                    "cause_family": "REPRESENTATION.ACCURACY",
-                                    "cause_id": "AI_FACT_CONFLICT",
+                                    "cause_family": "FACT.CONSISTENCY",
+                                    "id": "AI_FACT_CONFLICT", "cause_id": "AI_FACT_CONFLICT",
                                     "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
                                     "suggested_action": {"summary": "Publish canonical pricing.", "priority": "high"}
                                 })

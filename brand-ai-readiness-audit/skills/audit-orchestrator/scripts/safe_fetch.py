@@ -14,7 +14,7 @@ import time
 import zlib
 from io import BytesIO
 
-DEFAULT_USER_AGENT = "Brand-AI-Readiness-Audit/3.0.0"
+DEFAULT_USER_AGENT = "Brand-AI-Readiness-Audit/1.0.0"
 
 BLOCKED_NETWORKS = [
     ipaddress.ip_network("0.0.0.0/8"),

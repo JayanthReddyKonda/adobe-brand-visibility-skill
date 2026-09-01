@@ -78,3 +78,21 @@ either INCONCLUSIVE or a proactive recommendation.
 
 Findings here rely on Levels 1–3 (direct HTTP/DOM, structured data, cross-page
 first-party). Level 6 (heuristic inference) never produces high severity.
+
+
+========================================================================
+=== SOURCE FILE: authority-correlation-guide.md ===
+========================================================================
+
+# External Authority Channels & AI Citation Weight Matrix
+
+AI search engines (Perplexity, ChatGPT Search, Claude Search) do not rely solely on internal HTML markup; they cross-validate entity claims against authoritative external web nodes.
+
+## Top Authority Node Archetypes:
+1. Wikidata & Wikipedia (QID Linking): Primary source of truth for entity disambiguation in Google Knowledge Graph and open foundation models.
+2. Official YouTube & Social Hubs: Highly weighted multi-modal citation anchors (~0.737 correlation with AI search answers).
+3. LinkedIn Corporate Directory: Verifies operational legitimacy, employee size, and headquarters locale.
+4. SEC / Crunchbase / Official Registries: Provides authoritative fiscal and corporate founding facts.
+
+## Audit Rule:
+Declaring sameAs links to 4xx/5xx dead profiles damages the brand entity trust score. Probing declared links in real time ensures only live, authoritative anchors enter the Stateful Knowledge Graph.

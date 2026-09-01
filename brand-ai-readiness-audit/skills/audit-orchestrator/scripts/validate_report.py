@@ -37,6 +37,15 @@ def validate_type(instance, schema, path="root"):
                 except ValueError:
                     return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
 
+
+    if "minimum" in schema and isinstance(instance, (int, float)):
+        if instance < schema["minimum"]:
+            return f"{path}: Value {instance} is less than minimum {schema['minimum']}"
+
+    if "maximum" in schema and isinstance(instance, (int, float)):
+        if instance > schema["maximum"]:
+            return f"{path}: Value {instance} is greater than maximum {schema['maximum']}"
+
     if "enum" in schema:
         if instance not in schema["enum"]:
             return f"{path}: Value {repr(instance)} not in allowed enum {schema['enum']}"

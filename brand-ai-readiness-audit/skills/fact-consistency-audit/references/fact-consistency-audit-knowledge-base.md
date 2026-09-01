@@ -1,5 +1,33 @@
 # FACT-CONSISTENCY-AUDIT KNOWLEDGE BASE
 
+## Table of Contents
+
+- [Signal](#signal)
+- [Do NOT Report As Defect When:](#do-not-report-as-defect-when)
+- [Report As Defect ONLY When:](#report-as-defect-only-when)
+- [1. The Entity Disambiguation Problem](#1-the-entity-disambiguation-problem)
+- [2. Multi-Source Corroboration Links (`sameAs`)](#2-multi-source-corroboration-links-sameas)
+  - [Example Schema Implementation](#example-schema-implementation)
+- [3. Authoritative About Page Structure](#3-authoritative-about-page-structure)
+- [1. The Timestamp & Freshness Hierarchy](#1-the-timestamp-freshness-hierarchy)
+- [2. Temporal Drift & Legacy Template Rules](#2-temporal-drift-legacy-template-rules)
+- [3. Product Lifecycle Consistency Matrix](#3-product-lifecycle-consistency-matrix)
+  - [Contradiction Criteria:](#contradiction-criteria)
+  - [Verification Guardrail:](#verification-guardrail)
+- [1. Temporal Metadata & Freshness Signals](#1-temporal-metadata-freshness-signals)
+- [2. Cross-Page Fact Consistency](#2-cross-page-fact-consistency)
+- [3. Discontinued / Outdated Product Claims](#3-discontinued-outdated-product-claims)
+- [C1. Scoped Price Contradictions](#c1-scoped-price-contradictions)
+- [C2. Product Lifecycle & Stock State Synchronization](#c2-product-lifecycle-stock-state-synchronization)
+- [C3. Contact Channel & Support Consistency](#c3-contact-channel-support-consistency)
+- [C4. Temporal Freshness & Copyright Timestamps](#c4-temporal-freshness-copyright-timestamps)
+- [1. Contextual Scope Invariant](#1-contextual-scope-invariant)
+  - [False Positive Prevention (What NOT to Compare):](#false-positive-prevention-what-not-to-compare)
+- [2. Currency & Price Normalization Algorithm](#2-currency-price-normalization-algorithm)
+- [3. Contact & Phone Normalization](#3-contact-phone-normalization)
+
+---
+
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
 

@@ -315,7 +315,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "confidence": "high",
                 "root_cause": "The brand publishes no Schema.org Organization markup, OpenGraph site_name, or descriptive title.",
                 "cause_family": "ENTITY.IDENTITY",
-                "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+                "id": "MATERIAL_ENTITY_AMBIGUITY", "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
                 "impact": "AI models cannot resolve the brand entity with high confidence, leading to entity collisions and ungrounded answers.",
                 "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
                 "suggested_action": {
@@ -359,7 +359,7 @@ def audit(base, domain, inv=None, state_file=None):
                             "confidence": "high",
                             "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
                             "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
-                            "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                            "id": "ATTRIBUTE_INCOMPLETENESS", "cause_id": "ATTRIBUTE_INCOMPLETENESS",
                             "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
                             "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
                             "suggested_action": {

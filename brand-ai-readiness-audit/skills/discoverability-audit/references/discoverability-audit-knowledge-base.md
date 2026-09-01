@@ -1,5 +1,32 @@
 # DISCOVERABILITY-AUDIT KNOWLEDGE BASE
 
+## Table of Contents
+
+- [C1. Homepage reachability](#c1-homepage-reachability)
+- [C2. robots.txt AI-crawler access (RFC 9309)](#c2-robotstxt-ai-crawler-access-rfc-9309)
+- [C3. Differential UA treatment](#c3-differential-ua-treatment)
+- [C4. noindex / X-Robots-Tag](#c4-noindex-x-robots-tag)
+- [C5. Canonical consistency (corroborated)](#c5-canonical-consistency-corroborated)
+- [C6. Rendering risk](#c6-rendering-risk)
+- [Inconclusive handling](#inconclusive-handling)
+- [Crawler Taxonomy & Impact Matrix](#crawler-taxonomy-impact-matrix)
+- [Key Audit Rules](#key-audit-rules)
+- [1. robots.txt & Access Directives (RFC 9309)](#1-robotstxt-access-directives-rfc-9309)
+  - [User-Agent Matching Precedence](#user-agent-matching-precedence)
+  - [Path Syntax Rules](#path-syntax-rules)
+  - [Critical AI Distinctions](#critical-ai-distinctions)
+- [2. Canonicalization & Consolidation](#2-canonicalization-consolidation)
+  - [Canonical Rules](#canonical-rules)
+  - [AI Search Impact](#ai-search-impact)
+- [3. XML Sitemaps & Discovery Aids](#3-xml-sitemaps-discovery-aids)
+  - [Sitemaps Standards](#sitemaps-standards)
+  - [`llms.txt` Role](#llmstxt-role)
+- [4. Rendering & Content Extractability](#4-rendering-content-extractability)
+  - [Server-Side Rendering (SSR) vs Client-Side Rendering (CSR)](#server-side-rendering-ssr-vs-client-side-rendering-csr)
+- [5. Snippet Controls for Generative AI](#5-snippet-controls-for-generative-ai)
+
+---
+
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
 
@@ -194,3 +221,55 @@ Fine-grained controls to govern how search engines and AI assistants quote conte
 <div data-nosnippet>Proprietary pricing notes not for snippet extraction.</div>
 ```
 *(Note: `data-nosnippet` is only supported on `span`, `div`, and `section` tags).*
+
+
+========================================================================
+=== SOURCE FILE: robots-txt-recipe.md ===
+========================================================================
+
+# Production-Ready robots.txt Recipe (Copy-Paste Remediation)
+
+This standard `robots.txt` configuration allows real-time AI search retrieval crawlers (ChatGPT Search, Claude, Perplexity) while cleanly opting out of foundation model training datasets (if desired by brand governance):
+
+```text
+# ==============================================================================
+# AI Search Retrieval Crawlers (ALLOWED: Required for Citations & AI Overviews)
+# ==============================================================================
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+# ==============================================================================
+# Foundation Model Training Tokens (OPTIONAL: Disallow to Opt Out of Training)
+# Note: Blocking training tokens does NOT affect live AI search retrieval citations.
+# ==============================================================================
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+# ==============================================================================
+# General Web Indexers & Sitemaps
+# ==============================================================================
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /checkout/
+Disallow: /api/
+
+Sitemap: https://example.com/sitemap.xml

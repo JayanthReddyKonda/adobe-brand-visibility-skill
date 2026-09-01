@@ -163,7 +163,9 @@ def audit(base, domain, inv=None, state_file=None):
                         "title": f"Authority link fails to corroborate brand identity claim",
                         "severity": "medium",
                         "category": "corroboration",
-                        "cause_id": "CLAIM_CORROBORATION_GAP",
+                        "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+                        "id": "CLAIM_CORROBORATION_GAP", "cause_id": "CLAIM_CORROBORATION_GAP",
+                        "root_cause": f"Declared authority profile does not substantiate brand identity for {brand_name}.",
                         "confidence": "high",
                         "evidence": f"The declared sameAs link {u} is reachable, but neither its title, og:site_name, nor body text explicitly state the brand name '{brand_name}'.",
                         "suggested_action": {
@@ -182,7 +184,7 @@ def audit(base, domain, inv=None, state_file=None):
             "confidence": "high",
             "root_cause": "Declared sameAs identity links return HTTP 4xx or 5xx error codes.",
             "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
-            "cause_id": "BROKEN_AUTHORITY_ANCHOR",
+            "id": "BROKEN_AUTHORITY_ANCHOR", "cause_id": "BROKEN_AUTHORITY_ANCHOR",
             "impact": "AI models attempting to verify entity identity against independent authorities encounter broken links, reducing confidence.",
             "evidence": f"Declared sameAs links returned error status: {'; '.join(broken)}.",
             "suggested_action": {

@@ -1,14 +1,15 @@
 ---
 name: audit-orchestrator
 description: >
-  Audit a website for AI discoverability, content extractability, and visitor engagement
-  by composing specialist skills under a strict global time limit (< 5 min) and emitting
-  a single evidence-backed JSON report.
+  Use this skill to perform a comprehensive, end-to-end Brand AI-Readiness and Visibility audit
+  on any website. Composes 6 specialist skills under a strict < 5 minute deadline, builds a
+  Stateful Knowledge Graph, and emits a schema-validated JSON report with dual-track remediation.
 license: MIT
-compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
+compatibility: ">=Python-3.9"
 metadata:
   role: entrypoint
-  version: "3.0.0"
+  version: "1.0.0"
+  author: "Jayanth Reddy Konda"
 allowed-tools:
   - run_command
   - view_file
@@ -16,13 +17,22 @@ allowed-tools:
 
 # Audit Orchestrator (Entrypoint Skill)
 
+
+| Audit Mode | Command | Output |
+|---|---|---|
+| **Full End-to-End Audit** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com` | Draft-07 JSON Report (stdout) |
+| **Strict Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com | python3 skills/audit-orchestrator/scripts/validate_report.py -` | Exit Code 0 |
+| **Offline Deterministic Fixture Audit** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://testsite.com --inventory /tmp/test_inv.json` | JSON Report (< 5s) |
+
+> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Execute them via CLI flags and parse structured stdout JSON. Run `python3 scripts/<script>.py --help` for usage.
+
 The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordinates a bounded, SSRF-safe shared inventory crawl, loads specialist skill contexts and references sequentially into agent memory, executes self-contained diagnostic scripts with `--format json`, reconciles multi-signal evidence, eliminates false positives, maps root causes to a unified causal taxonomy, and emits a strictly validated JSON audit report conforming to the Adobe Round 3 schema.
 
 ---
 
 
 > [!TIP]
-> **Execution Context:** DO NOT assume your working directory contains a `<MARKETPLACE_ROOT>/skills/` folder directly. The marketplace might be installed in a nested directory like `.agents/skills/`. You MUST use absolute paths. Before executing any scripts, find the absolute path to the marketplace root and use it to construct all command paths. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system.
+> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace might be installed in a nested directory like `.agents/skills/`. You MUST use absolute paths. Before executing any scripts, find the absolute path to the marketplace root and use it to construct all command paths. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system.
 
 ## When to Use
 
@@ -40,15 +50,18 @@ The central orchestrator of the Brand AI-Readiness Audit Marketplace. It coordin
 - **`--format`** (string, optional): Output format: `json` (default, machine-readable) or `markdown`.
 - **`--include-proactive` / `--no-proactive`** (flag, optional): Include or suppress proactive improvement recommendations (default: True).
 - **`--responses` / `--observations`** (string, optional): Path to JSON file of observed AI assistant claims to cross-verify via `fact-consistency-audit`.
-## References to Consult
+## References & Documentation Library
 
-> [!IMPORTANT]
-> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/audit-orchestrator/references/audit-orchestrator-knowledge-base.md`
-> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
+Load these resources as needed during audit orchestration:
 
+### Core Knowledge Base (Load First)
+- [📖 Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Master architecture, multi-signal evidence reconciliation, causal taxonomy, and dual-track remediation engine.
 
+### Output Schema Specification
+- [📋 Report Schema Draft-07](references/report-schema.json): Strict JSON schema definition enforcing zero-defect report structure.
+
+### Technical Foundations (Load on Technical Inquiries)
+- [🛠️ SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
 ## Master Agent Execution Flow (Step-by-Step)
 
 > [!CAUTION]
@@ -69,56 +82,56 @@ The AI Agent must execute this audit as a sequential, self-contained multi-skill
 ### Step 1: Inventory Acquisition
 Acquire the type-safe shared inventory (homepage + robots.txt + sitemaps -> HTML pages):
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/acquire_inventory.py --site <target_url> --output inv.json --format json
+python3 scripts/acquire_inventory.py --site <target_url> --output inv.json --format json
 ```
 
 ### Step 2: Discoverability & Retrieval Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/discoverability-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `skills/discoverability-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory inv.json --format json
+   python3 skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 ### Step 3: Entity Identity & Answerability Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/entity-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `skills/entity-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 <MARKETPLACE_ROOT>/skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory inv.json --format json
+   python3 skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 ### Step 4: Fact Consistency & Lifecycle Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/fact-consistency-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `skills/fact-consistency-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 <MARKETPLACE_ROOT>/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory inv.json --format json
+   python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 
 ### Step 5: Authority & SameAs Corroboration Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/corroboration-authority-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `skills/corroboration-authority-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
+   python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 ### Step 6: Generative Engine Optimization (GEO) Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/geo-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `skills/geo-content-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 <MARKETPLACE_ROOT>/skills/geo-content-audit/scripts/geo_content_check.py --site <target_url> --inventory inv.json --format json
+   python3 skills/geo-content-audit/scripts/geo_content_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 ### Step 7: Engagement & Context Continuity Audit
-1. **Load Context:** Read `<MARKETPLACE_ROOT>/skills/engagement-context-audit/SKILL.md` (which contains the unified knowledge base pointer).
+1. **Load Context:** Read `skills/engagement-context-audit/SKILL.md` (which contains the unified knowledge base pointer).
 2. **Execute Diagnostic Script:**
    ```bash
-   python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
+   python3 skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
    ```
 
 ### Step 8: Master Evidence Synthesis & Schema Validation Gate
 The audit pipeline synthesizes specialist findings, assigns root causes from [references/audit-orchestrator-knowledge-base.md](references/audit-orchestrator-knowledge-base.md), deduplicates recommendations, and validates against [references/report-schema.json](references/report-schema.json):
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/audit-orchestrator/scripts/orchestrator.py --site <target_url> --format json
+python3 scripts/orchestrator.py --site <target_url> --format json
 ```
 All specialist checks, shared inventory acquisition, multi-signal evidence reconciliation, and strict schema validation are executed sequentially within the 300s monotonic deadline.
 
@@ -150,6 +163,14 @@ All specialist checks, shared inventory acquisition, multi-signal evidence recon
 > To prevent syntax errors, do not manually reconstruct the JSON. Copy the exact `stdout` string from the script and wrap it in a standard markdown json code block (````json ... ````).
 
 ---
+
+
+## Gotchas & False-Positive Boundaries
+
+- **Never modify live sites:** This audit is strictly read-only and analytical. Never execute POST/PUT/DELETE requests or alter live configurations.
+- **SSRF Hard Boundary:** All fetches pass through `safe_fetch.py`. Never attempt to probe private RFC-1918 subnets, cloud metadata (169.254.169.254), or loopback interfaces.
+- **Non-HTML Resource Invariant:** XML sitemaps, robots.txt, JSON feeds, and PDFs are infrastructure metadata and must NEVER be audited for narrative or heading content.
+- **Validation Gate:** Always pipe stdout to `python3 skills/audit-orchestrator/scripts/validate_report.py -` to ensure the final report strictly satisfies `report-schema.json`.
 
 ## Security & SSRF Policy
 

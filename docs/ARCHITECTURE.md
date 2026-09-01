@@ -1,39 +1,96 @@
-# Architectural Defense: Separation of Concerns
+# Architectural Defense: Separation of Concerns & SOTA AI-Readiness
 
-The Adobe AI-Readiness Rubric explicitly evaluates whether the marketplace decomposition reflects **genuine separation of concerns** rather than arbitrary padding. 
+**Author:** Jayanth Reddy Konda  
+**Version:** 1.0.0
+**Specification Compliance:** Adobe Round 3 Hackathon (`round3_PS.pdf`) & `agentskills.io`
 
-This marketplace is decomposed into **6 Domain Specialists** and **1 Orchestrator**. This is not padding. This architecture is driven strictly by the **Stateful Knowledge Graph Pattern** and the **Principle of Least Privilege**, ensuring hermetic security, SSRF isolation, and causal execution boundaries.
+---
 
-## The Principle of Least Privilege (Why 7 Skills total?)
+## 1. Architectural Philosophy: The Two-Stage Funnel
 
-Combining these skills into a monolithic "Audit Skill" would violate core security and performance invariants. By isolating them, we restrict capabilities to only the boundaries required by the specific domain check.
+Modern generative search engines (ChatGPT Search, Perplexity Pro, Google AI Overviews, Claude) evaluate web content in two distinct, sequential phases:
 
-### 1. `corroboration-authority-audit` (The Network Boundary)
-- **Concern:** Validates `sameAs` identity claims against external 3rd-party profiles.
-- **Why it's isolated:** This is the **only** skill in the marketplace permitted to resolve outbound network calls to domains *other* than the primary target. Keeping it isolated ensures external network egress is strictly bounded to one auditable sandbox, preventing SSRF attacks across the main crawler fleet.
+```mermaid
+graph TD
+    A["Target Website / Web Assets"] --> B["Stage 1: Retrieval & Indexation Funnel"]
+    B --> C{"Retrieved into LLM Context?"}
+    C -- "No" --> D["Zero Citation Potential (Invisible)"]
+    C -- "Yes" --> E["Stage 2: Generative Citation Selection"]
+    E --> F{"Passes Citability Threshold?"}
+    F -- "No" --> G["Summarized without Attribution"]
+    F -- "Yes" --> H["Direct Brand Citation & Referral Handoff"]
+```
 
-### 2. `fact-consistency-audit` (The Validation Boundary)
-- **Concern:** Detects conflicting pricing, contact info, and lifecycle facts.
-- **Why it's isolated:** This skill executes temporal contradiction logic across the Knowledge Graph. It merges previous standalone capabilities (like assistant representation checks) into a single unified temporal ledger for factual verification.
+1. **Stage 1 (Retrieval & Indexation):**
+   - Directives: `robots.txt` permissions (GPTBot, ClaudeBot, PerplexityBot), `noindex` directives, HTTP status codes, raw HTML rendering completeness.
+   - Machine Anchors: Schema.org `@graph` Organization and Product entities.
+   - Audited by: `discoverability-audit` & `entity-content-audit`.
 
-### 3. `discoverability-audit` (The Infrastructure Boundary)
-- **Concern:** HTTP status codes, `robots.txt` parser trees, Canonical consolidation, and Retrieval-Window Indexing.
-- **Why it's isolated:** Infrastructure logic evaluates whether an AI crawler can even *reach* or *index* a page. If this stage fails, executing deep semantic evaluation is wasted compute.
+2. **Stage 2 (Generative Citation Selection):**
+   - Empirical Depth: 134–167 word passage chunks, direct answers in first 40–60 words, < 2% pronoun density, quantifiable numbers/percentages, causal conjunctions (`because`, `due to`, `therefore`).
+   - Grounded Truth: Multi-page fact consistency and verified third-party authority node links (`sameAs`).
+   - Audited by: `geo-content-audit`, `fact-consistency-audit`, `corroboration-authority-audit`, and `engagement-context-audit`.
 
-### 4. `entity-content-audit` vs `geo-content-audit` (The Semantic Boundary)
-- **`entity-content`:** A strict knowledge-parser. It extracts deterministic `JSON-LD` schemas and HTML properties to establish *Who* the brand is and *What* they sell, seeding the Graph.
-- **`geo-content`:** Evaluates text for proven Generative Engine Optimization (GEO) dimensions, specifically "In-Depth Mechanisms" (causal conjunctions) and "Specific Evidence" (digits/metrics) based on AutoGEO research.
-- **Why they are separated:** One parses strict explicit graphs; the other evaluates semantic styling. Merging them leads to overlapping concerns and fragile confidence scores.
+---
 
-### 5. `engagement-context-audit` (The Human-AI Handoff Boundary)
-- **Concern:** Post-click continuity. Do AI-referred visitors land on a page that matches their intent?
-- **Why it's isolated:** This evaluates Information Scent Anchoring—verifying that the Canonical Entity extracted from the Knowledge Graph matches the anchor text used in the primary `<h1>` tag. It is decoupled from technical crawlability.
+## 2. Principle of Least Privilege & Modular Decomposition
 
-## Clean Composition via the Orchestrator
+Combining these capabilities into a monolithic audit script violates security sandboxing, creates state pollution, and increases context-window bloat. The 7-skill marketplace decomposition enforces strict execution and security boundaries:
 
-The `audit-orchestrator` skill proves the cleanliness of this separation:
-1. It creates an atomic, concurrency-safe `state.json` file.
-2. It dynamically invokes the skills in a strict causal pipeline: `Discoverability -> Entity -> Fact -> Corroboration -> GEO -> Engagement`.
-3. It maps 100% of the synthesized findings into the unified, strictly-typed Adobe Round 3 Schema (enforcing `technical_fix` vs `creative_fix`).
+| Skill Identifier | Isolated Responsibility & Security Boundary |
+|---|---|
+| **1. audit-orchestrator** (Entrypoint) | Pipeline coordinator, concurrency-safe Knowledge Graph, Draft-07 schema validation gate, dual-track remediation. |
+| **2. discoverability-audit** | HTTP status codes, robots.txt trees, canonical tags, meta robots noindex, TTFB crawlability metrics. |
+| **3. entity-content-audit** | JSON-LD @graph extraction (Organization, Product), weighted Answerability attribute completeness scoring. |
+| **4. fact-consistency-audit** | Scoped first-party fact ledger, temporal pricing and contact contradiction detection across multiple URLs. |
+| **5. corroboration-authority-audit** | The ONLY network-egress boundary permitted to probe external sameAs links (Wikidata, LinkedIn, Wikipedia). |
+| **6. geo-content-audit** | Generative Engine Optimization (Princeton KDD 2024), mechanistic depth, quantifiable metrics, passage chunking. |
+| **7. engagement-context-audit** | Post-citation continuity, Entity-to-H1 scent anchoring, commercial CTA reachability, bounce prevention. |
 
-**Conclusion:** The 7-skill decomposition maximizes security isolation, enables stateful cross-skill intelligence, and aligns perfectly with the Adobe Rubric's mandate for "genuine separation of concerns."
+---
+
+## 3. Stateful Knowledge Graph Architecture
+
+Inter-skill intelligence is shared through an atomic, concurrency-safe `state.json` file:
+
+```json
+{
+  "version": 1,
+  "entities": {
+    "Organization": {
+      "name": "BrandCorp",
+      "url": "https://brandcorp.com",
+      "sameAs": ["https://twitter.com/brandcorp"]
+    }
+  },
+  "facts": {
+    "pricing": [
+      {"url": "https://brandcorp.com/", "value": "$49/mo"},
+      {"url": "https://brandcorp.com/pricing", "value": "$49/mo"}
+    ]
+  },
+  "observations": {},
+  "page_context": {}
+}
+```
+
+- **Atomic Writes:** Written using `tempfile.NamedTemporaryFile` + `os.replace` to prevent file corruption during multi-stage processing.
+- **Zero Hallucination Pipeline:** Specialists query the state graph rather than re-fetching pages or hallucinating facts.
+
+---
+
+## 4. Black-Box CLI Execution Standard
+
+Following Anthropic's official skill authoring standards:
+- **No Ingestion of Source Code:** LLM agents do not waste prompt tokens loading large Python scripts into context.
+- **CLI Subprocess Invocations:** Agents execute `python3 scripts/<check>.py --site <url> --inventory <inv>` and read structured JSON from `stdout`.
+- **Stream Separation:** Pure JSON data emits to `stdout`; diagnostic progress and warnings emit to `stderr`.
+
+---
+
+## 5. Dual-Track Remediation Floor
+
+Every finding generated by any specialist strictly conforms to the Adobe Round 3 dual-track remediation requirement:
+- **`technical_fix`:** Concrete code patches, schema markup, or server configuration directives (for developers).
+- **`creative_fix`:** Content rewriting guidelines, heading restructurings, or positioning adjustments (for copywriters/marketers).
+- **`verification`:** Step-by-step instructions to validate that the remediation successfully resolved the defect.

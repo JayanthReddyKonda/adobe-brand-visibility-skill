@@ -1,5 +1,23 @@
 # ENGAGEMENT-CONTEXT-AUDIT KNOWLEDGE BASE
 
+## Table of Contents
+
+- [1. First-Visit Orientation Heuristics (Above-the-Fold)](#1-first-visit-orientation-heuristics-above-the-fold)
+- [2. Heading Hierarchy & Information Scent](#2-heading-hierarchy-information-scent)
+- [3. Navigational Integrity & Journey Continuity](#3-navigational-integrity-journey-continuity)
+- [1. Conclusion-First Writing Architecture](#1-conclusion-first-writing-architecture)
+- [2. Heading Hierarchy & Information Scent](#2-heading-hierarchy-information-scent)
+- [3. Snippet Visibility Controls](#3-snippet-visibility-controls)
+- [C1. 5-Second Orientation & Heading Information Scent](#c1-5-second-orientation-heading-information-scent)
+- [C2. Destination Discoverability & Navigation Friction](#c2-destination-discoverability-navigation-friction)
+- [C3. Intent-to-Landing Alignment](#c3-intent-to-landing-alignment)
+- [1. The 4-Question First-Visit Orientation Test](#1-the-4-question-first-visit-orientation-test)
+- [2. Heading Information Scent Matrix](#2-heading-information-scent-matrix)
+- [3. Destination Reachability & Navigation Friction](#3-destination-reachability-navigation-friction)
+- [4. Intent-to-Landing Match (Specialized Routes)](#4-intent-to-landing-match-specialized-routes)
+
+---
+
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
 

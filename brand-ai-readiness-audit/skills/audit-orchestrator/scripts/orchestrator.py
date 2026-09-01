@@ -35,6 +35,86 @@ from acquire_inventory import build_inventory, classify_page, normalize_target, 
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
 
+
+CAUSE_REMEDY_FALLBACKS = {
+    "AI_RETRIEVAL_BLOCKED": {
+        "technical_fix": "Add 'User-agent: OAI-SearchBot\nAllow: /' to robots.txt and whitelist AI crawler IP ranges in CDN/WAF rules.",
+        "creative_fix": "Ensure public search landing pages provide accessible crawl paths for real-time search retrieval.",
+        "verification": "Re-probe robots.txt and root URL using OAI-SearchBot User-Agent."
+    },
+    "NOINDEX_EXCLUSION": {
+        "technical_fix": "Remove 'noindex' and 'none' directives from meta robots tags and X-Robots-Tag HTTP response headers.",
+        "creative_fix": None,
+        "verification": "Inspect HTTP response headers and DOM markup to confirm absence of noindex."
+    },
+    "RENDERED_CONTENT_GAP": {
+        "technical_fix": "Implement Server-Side Rendering (SSR) or Static Site Generation (SSG) for initial HTML body text.",
+        "creative_fix": "Ensure primary value proposition and product descriptions are rendered as semantic HTML rather than dynamic client-only state.",
+        "verification": "Fetch raw HTML without executing JavaScript and confirm primary copy is present."
+    },
+    "CANONICAL_FRAGMENTATION": {
+        "technical_fix": "Set <link rel='canonical'> href to point to the authoritative URL on the current domain.",
+        "creative_fix": None,
+        "verification": "Verify the canonical tag matches the authoritative host URL."
+    },
+    "LOCALE_MISCONFIGURATION": {
+        "technical_fix": "Standardize hreflang tags to valid ISO 639-1 language and ISO 3166-1 Alpha-2 region codes.",
+        "creative_fix": None,
+        "verification": "Inspect alternate link tags for valid ISO codes (e.g. 'en-GB' instead of 'eng-UK')."
+    },
+    "MATERIAL_ENTITY_AMBIGUITY": {
+        "technical_fix": "Embed Schema.org Organization JSON-LD markup on homepage declaring canonical name, url, logo, and sameAs array.",
+        "creative_fix": "Explicitly state official brand name and corporate identity in page title, hero heading, and footer.",
+        "verification": "Validate homepage JSON-LD using the Schema.org / Google Rich Results validator."
+    },
+    "ATTRIBUTE_INCOMPLETENESS": {
+        "technical_fix": "Populate missing Offer properties ('price', 'priceCurrency', 'availability') in Product JSON-LD.",
+        "creative_fix": "Ensure pricing, stock status, and product specifications are visible in page body copy.",
+        "verification": "Verify Product schema in Google Rich Results Test shows complete attributes."
+    },
+    "FIRST_PARTY_FACT_CONFLICT": {
+        "technical_fix": "Synchronize prices across pricing tables, product detail schemas, and checkout endpoints from a single authoritative source.",
+        "creative_fix": "Review marketing and sales landing pages to eliminate outdated promotional pricing.",
+        "verification": "Re-crawl affected pages and verify identical pricing appears across all listings."
+    },
+    "DISCONTINUED_VS_CURRENT_CONFLICT": {
+        "technical_fix": "Update product schema availability to 'https://schema.org/Discontinued' on all pages referencing legacy SKUs.",
+        "creative_fix": "Add clear banner copy indicating legacy lifecycle status and redirect to successor products.",
+        "verification": "Verify all product pages show consistent availability and lifecycle markers."
+    },
+    "AI_FACT_CONFLICT": {
+        "technical_fix": "Publish explicit Product & Offer JSON-LD schema to ground retrieval models with unambiguous facts.",
+        "creative_fix": "Ensure core pricing and feature comparisons are formatted in clean HTML tables.",
+        "verification": "Re-query assistant to confirm quoted facts align with canonical schema."
+    },
+    "BROKEN_AUTHORITY_ANCHOR": {
+        "technical_fix": "Update or remove 4xx/5xx URLs in Schema.org 'sameAs' arrays to point to live canonical profiles.",
+        "creative_fix": None,
+        "verification": "Perform HTTP GET/HEAD probe on all sameAs URLs to verify HTTP 200 response."
+    },
+    "CLAIM_CORROBORATION_GAP": {
+        "technical_fix": "Ensure declared sameAs profiles link back to the brand domain or explicitly state the brand name in title/meta tags.",
+        "creative_fix": "Standardize brand naming across external registries and official social profiles.",
+        "verification": "Verify external authority profile contains canonical brand name in title or og:site_name."
+    },
+    "MISSING_IN_DEPTH_MECHANISMS": {
+        "technical_fix": "Structure explanatory content into semantic <h2>/<h3> question headings with direct answer blocks.",
+        "creative_fix": "Expand product and feature descriptions to explain 'how' and 'why' the technology works using causal conjunctions.",
+        "verification": "Inspect body copy to confirm presence of mechanistic depth words (how, why, because, enables)."
+    },
+    "INTENT_TO_LANDING_MISMATCH": {
+        "technical_fix": "Anchor primary commercial call-to-action ('Buy Now', 'Contact Sales') above the fold on pricing URLs.",
+        "creative_fix": "Align landing page hero headline with the specific referral search query intent.",
+        "verification": "Verify interactive CTA buttons and pricing details are visible in the initial viewport."
+    },
+    "LOW_INFORMATION_SCENT": {
+        "technical_fix": "Ensure every page includes a single semantic <h1> containing the canonical entity name.",
+        "creative_fix": "Rewrite generic headings ('Welcome', 'Home') to state the specific value proposition and subject.",
+        "verification": "Inspect page markup to confirm single <h1> anchors the target entity."
+    }
+}
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Audit a website for AI discoverability, content extractability, and visitor engagement."
@@ -394,7 +474,7 @@ def compose_audit(site, include_proactive=True, with_representation=False,
     except Exception:
         final_knowledge_graph = {}
 
-    if inventory_path:
+    if inventory_path and cleanup_inventory:
         try:
             os.unlink(inventory_path)
         except OSError:
@@ -495,6 +575,16 @@ def compose_audit(site, include_proactive=True, with_representation=False,
             if "technical_fix" in action: suggested_action["technical_fix"] = action["technical_fix"]
             if "creative_fix" in action: suggested_action["creative_fix"] = action["creative_fix"]
             if "verification" in action: suggested_action["verification"] = action["verification"]
+
+        cid = item.get("cause_id")
+        if cid in CAUSE_REMEDY_FALLBACKS:
+            fallback = CAUSE_REMEDY_FALLBACKS[cid]
+            if "technical_fix" not in suggested_action or suggested_action["technical_fix"] is None:
+                suggested_action["technical_fix"] = fallback.get("technical_fix")
+            if "creative_fix" not in suggested_action or suggested_action["creative_fix"] is None:
+                suggested_action["creative_fix"] = fallback.get("creative_fix")
+            if "verification" not in suggested_action or not suggested_action["verification"]:
+                suggested_action["verification"] = fallback.get("verification")
 
         finding_entry = {
             "id": f"F-{len(final_findings) + 1:03d}",

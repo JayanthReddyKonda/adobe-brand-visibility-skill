@@ -1,22 +1,29 @@
 ---
 name: entity-content-audit
 description: >
-  Entity & content understanding layer. Determines whether an AI system can
-  understand WHO the brand is and WHAT it offers: organization identity
-  explicitness, structured schema (JSON-LD), and the Answerability Engine
-  measuring material attribute completeness per page type.
+  Use this skill to determine whether AI systems can understand WHO a brand is and WHAT it
+  offers. Evaluates machine-explicit Organization entity schema, OpenGraph identity tags,
+  and weighted Answerability attribute completeness (price, availability, specifications).
 license: MIT
-compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
+compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "3.0.0"
+  version: "1.0.0"
+  author: "Jayanth Reddy Konda"
 allowed-tools:
   - run_command
   - view_file
 ---
 
 # Entity & Content Audit Skill
+
+
+| Task | Execution Command | Output Contract |
+|---|---|---|
+| **Schema.org & Entity Answerability Check** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+
+> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
 
 Evaluates whether an AI search system can resolve the brand's entity identity (`Organization`) and extract its commercial offerings (`Product`, `Offer`, `Service`). Computes the mathematically reproducible weighted **Answerability Index** across sampled HTML pages.
 
@@ -34,33 +41,27 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 
 ---
 
-## References to Consult
+## References & Documentation Library
 
-> [!CAUTION]
-> **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
-> You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
-> `<MARKETPLACE_ROOT>/skills/entity-content-audit/references/entity-content-audit-knowledge-base.md` (or the equivalent path in your environment).
-> Failure to read the exact causal taxonomies from this file will cause schema validation failures.
+Load these resources as needed during entity analysis:
 
+### Core Knowledge Base (Load First)
+- [📖 Entity Content Knowledge Base](references/entity-content-audit-knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, and the 7-attribute Answerability Index formula.
 
-> [!IMPORTANT]
-> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/entity-content-audit/references/entity-content-audit-knowledge-base.md`
-> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
-
-
+### Schema.org Reference Templates
+- [🏢 Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
+- [📦 Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
 ## Mandatory Execution Command
 
 Execute the deterministic entity and answerability script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/entity-content-audit/scripts/entity_content_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/entity_content_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json
+python3 scripts/entity_content_check.py --site https://example.com --format json
 ```
 
 
@@ -95,6 +96,13 @@ Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], entity_snapshot{}, coverage{}, limitations[]}`.
 
 ---
+
+
+## Gotchas & False-Positive Boundaries
+
+- **Never flag missing schema on CSR shells:** If a page contains fewer than 25 words due to client-side rendering, return `status: inconclusive` rather than reporting missing entities.
+- **Missing sameAs is an advisory recommendation:** Never report missing `sameAs` links as a critical defect finding; emit as a proactive recommendation.
+- **Non-Commerce Sites:** Do not penalize service, media, or portfolio sites for omitting ecommerce `Product` schema.
 
 ## Security & SSRF Policy
 

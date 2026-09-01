@@ -1,5 +1,41 @@
 # AUDIT-ORCHESTRATOR KNOWLEDGE BASE
 
+## Table of Contents
+
+- [Causal Taxonomy Hierarchy](#causal-taxonomy-hierarchy)
+- [Root Cause Reference Table](#root-cause-reference-table)
+- [1. `AI_RETRIEVAL_BLOCKED`](#1-ai-retrieval-blocked)
+- [2. `RENDERED_CONTENT_GAP`](#2-rendered-content-gap)
+- [3. `MATERIAL_ENTITY_AMBIGUITY`](#3-material-entity-ambiguity)
+- [4. `FIRST_PARTY_FACT_CONFLICT`](#4-first-party-fact-conflict)
+- [5. `BROKEN_AUTHORITY_ANCHOR`](#5-broken-authority-anchor)
+- [6. `INTENT_TO_LANDING_MISMATCH`](#6-intent-to-landing-mismatch)
+- [7. `LOW_INFORMATION_SCENT`](#7-low-information-scent)
+- [8. `AI_FACT_CONFLICT`](#8-ai-fact-conflict)
+- [9. `MISSING_IN_DEPTH_MECHANISMS`](#9-missing-in-depth-mechanisms)
+- [Top-Level Fields](#top-level-fields)
+- [Summary Object](#summary-object)
+- [Finding Object](#finding-object)
+  - [Suggested Action Object](#suggested-action-object)
+- [Root Cause Object](#root-cause-object)
+- [Example Clean Production Report](#example-clean-production-report)
+- [Severity Rubric](#severity-rubric)
+- [Confidence Model](#confidence-model)
+- [1. Specialist Responsibilities](#1-specialist-responsibilities)
+- [2. Global Wall-Clock Deadline (< 5 Minutes)](#2-global-wall-clock-deadline-5-minutes)
+- [3. SSRF Protection & Bounded Streaming](#3-ssrf-protection-bounded-streaming)
+- [4. Crawler Matrix Semantics](#4-crawler-matrix-semantics)
+- [5. Eligibility Gate & Deduplication](#5-eligibility-gate-deduplication)
+- [6. Taxonomy-Driven Root-Cause Clustering](#6-taxonomy-driven-root-cause-clustering)
+- [7. Objective Audit Metrics](#7-objective-audit-metrics)
+- [1. Specialist Status Contract](#1-specialist-status-contract)
+- [2. Public Report Contract](#2-public-report-contract)
+  - [2.1 Finding Contract](#21-finding-contract)
+- [3. Internal Shared State Contract](#3-internal-shared-state-contract)
+- [4. No Heuristic Defects Rule](#4-no-heuristic-defects-rule)
+
+---
+
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
 

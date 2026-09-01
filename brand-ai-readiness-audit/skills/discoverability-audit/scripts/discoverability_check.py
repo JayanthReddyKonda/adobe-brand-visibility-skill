@@ -275,7 +275,7 @@ def audit(base, domain, inv=None, state_file=None):
             "confidence": "high",
             "root_cause": f"Root landing URL returns HTTP status {status}.",
             "cause_family": "DISCOVERY.ACCESS",
-            "cause_id": "AI_RETRIEVAL_BLOCKED",
+            "id": "AI_RETRIEVAL_BLOCKED", "cause_id": "AI_RETRIEVAL_BLOCKED",
             "impact": "Search crawlers and AI assistants cannot fetch the site entrypoint.",
             "evidence": f"GET {base}/ returned HTTP {status}.",
             "suggested_action": {
@@ -299,7 +299,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "confidence": "high",
                 "root_cause": "The web server or WAF returns HTTP 403/503 specifically when probed with AI search crawler User-Agents.",
                 "cause_family": "DISCOVERY.ACCESS",
-                "cause_id": "AI_RETRIEVAL_BLOCKED",
+                "id": "AI_RETRIEVAL_BLOCKED", "cause_id": "AI_RETRIEVAL_BLOCKED",
                 "impact": "Real-time AI search assistants (ChatGPT Search) are blocked from fetching site content regardless of robots.txt declarations.",
                 "evidence": f"GET / returned HTTP 200 for standard browsers but HTTP {bot_status} for OAI-SearchBot.",
                 "suggested_action": {
@@ -329,7 +329,7 @@ def audit(base, domain, inv=None, state_file=None):
             "confidence": "high",
             "root_cause": "A noindex or none directive in meta robots or X-Robots-Tag excludes the page from search indexes.",
             "cause_family": "DISCOVERY.ACCESS",
-            "cause_id": "NOINDEX_EXCLUSION",
+            "id": "NOINDEX_EXCLUSION", "cause_id": "NOINDEX_EXCLUSION",
             "impact": "AI assistants and search engines are instructed not to index or cite this page.",
             "evidence": f"Found direct exclusion directive in meta robots / X-Robots-Tag ({', '.join(sorted(robot_tokens & {'noindex', 'none'}))}).",
             "suggested_action": {
@@ -362,7 +362,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "confidence": "high",
                 "root_cause": "The page declares hreflang tags using invalid ISO 639-1 or ISO 3166-1 codes.",
                 "cause_family": "DISCOVERY.DISCOVERY_PATH",
-                "cause_id": "LOCALE_MISCONFIGURATION",
+                "id": "LOCALE_MISCONFIGURATION", "cause_id": "LOCALE_MISCONFIGURATION",
                 "impact": "Search engines and AI indexers may misinterpret the language or regional targeting, surfacing the wrong locale.",
                 "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(invalid_langs)}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
                 "suggested_action": {
@@ -384,7 +384,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "confidence": "high",
                 "root_cause": "The page's canonical tag points to a different host, fragmenting search authority.",
                 "cause_family": "DISCOVERY.DISCOVERY_PATH",
-                "cause_id": "CANONICAL_FRAGMENTATION",
+                "id": "CANONICAL_FRAGMENTATION", "cause_id": "CANONICAL_FRAGMENTATION",
                 "impact": "Search engines consolidate ranking signals and citations onto the external canonical domain.",
                 "evidence": f"Page on {domain} specifies canonical target '{dom.canonical}'.",
                 "suggested_action": {
@@ -408,7 +408,7 @@ def audit(base, domain, inv=None, state_file=None):
             "confidence": "high" if dom.noscript_requires_js else "medium",
             "root_cause": "The initial HTML payload is an unrendered JavaScript single-page application shell containing fewer than 25 words.",
             "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
-            "cause_id": "RENDERED_CONTENT_GAP",
+            "id": "RENDERED_CONTENT_GAP", "cause_id": "RENDERED_CONTENT_GAP",
             "impact": "Some retrieval clients may receive materially incomplete content from the initial HTML representation.",
             "evidence": f"Initial HTML contains only {visible_words} visible words and an unrendered client-side shell ({marker}).",
             "suggested_action": {
@@ -426,7 +426,7 @@ def audit(base, domain, inv=None, state_file=None):
             "confidence": "medium",
             "root_cause": "The initial HTML body contains minimal copy and an application JavaScript bundle without pre-rendered semantic content.",
             "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
-            "cause_id": "RENDERED_CONTENT_GAP",
+            "id": "RENDERED_CONTENT_GAP", "cause_id": "RENDERED_CONTENT_GAP",
             "impact": "AI retrieval crawlers may receive an unrendered page shell if the page relies on client-side mounting.",
             "evidence": f"Initial HTML contains only {visible_words} visible words, no semantic headings/paragraphs, and {len(dom.app_script_srcs)} application script(s).",
             "suggested_action": {
@@ -473,7 +473,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "confidence": "high",
                 "root_cause": "robots.txt explicitly disallows AI search retrieval crawlers responsible for live citations.",
                 "cause_family": "DISCOVERY.ACCESS",
-                "cause_id": "AI_RETRIEVAL_BLOCKED",
+                "id": "AI_RETRIEVAL_BLOCKED", "cause_id": "AI_RETRIEVAL_BLOCKED",
                 "impact": "The site is excluded from real-time web grounding and citation generation in ChatGPT Search, Claude, and Perplexity.",
                 "evidence": f"robots.txt disallows {len(blocked_retrieval)} retrieval crawler(s): {rules_str}.",
                 "suggested_action": {

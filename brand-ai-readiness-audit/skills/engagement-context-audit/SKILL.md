@@ -1,20 +1,29 @@
 ---
 name: engagement-context-audit
 description: >
-  Engagement & context continuity layer. Evaluates visitor orientation, heading information scent
-  (5-second test), destination navigation reachability, and intent-handoff continuity for AI-referred traffic to prevent bounce.
+  Use this skill to evaluate visitor orientation and intent-handoff continuity for AI-referred
+  traffic. Evaluates heading information scent (Entity-to-H1 anchoring), commercial call-to-action
+  reachability, and destination navigation to prevent post-citation bounce.
 license: MIT
-compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
+compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "3.0.0"
+  version: "1.0.0"
+  author: "Jayanth Reddy Konda"
 allowed-tools:
   - run_command
   - view_file
 ---
 
 # Engagement & Context Continuity Audit Skill
+
+
+| Task | Execution Command | Output Contract |
+|---|---|---|
+| **Visitor Continuity & Information Scent Check** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+
+> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
 
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.
 
@@ -32,33 +41,27 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 
 ---
 
-## References to Consult
+## References & Documentation Library
 
-> [!CAUTION]
-> **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
-> You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
-> `<MARKETPLACE_ROOT>/skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md` (or the equivalent path in your environment).
-> Failure to read the exact causal taxonomies from this file will cause schema validation failures.
+Load these resources as needed during engagement context checks:
 
+### Core Knowledge Base (Load First)
+- [📖 Engagement Context Knowledge Base](references/engagement-context-audit-knowledge-base.md): Entity-to-H1 information scent evaluation, commercial intent CTA reachability, and post-referral bounce prevention.
 
-> [!IMPORTANT]
-> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md`
-> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
-
-
+### Reference Page Schemas
+- [💳 Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
+- [🛒 Product Purchase Template](references/product-purchase.json): Standard conversion and purchase handoff structure.
 ## Mandatory Execution Command
 
 Execute the engagement and intent continuity script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/engagement_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
+python3 scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 
@@ -83,6 +86,12 @@ Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
 
 ---
+
+
+## Gotchas & False-Positive Boundaries
+
+- **Missing H1 is a Recommendation:** An absent or generic `<h1>` tag alone is emitted as a proactive recommendation (`LOW_INFORMATION_SCENT`), not a critical defect.
+- **Commercial Continuity:** Intent mismatch is only reported when a page provides bottom-funnel commercial pricing facts but provides zero next-step interactive or sales navigation.
 
 ## Security & SSRF Policy
 

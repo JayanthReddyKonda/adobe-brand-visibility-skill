@@ -1,21 +1,29 @@
 ---
 name: fact-consistency-audit
 description: >
-  Fact consistency layer. Builds a scoped first-party fact ledger (prices, contacts,
-  copyright years, freshness timestamps, product lifecycle states) across sampled pages
-  and reports verified contradictions only when facts share the same entity, attribute, and scope.
+  Use this skill to detect cross-page factual contradictions across a website. Builds a scoped
+  first-party fact ledger (prices, contacts, lifecycle states) and identifies verified
+  conflicts that cause AI assistants to quote hallucinated or inconsistent brand information.
 license: MIT
-compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
+compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "3.0.0"
+  version: "1.0.0"
+  author: "Jayanth Reddy Konda"
 allowed-tools:
   - run_command
   - view_file
 ---
 
 # Fact Consistency & Lifecycle Audit Skill
+
+
+| Task | Execution Command | Output Contract |
+|---|---|---|
+| **Cross-Page Factual Consistency Ledger** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+
+> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
 
 Constructs a multi-attribute first-party fact ledger across sampled website pages. Detects verified commercial contradictions, product lifecycle conflicts (discontinued vs current), and legacy fact propagation.
 
@@ -33,33 +41,23 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 
 ---
 
-## References to Consult
+## References & Documentation Library
 
-> [!CAUTION]
-> **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
-> You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
-> `<MARKETPLACE_ROOT>/skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md` (or the equivalent path in your environment).
-> Failure to read the exact causal taxonomies from this file will cause schema validation failures.
+Load these resources as needed during factual consistency checks:
 
-
-> [!IMPORTANT]
-> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md`
-> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
-
-
+### Core Knowledge Base (Load First)
+- [📖 Fact Consistency Knowledge Base](references/fact-consistency-audit-knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
 ## Mandatory Execution Command
 
 Execute the fact ledger and consistency script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/fact_consistency_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json
+python3 scripts/fact_consistency_check.py --site https://example.com --format json
 ```
 
 
@@ -83,6 +81,13 @@ Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], coverage{}, limitations[]}`.
 
 ---
+
+
+## Gotchas & False-Positive Boundaries
+
+- **Strict Entity & Scope Matching:** Only flag price conflicts when facts share the identical entity, currency, billing interval, and product variant.
+- **Tiered Pricing Tables:** Do not flag multiple distinct price tiers (e.g. Starter $49 vs Pro $99) on the same page as a factual conflict.
+- **Footer Copyright Drift:** Varying copyright years across page templates should be emitted as a freshness recommendation, not a critical defect.
 
 ## Security & SSRF Policy
 

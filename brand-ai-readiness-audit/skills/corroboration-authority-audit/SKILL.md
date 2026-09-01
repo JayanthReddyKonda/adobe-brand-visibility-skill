@@ -1,21 +1,29 @@
 ---
 name: corroboration-authority-audit
 description: >
-  Cross-web identity-link authority layer. Distinguishes identity link verification
-  (verifying declared sameAs URLs resolve with HTTP 200) from external claim corroboration.
-  A declared authority link that is provably broken (4xx/5xx) is a finding; absence of links is a recommendation.
+  Use this skill to verify external identity-link authority and claim corroboration. Probes
+  declared sameAs URLs (Wikidata, LinkedIn, Wikipedia) to ensure they resolve with HTTP 200
+  and substantiate the brand canonical identity.
 license: MIT
-compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
+compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "3.0.0"
+  version: "1.0.0"
+  author: "Jayanth Reddy Konda"
 allowed-tools:
   - run_command
   - view_file
 ---
 
 # Corroboration & Authority Audit Skill
+
+
+| Task | Execution Command | Output Contract |
+|---|---|---|
+| **External sameAs Authority Prober** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+
+> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
 
 Evaluates external entity authority by verifying that declared identity links (`sameAs` in Organization JSON-LD pointing to Wikidata, Crunchbase, Wikipedia, and official social channels) resolve cleanly with HTTP 200 without broken redirect loops or 4xx/5xx HTTP errors.
 
@@ -33,33 +41,23 @@ Evaluates external entity authority by verifying that declared identity links (`
 
 ---
 
-## References to Consult
+## References & Documentation Library
 
-> [!CAUTION]
-> **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
-> You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
-> `<MARKETPLACE_ROOT>/skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md` (or the equivalent path in your environment).
-> Failure to read the exact causal taxonomies from this file will cause schema validation failures.
+Load these resources as needed during authority corroboration checks:
 
-
-> [!IMPORTANT]
-> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md`
-> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
-
-
+### Core Knowledge Base (Load First)
+- [📖 Corroboration Authority Knowledge Base](references/corroboration-authority-audit-knowledge-base.md): External sameAs probing protocols, bounded HTTP verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
 ## Mandatory Execution Command
 
 Execute the authority link verification script with `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/corroboration_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json
+python3 scripts/corroboration_check.py --site https://example.com --format json
 ```
 
 
@@ -83,6 +81,12 @@ Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
 
 ---
+
+
+## Gotchas & False-Positive Boundaries
+
+- **Broken Links vs Missing Links:** A declared `sameAs` link that returns HTTP 4xx/5xx is a defect finding (`BROKEN_AUTHORITY_ANCHOR`). Total absence of declared links is an advisory recommendation.
+- **Bounded Remote Probing:** Probe at most 5 declared authority URLs with a strict 5-second timeout and 512 KB payload cap to prevent latency bottlenecks.
 
 ## Security & SSRF Policy
 

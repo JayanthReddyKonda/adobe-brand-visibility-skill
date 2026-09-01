@@ -1,0 +1,15 @@
+{
+  "skill_name": "geo-content-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Evaluate content on https://example.com for Generative Engine Optimization (GEO) causal mechanisms and statistical evidence.",
+      "expected_output": "AutoGEO scoring and mechanistic depth analysis.",
+      "assertions": [
+        "Mechanistic causal conjunctions (how, why, because, enables) are counted",
+        "Numerical evidence and benchmark statistics are detected",
+        "Shallow pages trigger MISSING_IN_DEPTH_MECHANISMS findings"
+      ]
+    }
+  ]
+}

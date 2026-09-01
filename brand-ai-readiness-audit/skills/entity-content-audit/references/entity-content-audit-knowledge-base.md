@@ -1,5 +1,26 @@
 # ENTITY-CONTENT-AUDIT KNOWLEDGE BASE
 
+## Table of Contents
+
+- [Preconditions](#preconditions)
+- [C1. Identity explicitness](#c1-identity-explicitness)
+- [C2. Product/offer extraction](#c2-productoffer-extraction)
+- [C3. Claim completeness](#c3-claim-completeness)
+- [C4. sameAs corroboration (recommendation only)](#c4-sameas-corroboration-recommendation-only)
+- [Evidence standards](#evidence-standards)
+- [1. Syntax & Placement Best Practices](#1-syntax-placement-best-practices)
+- [2. Organization Schema](#2-organization-schema)
+- [3. Product & Offer Schema](#3-product-offer-schema)
+- [4. Defect vs Recommendation Rules](#4-defect-vs-recommendation-rules)
+- [Signal](#signal)
+- [Do NOT Report As Defect When:](#do-not-report-as-defect-when)
+- [Report ONLY As:](#report-only-as)
+- [Report As Defect ONLY When:](#report-as-defect-only-when)
+- [1. Master Linked Graph Template (Organization + WebSite + SearchAction)](#1-master-linked-graph-template-organization-website-searchaction)
+- [2. Product & Offer Schema with Full Answerability](#2-product-offer-schema-with-full-answerability)
+
+---
+
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
 
@@ -173,3 +194,90 @@ Page contains readable HTML text but has no `<script type="application/ld+json">
 ## Report As Defect ONLY When:
 - The page is a core commercial flagship product or organization page where crucial facts (pricing variants, availability state, technical specifications) are embedded in complex client-side tables or obfuscated structures that cannot be extracted deterministically without structured schema.
 
+
+
+========================================================================
+=== SOURCE FILE: schema-templates-catalog.md ===
+========================================================================
+
+# Schema.org Copy-Paste Templates Catalog
+
+## 1. Master Linked Graph Template (Organization + WebSite + SearchAction)
+
+Embed this single linked JSON-LD block inside the `<head>` of the homepage:
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://example.com/#organization",
+      "name": "Acme Corporation",
+      "url": "https://example.com",
+      "logo": "https://example.com/assets/logo.png",
+      "sameAs": [
+        "https://www.wikidata.org/wiki/Q123456",
+        "https://en.wikipedia.org/wiki/Acme_Corp",
+        "https://www.linkedin.com/company/acme-corp",
+        "https://twitter.com/acme"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+1-800-555-0199",
+        "contactType": "customer service",
+        "areaServed": "US",
+        "availableLanguage": ["en", "es"]
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://example.com/#website",
+      "url": "https://example.com",
+      "name": "Acme Official Platform",
+      "publisher": {
+        "@id": "https://example.com/#organization"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://example.com/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+  ]
+}
+</script>
+```
+
+## 2. Product & Offer Schema with Full Answerability
+
+Embed this on product detail pages to satisfy all commercial AI shopping agents:
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "Acme CloudSync Enterprise",
+  "image": "https://example.com/images/cloudsync.jpg",
+  "description": "Enterprise cloud synchronization platform with AES-256 encryption and automated failover.",
+  "sku": "ACME-CS-ENT",
+  "brand": {
+    "@type": "Brand",
+    "name": "Acme"
+  },
+  "offers": {
+    "@type": "Offer",
+    "url": "https://example.com/pricing",
+    "price": "49.00",
+    "priceCurrency": "USD",
+    "priceValidUntil": "2027-12-31",
+    "availability": "https://schema.org/InStock",
+    "seller": {
+      "@id": "https://example.com/#organization"
+    }
+  }
+}
+</script>
+```

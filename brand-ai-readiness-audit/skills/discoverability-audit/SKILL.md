@@ -1,23 +1,29 @@
 ---
 name: discoverability-audit
 description: >
-  Access & discovery layer of the brand AI-readiness audit. Checks whether AI
-  retrieval systems can REACH the site (HTTP status, robots.txt AI-crawler
-  rules distinguishing retrieval vs training bots, noindex/X-Robots-Tag, canonical)
-  and whether primary content is present in the initial HTML (rendering risk,
-  stated precisely as verified raw-HTML evidence).
+  Use this skill to audit whether AI retrieval engines (ChatGPT Search, Claude, Perplexity)
+  can reach and extract content from a website. Evaluates robots.txt crawler permissions,
+  meta robots directives (noindex/none), canonical tags, and raw HTML rendering completeness.
 license: MIT
-compatibility: Cross-platform (Linux, macOS, Windows). Requires Python 3.8+ (standard library only).
+compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "3.0.0"
+  version: "1.0.0"
+  author: "Jayanth Reddy Konda"
 allowed-tools:
   - run_command
   - view_file
 ---
 
 # Discoverability Audit Skill
+
+
+| Task | Execution Command | Output Contract |
+|---|---|---|
+| **Crawlability & AI Indexation Check** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory <inv>` | `status`, `findings`, `recommendations` |
+
+> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
 
 Evaluates the accessibility and indexing pipeline of a website for AI retrieval engines (ChatGPT Search, Claude Search, Perplexity AI, Google Search). Determines whether AI crawlers can fetch the site's content and whether initial HTML payloads carry extractable text.
 
@@ -36,33 +42,26 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 
 ---
 
-## References to Consult
+## References & Documentation Library
 
-> [!CAUTION]
-> **EVALUATOR MANDATE: KNOWLEDGE BASE INTEGRITY**
-> You MUST read the shared knowledge base into your context before executing this script. Use your file viewer (e.g. `cat`, `type`, `view_file`) on the following file relative to the marketplace root:
-> `<MARKETPLACE_ROOT>/skills/discoverability-audit/references/discoverability-audit-knowledge-base.md` (or the equivalent path in your environment).
-> Failure to read the exact causal taxonomies from this file will cause schema validation failures.
+Load these resources as needed during discoverability checks:
 
+### Core Knowledge Base (Load First)
+- [📖 Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, and raw HTML extractability thresholds.
 
-> [!IMPORTANT]
-> **MANDATORY READING:** You MUST read the unified knowledge base before proceeding.
-> Read the following file into your context using your available file viewer tool (e.g., `view_file`, `cat`, `type`):
-> `<MARKETPLACE_ROOT>/skills/discoverability-audit/references/discoverability-audit-knowledge-base.md`
-> Do NOT attempt to guess the rules. All schemas, causal taxonomies, and decision matrices are strictly defined in that single file.
-
-
+### Specialized Reference Guides (Load on Condition)
+- [🌐 International SEO & Localization](references/international-seo.md): Read when auditing multi-lingual or multi-region websites to verify hreflang reciprocity, x-default tags, and ISO 639-1 / ISO 3166-1 Alpha 2 codes.
 ## Mandatory Execution Command
 
 Execute the deterministic extraction script using the shared inventory and `--format json`:
 
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_check.py --site <target_url> --inventory inv.json --format json
+python3 scripts/discoverability_check.py --site <target_url> --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json
+python3 scripts/discoverability_check.py --site https://example.com --format json
 ```
 
 
@@ -86,7 +85,7 @@ python3 <MARKETPLACE_ROOT>/skills/discoverability-audit/scripts/discoverability_
 
 ---
 
-## What NOT to Flag (False Positive Protections)
+## Gotchas & False-Positive Boundaries
 
 - Do NOT flag training bot blocks (`GPTBot`) as critical AI search failures.
 - Do NOT flag missing `llms.txt` as a defect (it is an optional discovery file).

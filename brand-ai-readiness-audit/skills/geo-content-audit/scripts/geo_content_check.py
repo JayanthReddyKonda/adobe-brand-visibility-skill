@@ -110,7 +110,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "confidence": "high",
                 "root_cause": "The page fails to provide in-depth mechanistic explanations ('how' and 'why'), which Generative Engines heavily prioritize.",
                 "cause_family": "CONTENT.SHALLOW_COVERAGE",
-                "cause_id": "MISSING_IN_DEPTH_MECHANISMS",
+                "id": "MISSING_IN_DEPTH_MECHANISMS", "cause_id": "MISSING_IN_DEPTH_MECHANISMS",
                 "evidence": f"Page {url} lacks causal conjunctions or explanatory depth markers.",
                 "impact": "Generative Engines prefer to cite sources that offer deep explanatory context rather than surface-level statements.",
                 "suggested_action": {
@@ -123,8 +123,11 @@ def audit(base, domain, inv=None, state_file=None):
         has_evidence = len(_STAT_RE.findall(full_text)) > 0
         if not has_evidence:
             recommendations.append({
+                "title": "Substantiate content with quantifiable evidence and statistics",
+                "category": "content",
+                "rationale": f"Substantiate claims on {url} with specific, verifiable data, statistics, or named examples to improve AutoGEO preference.",
                 "summary": f"Substantiate claims on {url} with specific, verifiable data, statistics, or named examples to improve AutoGEO preference.",
-                "priority": "low"
+                "suggested_action": "Incorporate verifiable statistics, benchmark numbers, or quantifiable metrics."
             })
 
         
@@ -135,8 +138,11 @@ def audit(base, domain, inv=None, state_file=None):
         # P0-6 & P0-7: Advisory GEO Metrics
         if ptype == "product_detail" and parser.tables == 0 and parser.lists == 0:
             recommendations.append({
+                "title": "Structure product specifications in semantic tables or lists",
+                "category": "content",
+                "rationale": f"Product page {url} contains no semantic tables or lists.",
                 "summary": f"Product page {url} contains no semantic tables or lists. If material attributes are genuinely hard to isolate, structuring them may aid deterministic extraction.",
-                "priority": "low"
+                "suggested_action": "Add structured <table>, <dl>, or <ul> elements for material specifications."
             })
 
         # Articles / Information pages need statistical density and clear answer blocks

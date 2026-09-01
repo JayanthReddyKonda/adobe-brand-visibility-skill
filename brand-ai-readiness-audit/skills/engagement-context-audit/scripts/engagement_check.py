@@ -331,7 +331,9 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "title": "Pricing intent journey lacks explicit commercial continuation",
                 "severity": "medium",
                 "category": "engagement",
-                "cause_id": "INTENT_TO_LANDING_MISMATCH",
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "id": "INTENT_TO_LANDING_MISMATCH", "cause_id": "INTENT_TO_LANDING_MISMATCH",
+                "root_cause": "The page provides pricing facts for an entity but lacks explicit next-step commercial navigation or transactional actions.",
                 "confidence": "high",
                 "evidence": f"Page {url} provides explicit commercial facts (pricing for '{facts['scoped_prices'][0]['entity']}'), satisfying a bottom-funnel intent, but provides no clear transactional or sales-contact navigation.",
                 "suggested_action": {
@@ -343,8 +345,11 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     # 2. Entity-to-Heading Anchor (Information Scent)
     if not dom.h1_list:
         recommendations.append({
+            "title": "Add descriptive H1 heading for visitor orientation",
+            "category": "engagement",
+            "rationale": f"Page {url} is missing an H1 heading.",
             "summary": "Ensure every page provides a clear <h1> describing its specific value proposition or content.",
-            "priority": "low"
+            "suggested_action": "Ensure every page provides a clear <h1> describing its specific value proposition or content."
         })
     elif state and "entities" in state and url in state["entities"]:
         entities = state["entities"][url]
@@ -358,7 +363,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "confidence": "high",
                 "root_cause": "The page's primary <h1> does not contain the name of the canonical entity, leading to user disorientation upon arrival.",
                 "cause_family": "EXPERIENCE.CONTINUITY",
-                "cause_id": "LOW_INFORMATION_SCENT",
+                "id": "LOW_INFORMATION_SCENT", "cause_id": "LOW_INFORMATION_SCENT",
                 "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
                 "suggested_action": {
                     "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
