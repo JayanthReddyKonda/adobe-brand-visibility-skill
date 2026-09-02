@@ -11,7 +11,7 @@ import engagement_check
 class TestEngagement(unittest.TestCase):
     def test_no_h1(self):
         html = "<html><body><p>No H1 here</p></body></html>"
-        findings, recs, metrics = engagement_check.audit_page_engagement(html, "http://example.com/", "other")
+        findings, recs, _metrics = engagement_check.audit_page_engagement(html, "http://example.com/", "other")
 
         # Verify no finding is created solely because of no H1
         for f in findings:
