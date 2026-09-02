@@ -50,11 +50,10 @@ class UnifiedDOMParser(HTMLParser):
             self.in_json_ld = False
         elif tag == "title":
             self.in_title = False
-        elif tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
-            if self.current_heading:
-                self.current_heading["text"] = self.current_heading["text"].strip()
-                self.headings.append(self.current_heading)
-                self.current_heading = None
+        elif tag in ("h1", "h2", "h3", "h4", "h5", "h6") and self.current_heading:
+            self.current_heading["text"] = self.current_heading["text"].strip()
+            self.headings.append(self.current_heading)
+            self.current_heading = None
         self.current_tag = None
 
     def handle_data(self, data):

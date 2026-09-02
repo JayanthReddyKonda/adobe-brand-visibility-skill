@@ -221,7 +221,7 @@ def is_valid_product_entity(name):
         return False
 
     # Must not end with question/colon punctuation (e.g. FAQ questions)
-    if clean.endswith("?") or clean.endswith(":"):
+    if clean.endswith(("?", ":")):
         return False
 
     # Must not contain question prefixes or FAQ phrases
@@ -257,13 +257,7 @@ def is_valid_product_entity(name):
 
     if clean_lower in UTILITY_HEADINGS:
         return False
-    if any(
-        k in clean_lower
-        for k in ("cookie", "privacy", "terms", "navigation", "diversity", "giving", "usage limit", "frequently asked")
-    ):
-        return False
-
-    return True
+    return not any(k in clean_lower for k in ("cookie", "privacy", "terms", "navigation", "diversity", "giving", "usage limit", "frequently asked"))
 
 
 def resolve_json_ld_graph(raw_json_list):
@@ -435,15 +429,14 @@ def extract_scoped_facts(html_str, url):
     # 5. Lifecycle text detection (Removed to prevent false positives)
     for h in parser.headings:
         h_text = h[1]
-        if DISCONTINUED_PATTERN.search(h_text):
-            if is_valid_product_entity(h_text):
-                matched = False
-                for p in facts["products_with_status"]:
-                    if p["name"].lower() == h_text.lower().strip():
-                        p["status"] = "discontinued"
-                        matched = True
-                if not matched:
-                    facts["products_with_status"].append({"name": h_text.strip(), "status": "discontinued", "url": url})
+        if DISCONTINUED_PATTERN.search(h_text) and is_valid_product_entity(h_text):
+            matched = False
+            for p in facts["products_with_status"]:
+                if p["name"].lower() == h_text.lower().strip():
+                    p["status"] = "discontinued"
+                    matched = True
+            if not matched:
+                facts["products_with_status"].append({"name": h_text.strip(), "status": "discontinued", "url": url})
 
     # 6. Scoped emails & phones
     for m in EMAIL_PATTERN.finditer(html_str):
@@ -600,7 +593,7 @@ def compare_ai_observations(fact_ledger, responses_file):
         for idx, obs in enumerate(obs_list):
             assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx + 1}"
             mentioned = obs.get("mentioned") is True
-            cited = obs.get("cited") is True
+            obs.get("cited") is True
 
             if not mentioned:
                 notes.append(f"{assistant_name} omitted brand.")
@@ -670,7 +663,7 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
             if raw_html:
                 page_fact_list.append(extract_scoped_facts(raw_html, u))
     else:
-        status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
+        _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
             page_fact_list.append(extract_scoped_facts(html, base + "/"))
 
@@ -683,7 +676,7 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
         }
 
     f_findings, f_recs = evaluate_fact_consistency(page_fact_list, base)
-    ai_findings, ai_notes = compare_ai_observations(page_fact_list, responses_file)
+    ai_findings, _ai_notes = compare_ai_observations(page_fact_list, responses_file)
     f_findings.extend(ai_findings)
     findings.extend(f_findings)
     recommendations.extend(f_recs)

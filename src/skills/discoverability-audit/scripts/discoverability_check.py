@@ -532,7 +532,7 @@ def audit(base, domain, inv=None, state_file=None):
 
     # 3. robots.txt Analysis
     if r_status == 200 and robots_txt:
-        groups, sitemaps = parse_robots(robots_txt)
+        groups, _sitemaps = parse_robots(robots_txt)
         blocked_retrieval = []
         blocked_training = []
 

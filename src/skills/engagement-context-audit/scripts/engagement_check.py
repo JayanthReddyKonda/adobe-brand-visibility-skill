@@ -47,7 +47,7 @@ def extract_locale_and_path(url):
 
 def classify_page(url, title=""):
     """Classify an HTML page with confidence and granular page types."""
-    locale, logical_path = extract_locale_and_path(url)
+    _locale, logical_path = extract_locale_and_path(url)
     segments = [s for s in logical_path.strip("/").split("/") if s]
     t_lower = (title or "").lower()
 
@@ -349,8 +349,8 @@ SITE_TYPE_CENTROIDS = {
 def cosine_similarity(vec1, vec2):
     intersection = set(vec1.keys()) & set(vec2.keys())
     numerator = sum([vec1[x] * vec2[x] for x in intersection])
-    sum1 = sum([vec1[x] ** 2 for x in vec1.keys()])
-    sum2 = sum([vec2[x] ** 2 for x in vec2.keys()])
+    sum1 = sum([vec1[x] ** 2 for x in vec1])
+    sum2 = sum([vec2[x] ** 2 for x in vec2])
     denominator = math.sqrt(sum1) * math.sqrt(sum2)
     return float(numerator) / denominator if denominator else 0.0
 
@@ -497,11 +497,10 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
 
 
 def audit(base, domain, inv=None, state_file=None):
-    state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
     if state_file and os.path.exists(state_file):
         try:
             with open(state_file, "r") as f:
-                state = json.load(f)
+                json.load(f)
         except Exception:
             pass
     findings = []
@@ -525,7 +524,7 @@ def audit(base, domain, inv=None, state_file=None):
             if raw_html:
                 html_pages.append(p)
     else:
-        status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
+        _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
             html_pages.append({"url": base + "/", "html": html, "page_type": "homepage"})
 

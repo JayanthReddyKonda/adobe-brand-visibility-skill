@@ -4,6 +4,8 @@ echo "Cleaning build directory..."
 rm -rf build/brand-ai-readiness-audit
 mkdir -p build/brand-ai-readiness-audit
 
+
+
 echo "Copying src to build..."
 cp -a src/* build/brand-ai-readiness-audit/
 

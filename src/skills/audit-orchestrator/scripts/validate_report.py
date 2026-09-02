@@ -28,31 +28,26 @@ def validate_type(instance, schema, path="root"):
         if not valid:
             return f"{path}: Expected {type_list}, got {type(instance).__name__}"
 
-        if "string" in type_list and isinstance(instance, str):
-            if schema.get("format") == "date-time":
-                import datetime
+        if "string" in type_list and isinstance(instance, str) and schema.get("format") == "date-time":
+            import datetime
 
-                try:
-                    dt_str = instance.replace("Z", "+00:00")
-                    datetime.datetime.fromisoformat(dt_str)
-                except ValueError:
-                    return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
+            try:
+                dt_str = instance.replace("Z", "+00:00")
+                datetime.datetime.fromisoformat(dt_str)
+            except ValueError:
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
 
-    if "minimum" in schema and isinstance(instance, (int, float)):
-        if instance < schema["minimum"]:
-            return f"{path}: Value {instance} is less than minimum {schema['minimum']}"
+    if "minimum" in schema and isinstance(instance, (int, float)) and instance < schema["minimum"]:
+        return f"{path}: Value {instance} is less than minimum {schema['minimum']}"
 
-    if "maximum" in schema and isinstance(instance, (int, float)):
-        if instance > schema["maximum"]:
-            return f"{path}: Value {instance} is greater than maximum {schema['maximum']}"
+    if "maximum" in schema and isinstance(instance, (int, float)) and instance > schema["maximum"]:
+        return f"{path}: Value {instance} is greater than maximum {schema['maximum']}"
 
-    if "enum" in schema:
-        if instance not in schema["enum"]:
-            return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
+    if "enum" in schema and instance not in schema["enum"]:
+        return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
 
-    if "minLength" in schema and isinstance(instance, str):
-        if len(instance) < schema["minLength"]:
-            return f"{path}: String too short, expected at least {schema['minLength']} chars"
+    if "minLength" in schema and isinstance(instance, str) and len(instance) < schema["minLength"]:
+        return f"{path}: String too short, expected at least {schema['minLength']} chars"
 
     if isinstance(instance, dict):
         if "required" in schema:

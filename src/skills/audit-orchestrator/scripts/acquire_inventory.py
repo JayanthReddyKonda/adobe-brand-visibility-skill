@@ -60,18 +60,14 @@ def is_html_response(headers, body_snippet=""):
     snippet = body_snippet.strip()[:200].lower()
     if snippet.startswith("<?xml") or "<urlset" in snippet or "<sitemapindex" in snippet:
         return False
-    if "<!doctype html" in snippet or "<html" in snippet:
-        return True
-    return False
+    return bool("<!doctype html" in snippet or "<html" in snippet)
 
 
 def is_sitemap_or_non_html_url(url):
     u_lower = url.lower().split("?")[0].split("#")[0]
     if u_lower.endswith(NON_HTML_EXTENSIONS):
         return True
-    if "sitemap" in u_lower or "feed.xml" in u_lower or "rss.xml" in u_lower or "robots.txt" in u_lower:
-        return True
-    return False
+    return bool("sitemap" in u_lower or "feed.xml" in u_lower or "rss.xml" in u_lower or "robots.txt" in u_lower)
 
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
@@ -91,7 +87,7 @@ def extract_locale_and_template(url):
 
 def classify_page(url, title=""):
     """Classify an HTML page with confidence, granular page types, and template identification."""
-    parsed = urlparse(url)
+    urlparse(url)
     locale, logical_path = extract_locale_and_template(url)
     segments = [s for s in logical_path.strip("/").split("/") if s]
     t_lower = (title or "").lower()
@@ -201,7 +197,7 @@ def _parse_sitemap_xml(sitemap_body):
 
 def normalize_target(site):
     s = site.strip()
-    if not (s.startswith("http://") or s.startswith("https://")):
+    if not (s.startswith(("http://", "https://"))):
         base = f"https://{s.split('/')[0]}"
     else:
         parts = s.split("://", 1)
@@ -444,7 +440,7 @@ def main():
     args = parser.parse_args()
 
     s = args.site.strip()
-    if not (s.startswith("http://") or s.startswith("https://")):
+    if not (s.startswith(("http://", "https://"))):
         base_url = f"https://{s.split('/')[0]}"
     else:
         parts = s.split("://", 1)

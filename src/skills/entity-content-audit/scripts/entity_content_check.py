@@ -151,9 +151,8 @@ class EntityDOMParser(HTMLParser):
             self.title += " " + data.strip()
         elif self.current_h is not None:
             self.current_h_text.append(data)
-        elif not self.in_script:
-            if data.strip():
-                self.text_content.append(data.strip())
+        elif not self.in_script and data.strip():
+            self.text_content.append(data.strip())
 
 
 def matches_schema_type(entity, target_types):
@@ -299,7 +298,7 @@ def audit(base, domain, inv=None, state_file=None):
             ):
                 html_pages.append(p)
     else:
-        status, html, headers, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
+        status, html, _headers, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
             html_pages.append(
                 {"url": base + "/", "status": status, "resource_type": "html", "page_type": "homepage", "html": html}
