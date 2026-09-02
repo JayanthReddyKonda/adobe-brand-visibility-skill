@@ -24,7 +24,7 @@ if SCRIPT_DIR not in sys.path:
 try:
     from fetcher import safe_fetch, safe_check_status
 except ImportError:
-    from core.fetcher import safe_fetch, safe_check_status, safe_check_status, DEFAULT_USER_AGENT
+    from fetcher import safe_fetch, safe_check_status, safe_check_status, DEFAULT_USER_AGENT
 
 
 

@@ -20,7 +20,7 @@ if SCRIPT_DIR not in sys.path:
 try:
     from fetcher import safe_fetch, safe_check_status
 except ImportError:
-    from core.fetcher import safe_fetch, safe_check_status
+    from fetcher import safe_fetch, safe_check_status
 
 QUESTION_RE = re.compile(r"^(what|why|how|when|where|who|which|can|does|is|are)\b|\?$", re.I)
 _WORD_RE = re.compile(r"\b\w+\b")
