@@ -6,10 +6,11 @@ Causal Root Causes:
   - AUTHORITY.IDENTITY_CORROBORATION: BROKEN_AUTHORITY_ANCHOR
   - AUTHORITY.CLAIM_CORROBORATION: CLAIM_CORROBORATION_GAP
 """
-import sys
-import os
-import json
+
 import argparse
+import json
+import os
+import sys
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -19,12 +20,9 @@ if SCRIPT_DIR not in sys.path:
 
 
 try:
-    from fetcher import safe_fetch, safe_check_status
+    from fetcher import safe_check_status, safe_fetch
 except ImportError:
-    from fetcher import safe_fetch, safe_check_status, safe_check_status, DEFAULT_USER_AGENT
-
-
-
+    from fetcher import safe_fetch
 
 
 class SameAsExtractor(HTMLParser):
@@ -85,19 +83,30 @@ def audit(base, domain, inv=None, state_file=None):
 
     # 1. Fetch Homepage
     if inv is not None:
-        home = next((p for p in inv.get("pages", []) if p.get("page_type") == "homepage" and ("html" in str(p.get("resource_type", "")).lower() or "html" in str(p.get("content_type", "")).lower())), None)
+        home = next(
+            (
+                p
+                for p in inv.get("pages", [])
+                if p.get("page_type") == "homepage"
+                and (
+                    "html" in str(p.get("resource_type", "")).lower()
+                    or "html" in str(p.get("content_type", "")).lower()
+                )
+            ),
+            None,
+        )
         if not home and inv.get("pages"):
             home = inv["pages"][0]
         html = home.get("html") if home else None
     else:
-        status, html, _, err = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
+        status, html, _, err = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
 
         if not html:
             return {
                 "status": "inconclusive",
                 "findings": [],
                 "recommendations": [],
-                "error": f"could not reach {base}: {err}"
+                "error": f"could not reach {base}: {err}",
             }
 
     if not html:
@@ -105,7 +114,7 @@ def audit(base, domain, inv=None, state_file=None):
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
-            "error": f"could not retrieve content from {base}"
+            "error": f"could not retrieve content from {base}",
         }
 
     sameas_urls = extract_sameas_links(html)
@@ -113,34 +122,32 @@ def audit(base, domain, inv=None, state_file=None):
     # 2. Extract Brand Name Claim for Corroboration
     brand_name = None
     import re
-    title_match = re.search(r'<title>(.*?)</title>', html, re.I)
+
+    title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
     if title_match:
-        brand_name = title_match.group(1).split('|')[0].replace(' - ', '|').replace(' | ', '|').split('|')[0].strip()
+        brand_name = title_match.group(1).split("|")[0].replace(" - ", "|").replace(" | ", "|").split("|")[0].strip()
 
     # 3. Check declared authority links and perform Bounded Claim Corroboration
     if not sameas_urls:
-        recommendations.append({
-            "title": "Establish an integrated brand identity block with authoritative sameAs links",
-            "category": "corroboration",
-            "rationale": "No sameAs links were declared. Adding them enables bounded claim corroboration.",
-            "suggested_action": "Add sameAs URLs to Organization JSON-LD."
-        })
-        return {
-            "status": "ok",
-            "findings": findings,
-            "recommendations": recommendations,
-            "observations": observations
-        }
+        recommendations.append(
+            {
+                "title": "Establish an integrated brand identity block with authoritative sameAs links",
+                "category": "corroboration",
+                "rationale": "No sameAs links were declared. Adding them enables bounded claim corroboration.",
+                "suggested_action": "Add sameAs URLs to Organization JSON-LD.",
+            }
+        )
+        return {"status": "ok", "findings": findings, "recommendations": recommendations, "observations": observations}
 
     checked = []
     broken = []
-    
+
     for u in sameas_urls[:5]:
         if u.startswith(base):
             continue
-            
+
         checked.append(u)
-        status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512*1024, method="GET")
+        status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512 * 1024, method="GET")
         if status != 200:
             broken.append(f"{u} (HTTP {status})")
 
@@ -148,69 +155,77 @@ def audit(base, domain, inv=None, state_file=None):
             # Bounded Claim Corroboration: Does the external authority corroborate the identity claim?
             # We specifically look for the brand name in the external page's <title> or <meta property="og:site_name">
             ext_title = ""
-            ext_title_match = re.search(r'<title>(.*?)</title>', ext_html, re.I)
-            if ext_title_match: ext_title = ext_title_match.group(1).lower()
-            
-            og_match = re.search(r'<meta[^>]*property=["\']og:site_name["\'][^>]*content=["\']([^"\']+)["\']', ext_html, re.I)
+            ext_title_match = re.search(r"<title>(.*?)</title>", ext_html, re.IGNORECASE)
+            if ext_title_match:
+                ext_title = ext_title_match.group(1).lower()
+
+            og_match = re.search(
+                r'<meta[^>]*property=["\']og:site_name["\'][^>]*content=["\']([^"\']+)["\']', ext_html, re.IGNORECASE
+            )
             og_site_name = og_match.group(1).lower() if og_match else ""
-            
+
             brand_lower = brand_name.lower()
-            
+
             # If the external authority explicitly mentions the brand in its most critical identity fields
             if brand_lower in ext_title or brand_lower in og_site_name:
-                observations.append({"observation": f"Successfully corroborated brand name '{brand_name}' via <title>/og:site_name on external authority {u}."})
+                observations.append(
+                    {
+                        "observation": f"Successfully corroborated brand name '{brand_name}' via <title>/og:site_name on external authority {u}."
+                    }
+                )
             else:
                 # We check full text as a weak fallback
                 if brand_lower not in ext_html.lower():
-                    findings.append({
-                        "title": f"Authority link fails to corroborate brand identity claim",
-                        "severity": "medium",
-                        "category": "corroboration",
-                        "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
-                        "id": "CLAIM_CORROBORATION_GAP", "cause_id": "CLAIM_CORROBORATION_GAP",
-                        "root_cause": f"Declared authority profile does not substantiate brand identity for {brand_name}.",
-                        "confidence": "high",
-                        "evidence": f"The declared sameAs link {u} is reachable, but neither its title, og:site_name, nor body text explicitly state the brand name '{brand_name}'.",
-                        "suggested_action": {
-                            "summary": f"Ensure the external authority page at {urlparse(u).hostname} explicitly claims the canonical brand name.",
-                            "priority": "medium"
+                    findings.append(
+                        {
+                            "title": "Authority link fails to corroborate brand identity claim",
+                            "severity": "medium",
+                            "category": "corroboration",
+                            "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+                            "id": "CLAIM_CORROBORATION_GAP",
+                            "cause_id": "CLAIM_CORROBORATION_GAP",
+                            "root_cause": f"Declared authority profile does not substantiate brand identity for {brand_name}.",
+                            "confidence": "high",
+                            "evidence": f"The declared sameAs link {u} is reachable, but neither its title, og:site_name, nor body text explicitly state the brand name '{brand_name}'.",
+                            "suggested_action": {
+                                "summary": f"Ensure the external authority page at {urlparse(u).hostname} explicitly claims the canonical brand name.",
+                                "priority": "medium",
+                            },
                         }
-                    })
-
-
+                    )
 
     if broken:
-        findings.append({
-            "category": "corroboration",
-            "title": f"Broken authority/profile links declared in sameAs ({len(broken)} link(s))",
-            "severity": "medium",
-            "confidence": "high",
-            "root_cause": "Declared sameAs identity links return HTTP 4xx or 5xx error codes.",
-            "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
-            "id": "BROKEN_AUTHORITY_ANCHOR", "cause_id": "BROKEN_AUTHORITY_ANCHOR",
-            "impact": "AI models attempting to verify entity identity against independent authorities encounter broken links, reducing confidence.",
-            "evidence": f"Declared sameAs links returned error status: {'; '.join(broken)}.",
-            "suggested_action": {
-                "summary": "Update or remove broken sameAs URLs in Organization JSON-LD markup.",
-                "priority": "medium",
-                "verification": "Confirm all declared sameAs URLs return HTTP 200."
+        findings.append(
+            {
+                "category": "corroboration",
+                "title": f"Broken authority/profile links declared in sameAs ({len(broken)} link(s))",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "Declared sameAs identity links return HTTP 4xx or 5xx error codes.",
+                "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+                "id": "BROKEN_AUTHORITY_ANCHOR",
+                "cause_id": "BROKEN_AUTHORITY_ANCHOR",
+                "impact": "AI models attempting to verify entity identity against independent authorities encounter broken links, reducing confidence.",
+                "evidence": f"Declared sameAs links returned error status: {'; '.join(broken)}.",
+                "suggested_action": {
+                    "summary": "Update or remove broken sameAs URLs in Organization JSON-LD markup.",
+                    "priority": "medium",
+                    "verification": "Confirm all declared sameAs URLs return HTTP 200.",
+                },
             }
-        })
+        )
 
     return {
         "status": "ok",
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,
-        "coverage": {
-            "sameas_count": len(sameas_urls),
-            "probed": len(checked),
-            "results": checked
-        },
+        "coverage": {"sameas_count": len(sameas_urls), "probed": len(checked), "results": checked},
         "limitations": [
             "Probed declared sameAs authority URLs; full web-wide claim corroboration was bounded to declared links."
-        ]
+        ],
     }
+
 
 def main():
     parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
@@ -234,33 +249,37 @@ def main():
     res = audit(base, p.netloc, inv=inv, state_file=args.state)
     # ULTIMATE FOUNDATION: Convert the script's internal findings into pure factual telemetry
     # The AI Agent will read these facts and perform the causal reasoning.
-    
+
     raw_facts = []
-    
+
     for f in res.get("findings", []):
-        raw_facts.append({
-            "fact_type": f.get("category", "finding"),
-            "evidence": f.get("evidence", ""),
-            "cause_id": f.get("cause_id", ""),  # Passed as a hint/metric for the AI
-        })
-        
+        raw_facts.append(
+            {
+                "fact_type": f.get("category", "finding"),
+                "evidence": f.get("evidence", ""),
+                "cause_id": f.get("cause_id", ""),  # Passed as a hint/metric for the AI
+            }
+        )
+
     for o in res.get("observations", []):
-        raw_facts.append({
-            "fact_type": o.get("role", "observation"),
-            "evidence": o.get("observation", ""),
-        })
-        
+        raw_facts.append(
+            {
+                "fact_type": o.get("role", "observation"),
+                "evidence": o.get("observation", ""),
+            }
+        )
+
     telemetry = res.get("coverage", {})
     if "entity_snapshot" in res:
         telemetry["entity_snapshot"] = res["entity_snapshot"]
-        
+
     final_output = {
         "status": res.get("status", "ok"),
         "telemetry": telemetry,
         "raw_extracted_facts": raw_facts,
-        "error": res.get("error")
+        "error": res.get("error"),
     }
-    
+
     print(json.dumps(final_output, indent=2))
 
 

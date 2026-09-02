@@ -1,9 +1,9 @@
-import unittest
 import sys
-import os
+import unittest
 
 sys.path.insert(0, "src/skills/audit-orchestrator/scripts")
 import fetcher
+
 
 class TestSafeFetchUnit(unittest.TestCase):
     def test_blocked_private_ipv4(self):
@@ -41,6 +41,7 @@ class TestSafeFetchUnit(unittest.TestCase):
         safe, reason, safe_ips = fetcher._is_safe_host("8.8.8.8")
         self.assertTrue(safe)
         self.assertTrue(len(safe_ips) > 0)
+
 
 if __name__ == "__main__":
     unittest.main()

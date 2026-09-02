@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import sys
 import json
 import os
-import re
+import sys
+
 
 def validate_type(instance, schema, path="root"):
     expected_type = schema.get("type")
@@ -15,7 +15,7 @@ def validate_type(instance, schema, path="root"):
             "integer": int,
             "number": (int, float),
             "boolean": bool,
-            "null": type(None)
+            "null": type(None),
         }
         valid = False
         for t in type_list:
@@ -24,19 +24,19 @@ def validate_type(instance, schema, path="root"):
                     continue  # bool is a subclass of int, but we want strict checking
                 valid = True
                 break
-        
+
         if not valid:
             return f"{path}: Expected {type_list}, got {type(instance).__name__}"
 
         if "string" in type_list and isinstance(instance, str):
             if schema.get("format") == "date-time":
                 import datetime
+
                 try:
-                    dt_str = instance.replace('Z', '+00:00')
+                    dt_str = instance.replace("Z", "+00:00")
                     datetime.datetime.fromisoformat(dt_str)
                 except ValueError:
                     return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
-
 
     if "minimum" in schema and isinstance(instance, (int, float)):
         if instance < schema["minimum"]:
@@ -48,7 +48,7 @@ def validate_type(instance, schema, path="root"):
 
     if "enum" in schema:
         if instance not in schema["enum"]:
-            return f"{path}: Value {repr(instance)} not in allowed enum {schema['enum']}"
+            return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
 
     if "minLength" in schema and isinstance(instance, str):
         if len(instance) < schema["minLength"]:
@@ -59,11 +59,12 @@ def validate_type(instance, schema, path="root"):
             for req in schema["required"]:
                 if req not in instance:
                     return f"{path}: Missing required property '{req}'"
-        
+
         for k, v in instance.items():
             if "properties" in schema and k in schema["properties"]:
                 err = validate_type(v, schema["properties"][k], path=f"{path}.{k}")
-                if err: return err
+                if err:
+                    return err
             elif schema.get("additionalProperties") is False:
                 return f"{path}: Additional property '{k}' not allowed"
 
@@ -71,9 +72,11 @@ def validate_type(instance, schema, path="root"):
         if "items" in schema:
             for i, item in enumerate(instance):
                 err = validate_type(item, schema["items"], path=f"{path}[{i}]")
-                if err: return err
+                if err:
+                    return err
 
     return None
+
 
 def main():
     if "-" in sys.argv:
@@ -88,7 +91,9 @@ def main():
         print(f"Invalid JSON input: {e}", file=sys.stderr)
         sys.exit(2)
 
-    schema_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json")
+    schema_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
+    )
     if not os.path.exists(schema_path):
         print(f"Schema not found at {schema_path}", file=sys.stderr)
         sys.exit(2)
@@ -103,6 +108,7 @@ def main():
 
     print(json.dumps(report, indent=2))
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()

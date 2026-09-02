@@ -1,12 +1,14 @@
 import json
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Union
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
+
 
 @dataclass
 class TelemetryFact:
     fact_type: str
     evidence: str
     metadata: Dict[str, Any]
+
 
 @dataclass
 class TelemetryResponse:

@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 
+
 class UnifiedDOMParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -11,19 +12,19 @@ class UnifiedDOMParser(HTMLParser):
         self.headings = []
         self.visible_text = []
         self.script_srcs = []
-        
+
         self.in_json_ld = False
         self.in_title = False
         self.current_heading = None
-        
+
         # Track elements that block visible text
-        self.ignore_tags = {'script', 'style', 'noscript', 'head', 'meta', 'link'}
+        self.ignore_tags = {"script", "style", "noscript", "head", "meta", "link"}
         self.current_tag = None
 
     def handle_starttag(self, tag, attrs):
         self.current_tag = tag
         attrs_dict = dict(attrs)
-        
+
         if tag == "script":
             if attrs_dict.get("type") == "application/ld+json":
                 self.in_json_ld = True
@@ -63,10 +64,9 @@ class UnifiedDOMParser(HTMLParser):
             self.title += data
         elif self.current_heading:
             self.current_heading["text"] += data
-            
+
         if self.current_tag not in self.ignore_tags and data.strip():
             self.visible_text.append(data.strip())
-            
+
     def get_visible_words_count(self) -> int:
         return sum(len(t.split()) for t in self.visible_text)
-
