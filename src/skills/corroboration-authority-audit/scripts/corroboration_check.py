@@ -306,6 +306,38 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
+    # 57% Off-Site Third-Party Footprint Evaluation (Omniscient Digital 2026 Benchmark)
+    high_citation_platforms = (
+        "reddit.com",
+        "wikipedia.org",
+        "youtube.com",
+        "linkedin.com",
+        "github.com",
+        "trustpilot.com",
+        "g2.com",
+        "capterra.com",
+    )
+    found_third_party_nodes = []
+    for link in sameas_urls:
+        if isinstance(link, str):
+            l_lower = link.lower()
+            if any(platform in l_lower for platform in high_citation_platforms):
+                found_third_party_nodes.append(link)
+
+    if len(found_third_party_nodes) == 0:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.AUTHORITY.OFFSITE_FOOTPRINT_GAP.001",
+                "title": "Establish off-site third-party corroboration on high-citation authority platforms",
+                "category": "corroboration",
+                "summary": f"Brand '{base}' lacks declared presence on the top third-party citation platforms (Reddit, Wikipedia, YouTube, LinkedIn, G2/Trustpilot). Empirical research across 23,387 branded AI search citations demonstrates that 57% of citations derive from third-party reviews and listicles, while only ~4.5% originate from a brand's own pages.",
+                "priority": "high",
+                "technical_fix": "Add verified corporate profiles on LinkedIn, GitHub, YouTube, or review platforms to the Organization sameAs schema array.",
+                "creative_fix": "Actively cultivate third-party mentions, expert reviews, and community discussions on high-citation hubs.",
+                "verification": "Confirm sameAs array links to at least one third-party review or authority platform.",
+            }
+        )
+
     return {
         "status": "ok",
         "findings": findings,

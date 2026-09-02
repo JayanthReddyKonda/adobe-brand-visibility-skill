@@ -214,7 +214,7 @@ class TestEngagementDeep(unittest.TestCase):
                     "status": 200,
                     "content_type": "text/html",
                     "page_type": "homepage",
-                    "html": f'<html><body><h1>Cloud Platform</h1><p>{long_body}</p><button>Submit</button></body></html>',
+                    "html": f"<html><body><h1>Cloud Platform</h1><p>{long_body}</p><button>Submit</button></body></html>",
                 }
             ],
         }
@@ -243,9 +243,7 @@ class TestEngagementDeep(unittest.TestCase):
                     "html": "<html><body><h1>TestBrand</h1><p>Pricing starts at $29/mo.</p></body></html>",
                 }
             ],
-            "infrastructure": {
-                "pricing_manifest": {"present": True, "status": 200, "snippet": "# Pricing"}
-            },
+            "infrastructure": {"pricing_manifest": {"present": True, "status": 200, "snippet": "# Pricing"}},
         }
         with open(self.test_inv, "w") as f:
             json.dump(inv_data, f)

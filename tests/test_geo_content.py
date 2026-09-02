@@ -53,7 +53,9 @@ class TestGeoContentAudit(unittest.TestCase):
         self.assertEqual(data["status"], "ok")
 
     def test_geo_rag_passage_chunking_recommendation(self):
-        long_body = "TestBrand provides comprehensive solutions for distributed systems and enterprise infrastructure. " * 20
+        long_body = (
+            "TestBrand provides comprehensive solutions for distributed systems and enterprise infrastructure. " * 20
+        )
         inv_data = {
             "site": "https://testbrand.com",
             "pages": [
@@ -160,6 +162,106 @@ class TestGeoContentAudit(unittest.TestCase):
         data = json.loads(res.stdout)
         cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
         self.assertIn("CONTENT_RECENCY_DEFICIT", cause_ids)
+
+    def test_atomic_fact_to_token_ratio(self):
+        # Text with low factual density (flowery marketing prose lacking numbers/dates)
+        fluff = (
+            "We are an innovative team that provides amazing solutions for incredible results. We strive to empower everyone with wonderful experiences. Our dedicated professionals work tirelessly to achieve marvelous outcomes."
+            * 10
+        )
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/about",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": f"<html><body><h1>About Us</h1><p>{fluff}</p></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("LOW_FACT_TO_TOKEN_RATIO", cause_ids)
+
+    def test_exophoric_pronoun_ratio(self):
+        # Paragraphs opening with ambiguous pronouns
+        p1 = "It enables seamless distributed workflow across cloud infrastructure without latency."
+        p2 = "They provide comprehensive telemetry and observability for high-throughput enterprise pipelines."
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/features",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": f"<html><body><h1>Features</h1><p>{p1}</p><p>{p2}</p></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        rec_ids = [r.get("id") for r in data.get("recommendations", [])]
+        self.assertIn("PROACTIVE.GEO.EXOPHORIC_PRONOUN_GROUNDING.001", rec_ids)
+
+    def test_wilson_confidence_interval_calc(self):
+        import sys
+
+        sys.path.insert(0, os.path.dirname(self.script_path))
+        from geo_content_check import wilson_confidence_interval
+
+        # 10 runs, 5 citations (50% citation rate)
+        low, high = wilson_confidence_interval(5, 10, z=1.96)
+        self.assertTrue(0.20 < low < 0.35)
+        self.assertTrue(0.65 < high < 0.80)
+        # 0 total runs returns (0.0, 0.0)
+        self.assertEqual(wilson_confidence_interval(0, 0), (0.0, 0.0))
+
+    def test_qa_alone_format_warning(self):
+        # Page with pure FAQ format lacking numbers, code, or comparisons
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/faq",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": "<html><body><h1>Frequently Asked Questions</h1><dl><dt>What do you do?</dt><dd>We assist customers with their workflows through intuitive interfaces.</dd><dt>How do I start?</dt><dd>Contact our team to get started with a consultation.</dd></dl></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        rec_ids = [r.get("id") for r in data.get("recommendations", [])]
+        self.assertIn("PROACTIVE.GEO.BEYOND_FAQ_FORMAT.001", rec_ids)
 
 
 if __name__ == "__main__":

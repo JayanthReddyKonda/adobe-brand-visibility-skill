@@ -195,7 +195,39 @@ Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over a
    - **Navigational Brand Queries** (e.g., *"What is [Brand]?"* — entity resolution failure, hallucination, lack of knowledge graph anchor).
    - **Categorical / Discovery Queries** (e.g., *"Where can I buy/stream/find [Topic]?"* — competitor selection due to superior schema attributes, licensing provenance, or causal depth).
 6. **Proactive Recommendations:** Add recommendations that genuinely strengthen AI discoverability beyond defects (e.g., modular 120-180 word RAG passage chunking with direct answer leads, Wikidata entity registration, or JSON-LD structured consolidation).
-7. **Platform-Specific Citation Breakdown:** In your reasoning and executive summary, contrast visibility across the Big 3 Generative Engines:
+7. **The 17-Rule Consolidated Matrix (`CR01`–`TX06`):**
+   Audit reasoning must evaluate the target domain against the complete consolidated benchmark suite defined in `references/state-of-the-art-geo-benchmarks.md`:
+   - **Crawler Access (`CR01`–`CR05`):** RFC 9309 compliance, 500 KiB file cap, HTTP 5xx fail-closed state, and explicit permissions for `OAI-SearchBot`, `Claude-SearchBot`, and `PerplexityBot`.
+   - **Machine-Readable Manifests (`LL01`–`LL02`):** Root `/llms.txt` availability with H1 title and blockquote, plus first-100-word executive summaries.
+   - **Rendering & Delivery (`RD01`–`RD02`):** Content Availability Gap ($	ext{CAG} < 0.15$) and text-to-HTML Signal-to-Noise Ratio ($	ext{SNR} > 0.12$).
+   - **Structured Data (`SC01`–`SC03`):** Organization $\ge 2$ authoritative `sameAs` nodes, clean float Offer prices with ISO 4217 currencies, and 60-day freshness.
+   - **Text & Citability (`TX01`–`TX06`):** BLUF top-30% placement, Hyland hedge density $\le 1.2\%$, Atomic Fact-to-Token Ratio $	ext{FTR} \ge 0.080$, Exophoric Pronoun Ratio $0\%$, Shannon Token Entropy $6.8 - 7.6	ext{ bits}$, and Princeton GEO evidence density ($\ge 1	ext{ stat} + 1	ext{ quote} / 150	ext{ words}$).
+
+8. **The 6 Orthogonal Scores Model & Wilson Confidence Intervals:**
+   Audit synthesis must evaluate the target brand across the 6 orthogonal dimensions defined in `references/sota-ai-readiness-framework-2026.md`:
+   - **Crawlability Score (20%):** Deterministic HTTP, RFC 9309, crawler access.
+   - **Retrieval Readiness (20%):** Text extraction, SNR, Content Availability Gap.
+   - **Citation Readiness (20%):** Atomic Fact-to-Token Ratio (FTR), hedge rate, BLUF top-30%.
+   - **Entity Authority (15%):** Schema graph, sameAs nodes, fact ledger consistency.
+   - **Cross-Engine Visibility (15%):** CECO and Wilson 95% confidence intervals.
+   - **Agentic Commerce Readiness (10%):** Product consistency, UCP, AP2, and A2A interoperability.
+
+9. **The Canonical 16-Defect Classification (HF-01 to HF-08 and W-01 to W-08):**
+   Every finding must be mapped to its corresponding Hard Failure (`HF`) or High-Value Warning (`W`) code from the defect catalog.
+
+10. **The Citation Failure Modes Decision Tree (Tian et al. 2026):**
+   Structure root cause analysis using the 5-stage failure taxonomy:
+   - **Retrieval Failure:** robots.txt disallow, HTTP 4xx/5xx, noindex, or empty SSR application shell.
+   - **Relevance Failure:** Title/H1 query-intent mismatch or semantic drift.
+   - **Redundancy Failure:** Generic, commoditized content losing context attention to higher-authority domains.
+   - **Trust Failure:** FTR < 0.040, excessive hedge language (>2.5%), or uncorroborated entity claims.
+   - **Extraction Failure:** nosnippet directives, low text Signal-to-Noise Ratio (<0.12), or DOM fragmentation.
+
+11. **The 57% Off-Site Authority Rule & CITE Rubric:**
+   Reasoning must acknowledge that 57% of branded AI citations derive from third-party reviews and authority nodes (Reddit, Wikipedia, YouTube, LinkedIn), and evaluate pages against the 0–30 CITE rubric.
+
+12. **Platform-Specific Citation Breakdown & PAWC Scoring:**
+   In your reasoning and executive summary, contrast visibility across the Big 3 Generative Engines using the Position-Adjusted Word Count ($	ext{PAWC}$) framework:
    - **Google AI Overviews (Gemini):** Traditional SEO gateway (top 10 correlation), table extractability, direct 40–60 word answer leads, and query fan-out topical clusters.
    - **ChatGPT Search (Bing):** Wikipedia/Wikidata entity grounding (47.9% share), comprehensive 2000+ word deep guides, and autonomous buying agent manifests (`/pricing.md`).
    - **Perplexity AI:** Community consensus validation (Reddit 46.7%), recency (<3 months 3x boost), and multi-source corroboration.

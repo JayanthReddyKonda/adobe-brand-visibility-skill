@@ -500,6 +500,118 @@ def audit(base, domain, inv=None, state_file=None):
                             }
                         )
 
+            # Rule SC01 & SC02: Clean Float Price, ISO 4217, and sameAs Density
+            for obj in typed_objects:
+                # SC01: sameAs profile density
+                if matches_schema_type(obj, ("organization", "corporation")):
+                    same_as = obj.get("sameAs", [])
+                    same_as_list = same_as if isinstance(same_as, list) else [same_as]
+                    if len(same_as_list) < 2:
+                        recommendations.append(
+                            {
+                                "id": "PROACTIVE.ENTITY.SAMEAS_DENSITY.001",
+                                "title": "Declare at least two authoritative sameAs profile links in Organization schema",
+                                "category": "entity",
+                                "summary": f"Organization schema on {purl} declares {len(same_as_list)} sameAs link(s). Linking to >= 2 verified external identity anchors (Wikidata, Wikipedia, LinkedIn, GitHub) is required for definitive Knowledge Graph entity resolution.",
+                                "priority": "medium",
+                                "technical_fix": "Add verified Wikidata, LinkedIn, or official social profile URLs to the sameAs array.",
+                                "creative_fix": "Ensure corporate profiles on major authority platforms link back canonically to the brand.",
+                                "verification": "Verify sameAs array contains >= 2 valid authority URLs.",
+                            }
+                        )
+                # SC02: Offer clean float price
+                if matches_schema_type(obj, ("product", "individualproduct", "offer")):
+                    offers_raw = obj.get("offers", obj if matches_schema_type(obj, ("offer",)) else {})
+                    offers_items = offers_raw if isinstance(offers_raw, list) else [offers_raw]
+                    for off in offers_items:
+                        if isinstance(off, dict):
+                            price_val = off.get("price")
+                            if (
+                                price_val is not None
+                                and isinstance(price_val, str)
+                                and any(sym in price_val for sym in ("$", "€", "£", "¥"))
+                            ):
+                                findings.append(
+                                    {
+                                        "category": "entity",
+                                        "title": "Offer price contains currency symbol (must be clean float)",
+                                        "severity": "medium",
+                                        "confidence": "high",
+                                        "root_cause": f"SCHEMA_PRICE_FORMAT_INVALID: Offer price '{price_val}' on {purl} contains currency symbols. AI buying agents and Google Merchant specifications require price to be a clean numeric string (e.g. '49.00', not '$49.00').",
+                                        "cause_family": "COMMERCIAL.TRANSACTION_GAP",
+                                        "id": "SCHEMA_PRICE_FORMAT_INVALID",
+                                        "cause_id": "SCHEMA_PRICE_FORMAT_INVALID",
+                                        "evidence": f"Offer declared price as '{price_val}'. Currency must be isolated in priceCurrency.",
+                                        "impact": "Autonomous procurement and shopping agents fail to parse numerical pricing, excluding the product from AI shopping results.",
+                                        "suggested_action": {
+                                            "summary": "Strip currency symbols from price and declare ISO 4217 in priceCurrency.",
+                                            "technical_fix": "Format schema price as 'price': '49.00' and 'priceCurrency': 'USD'.",
+                                            "creative_fix": "Display currency symbols visually in HTML while keeping JSON-LD numeric.",
+                                            "priority": "medium",
+                                            "verification": "Confirm price contains only digits and decimal points.",
+                                        },
+                                    }
+                                )
+
+            # Rule HF-06 & W-03: Product Consistency (HTML text vs JSON-LD Offer Price)
+            for obj in typed_objects:
+                if matches_schema_type(obj, ("product", "individualproduct")):
+                    offers = obj.get("offers", {})
+                    offer_items = offers if isinstance(offers, list) else [offers]
+                    for off in offer_items:
+                        if isinstance(off, dict):
+                            schema_price_raw = str(off.get("price", ""))
+                            # Extract visible price from HTML text
+                            html_prices = re.findall(r"\$\s*(\d+(?:\.\d{2})?)", phtml)
+                            if html_prices and schema_price_raw:
+                                # Clean schema price
+                                clean_schema_price = re.sub(r"[^0-9.]", "", schema_price_raw)
+                                if clean_schema_price and clean_schema_price not in html_prices:
+                                    findings.append(
+                                        {
+                                            "category": "commercial",
+                                            "title": "Product price contradiction between HTML copy and JSON-LD (HF-06)",
+                                            "severity": "critical",
+                                            "confidence": "high",
+                                            "root_cause": f"COMMERCIAL_PRODUCT_DATA_CONTRADICTION: HTML copy displays price(s) '${html_prices[0]}' but JSON-LD Offer declares price '{schema_price_raw}'. Autonomous shopping agents and Google Merchant Graph drop product trust on data contradictions.",
+                                            "cause_family": "COMMERCIAL.TRANSACTION_GAP",
+                                            "id": "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+                                            "cause_id": "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+                                            "evidence": f"HTML price: ${html_prices[0]} vs JSON-LD price: {schema_price_raw} on {purl}.",
+                                            "impact": "AI shopping assistants (ChatGPT Instant Checkout, Google Shopping Graph) reject contradictory product offers.",
+                                            "suggested_action": {
+                                                "summary": "Synchronize HTML visible pricing with JSON-LD Offer price.",
+                                                "technical_fix": f"Update JSON-LD Offer price to match verified visible price of {html_prices[0]}.",
+                                                "creative_fix": "Implement single-source-of-truth pricing rendering on product detail pages.",
+                                                "priority": "critical",
+                                                "verification": "Confirm HTML and JSON-LD offer prices match exactly.",
+                                            },
+                                        }
+                                    )
+
+            # Rule UCP-01 & A2A-01: Universal Commerce Protocol & Agent2Agent Interoperability Probes
+            if inv:
+                infra = inv.get("infrastructure", {})
+                has_ucp = bool(infra.get("ucp_manifest"))
+                has_a2a = bool(infra.get("a2a_agent_card"))
+                if (
+                    not has_ucp
+                    and not has_a2a
+                    and any(p.get("page_type") in ("product", "pricing") for p in html_pages)
+                ):
+                    recommendations.append(
+                        {
+                            "id": "PROACTIVE.COMMERCE.AGENTIC_PROTOCOL.001",
+                            "title": "Implement Universal Commerce Protocol (UCP) or A2A agent cards for autonomous checkout",
+                            "category": "commercial",
+                            "summary": "The site lacks machine-readable agentic commerce protocols (Google UCP, Agent Payments AP2, or Agent2Agent A2A). Emerging AI buying agents (Gemini AI Mode, ChatGPT Checkout) require programmatic discovery and checkout manifests.",
+                            "priority": "medium",
+                            "technical_fix": "Expose a machine-readable commerce manifest at '/.well-known/ucp.json' or 'agent_card.json' declaring cart, checkout, and inventory capabilities.",
+                            "creative_fix": "Publish an OpenAPI specification defining transactional endpoints for purchasing agents.",
+                            "verification": "Verify GET /.well-known/ucp.json returns HTTP 200 with valid schema.",
+                        }
+                    )
+
             # 3.2 Merchant Listing Return & Shipping Policies Check
             for obj in typed_objects:
                 if matches_schema_type(obj, ("product", "individualproduct")):

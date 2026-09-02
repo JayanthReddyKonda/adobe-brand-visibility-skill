@@ -633,7 +633,7 @@ def audit(base, domain, inv=None, state_file=None):
             pricing_present = True
         else:
             status_pt, pt_body, _, _ = safe_fetch(f"{base}/pricing.txt", timeout=5, max_bytes=512 * 1024)
-            pricing_present = (status_pt == 200 and bool(pt_body))
+            pricing_present = status_pt == 200 and bool(pt_body)
 
     if pricing_present:
         observations.append(

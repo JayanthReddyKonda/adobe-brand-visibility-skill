@@ -692,3 +692,49 @@ For programmatic integration, CI/CD gates, and automated trend monitoring, the o
 }
 -->
 ```
+
+
+## 10. The Canonical 16-Defect Matrix (HF-01 to HF-08 and W-01 to W-08)
+
+To eliminate subjective ambiguity, audit findings must map directly to the canonical defect taxonomy:
+
+### A. Hard Failures (HF-01 to HF-08) — Deterministic Blockers
+| Code | Title | Category | Severity | Root Cause Definition |
+| :--- | :--- | :--- | :--- | :--- |
+| **HF-01** | Target URL Unreachable / Non-200 | Crawlability | Critical | HTTP status >= 400 or network timeout. |
+| **HF-02** | Canonical URL Contradictory | Discoverability | High | Target page declares contradictory or missing canonical tag. |
+| **HF-03** | Search Crawler Blocked in robots.txt | Crawlability | Critical | `OAI-SearchBot`, `Claude-SearchBot`, or `PerplexityBot` disallowed. |
+| **HF-04** | noindex Directive Active | Indexability | Critical | `<meta name="robots" content="noindex">` or HTTP `X-Robots-Tag`. |
+| **HF-05** | nosnippet on Core Content | Snippet Control | High | `nosnippet`, restrictive `max-snippet`, or `data-nosnippet` on text. |
+| **HF-06** | Product Data Contradiction | Commerce | Critical | HTML visible price differs from JSON-LD `Offer.price`. |
+| **HF-07** | Critical Claims in Non-Text Media | Extractability | High | Core facts exist solely in images, PDFs, or dynamic JS rendering. |
+| **HF-08** | Schema Directly Contradicts Visible HTML | Structured Data | High | Schema entities state values incompatible with on-page copy. |
+
+### B. High-Value Warnings (W-01 to W-08) — Probabilistic & Quality Risks
+| Code | Title | Category | Severity | Root Cause Definition |
+| :--- | :--- | :--- | :--- | :--- |
+| **W-01** | Initial HTML Extraction Deficit | Retrieval | Medium | SSR content availability gap exceeds 15% (CAG >= 0.15). |
+| **W-02** | High-Value Facts Lack Source Attribution | Citability | Medium | Crucial commercial claims lack verifiable sources or citations. |
+| **W-03** | Commercial Pricing / Inventory Drift | Consistency | Medium | Cross-page or feed discrepancy in price, currency, or stock status. |
+| **W-04** | Brand Entity Discordance | Authority | Medium | Organization name or sameAs links conflict across routes. |
+| **W-05** | Excessive Discovery Depth | Architecture | Low | Authoritative evidence requires > 3 clicks/hops from homepage. |
+| **W-06** | llms.txt Link Decay | Manifest | Low | Links inside `/llms.txt` return 4xx redirects or non-canonical URLs. |
+| **W-07** | Low Atomic Fact Density | Content | Medium | FTR < 0.040; prose lacks verifiable dates, figures, or metrics. |
+| **W-08** | Cross-Engine Citation Divergence | Visibility | Medium | CECO < 0.50; brand cited on only 1 engine while absent on others. |
+
+---
+
+## 11. The 6 Orthogonal Scoring Dimensions & Statistical Formulation
+
+To avoid conflating crawlability with empirical visibility, the audit synthesizes six distinct, orthogonal scores:
+
+$$\text{Crawlability (20\%)} + \text{Retrieval (20\%)} + \text{Citation Readiness (20\%)} + \text{Entity Authority (15\%)} + \text{Cross-Engine Visibility (15\%)} + \text{Agentic Commerce (10\%)}$$
+
+### Mathematical Formulations:
+1. **Cross-Engine Citation Coverage (CECO):**
+   $$\text{CECO} = \frac{\#\text{engines citing brand/domain}}{\#\text{engines tested}}$$
+2. **Wilson 95% Score Confidence Interval:**
+   $$\text{CI}_{95\%} = \frac{\hat p + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat p(1-\hat p)}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}$$
+   Where $\hat p$ is the observed sample citation rate, $n$ is total query runs (minimum $n \ge 10$), and $z = 1.96$.
+3. **Product Consistency Index:**
+   $$\text{ProductConsistency} = 1 - \frac{\#\text{conflicting fields}}{\#\text{checked fields}}$$

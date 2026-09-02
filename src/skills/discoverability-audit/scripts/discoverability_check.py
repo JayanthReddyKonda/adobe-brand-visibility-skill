@@ -526,7 +526,87 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
+    # Rule HF-05: Restrictive Snippet Controls on Core Content (nosnippet)
+    all_pages = inv.get("pages", []) if inv else [{"url": base + "/", "html": html}]
+    for page in all_pages:
+        p_html = page.get("html", "")
+        p_url = page.get("url", base)
+        if p_html:
+            has_nosnippet = bool(re.search(r"<meta[^>]+content=[^>]*nosnippet", p_html, re.IGNORECASE))
+            if has_nosnippet:
+                findings.append(
+                    {
+                        "category": "crawlability",
+                        "title": "nosnippet directive active on page (HF-05)",
+                        "severity": "high",
+                        "confidence": "high",
+                        "root_cause": f"Page {p_url} declares nosnippet directive. Under Google Search Central and AEO guidance, nosnippet suppresses textual extraction for AI Overviews and answer engine synthesis.",
+                        "cause_family": "CRAWLER.ACCESS_DENIED",
+                        "id": "NOSNIPPET_ON_CORE_CONTENT",
+                        "cause_id": "NOSNIPPET_ON_CORE_CONTENT",
+                        "evidence": f"Found nosnippet directive in HTML head metadata on {p_url}.",
+                        "impact": "Generative search engines cannot display or quote textual snippets from this page in synthesized answers.",
+                        "suggested_action": {
+                            "summary": "Remove nosnippet directive from indexable informational pages.",
+                            "technical_fix": "Replace nosnippet with fine-grained max-snippet:-1 to allow full generative synthesis.",
+                            "creative_fix": "Use targeted data-nosnippet only on sensitive UI components, not main article copy.",
+                            "priority": "high",
+                            "verification": "Confirm nosnippet meta tag is removed from document head.",
+                        },
+                    }
+                )
+                break
+
     # 3. robots.txt Analysis
+    # RFC 9309 Rule CR04: File Size Cap (500 KiB / 512,000 octets)
+    robots_bytes = len(robots_txt.encode("utf-8")) if robots_txt else 0
+    if robots_bytes > 512000:
+        findings.append(
+            {
+                "category": "discoverability",
+                "title": "robots.txt exceeds RFC 9309 500 KiB cap (directives truncated)",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": f"RFC 9309 section 2.2 stipulates that crawlers parse at least 500 KiB (512,000 octets). This file is {robots_bytes} octets. Directives beyond 500 KiB are discarded by AI retrieval crawlers.",
+                "cause_family": "CRAWLER.ACCESS_DENIED",
+                "id": "ROBOTS_TXT_OVERSIZED",
+                "cause_id": "ROBOTS_TXT_OVERSIZED",
+                "impact": "Directives placed after the 500 KiB threshold are ignored, leading to crawler misalignment.",
+                "evidence": f"robots.txt size is {robots_bytes} bytes (limit: 512,000 bytes).",
+                "suggested_action": {
+                    "summary": "Truncate or optimize robots.txt to remain strictly under 500 KiB.",
+                    "technical_fix": "Remove redundant Disallow rules, wildcard bloat, or paginate URL-specific blocks into sitemaps.",
+                    "creative_fix": "Maintain a clean, minimal robots.txt with top-level section directives.",
+                    "priority": "medium",
+                    "verification": "Confirm robots.txt byte count is <= 512,000 bytes.",
+                },
+            }
+        )
+
+    # RFC 9309 Rule CR05: Server Error 5xx Fail-Closed State
+    if r_status is not None and 500 <= r_status <= 599:
+        findings.append(
+            {
+                "category": "discoverability",
+                "title": "robots.txt returns HTTP 5xx server error (RFC 9309 fail-closed)",
+                "severity": "critical",
+                "confidence": "high",
+                "root_cause": f"robots.txt returned HTTP {r_status}. Under RFC 9309 section 2.3.1.2, 5xx server errors cause crawlers to assume a full temporary disallow (fail-closed), halting all indexing.",
+                "cause_family": "CRAWLER.ACCESS_DENIED",
+                "id": "ROBOTS_5XX_FAIL_CLOSED",
+                "cause_id": "ROBOTS_5XX_FAIL_CLOSED",
+                "impact": "AI retrieval crawlers suspend all crawling and indexing of the domain until 5xx errors resolve.",
+                "evidence": f"GET {base}/robots.txt returned HTTP {r_status}.",
+                "suggested_action": {
+                    "summary": "Fix web server configuration to return HTTP 200 (or HTTP 404) for robots.txt.",
+                    "technical_fix": "Investigate upstream web server, gateway, or CDN configuration returning 5xx.",
+                    "creative_fix": "Serve a static robots.txt directly from CDN edge caching.",
+                    "priority": "critical",
+                    "verification": "Confirm curl -I https://example.com/robots.txt returns HTTP 200.",
+                },
+            }
+        )
+
     if r_status == 200 and robots_txt:
         groups, _sitemaps = parse_robots(robots_txt)
         blocked_retrieval = []
@@ -550,6 +630,19 @@ def audit(base, domain, inv=None, state_file=None):
                             "role": role,
                         }
                     )
+
+        # Disaggregation Architecture: AI Search Crawlers vs. AI Training Harvesters
+        search_bots_total = len([b for b in AI_BOTS if CRAWLER_SEMANTICS.get(b, {}).get("role") == "retrieval"])
+        search_bots_allowed = search_bots_total - len(blocked_retrieval)
+        ai_search_readiness = round((search_bots_allowed / max(search_bots_total, 1)) * 100.0, 1)
+
+        observations.append(
+            {
+                "observation": f"AI Search Retrieval Readiness is {ai_search_readiness}% ({search_bots_allowed}/{search_bots_total} search indexers permitted).",
+                "role": "crawler_disaggregation",
+                "impact": "Search crawlers (OAI-SearchBot, Claude-SearchBot, PerplexityBot) determine generative search answer inclusion. Blocking training bots (GPTBot, ClaudeBot) protects proprietary data without reducing AI search citations.",
+            }
+        )
 
         # Disallowed retrieval crawlers -> Critical finding
         if blocked_retrieval:
@@ -594,7 +687,7 @@ def audit(base, domain, inv=None, state_file=None):
         llms_present = llms_info.get("present", False)
     else:
         status, l_body, _, _ = safe_fetch(f"{base}/llms.txt", timeout=5, max_bytes=512 * 1024)
-        llms_present = (status == 200 and bool(l_body))
+        llms_present = status == 200 and bool(l_body)
 
     if llms_present:
         observations.append(
