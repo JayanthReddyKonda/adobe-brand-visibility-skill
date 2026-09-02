@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 import json
 import subprocess
@@ -6,7 +7,7 @@ import os
 class TestDiscoverabilityAudit(unittest.TestCase):
     def setUp(self):
         self.script_path = "src/skills/discoverability-audit/scripts/discoverability_check.py"
-        self.test_inv = "/tmp/test_disc_inv.json"
+        self.test_inv = os.path.join(tempfile.gettempdir(), "test_disc_inv.json")
         
     def test_robots_txt_searchbot_blocking(self):
         inv_data = {

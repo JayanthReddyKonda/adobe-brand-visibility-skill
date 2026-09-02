@@ -25,14 +25,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-try:
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
-except ImportError:
-    import sys, os
-    _orch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../audit-orchestrator/scripts"))
-    if _orch_dir not in sys.path:
-        sys.path.insert(0, _orch_dir)
-    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 
 
 

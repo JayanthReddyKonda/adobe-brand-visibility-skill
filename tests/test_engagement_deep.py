@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 import json
 import subprocess
@@ -6,8 +7,8 @@ import os
 class TestEngagementDeep(unittest.TestCase):
     def setUp(self):
         self.script = "src/skills/engagement-context-audit/scripts/engagement_check.py"
-        self.test_inv = "/tmp/test_eng_inv.json"
-        self.test_state = "/tmp/test_eng_state.json"
+        self.test_inv = os.path.join(tempfile.gettempdir(), "test_eng_inv.json")
+        self.test_state = os.path.join(tempfile.gettempdir(), "test_eng_state.json")
 
     def test_engagement_audit_execution(self):
         inv_data = {

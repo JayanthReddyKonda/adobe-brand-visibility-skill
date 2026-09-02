@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 import json
 import subprocess
@@ -6,8 +7,8 @@ import os
 class TestGeoContentAudit(unittest.TestCase):
     def setUp(self):
         self.script_path = "src/skills/geo-content-audit/scripts/geo_content_check.py"
-        self.test_inv = "/tmp/test_geo_inv.json"
-        self.test_state = "/tmp/test_geo_state.json"
+        self.test_inv = os.path.join(tempfile.gettempdir(), "test_geo_inv.json")
+        self.test_state = os.path.join(tempfile.gettempdir(), "test_geo_state.json")
         
     def test_geo_scoring(self):
         inv_data = {

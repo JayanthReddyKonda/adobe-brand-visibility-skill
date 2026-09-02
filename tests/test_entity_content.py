@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 import json
 import subprocess
@@ -6,8 +7,8 @@ import os
 class TestEntityContentAudit(unittest.TestCase):
     def setUp(self):
         self.script_path = "src/skills/entity-content-audit/scripts/entity_content_check.py"
-        self.test_inv = "/tmp/test_entity_inv.json"
-        self.test_state = "/tmp/test_entity_state.json"
+        self.test_inv = os.path.join(tempfile.gettempdir(), "test_entity_inv.json")
+        self.test_state = os.path.join(tempfile.gettempdir(), "test_entity_state.json")
         
     def test_missing_product_answerability(self):
         inv_data = {

@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 import json
 import subprocess
@@ -6,8 +7,8 @@ import os
 class TestCorroborationDeep(unittest.TestCase):
     def setUp(self):
         self.script = "src/skills/corroboration-authority-audit/scripts/corroboration_check.py"
-        self.test_inv = "/tmp/test_corrob_inv.json"
-        self.test_state = "/tmp/test_corrob_state.json"
+        self.test_inv = os.path.join(tempfile.gettempdir(), "test_corrob_inv.json")
+        self.test_state = os.path.join(tempfile.gettempdir(), "test_corrob_state.json")
 
     def test_corroboration_with_valid_sameas(self):
         inv_data = {
@@ -101,7 +102,7 @@ class TestCorroborationDeep(unittest.TestCase):
         self.assertIn("BROKEN_AUTHORITY_ANCHOR", cause_ids)
 
     def test_corroboration_empty_inventory(self):
-        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", "/tmp/non_existent.json"], capture_output=True, text=True)
+        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", os.path.join(tempfile.gettempdir(), "non_existent.json")], capture_output=True, text=True)
         self.assertEqual(res.returncode, 0)
 
 if __name__ == "__main__":

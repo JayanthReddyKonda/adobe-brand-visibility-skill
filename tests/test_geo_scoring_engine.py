@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 import sys
 import json
@@ -7,8 +8,8 @@ import os
 class TestGeoScoringEngine(unittest.TestCase):
     def setUp(self):
         self.script_path = "src/skills/geo-content-audit/scripts/geo_content_check.py"
-        self.test_inv = "/tmp/test_geo_unit_inv.json"
-        self.test_state = "/tmp/test_geo_unit_state.json"
+        self.test_inv = os.path.join(tempfile.gettempdir(), "test_geo_unit_inv.json")
+        self.test_state = os.path.join(tempfile.gettempdir(), "test_geo_unit_state.json")
 
     def test_causal_conjunction_detection(self):
         # A pricing page with deep causal explanations should not flag missing mechanisms
