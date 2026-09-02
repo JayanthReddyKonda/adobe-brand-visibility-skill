@@ -51,6 +51,7 @@ class TestEntityContentAudit(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -93,6 +94,7 @@ class TestEntityContentAudit(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )

@@ -42,6 +42,7 @@ class TestEngagementDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -80,6 +81,7 @@ class TestEngagementDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -93,6 +95,7 @@ class TestEngagementDeep(unittest.TestCase):
             json.dump(inv_data, f)
         res = subprocess.run(
             ["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -129,6 +132,7 @@ class TestEngagementDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -168,6 +172,7 @@ class TestEngagementDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )

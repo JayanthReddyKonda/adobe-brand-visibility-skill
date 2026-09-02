@@ -42,6 +42,7 @@ class TestCorroborationDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -80,6 +81,7 @@ class TestCorroborationDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -121,6 +123,7 @@ class TestCorroborationDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -161,6 +164,7 @@ class TestCorroborationDeep(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -180,6 +184,7 @@ class TestCorroborationDeep(unittest.TestCase):
                 "--inventory",
                 os.path.join(tempfile.gettempdir(), "non_existent.json"),
             ],
+            check=False,
             capture_output=True,
             text=True,
         )

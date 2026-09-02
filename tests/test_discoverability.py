@@ -30,6 +30,7 @@ class TestDiscoverabilityAudit(unittest.TestCase):
 
         res = subprocess.run(
             ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
             capture_output=True,
             text=True,
         )
@@ -59,6 +60,7 @@ class TestDiscoverabilityAudit(unittest.TestCase):
 
         res = subprocess.run(
             ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
             capture_output=True,
             text=True,
         )

@@ -19,7 +19,7 @@ class TestSchemaEdgeCases(unittest.TestCase):
             "unexpected_root_field": "illegal",
         }
         res = subprocess.run(
-            ["python3", self.val_script, "-"], input=json.dumps(bad_report), capture_output=True, text=True
+            ["python3", self.val_script, "-"], input=json.dumps(bad_report), check=False, capture_output=True, text=True
         )
         self.assertNotEqual(res.returncode, 0)
 
@@ -32,7 +32,7 @@ class TestSchemaEdgeCases(unittest.TestCase):
             "findings": [],
         }
         res = subprocess.run(
-            ["python3", self.val_script, "-"], input=json.dumps(bad_report), capture_output=True, text=True
+            ["python3", self.val_script, "-"], input=json.dumps(bad_report), check=False, capture_output=True, text=True
         )
         self.assertNotEqual(res.returncode, 0)
 
@@ -45,7 +45,7 @@ class TestSchemaEdgeCases(unittest.TestCase):
             "findings": [],
         }
         res = subprocess.run(
-            ["python3", self.val_script, "-"], input=json.dumps(bad_report), capture_output=True, text=True
+            ["python3", self.val_script, "-"], input=json.dumps(bad_report), check=False, capture_output=True, text=True
         )
         self.assertNotEqual(res.returncode, 0)
 
@@ -82,13 +82,19 @@ class TestSchemaEdgeCases(unittest.TestCase):
             "proactive_actions": [],
         }
         res = subprocess.run(
-            ["python3", self.val_script, "-"], input=json.dumps(valid_report), capture_output=True, text=True
+            ["python3", self.val_script, "-"],
+            input=json.dumps(valid_report),
+            check=False,
+            capture_output=True,
+            text=True,
         )
         self.assertEqual(res.returncode, 0)
 
     def test_reject_unquoted_or_malformed_json_input(self):
         malformed_json = "{ site: 'example.com', unquoted_key: 123 }"
-        res = subprocess.run(["python3", self.val_script, "-"], input=malformed_json, capture_output=True, text=True)
+        res = subprocess.run(
+            ["python3", self.val_script, "-"], input=malformed_json, check=False, capture_output=True, text=True
+        )
         self.assertNotEqual(res.returncode, 0)
 
 

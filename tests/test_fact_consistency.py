@@ -51,6 +51,7 @@ class TestFactConsistencyAudit(unittest.TestCase):
                 "--state",
                 self.test_state,
             ],
+            check=False,
             capture_output=True,
             text=True,
         )

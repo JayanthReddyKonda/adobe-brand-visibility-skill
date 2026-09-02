@@ -139,7 +139,7 @@ def _decompress_bounded(response, max_bytes):
             if decompressor.unconsumed_tail or len(out) >= max_bytes:
                 return bytes(out[:max_bytes])
         except Exception as e:
-            raise ValueError(f"Decompression error: {e}")
+            raise ValueError(f"Decompression error: {e}") from e
     return bytes(out)
 
 

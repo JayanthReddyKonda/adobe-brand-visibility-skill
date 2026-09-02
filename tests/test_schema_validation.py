@@ -43,7 +43,11 @@ class TestSchemaValidationGate(unittest.TestCase):
             "proactive_actions": [],
         }
         res = subprocess.run(
-            ["python3", self.val_script, "-"], input=json.dumps(valid_report), capture_output=True, text=True
+            ["python3", self.val_script, "-"],
+            input=json.dumps(valid_report),
+            check=False,
+            capture_output=True,
+            text=True,
         )
         self.assertEqual(res.returncode, 0)
 
@@ -77,7 +81,11 @@ class TestSchemaValidationGate(unittest.TestCase):
             "proactive_actions": [],
         }
         res = subprocess.run(
-            ["python3", self.val_script, "-"], input=json.dumps(invalid_report), capture_output=True, text=True
+            ["python3", self.val_script, "-"],
+            input=json.dumps(invalid_report),
+            check=False,
+            capture_output=True,
+            text=True,
         )
         self.assertNotEqual(res.returncode, 0)
 

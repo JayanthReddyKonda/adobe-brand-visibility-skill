@@ -98,7 +98,7 @@ class TestSpecialistSensors(unittest.TestCase):
                 "--format",
                 "json",
             ]
-            proc = subprocess.run(cmd, capture_output=True, text=True)
+            proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, f"{sname} failed with stderr: {proc.stderr}")
 
             out = json.loads(proc.stdout)

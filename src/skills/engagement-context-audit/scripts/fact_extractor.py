@@ -13,7 +13,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -24,7 +24,7 @@ if SCRIPT_DIR not in sys.path:
 
 from safe_fetch import safe_fetch
 
-CURRENT_YEAR = datetime.now().year
+CURRENT_YEAR = datetime.now(timezone.utc).year
 PRICE_PATTERN = re.compile(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", re.IGNORECASE)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+", re.IGNORECASE)
 PHONE_PATTERN = re.compile(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}")
