@@ -5,45 +5,27 @@ Crawls the target homepage, robots.txt, and XML sitemaps, extracting and filteri
 genuine HTML pages for downstream specialist audits while isolating infrastructure resources.
 """
 
-import argparse
-import concurrent.futures
-import json
+import sys
 import os
 import re
-import sys
+import json
 import time
+import argparse
 import xml.etree.ElementTree as ET
-from urllib.parse import urljoin, urlparse
+from datetime import datetime, timezone
+import concurrent.futures
+from urllib.parse import urlparse, urljoin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
+    
+from safe_fetch import safe_fetch, DEFAULT_USER_AGENT
 
-from fetcher import DEFAULT_USER_AGENT, safe_fetch
 
 NON_HTML_EXTENSIONS = (
-    ".xml",
-    ".xml.gz",
-    ".txt",
-    ".pdf",
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".svg",
-    ".webp",
-    ".mp4",
-    ".mp3",
-    ".json",
-    ".js",
-    ".css",
-    ".zip",
-    ".gz",
-    ".tar",
-    ".ico",
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".eot",
+    ".xml", ".xml.gz", ".txt", ".pdf", ".jpg", ".jpeg", ".png", ".gif",
+    ".svg", ".webp", ".mp4", ".mp3", ".json", ".js", ".css", ".zip",
+    ".gz", ".tar", ".ico", ".woff", ".woff2", ".ttf", ".eot"
 )
 
 
@@ -60,14 +42,18 @@ def is_html_response(headers, body_snippet=""):
     snippet = body_snippet.strip()[:200].lower()
     if snippet.startswith("<?xml") or "<urlset" in snippet or "<sitemapindex" in snippet:
         return False
-    return bool("<!doctype html" in snippet or "<html" in snippet)
+    if "<!doctype html" in snippet or "<html" in snippet:
+        return True
+    return False
 
 
 def is_sitemap_or_non_html_url(url):
     u_lower = url.lower().split("?")[0].split("#")[0]
     if u_lower.endswith(NON_HTML_EXTENSIONS):
         return True
-    return bool("sitemap" in u_lower or "feed.xml" in u_lower or "rss.xml" in u_lower or "robots.txt" in u_lower)
+    if "sitemap" in u_lower or "feed.xml" in u_lower or "rss.xml" in u_lower or "robots.txt" in u_lower:
+        return True
+    return False
 
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
@@ -77,7 +63,7 @@ def extract_locale_and_template(url):
     parsed = urlparse(url)
     segments = [s for s in parsed.path.strip("/").split("/") if s]
     locale = "default"
-    if segments and (segments[0].lower() in KNOWN_LOCALES or re.match(r"^[a-z]{2}(-[a-z]{2})?$", segments[0].lower())):
+    if segments and (segments[0].lower() in KNOWN_LOCALES or re.match(r'^[a-z]{2}(-[a-z]{2})?$', segments[0].lower())):
         locale = segments[0].lower()
         logical_path = "/" + "/".join(segments[1:])
     else:
@@ -87,7 +73,7 @@ def extract_locale_and_template(url):
 
 def classify_page(url, title=""):
     """Classify an HTML page with confidence, granular page types, and template identification."""
-    urlparse(url)
+    parsed = urlparse(url)
     locale, logical_path = extract_locale_and_template(url)
     segments = [s for s in logical_path.strip("/").split("/") if s]
     t_lower = (title or "").lower()
@@ -104,11 +90,7 @@ def classify_page(url, title=""):
     if len(segments) == 1 and segments[0] in ("products", "shop", "catalog", "store", "items"):
         return "product_listing", "high", logical_path, locale
 
-    if (
-        len(segments) >= 2
-        and segments[0] in ("products", "p", "product", "item", "items", "shop", "catalog")
-        and segments[1] not in ("default", "all", "category", "categories")
-    ):
+    if len(segments) >= 2 and segments[0] in ("products", "p", "product", "item", "items", "shop", "catalog") and segments[1] not in ("default", "all", "category", "categories"):
         return "product_detail", "high", "/products/*", locale
 
     if any(s in ("category", "categories", "collection", "collections", "browse") for s in segments):
@@ -136,28 +118,28 @@ def classify_page(url, title=""):
         return "article", "high", "/article", locale
 
     # Title-based inferences with multilingual awareness
-    if re.search(r"\b(contact\s*(us|ez-nous)?|contáctenos|kontakt|お問い合わせ)\b", t_lower):
+    if re.search(r'\b(contact\s*(us|ez-nous)?|contáctenos|kontakt|お問い合わせ)\b', t_lower):
         return "contact", "high", "/contact", locale
-    if re.search(r"\b(pricing|plans|tarifs|preise)\b", t_lower):
+    if re.search(r'\b(pricing|plans|tarifs|preise)\b', t_lower):
         return "pricing", "medium", "/pricing", locale
-    if re.search(r"\b(subscription|abonnement|suscripción|subscribe)\b", t_lower):
+    if re.search(r'\b(subscription|abonnement|suscripción|subscribe)\b', t_lower):
         return "subscription_flow", "high", "/subscription", locale
-    if re.search(r"\b(products?|catalog|shop|boutique|tienda)\b", t_lower):
+    if re.search(r'\b(products?|catalog|shop|boutique|tienda)\b', t_lower):
         return "product_listing", "medium", "/products", locale
-    if re.search(r"\b(about\s*(us)?|notre\s*histoire|sobre\s*nosotros|company)\b", t_lower):
+    if re.search(r'\b(about\s*(us)?|notre\s*histoire|sobre\s*nosotros|company)\b', t_lower):
         return "about", "medium", "/about", locale
 
     return "other", "low", logical_path, locale
 
 
 def _visible_words(html):
-    text = re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html or "", flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html or "", flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", " ", text)
     return len(text.split())
 
 
 def _extract_title(html):
-    m = re.search(r"<title[^>]*>([^<]{1,300})</title>", html or "", re.IGNORECASE)
+    m = re.search(r"<title[^>]*>([^<]{1,300})</title>", html or "", re.I)
     return m.group(1).strip() if m else ""
 
 
@@ -186,7 +168,7 @@ def _parse_sitemap_xml(sitemap_body):
                             page_urls.append(u)
     except Exception:
         # Fallback regex parsing
-        for loc in re.findall(r"<loc>(https?://[^<]+)</loc>", sitemap_body, re.IGNORECASE):
+        for loc in re.findall(r"<loc>(https?://[^<]+)</loc>", sitemap_body, re.I):
             loc = loc.strip()
             if loc.endswith((".xml", ".xml.gz")) or "sitemap" in loc.lower():
                 child_sitemaps.append(loc)
@@ -197,7 +179,7 @@ def _parse_sitemap_xml(sitemap_body):
 
 def normalize_target(site):
     s = site.strip()
-    if not (s.startswith(("http://", "https://"))):
+    if not (s.startswith("http://") or s.startswith("https://")):
         base = f"https://{s.split('/')[0]}"
     else:
         parts = s.split("://", 1)
@@ -220,40 +202,32 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             "sitemaps_discovered": [],
             "sitemaps_processed": 0,
             "urls_extracted": 0,
-            "same_origin_urls": 0,
+            "same_origin_urls": 0
         },
-        "limitations": [],
+        "limitations": []
     }
 
     # 1. Homepage Acquisition
-    status, html, headers, err = safe_fetch(base_url + "/", timeout=10, max_bytes=2 * 1024 * 1024)
+    status, html, headers, err = safe_fetch(base_url + "/", timeout=10, max_bytes=2*1024*1024)
     if status is None or not html:
         inv["limitations"].append(f"Homepage unreachable ({err or 'network error'}); inventory could not be built.")
-        return inv, {
-            "homepage_reachable": False,
-            "html_pages_sampled": 0,
-            "sitemaps_processed": 0,
-            "urls_discovered": 0,
-            "elapsed_seconds": round(time.monotonic() - start_mono, 1),
-        }
+        return inv, {"homepage_reachable": False, "html_pages_sampled": 0, "sitemaps_processed": 0, "urls_discovered": 0, "elapsed_seconds": round(time.monotonic() - start_mono, 1)}
 
     ptype, pconf, ptmpl, ploc = classify_page(base_url + "/", _extract_title(html))
-    inv["pages"].append(
-        {
-            "url": base_url + "/",
-            "status": status,
-            "resource_type": "html",
-            "content_type": headers.get("content-type", "text/html"),
-            "page_type": ptype,
-            "page_type_confidence": pconf,
-            "logical_template": ptmpl,
-            "locale": ploc,
-            "title": _extract_title(html),
-            "word_count": _visible_words(html),
-            "html": html,
-            "headers": headers,
-        }
-    )
+    inv["pages"].append({
+        "url": base_url + "/",
+        "status": status,
+        "resource_type": "html",
+        "content_type": headers.get("content-type", "text/html"),
+        "page_type": ptype,
+        "page_type_confidence": pconf,
+        "logical_template": ptmpl,
+        "locale": ploc,
+        "title": _extract_title(html),
+        "word_count": _visible_words(html),
+        "html": html,
+        "headers": headers
+    })
 
     if deadline and time.monotonic() >= deadline:
         inv["limitations"].append("Inventory truncated at acquisition deadline.")
@@ -261,19 +235,19 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             "homepage_reachable": True,
             "html_pages_sampled": len(inv["pages"]),
             "sitemaps_processed": 0,
-            "elapsed_seconds": round(time.monotonic() - start_mono, 1),
+            "elapsed_seconds": round(time.monotonic() - start_mono, 1)
         }
 
+
     # 2. robots.txt
-    r_status, robots_txt, _, _ = safe_fetch(base_url + "/robots.txt", timeout=8, max_bytes=512 * 1024)
+    r_status, robots_txt, _, _ = safe_fetch(base_url + "/robots.txt", timeout=8, max_bytes=512*1024)
     inv["robots"] = {"status": r_status, "text": robots_txt if r_status == 200 else None}
     inv["infrastructure"]["robots"] = inv["robots"]
 
     sitemap_candidates = []
     if robots_txt and r_status == 200:
-        sitemap_candidates = [
-            l.split(":", 1)[1].strip() for l in robots_txt.splitlines() if l.lower().startswith("sitemap:")
-        ][:5]
+        sitemap_candidates = [l.split(":", 1)[1].strip() for l in robots_txt.splitlines()
+                              if l.lower().startswith("sitemap:")][:5]
     if not sitemap_candidates:
         sitemap_candidates = [base_url + "/sitemap.xml"]
 
@@ -295,7 +269,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         processed_sitemaps.add(sm_url)
         inv["infrastructure"]["sitemaps_discovered"].append(sm_url)
 
-        s_status, s_body, _, _ = safe_fetch(sm_url, timeout=8, max_bytes=2 * 1024 * 1024)
+        s_status, s_body, _, _ = safe_fetch(sm_url, timeout=8, max_bytes=2*1024*1024)
         if s_status == 200 and s_body:
             inv["infrastructure"]["sitemaps_processed"] += 1
             child_sms, raw_page_urls = _parse_sitemap_xml(s_body)
@@ -308,7 +282,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
 
     # Also extract in-HTML links from homepage if sitemap yielded few URLs
     if len(extracted_page_urls) < 10 and html:
-        for m in re.finditer(r'href=["\'](https?://[^"\']+|/[^"\']+)["\']', html, re.IGNORECASE):
+        for m in re.finditer(r'href=["\'](https?://[^"\']+|/[^"\']+)["\']', html, re.I):
             href = m.group(1).split("#")[0].split("?")[0]
             full_u = urljoin(base_url, href)
             if urlparse(full_u).netloc.lower() == target_netloc and not is_sitemap_or_non_html_url(full_u):
@@ -331,20 +305,11 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     selected_urls = []
     # Sample up to 3 per unique template across diverse page types
     priority_types = [
-        "product_detail",
-        "product_listing",
-        "subscription_flow",
-        "pricing",
-        "category",
-        "about",
-        "contact",
-        "location",
-        "documentation",
-        "article",
-        "other",
+        "product_detail", "product_listing", "subscription_flow", "pricing",
+        "category", "about", "contact", "location", "documentation", "article", "other"
     ]
     for pt in priority_types:
-        matching_keys = [k for k in by_template if k[0] == pt]
+        matching_keys = [k for k in by_template.keys() if k[0] == pt]
         for k in matching_keys:
             for u in by_template[k][:3]:
                 if len(selected_urls) >= max_pages - 1 or (deadline and time.monotonic() >= deadline):
@@ -360,7 +325,6 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     if robots_txt and r_status == 200:
         try:
             import urllib.robotparser
-
             rp = urllib.robotparser.RobotFileParser()
             rp.parse(robots_txt.splitlines())
         except Exception:
@@ -371,7 +335,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             return None
         if deadline and time.monotonic() >= deadline:
             return None
-        p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2 * 1024 * 1024, deadline=deadline)
+        p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2*1024*1024, deadline=deadline)
         if p_html and is_html_response(p_headers, p_html):
             pt, pconf, ptmpl, ploc = classify_page(u, _extract_title(p_html))
             return {
@@ -386,17 +350,15 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
                 "title": _extract_title(p_html),
                 "word_count": _visible_words(p_html),
                 "html": p_html,
-                "headers": p_headers,
+                "headers": p_headers
             }
         return None
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=8)
     future_to_url = {executor.submit(fetch_url, u): u for u in selected_urls}
-
+    
     try:
-        for future in concurrent.futures.as_completed(
-            future_to_url, timeout=deadline - time.monotonic() if deadline else None
-        ):
+        for future in concurrent.futures.as_completed(future_to_url, timeout=deadline - time.monotonic() if deadline else None):
             if deadline and time.monotonic() >= deadline:
                 if "Inventory crawl truncated when acquisition time budget was reached." not in inv["limitations"]:
                     inv["limitations"].append("Inventory crawl truncated when acquisition time budget was reached.")
@@ -423,13 +385,12 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         "urls_discovered": inv["infrastructure"]["urls_extracted"],
         "same_origin_urls": inv["infrastructure"]["same_origin_urls"],
         "elapsed_seconds": inv["elapsed_seconds"],
-        "page_types": {
-            t: sum(1 for p in inv["pages"] if p.get("page_type") == t)
-            for t in {p.get("page_type") for p in inv["pages"] if p.get("page_type")}
-        },
+        "page_types": {t: sum(1 for p in inv["pages"] if p.get("page_type") == t)
+                       for t in {p.get("page_type") for p in inv["pages"] if p.get("page_type")}}
     }
     inv.setdefault("infrastructure", {})["homepage_reachable"] = stats.get("homepage_reachable", True)
     return inv, stats
+
 
 
 def main():
@@ -440,7 +401,7 @@ def main():
     args = parser.parse_args()
 
     s = args.site.strip()
-    if not (s.startswith(("http://", "https://"))):
+    if not (s.startswith("http://") or s.startswith("https://")):
         base_url = f"https://{s.split('/')[0]}"
     else:
         parts = s.split("://", 1)
@@ -459,3 +420,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

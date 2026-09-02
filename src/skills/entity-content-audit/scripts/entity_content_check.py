@@ -12,11 +12,11 @@ Calculates the mathematically reproducible weighted Weighted material-attribute 
 Enforces strict Resource Invariant:
   - Only genuine HTML pages enter answerability audits (XML sitemaps and feeds are strictly excluded).
 """
-
-import argparse
-import json
-import os
 import sys
+import os
+import re
+import json
+import argparse
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -26,9 +26,14 @@ if SCRIPT_DIR not in sys.path:
 
 
 try:
-    from fetcher import safe_check_status, safe_fetch
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
 except ImportError:
-    from fetcher import safe_fetch
+    import sys, os
+    _orch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../audit-orchestrator/scripts"))
+    if _orch_dir not in sys.path:
+        sys.path.insert(0, _orch_dir)
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
 
 
 # Weighted Answerability Schema by Page Type (Structured & Measurable Material Attributes)
@@ -37,63 +42,47 @@ MATERIAL_ATTRIBUTE_WEIGHTS = {
         "product_name": (0.30, ["product", "item", "model", "sku", "title"]),
         "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
         "availability": (0.25, ["schema.org/instock", "schema.org/outofstock", "schema.org/preorder", "availability"]),
-        "specifications": (
-            0.20,
-            ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"],
-        ),
+        "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
     },
+
     "product": {  # Alias for single product pages
         "product_identity": (0.30, ["brand", "manufacturer", "sku", "mpn", "gtin", "model"]),
         "price": (0.25, ["₹", "$", "usd", "inr", "eur", "£", "price", "starts at", "/mo"]),
         "availability": (0.25, ["schema.org/instock", "schema.org/outofstock", "schema.org/preorder", "availability"]),
-        "specifications": (
-            0.20,
-            ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"],
-        ),
+        "specifications": (0.20, ["specifications", "features", "origin", "weight", "capacity", "sla", "dimensions", "details"])
     },
     "product_listing": {
         "catalog_items": (0.40, ["products", "items", "browse", "catalog", "shop", "collection", "filter"]),
         "category_title": (0.30, ["category", "all products", "our products", "shop all", "catalog", "explore"]),
-        "action_path": (0.30, ["view", "buy", "details", "add to cart", "shop now", "order"]),
+        "action_path": (0.30, ["view", "buy", "details", "add to cart", "shop now", "order"])
     },
     "category": {
         "catalog_items": (0.40, ["products", "items", "browse", "catalog", "shop", "collection", "filter"]),
         "category_title": (0.30, ["category", "all products", "our products", "shop all", "catalog", "explore"]),
-        "action_path": (0.30, ["view", "buy", "details", "add to cart", "shop now", "order"]),
+        "action_path": (0.30, ["view", "buy", "details", "add to cart", "shop now", "order"])
     },
     "subscription_flow": {
-        "plan_description": (
-            0.35,
-            ["subscription", "club", "membership", "recurring", "monthly", "deliveries", "frequency"],
-        ),
+        "plan_description": (0.35, ["subscription", "club", "membership", "recurring", "monthly", "deliveries", "frequency"]),
         "selection_options": (0.35, ["choose", "select", "options", "beans", "grind", "frequency", "tier", "plan"]),
-        "cta_action": (0.30, ["subscribe", "join", "sign up", "start", "checkout", "get started"]),
+        "cta_action": (0.30, ["subscribe", "join", "sign up", "start", "checkout", "get started"])
     },
     "pricing": {
         "tier_names": (0.35, ["starter", "pro", "enterprise", "basic", "premium", "tier", "plan", "membership"]),
-        "price_figures": (
-            0.35,
-            ["₹", "$", "usd", "inr", "eur", "£", "/mo", "/month", "/year", "free", "contact sales"],
-        ),
-        "feature_comparison": (
-            0.30,
-            ["features", "includes", "comparison", "unlimited", "storage", "users", "benefits"],
-        ),
+        "price_figures": (0.35, ["₹", "$", "usd", "inr", "eur", "£", "/mo", "/month", "/year", "free", "contact sales"]),
+        "feature_comparison": (0.30, ["features", "includes", "comparison", "unlimited", "storage", "users", "benefits"])
     },
     "service": {
         "service_name": (0.40, ["service", "consulting", "managed", "solution", "offerings"]),
         "deliverables": (0.30, ["deliverables", "capabilities", "scope", "includes", "what we do"]),
-        "engagement_model": (0.30, ["hourly", "retainer", "fixed", "timeline", "process", "contact"]),
+        "engagement_model": (0.30, ["hourly", "retainer", "fixed", "timeline", "process", "contact"])
     },
     "contact": {
         "email_channel": (0.40, ["@", "mailto:", "support@", "sales@", "contact@", "email"]),
         "phone_channel": (0.30, ["tel:", "+", "call", "phone", "hotline"]),
-        "location_or_form": (
-            0.30,
-            ["street", "address", "suite", "floor", "city", "headquarters", "form", "send message", "message"],
-        ),
-    },
+        "location_or_form": (0.30, ["street", "address", "suite", "floor", "city", "headquarters", "form", "send message", "message"])
+    }
 }
+
 
 
 class EntityDOMParser(HTMLParser):
@@ -151,8 +140,9 @@ class EntityDOMParser(HTMLParser):
             self.title += " " + data.strip()
         elif self.current_h is not None:
             self.current_h_text.append(data)
-        elif not self.in_script and data.strip():
-            self.text_content.append(data.strip())
+        elif not self.in_script:
+            if data.strip():
+                self.text_content.append(data.strip())
 
 
 def matches_schema_type(entity, target_types):
@@ -182,6 +172,7 @@ def parse_json_ld(raw_json_list):
         except Exception:
             pass
 
+
     # 1. Index all entities by @id
     id_map = {}
     for obj in raw_objects:
@@ -199,10 +190,7 @@ def parse_json_ld(raw_json_list):
             if isinstance(offers, dict) and "@id" in offers and offers["@id"] in id_map:
                 entity["offers"] = id_map[offers["@id"]]
             elif isinstance(offers, list):
-                entity["offers"] = [
-                    id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o
-                    for o in offers
-                ]
+                entity["offers"] = [id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o for o in offers]
 
         for rel in ("brand", "manufacturer", "publisher", "provider", "author", "organizer"):
             if rel in entity and isinstance(entity[rel], dict) and "@id" in entity[rel]:
@@ -228,6 +216,7 @@ def parse_json_ld(raw_json_list):
     return resolved_entities
 
 
+
 def evaluate_page_answerability(page_type, html_content, dom, url, structured_entities):
     if page_type not in ("product_detail", "product", "product_listing"):
         return None
@@ -235,35 +224,30 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
     products = [e for e in structured_entities if matches_schema_type(e, ["Product"])]
     if not products:
         return {"status": "missing_entity"}
-
+        
     results = []
     for p in products:
         facts = {
             "price": False,
             "availability": False,
             "specifications": bool(p.get("sku") or p.get("model") or p.get("weight")),
-            "description": bool(p.get("description")),
+            "description": bool(p.get("description"))
         }
-
+        
         offers = p.get("offers", {})
         if isinstance(offers, dict):
-            if offers.get("price"):
-                facts["price"] = True
-            if offers.get("availability"):
-                facts["availability"] = True
+            if offers.get("price"): facts["price"] = True
+            if offers.get("availability"): facts["availability"] = True
         elif isinstance(offers, list):
-            if any(isinstance(o, dict) and o.get("price") for o in offers):
-                facts["price"] = True
-            if any(isinstance(o, dict) and o.get("availability") for o in offers):
-                facts["availability"] = True
-
+            if any(isinstance(o, dict) and o.get("price") for o in offers): facts["price"] = True
+            if any(isinstance(o, dict) and o.get("availability") for o in offers): facts["availability"] = True
+            
         weights = {"price": 0.25, "availability": 0.25, "specifications": 0.20, "description": 0.30}
         score = sum(weights[k] for k, v in facts.items() if v)
-
+        
         results.append({"status": "present", "facts": facts, "score": round(score, 2)})
-
+        
     return {"status": "present", "results": results}
-
 
 def audit(base, domain, inv=None, state_file=None):
     state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
@@ -284,32 +268,27 @@ def audit(base, domain, inv=None, state_file=None):
             # Strict non-HTML / sitemap rejection
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
-            if (
-                raw_html.strip().startswith("<?xml")
-                or "<urlset" in raw_html.lower()
-                or "<sitemapindex" in raw_html.lower()
-            ):
+            if raw_html.strip().startswith("<?xml") or "<urlset" in raw_html.lower() or "<sitemapindex" in raw_html.lower():
                 continue
-            if (
-                p.get("resource_type") == "html"
-                or "<html" in raw_html.lower()
-                or "<!doctype html" in raw_html.lower()
-                or p.get("page_type") == "homepage"
-            ):
+            if p.get("resource_type") == "html" or "<html" in raw_html.lower() or "<!doctype html" in raw_html.lower() or p.get("page_type") == "homepage":
                 html_pages.append(p)
     else:
-        status, html, _headers, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
+        status, html, headers, _ = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
         if html:
-            html_pages.append(
-                {"url": base + "/", "status": status, "resource_type": "html", "page_type": "homepage", "html": html}
-            )
+            html_pages.append({
+                "url": base + "/",
+                "status": status,
+                "resource_type": "html",
+                "page_type": "homepage",
+                "html": html
+            })
 
     if not html_pages:
         return {
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
-            "error": f"could not reach {base} or no HTML pages found",
+            "error": f"could not reach {base} or no HTML pages found"
         }
 
     home_page = next((p for p in html_pages if p.get("page_type") == "homepage"), html_pages[0])
@@ -331,42 +310,34 @@ def audit(base, domain, inv=None, state_file=None):
             break
 
     og_site_name = dom.og_tags.get("og:site_name")
-    brand_name = (
-        (org_entity.get("name") if org_entity and isinstance(org_entity.get("name"), str) else None)
-        or og_site_name
-        or dom.title.replace(" - ", "|").replace(" | ", "|").split("|")[0].split("|")[0].strip()
-    )
+    brand_name = (org_entity.get("name") if org_entity and isinstance(org_entity.get("name"), str) else None) or og_site_name or dom.title.replace(" - ", "|").replace(" | ", "|").split("|")[0].split("|")[0].strip()
 
     if not org_entity:
         if not og_site_name and not dom.title:
-            findings.append(
-                {
-                    "category": "entity-identity",
-                    "title": "Missing machine-explicit Organization entity",
-                    "severity": "medium",
-                    "confidence": "high",
-                    "root_cause": "The brand publishes no Schema.org Organization markup, OpenGraph site_name, or descriptive title.",
-                    "cause_family": "ENTITY.IDENTITY",
-                    "id": "MATERIAL_ENTITY_AMBIGUITY",
-                    "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
-                    "impact": "AI models cannot resolve the brand entity with high confidence, leading to entity collisions and ungrounded answers.",
-                    "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
-                    "suggested_action": {
-                        "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
-                        "priority": "medium",
-                        "verification": "Inspect homepage JSON-LD and confirm Organization schema parses validly.",
-                    },
+            findings.append({
+                "category": "entity-identity",
+                "title": "Missing machine-explicit Organization entity",
+                "severity": "medium",
+
+                "confidence": "high",
+                "root_cause": "The brand publishes no Schema.org Organization markup, OpenGraph site_name, or descriptive title.",
+                "cause_family": "ENTITY.IDENTITY",
+                "id": "MATERIAL_ENTITY_AMBIGUITY", "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+                "impact": "AI models cannot resolve the brand entity with high confidence, leading to entity collisions and ungrounded answers.",
+                "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
+                "suggested_action": {
+                    "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
+                    "priority": "medium",
+                    "verification": "Inspect homepage JSON-LD and confirm Organization schema parses validly."
                 }
-            )
+            })
         else:
-            recommendations.append(
-                {
-                    "title": "Add Organization JSON-LD schema",
-                    "category": "entity-identity",
-                    "rationale": f"Brand '{brand_name}' is stated in human-readable text but lacks machine-explicit JSON-LD Organization markup.",
-                    "suggested_action": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles.",
-                }
-            )
+            recommendations.append({
+                "title": "Add Organization JSON-LD schema",
+                "category": "entity-identity",
+                "rationale": f"Brand '{brand_name}' is stated in human-readable text but lacks machine-explicit JSON-LD Organization markup.",
+                "suggested_action": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles."
+            })
 
     # 3. Answerability Evaluation Across Sampled HTML Pages (Excluding Homepage)
     answerability_evaluations = []
@@ -388,25 +359,22 @@ def audit(base, domain, inv=None, state_file=None):
                     answerability_evaluations.append(res)
                     missing = [k for k, v in res["facts"].items() if not v]
                     if missing:
-                        findings.append(
-                            {
-                                "category": "product-answerability",
-                                "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
-                                "severity": "medium",
-                                "confidence": "high",
-                                "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
-                                "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
-                                "id": "ATTRIBUTE_INCOMPLETENESS",
-                                "cause_id": "ATTRIBUTE_INCOMPLETENESS",
-                                "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
-                                "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
-                                "suggested_action": {
-                                    "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
-                                    "priority": "medium",
-                                    "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
-                                },
+                        findings.append({
+                            "category": "product-answerability",
+                            "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
+                            "severity": "medium",
+                            "confidence": "high",
+                            "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
+                            "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
+                            "id": "ATTRIBUTE_INCOMPLETENESS", "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                            "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
+                            "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
+                            "suggested_action": {
+                                "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
+                                "priority": "medium",
+                                "verification": "Check the Google Rich Results Test to confirm the properties are populated."
                             }
-                        )
+                        })
 
     if state_file:
         if "entities" not in state:
@@ -427,13 +395,12 @@ def audit(base, domain, inv=None, state_file=None):
                         state["entities"][u].append(o["name"])
             if brand_name and brand_name not in state["entities"][u]:
                 state["entities"][u].append(brand_name)
-        import tempfile
-
+        import tempfile, shutil
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
         with os.fdopen(fd, "w") as f:
             json.dump(state, f)
         os.replace(tmp, state_file)
-
+            
     return {
         "status": "ok",
         "findings": findings,
@@ -443,16 +410,16 @@ def audit(base, domain, inv=None, state_file=None):
             "brand_name": brand_name,
             "organization": org_entity,
             "og_site_name": og_site_name,
-            "title": dom.title,
+            "title": dom.title
         },
         "coverage": {
             "html_pages_evaluated": len(html_pages),
             "answerability_evaluations": answerability_evaluations,
-            "json_ld_count": len(json_ld_entities),
+            "json_ld_count": len(json_ld_entities)
         },
         "limitations": [
             "Entity and answerability analysis was performed on sampled first-party HTML; authenticated portals were not evaluated."
-        ],
+        ]
     }
 
 
@@ -476,40 +443,7 @@ def main():
         except Exception:
             inv = None
     res = audit(base, p.netloc, inv=inv, state_file=args.state)
-    # ULTIMATE FOUNDATION: Convert the script's internal findings into pure factual telemetry
-    # The AI Agent will read these facts and perform the causal reasoning.
-
-    raw_facts = []
-
-    for f in res.get("findings", []):
-        raw_facts.append(
-            {
-                "fact_type": f.get("category", "finding"),
-                "evidence": f.get("evidence", ""),
-                "cause_id": f.get("cause_id", ""),  # Passed as a hint/metric for the AI
-            }
-        )
-
-    for o in res.get("observations", []):
-        raw_facts.append(
-            {
-                "fact_type": o.get("role", "observation"),
-                "evidence": o.get("observation", ""),
-            }
-        )
-
-    telemetry = res.get("coverage", {})
-    if "entity_snapshot" in res:
-        telemetry["entity_snapshot"] = res["entity_snapshot"]
-
-    final_output = {
-        "status": res.get("status", "ok"),
-        "telemetry": telemetry,
-        "raw_extracted_facts": raw_facts,
-        "error": res.get("error"),
-    }
-
-    print(json.dumps(final_output, indent=2))
+    print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

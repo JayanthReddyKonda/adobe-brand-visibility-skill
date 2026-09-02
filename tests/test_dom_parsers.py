@@ -1,5 +1,6 @@
-import sys
 import unittest
+import sys
+import os
 
 sys.path.insert(0, "src/skills/discoverability-audit/scripts")
 import discoverability_check
@@ -12,7 +13,6 @@ import fact_consistency_check
 
 sys.path.insert(0, "src/skills/geo-content-audit/scripts")
 import geo_content_check
-
 
 class TestDOMParsers(unittest.TestCase):
     def test_discoverability_canonical_extraction(self):
@@ -28,10 +28,10 @@ class TestDOMParsers(unittest.TestCase):
         self.assertIn("noindex", parser.meta_robots)
 
     def test_entity_json_ld_single_and_graph(self):
-        html = """<html><head>
+        html = '''<html><head>
         <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Org1"}</script>
         <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Product", "name": "Prod1"}]}</script>
-        </head></html>"""
+        </head></html>'''
         parser = entity_content_check.EntityDOMParser()
         parser.feed(html)
         entities = entity_content_check.parse_json_ld(parser.json_ld_contents)
@@ -40,10 +40,10 @@ class TestDOMParsers(unittest.TestCase):
         self.assertIn("Prod1", names)
 
     def test_entity_malformed_json_ld_recovery(self):
-        html = """<html><head>
+        html = '''<html><head>
         <script type="application/ld+json">{ invalid json @#$ }</script>
         <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "ValidOrg"}</script>
-        </head></html>"""
+        </head></html>'''
         parser = entity_content_check.EntityDOMParser()
         parser.feed(html)
         entities = entity_content_check.parse_json_ld(parser.json_ld_contents)
@@ -51,20 +51,19 @@ class TestDOMParsers(unittest.TestCase):
         self.assertEqual(entities[0]["name"], "ValidOrg")
 
     def test_freshness_headings_and_context(self):
-        html = "<html><body><h2>Product Plan</h2><p>Price: $99/mo</p></body></html>"
+        html = '<html><body><h2>Product Plan</h2><p>Price: $99/mo</p></body></html>'
         parser = fact_consistency_check.FreshnessAnalyzer()
         parser.feed(html)
         self.assertTrue(len(parser.headings) > 0)
         self.assertEqual(parser.headings[0][1], "Product Plan")
 
     def test_geo_dom_parser_structure(self):
-        html = "<html><body><h1>Title</h1><table><tr><td>Data</td></tr></table><ul><li>Item 1</li></ul></body></html>"
+        html = '<html><body><h1>Title</h1><table><tr><td>Data</td></tr></table><ul><li>Item 1</li></ul></body></html>'
         parser = geo_content_check.GEODOMParser()
         parser.feed(html)
         self.assertEqual(parser.tables, 1)
         self.assertEqual(parser.lists, 1)
         self.assertIn("Title", parser.headings)
-
 
 if __name__ == "__main__":
     unittest.main()

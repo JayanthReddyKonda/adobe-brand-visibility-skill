@@ -1,9 +1,8 @@
-import sys
 import unittest
+import sys
 
 sys.path.insert(0, "src/skills/engagement-context-audit/scripts")
 import fact_extractor
-
 
 class TestFactExtractorDeep(unittest.TestCase):
     def test_email_extraction(self):
@@ -31,11 +30,10 @@ class TestFactExtractorDeep(unittest.TestCase):
         self.assertEqual(fact_extractor.extract_interval("Billed annually"), "year")
 
     def test_freshness_analyzer_dom(self):
-        html = "<html><head><title>Test Page</title></head><body><h1>Main Heading</h1><p>Body text</p></body></html>"
+        html = '<html><head><title>Test Page</title></head><body><h1>Main Heading</h1><p>Body text</p></body></html>'
         analyzer = fact_extractor.FreshnessAnalyzer()
         analyzer.feed(html)
         self.assertIn("Main Heading", analyzer.headings[0][1])
-
 
 if __name__ == "__main__":
     unittest.main()

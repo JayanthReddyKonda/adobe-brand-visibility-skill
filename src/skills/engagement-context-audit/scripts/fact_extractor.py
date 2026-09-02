@@ -7,12 +7,11 @@ Causal Root Causes:
   - FACT.FRESHNESS: LEGACY_FACT_PROPAGATION, STALE_AUTHORITATIVE_FACT
   - FACT.LIFECYCLE: DISCONTINUED_VS_CURRENT_CONFLICT
 """
-
-import argparse
-import json
+import sys
 import os
 import re
-import sys
+import json
+import argparse
 from datetime import datetime
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -22,15 +21,22 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from fetcher import safe_fetch
+try:
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+except ImportError:
+    import sys, os
+    _orch_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../audit-orchestrator/scripts"))
+    if _orch_dir not in sys.path:
+        sys.path.insert(0, _orch_dir)
+    from safe_fetch import safe_fetch, safe_check_status, DEFAULT_USER_AGENT
+
+
 
 CURRENT_YEAR = datetime.now().year
-PRICE_PATTERN = re.compile(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", re.IGNORECASE)
-EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+", re.IGNORECASE)
-PHONE_PATTERN = re.compile(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}")
-DISCONTINUED_PATTERN = re.compile(
-    r"\b(discontinued|retired|legacy|obsolete|end of life|out of production)\b", re.IGNORECASE
-)
+PRICE_PATTERN = re.compile(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', re.IGNORECASE)
+EMAIL_PATTERN = re.compile(r'[\w.+-]+@[\w-]+\.[\w.-]+', re.IGNORECASE)
+PHONE_PATTERN = re.compile(r'(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}')
+DISCONTINUED_PATTERN = re.compile(r'\b(discontinued|retired|legacy|obsolete|end of life|out of production)\b', re.IGNORECASE)
 
 
 def extract_currency(raw_str):
@@ -48,13 +54,14 @@ def extract_currency(raw_str):
 
 def extract_interval(raw_str):
     s = (raw_str or "").lower()
-    if re.search(r"(\bmonthly\b|\bper\s+month\b|/\s*mo\b|/\s*month\b)", s):
+    if re.search(r'(\bmonthly\b|\bper\s+month\b|/\s*mo\b|/\s*month\b)', s):
         return "month"
-    if re.search(r"(\bannually\b|\bannual\b|\byearly\b|\bper\s+year\b|/\s*yr\b|/\s*year\b)", s):
+    if re.search(r'(\bannually\b|\bannual\b|\byearly\b|\bper\s+year\b|/\s*yr\b|/\s*year\b)', s):
         return "year"
-    if re.search(r"(\bweekly\b|\bper\s+week\b|/\s*wk\b|/\s*week\b)", s):
+    if re.search(r'(\bweekly\b|\bper\s+week\b|/\s*wk\b|/\s*week\b)', s):
         return "week"
     return "one_time"
+
 
 
 def normalize_price_str(raw, currency=None):
@@ -63,7 +70,7 @@ def normalize_price_str(raw, currency=None):
         return None
     s = str(raw).strip()
     # European format with dot thousand separator and comma decimal: 1.250,50
-    if re.search(r"\d+\.\d{3},\d{2}", s):
+    if re.search(r'\d+\.\d{3},\d{2}', s):
         s = s.replace(".", "").replace(",", ".")
     elif "," in s and "." in s:
         # Standard US/UK: 1,250.50
@@ -74,8 +81,8 @@ def normalize_price_str(raw, currency=None):
             s = parts[0] + "." + parts[1]
         else:
             s = s.replace(",", "")
-
-    m = re.search(r"(\d+(?:\.\d{1,2})?)", s)
+    
+    m = re.search(r'(\d+(?:\.\d{1,2})?)', s)
     if not m:
         return None
     try:
@@ -83,6 +90,7 @@ def normalize_price_str(raw, currency=None):
         return f"{val:.2f}"
     except ValueError:
         return None
+
 
 
 class FreshnessAnalyzer(HTMLParser):
@@ -142,66 +150,14 @@ class FreshnessAnalyzer(HTMLParser):
 
 
 UTILITY_HEADINGS = {
-    "contact",
-    "contact us",
-    "about",
-    "about us",
-    "privacy policy",
-    "terms of service",
-    "terms & conditions",
-    "cart",
-    "shopping cart",
-    "checkout",
-    "login",
-    "register",
-    "sign in",
-    "sign up",
-    "cookie policy",
-    "faq",
-    "faqs",
-    "frequently asked questions",
-    "search",
-    "menu",
-    "navigation",
-    "home",
-    "homepage",
-    "welcome",
-    "pricing",
-    "plans",
-    "subscription",
-    "overview",
-    "details",
-    "features",
-    "giving",
-    "gives",
-    "diversity",
-    "impact",
-    "donate",
-    "donation",
-    "usage",
-    "usage limit",
-    "limits",
-    "support",
-    "help",
-    "careers",
-    "press",
-    "news",
-    "blog",
-    "events",
-    "community",
-    "resources",
-    "general",
-    "summary",
-    "introduction",
-    "conclusion",
-    "table of contents",
-    "highlights",
-    "compare",
-    "comparison",
-    "reviews",
-    "testimonials",
-    "questions",
-    "answers",
+    "contact", "contact us", "about", "about us", "privacy policy", "terms of service",
+    "terms & conditions", "cart", "shopping cart", "checkout", "login", "register", "sign in", "sign up",
+    "cookie policy", "faq", "faqs", "frequently asked questions", "search", "menu", "navigation",
+    "home", "homepage", "welcome", "pricing", "plans", "subscription", "overview", "details",
+    "features", "giving", "gives", "diversity", "impact", "donate", "donation", "usage",
+    "usage limit", "limits", "support", "help", "careers", "press", "news", "blog", "events",
+    "community", "resources", "general", "summary", "introduction", "conclusion", "table of contents",
+    "highlights", "compare", "comparison", "reviews", "testimonials", "questions", "answers"
 }
 
 
@@ -217,43 +173,30 @@ def is_valid_product_entity(name):
         return False
 
     # Must not end with question/colon punctuation (e.g. FAQ questions)
-    if clean.endswith(("?", ":")):
+    if clean.endswith("?") or clean.endswith(":"):
         return False
 
     # Must not contain question prefixes or FAQ phrases
-    question_prefixes = (
-        "what ",
-        "why ",
-        "how ",
-        "when ",
-        "where ",
-        "who ",
-        "which ",
-        "can ",
-        "is ",
-        "does ",
-        "faq",
-        "frequently ",
-    )
+    question_prefixes = ("what ", "why ", "how ", "when ", "where ", "who ", "which ", "can ", "is ", "does ", "faq", "frequently ")
     if clean_lower.startswith(question_prefixes):
         return False
 
     # Must not contain price tags, currency indicators, billing terms or math symbols
     if any(sym in clean for sym in ("$", "€", "£", "₹", "¥")):
         return False
-    if re.search(
-        r"\b(usd|eur|gbp|inr|cad|aud|per\s+month|per\s+user|per\s+year|/\s*mo|/\s*yr|billed|billing|pricing|tier|tiers|cost|rate|fee|fees|discount|first\s+\d+)\b",
-        clean_lower,
-    ):
+    if re.search(r'\b(usd|eur|gbp|inr|cad|aud|per\s+month|per\s+user|per\s+year|/\s*mo|/\s*yr|billed|billing|pricing|tier|tiers|cost|rate|fee|fees|discount|first\s+\d+)\b', clean_lower):
         return False
 
     # Must not contain large digit spans or raw numbers
-    if re.search(r"\d{2,}", clean):
+    if re.search(r'\d{2,}', clean):
         return False
 
     if clean_lower in UTILITY_HEADINGS:
         return False
-    return not any(k in clean_lower for k in ("cookie", "privacy", "terms", "navigation", "diversity", "giving", "usage limit", "frequently asked"))
+    if any(k in clean_lower for k in ("cookie", "privacy", "terms", "navigation", "diversity", "giving", "usage limit", "frequently asked")):
+        return False
+
+    return True
 
 
 def resolve_json_ld_graph(raw_json_list):
@@ -271,11 +214,8 @@ def resolve_json_ld_graph(raw_json_list):
         except Exception:
             pass
 
-    id_map = {
-        obj["@id"].strip(): obj
-        for obj in raw_objects
-        if isinstance(obj, dict) and "@id" in obj and isinstance(obj["@id"], str)
-    }
+
+    id_map = {obj["@id"].strip(): obj for obj in raw_objects if isinstance(obj, dict) and "@id" in obj and isinstance(obj["@id"], str)}
     resolved = []
     for obj in raw_objects:
         if not isinstance(obj, dict):
@@ -286,10 +226,7 @@ def resolve_json_ld_graph(raw_json_list):
             if isinstance(offers, dict) and "@id" in offers and offers["@id"] in id_map:
                 entity["offers"] = id_map[offers["@id"]]
             elif isinstance(offers, list):
-                entity["offers"] = [
-                    id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o
-                    for o in offers
-                ]
+                entity["offers"] = [id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o for o in offers]
         resolved.append(entity)
 
     for obj in raw_objects:
@@ -327,11 +264,11 @@ def extract_scoped_facts(html_str, url):
         "contact_emails": [],
         "contact_phones": [],
         "modification_dates": [],
-        "products_with_status": [],
+        "products_with_status": []
     }
 
     # 1. Copyright years
-    matches = re.findall(r"(?:©|&copy;|copyright)\s*(?:[0-9]{4}\s*[-–]\s*)?([0-9]{4})", full_text, re.IGNORECASE)
+    matches = re.findall(r'(?:©|&copy;|copyright)\s*(?:[0-9]{4}\s*[-–]\s*)?([0-9]{4})', full_text, re.IGNORECASE)
     for y in matches:
         try:
             iy = int(y)
@@ -362,30 +299,29 @@ def extract_scoped_facts(html_str, url):
                 p_curr = str(offer_obj.get("priceCurrency") or "UNKNOWN").upper()
                 avail = str(offer_obj.get("availability") or "").lower()
                 p_variant = str(offer_obj.get("sku") or offer_obj.get("name") or o.get("sku") or "default").strip()
-                status = (
-                    "discontinued"
-                    if "discontinued" in avail
-                    else ("in_stock" if "instock" in avail else ("preorder" if "preorder" in avail else "unknown"))
-                )
+                status = "discontinued" if "discontinued" in avail else ("in_stock" if "instock" in avail else ("preorder" if "preorder" in avail else "unknown"))
                 if pname and is_valid_product_entity(pname):
-                    facts["products_with_status"].append({"name": pname, "status": status, "url": url})
+                    facts["products_with_status"].append({
+                        "name": pname,
+                        "status": status,
+                        "url": url
+                    })
                     if p_val:
                         norm_p = normalize_price_str(str(p_val), p_curr)
                         if norm_p:
-                            facts["scoped_prices"].append(
-                                {
-                                    "entity": pname,
-                                    "price": norm_p,
-                                    "currency": p_curr,
-                                    "interval": "one_time",
-                                    "variant": p_variant,
-                                    "raw": f"{p_curr} {p_val}",
-                                }
-                            )
+                            facts["scoped_prices"].append({
+                                "entity": pname,
+                                "price": norm_p,
+                                "currency": p_curr,
+                                "interval": "one_time",
+                                "variant": p_variant,
+                                "raw": f"{p_curr} {p_val}"
+                            })
         if "dateModified" in o and isinstance(o["dateModified"], str):
             facts["modification_dates"].append(o["dateModified"])
         elif "datePublished" in o and isinstance(o["datePublished"], str):
             facts["modification_dates"].append(o["datePublished"])
+
 
     # Meta / OpenGraph update timestamps and brand/title facts
     for meta_key in ("article:modified_time", "og:updated_time", "last-modified"):
@@ -395,44 +331,44 @@ def extract_scoped_facts(html_str, url):
     if "og:site_name" in parser.meta_tags:
         facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
 
+
+
     # 4. Text-based scoped price extraction (ONLY within explicitly named, valid product sections)
     for ctx, txt in parser.text_with_context:
         if not ctx or ctx == "General" or not is_valid_product_entity(ctx):
             continue
-        for m in re.finditer(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", txt, re.IGNORECASE):
+        for m in re.finditer(r'(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)', txt, re.IGNORECASE):
             curr = extract_currency(m.group(0))
             norm_p = normalize_price_str(m.group(1), curr)
             if norm_p and float(norm_p) > 0:
                 invl = extract_interval(txt)
-                if not any(
-                    sp["price"] == norm_p
-                    and sp["entity"].lower() == ctx.lower().strip()
-                    and sp["currency"] == curr
-                    and sp["interval"] == invl
-                    for sp in facts["scoped_prices"]
-                ):
-                    facts["scoped_prices"].append(
-                        {
-                            "entity": ctx.strip(),
-                            "price": norm_p,
-                            "currency": curr,
-                            "interval": invl,
-                            "variant": "default",
-                            "raw": m.group(0),
-                        }
-                    )
+                if not any(sp["price"] == norm_p and sp["entity"].lower() == ctx.lower().strip() and sp["currency"] == curr and sp["interval"] == invl for sp in facts["scoped_prices"]):
+                    facts["scoped_prices"].append({
+                        "entity": ctx.strip(),
+                        "price": norm_p,
+                        "currency": curr,
+                        "interval": invl,
+                        "variant": "default",
+                        "raw": m.group(0)
+                    })
 
     # 5. Lifecycle text detection (Removed to prevent false positives)
     for h in parser.headings:
         h_text = h[1]
-        if DISCONTINUED_PATTERN.search(h_text) and is_valid_product_entity(h_text):
-            matched = False
-            for p in facts["products_with_status"]:
-                if p["name"].lower() == h_text.lower().strip():
-                    p["status"] = "discontinued"
-                    matched = True
-            if not matched:
-                facts["products_with_status"].append({"name": h_text.strip(), "status": "discontinued", "url": url})
+        if DISCONTINUED_PATTERN.search(h_text):
+            if is_valid_product_entity(h_text):
+                matched = False
+                for p in facts["products_with_status"]:
+                    if p["name"].lower() == h_text.lower().strip():
+                        p["status"] = "discontinued"
+                        matched = True
+                if not matched:
+                    facts["products_with_status"].append({
+                        "name": h_text.strip(),
+                        "status": "discontinued",
+                        "url": url
+                    })
+
 
     # 6. Scoped emails & phones
     for m in EMAIL_PATTERN.finditer(html_str):
@@ -495,24 +431,22 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                         details.append(f"{curr} {pval} on {u}")
 
                 if len(all_affected_urls) >= 2:
-                    findings.append(
-                        {
-                            "category": "fact-consistency",
-                            "title": f"Conflicting pricing published for '{ent}'",
-                            "severity": "high",
-                            "confidence": "high",
-                            "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
-                            "cause_family": "FACT.CONSISTENCY",
-                            "cause_id": "FIRST_PARTY_FACT_CONFLICT",
-                            "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
-                            "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
-                            "suggested_action": {
-                                "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
-                                "priority": "high",
-                                "verification": f"Re-crawl {', '.join(sorted(all_affected_urls))} and verify identical pricing appears on all pages.",
-                            },
+                    findings.append({
+                        "category": "fact-consistency",
+                        "title": f"Conflicting pricing published for '{ent}'",
+                        "severity": "high",
+                        "confidence": "high",
+                        "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
+                        "cause_family": "FACT.CONSISTENCY",
+                        "cause_id": "FIRST_PARTY_FACT_CONFLICT",
+                        "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
+                        "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
+                        "suggested_action": {
+                            "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
+                            "priority": "high",
+                            "verification": f"Re-crawl {', '.join(sorted(all_affected_urls))} and verify identical pricing appears on all pages."
                         }
-                    )
+                    })
 
     # 2. Product Lifecycle Conflicts (Discontinued vs Active)
     status_by_name = {}
@@ -527,24 +461,22 @@ def evaluate_fact_consistency(page_fact_list, base_url):
         if "discontinued" in stat_types and ("in_stock" in stat_types or "current" in stat_types):
             urls = {s[1] for s in statuses}
             if len(urls) >= 2:
-                findings.append(
-                    {
-                        "category": "lifecycle",
-                        "title": f"Product lifecycle conflict for '{name}' (discontinued vs current)",
-                        "severity": "high",
-                        "confidence": "high",
-                        "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
-                        "cause_family": "FACT.LIFECYCLE",
-                        "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
-                        "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
-                        "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
-                        "suggested_action": {
-                            "summary": f"Update all pages referencing '{name}' to consistently reflect its current product lifecycle status.",
-                            "priority": "high",
-                            "verification": f"Verify {', '.join(sorted(urls))} show consistent availability/discontinued markers.",
-                        },
+                findings.append({
+                    "category": "lifecycle",
+                    "title": f"Product lifecycle conflict for '{name}' (discontinued vs current)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
+                    "cause_family": "FACT.LIFECYCLE",
+                    "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
+                    "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
+                    "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
+                    "suggested_action": {
+                        "summary": f"Update all pages referencing '{name}' to consistently reflect its current product lifecycle status.",
+                        "priority": "high",
+                        "verification": f"Verify {', '.join(sorted(urls))} show consistent availability/discontinued markers."
                     }
-                )
+                })
 
     # 3. Copyright Year Inconsistency (Signals legacy fact drift - emitted as proactive observation unless paired with conflict)
     c_years_by_url = {}
@@ -557,47 +489,47 @@ def evaluate_fact_consistency(page_fact_list, base_url):
         oldest_year = min(unique_years)
         newest_year = max(unique_years)
         if newest_year - oldest_year >= 3:
-            recommendations.append(
-                {
-                    "title": "Synchronize footer copyright year across templates",
-                    "category": "freshness",
-                    "rationale": f"Copyright years range from {oldest_year} to {newest_year} across sampled page templates.",
-                    "suggested_action": f"Standardize site footers to dynamically render current year ({CURRENT_YEAR}).",
-                }
-            )
+            recommendations.append({
+                "title": "Synchronize footer copyright year across templates",
+                "category": "freshness",
+                "rationale": f"Copyright years range from {oldest_year} to {newest_year} across sampled page templates.",
+                "suggested_action": f"Standardize site footers to dynamically render current year ({CURRENT_YEAR})."
+            })
 
     return findings, recommendations
+
+
 
 
 def compare_ai_observations(fact_ledger, responses_file):
     findings = []
     notes = []
-
+    
     if not responses_file or not os.path.exists(responses_file):
         return findings, notes
-
+        
     try:
         with open(responses_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-
+            
         obs_list = data.get("observations") or data.get("responses") or []
         if isinstance(data, list):
             obs_list = data
-
+            
         for idx, obs in enumerate(obs_list):
-            assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx + 1}"
+            assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx+1}"
             mentioned = obs.get("mentioned") is True
-            obs.get("cited") is True
-
+            cited = obs.get("cited") is True
+            
             if not mentioned:
                 notes.append(f"{assistant_name} omitted brand.")
                 continue
-
+                
             for claim in obs.get("claims", []):
                 c_entity = str(claim.get("entity", "")).lower()
                 c_attr = str(claim.get("attribute", "")).lower()
                 c_val = str(claim.get("value", ""))
-
+                
                 if c_attr == "price":
                     claim_num = normalize_price_str(c_val, "UNKNOWN")
                     if claim_num is not None:
@@ -610,31 +542,25 @@ def compare_ai_observations(fact_ledger, responses_file):
                                     site_num = normalize_price_str(sp["price"], sp["currency"])
                                     if site_num is not None:
                                         entity_prices.append(float(site_num))
-
+                        
                         if found_match and entity_prices:
                             # P0-48 & P0-24 & P0-25: Entity bound global price checking
                             if not any(abs(float(claim_num) - sv) < 0.01 for sv in entity_prices):
-                                findings.append(
-                                    {
-                                        "category": "representation",
-                                        "title": f"{assistant_name} states conflicting pricing for '{claim.get('entity')}'",
-                                        "severity": "high",
-                                        "confidence": "high",
-                                        "root_cause": f"The AI asserts a price ({c_val}) for '{claim.get('entity')}' that contradicts its canonical on-site representation.",
-                                        "cause_family": "REPRESENTATION.ACCURACY",
-                                        "cause_id": "AI_FACT_CONFLICT",
-                                        "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
-                                        "suggested_action": {
-                                            "summary": "Publish canonical pricing.",
-                                            "priority": "high",
-                                        },
-                                    }
-                                )
+                                findings.append({
+                                    "category": "representation",
+                                    "title": f"{assistant_name} states conflicting pricing for '{claim.get('entity')}'",
+                                    "severity": "high",
+                                    "confidence": "high",
+                                    "root_cause": f"The AI asserts a price ({c_val}) for '{claim.get('entity')}' that contradicts its canonical on-site representation.",
+                                    "cause_family": "REPRESENTATION.ACCURACY",
+                                    "cause_id": "AI_FACT_CONFLICT",
+                                    "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
+                                    "suggested_action": {"summary": "Publish canonical pricing.", "priority": "high"}
+                                })
     except Exception:
         pass
-
+        
     return findings, notes
-
 
 def audit(base, domain, responses_file=None, inv=None):
     findings = []
@@ -647,16 +573,12 @@ def audit(base, domain, responses_file=None, inv=None):
             raw_html = p.get("html", "")
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
-            if (
-                raw_html.strip().startswith("<?xml")
-                or "<urlset" in raw_html.lower()
-                or "<sitemapindex" in raw_html.lower()
-            ):
+            if raw_html.strip().startswith("<?xml") or "<urlset" in raw_html.lower() or "<sitemapindex" in raw_html.lower():
                 continue
             if raw_html:
                 page_fact_list.append(extract_scoped_facts(raw_html, u))
     else:
-        _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
+        status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2*1024*1024)
         if html:
             page_fact_list.append(extract_scoped_facts(html, base + "/"))
 
@@ -665,11 +587,11 @@ def audit(base, domain, responses_file=None, inv=None):
             "status": "inconclusive",
             "findings": [],
             "recommendations": [],
-            "error": f"could not retrieve content from {base}",
+            "error": f"could not retrieve content from {base}"
         }
 
     f_findings, f_recs = evaluate_fact_consistency(page_fact_list, base)
-    ai_findings, _ai_notes = compare_ai_observations(page_fact_list, responses_file)
+    ai_findings, ai_notes = compare_ai_observations(page_fact_list, responses_file)
     f_findings.extend(ai_findings)
     findings.extend(f_findings)
     recommendations.extend(f_recs)
@@ -681,17 +603,16 @@ def audit(base, domain, responses_file=None, inv=None):
         "coverage": {
             "html_pages_checked": len(page_fact_list),
             "scoped_facts_recorded": sum(
-                len(pf["scoped_prices"])
-                + len(pf["contact_emails"])
-                + len(pf["contact_phones"])
-                + len(pf["brand_names"])
-                + len(pf["products_with_status"])
-                + len(pf["copyright_years"])
+                len(pf["scoped_prices"]) + len(pf["contact_emails"]) + len(pf["contact_phones"]) +
+                len(pf["brand_names"]) + len(pf["products_with_status"]) + len(pf["copyright_years"])
                 for pf in page_fact_list
             ),
-            "source": "shared-inventory" if inv is not None else "homepage-only",
+            "source": "shared-inventory" if inv is not None else "homepage-only"
         },
-        "limitations": ["Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"],
+
+        "limitations": [
+            "Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"
+        ]
     }
 
 
@@ -699,9 +620,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit fact freshness and consistency.")
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument(
-        "--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check"
-    )
+    parser.add_argument("--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
