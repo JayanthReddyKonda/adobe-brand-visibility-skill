@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Run a full Brand AI-Readiness audit against https://example.com and output a validated JSON report.",
+      "prompt": "Run a full Brand AI-Readiness and GEO audit against https://example.com and output a strictly validated Draft-07 JSON report.",
       "expected_output": "A complete, schema-compliant JSON report detailing findings, proactive actions, and audit summary.",
       "assertions": [
         "The output strictly validates against report-schema.json (Exit code 0)",
@@ -13,7 +13,7 @@
     },
     {
       "id": 2,
-      "prompt": "Perform an offline audit using pre-acquired inventory at /tmp/test_inv.json to detect pricing and accessibility conflicts.",
+      "prompt": "Perform an offline deterministic audit using pre-acquired inventory at inv.json to detect pricing, robots.txt, and entity conflicts.",
       "expected_output": "A deterministic JSON audit report identifying known defects without live network probes.",
       "assertions": [
         "The report identifies all injected synthetic defects",

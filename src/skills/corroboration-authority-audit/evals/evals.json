@@ -10,6 +10,15 @@
         "Missing sameAs links trigger advisory recommendations",
         "Probing enforces strict 5-second timeout and 512KB payload limits"
       ]
+    },
+    {
+      "id": 2,
+      "prompt": "Verify whether third-party authority nodes (Wikidata, LinkedIn, Wikipedia) validate the canonical brand identity on https://example.com.",
+      "expected_output": "Validation status of external knowledge graph identity anchors.",
+      "assertions": [
+        "HTTP 200 response on Wikidata/LinkedIn substantiates identity",
+        "Private network and non-HTTPS sameAs links are rejected by SSRF filters"
+      ]
     }
   ]
 }

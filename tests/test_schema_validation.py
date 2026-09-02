@@ -1,12 +1,12 @@
-import unittest
 import json
 import subprocess
-import os
+import unittest
+
 
 class TestSchemaValidationGate(unittest.TestCase):
     def setUp(self):
         self.val_script = "src/skills/audit-orchestrator/scripts/validate_report.py"
-        
+
     def test_valid_report_passes(self):
         valid_report = {
             "site": "https://example.com",
@@ -20,13 +20,31 @@ class TestSchemaValidationGate(unittest.TestCase):
                     "severity": "high",
                     "category": "discoverability",
                     "root_cause": "User-agent Disallow directive",
-                    "evidence": {"summary": "Disallow / found", "scope": "robots.txt", "sources": [{"url": "https://example.com/robots.txt", "type": "robots_txt", "observation": "Disallow: /"}]},
-                    "suggested_action": {"summary": "Allow AI bots", "priority": "high", "technical_fix": "Add Allow: /", "creative_fix": None, "verification": "Curl robots.txt"}
+                    "evidence": {
+                        "summary": "Disallow / found",
+                        "scope": "robots.txt",
+                        "sources": [
+                            {
+                                "url": "https://example.com/robots.txt",
+                                "type": "robots_txt",
+                                "observation": "Disallow: /",
+                            }
+                        ],
+                    },
+                    "suggested_action": {
+                        "summary": "Allow AI bots",
+                        "priority": "high",
+                        "technical_fix": "Add Allow: /",
+                        "creative_fix": None,
+                        "verification": "Curl robots.txt",
+                    },
                 }
             ],
-            "proactive_actions": []
+            "proactive_actions": [],
         }
-        res = subprocess.run(["python3", self.val_script, "-"], input=json.dumps(valid_report), capture_output=True, text=True)
+        res = subprocess.run(
+            ["python3", self.val_script, "-"], input=json.dumps(valid_report), capture_output=True, text=True
+        )
         self.assertEqual(res.returncode, 0)
 
     def test_invalid_severity_fails(self):
@@ -42,14 +60,27 @@ class TestSchemaValidationGate(unittest.TestCase):
                     "severity": "info",  # 'info' is forbidden by schema
                     "category": "discoverability",
                     "root_cause": "Test",
-                    "evidence": {"summary": "Test", "scope": "global", "sources": [{"url": "https://example.com", "type": "page", "observation": "Test"}]},
-                    "suggested_action": {"summary": "Test", "priority": "low", "technical_fix": "Fix", "creative_fix": None, "verification": "Verify"}
+                    "evidence": {
+                        "summary": "Test",
+                        "scope": "global",
+                        "sources": [{"url": "https://example.com", "type": "page", "observation": "Test"}],
+                    },
+                    "suggested_action": {
+                        "summary": "Test",
+                        "priority": "low",
+                        "technical_fix": "Fix",
+                        "creative_fix": None,
+                        "verification": "Verify",
+                    },
                 }
             ],
-            "proactive_actions": []
+            "proactive_actions": [],
         }
-        res = subprocess.run(["python3", self.val_script, "-"], input=json.dumps(invalid_report), capture_output=True, text=True)
+        res = subprocess.run(
+            ["python3", self.val_script, "-"], input=json.dumps(invalid_report), capture_output=True, text=True
+        )
         self.assertNotEqual(res.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

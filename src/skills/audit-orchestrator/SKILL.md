@@ -7,7 +7,7 @@ description: >
   ChatGPT/Claude/Perplexity citations", "find brand SEO/AEO defects", or wants an end-to-end brand
   visibility assessment. Coordinates 6 specialist skills, executes diagnostic sensors directly,
   applies cognitive reasoning over multi-signal evidence, and emits a Draft-07 schema-validated
-  JSON report with dual-track remediation. Zero external dependencies. Runs in < 5 minutes.
+  JSON report with dual-track remediation.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -56,13 +56,13 @@ The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist 
 Read these before synthesizing findings. They define your cognitive reasoning rules.
 
 ### Core Knowledge Base (Load First — MANDATORY)
-- [📖 Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Root cause taxonomy, multi-signal evidence reconciliation rules, severity rubric, confidence model, dual-track remediation catalog, and the full Draft-07 report schema contract.
+- [ Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Root cause taxonomy, multi-signal evidence reconciliation rules, severity rubric, confidence model, dual-track remediation catalog, and the full Draft-07 report schema contract.
 
 ### Output Schema (Load Before Writing Report — MANDATORY)
-- [📋 Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
+- [ Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
 
 ### Technical Foundations (Load on Technical Inquiries)
-- [🛠️ SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
+- [ SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
 
 ---
 

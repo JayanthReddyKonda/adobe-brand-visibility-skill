@@ -10,6 +10,16 @@
         "Discontinued vs active product lifecycle mismatches are reported",
         "Footer copyright year variations are emitted as freshness recommendations"
       ]
+    },
+    {
+      "id": 2,
+      "prompt": "Detect cross-page price discrepancies between product detail pages and catalog listings on https://example.com.",
+      "expected_output": "List of conflicting price facts for identical product entities.",
+      "assertions": [
+        "Different price values on product vs catalog page trigger FIRST_PARTY_FACT_CONFLICT",
+        "Multi-tier pricing on the same page is not flagged as a conflict",
+        "European and multi-currency formats are normalized before comparison"
+      ]
     }
   ]
 }

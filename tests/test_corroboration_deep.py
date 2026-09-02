@@ -1,8 +1,9 @@
+import json
+import os
+import subprocess
 import tempfile
 import unittest
-import json
-import subprocess
-import os
+
 
 class TestCorroborationDeep(unittest.TestCase):
     def setUp(self):
@@ -13,20 +14,37 @@ class TestCorroborationDeep(unittest.TestCase):
     def test_corroboration_with_valid_sameas(self):
         inv_data = {
             "site": "https://testbrand.com",
-            "pages": [{
-                "url": "https://testbrand.com/",
-                "status": 200,
-                "content_type": "text/html",
-                "page_type": "homepage",
-                "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://twitter.com/testbrand", "https://linkedin.com/company/testbrand"]}</script></head><body><h1>TestBrand</h1></body></html>"""
-            }]
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://twitter.com/testbrand", "https://linkedin.com/company/testbrand"]}</script></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
         }
         with open(self.test_inv, "w") as f:
             json.dump(inv_data, f)
         with open(self.test_state, "w") as f:
-            json.dump({"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f)
+            json.dump(
+                {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f
+            )
 
-        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv, "--state", self.test_state], capture_output=True, text=True)
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--state",
+                self.test_state,
+            ],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(res.returncode, 0)
         out = json.loads(res.stdout)
         self.assertEqual(out["status"], "ok")
@@ -34,20 +52,37 @@ class TestCorroborationDeep(unittest.TestCase):
     def test_corroboration_missing_sameas_emits_recommendation(self):
         inv_data = {
             "site": "https://testbrand.com",
-            "pages": [{
-                "url": "https://testbrand.com/",
-                "status": 200,
-                "content_type": "text/html",
-                "page_type": "homepage",
-                "html": """<!DOCTYPE html><html><head><title>TestBrand</title></head><body><h1>TestBrand</h1></body></html>"""
-            }]
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><title>TestBrand</title></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
         }
         with open(self.test_inv, "w") as f:
             json.dump(inv_data, f)
         with open(self.test_state, "w") as f:
-            json.dump({"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f)
+            json.dump(
+                {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f
+            )
 
-        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv, "--state", self.test_state], capture_output=True, text=True)
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--state",
+                self.test_state,
+            ],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(res.returncode, 0)
         out = json.loads(res.stdout)
         # Should emit recommendation to add sameAs profiles
@@ -58,20 +93,37 @@ class TestCorroborationDeep(unittest.TestCase):
         # sameAs with invalid non-existent domain should flag broken anchor
         inv_data = {
             "site": "https://testbrand.com",
-            "pages": [{
-                "url": "https://testbrand.com/",
-                "status": 200,
-                "content_type": "text/html",
-                "page_type": "homepage",
-                "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://invalid-non-existent-domain-test-12345.org"]}</script></head><body><h1>TestBrand</h1></body></html>"""
-            }]
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://invalid-non-existent-domain-test-12345.org"]}</script></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
         }
         with open(self.test_inv, "w") as f:
             json.dump(inv_data, f)
         with open(self.test_state, "w") as f:
-            json.dump({"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f)
+            json.dump(
+                {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f
+            )
 
-        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv, "--state", self.test_state], capture_output=True, text=True)
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--state",
+                self.test_state,
+            ],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(res.returncode, 0)
         out = json.loads(res.stdout)
         cause_ids = [f.get("cause_id") for f in out.get("findings", [])]
@@ -81,20 +133,37 @@ class TestCorroborationDeep(unittest.TestCase):
         # sameAs pointing to 127.0.0.1 must be safely blocked
         inv_data = {
             "site": "https://testbrand.com",
-            "pages": [{
-                "url": "https://testbrand.com/",
-                "status": 200,
-                "content_type": "text/html",
-                "page_type": "homepage",
-                "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["http://127.0.0.1:8080/admin"]}</script></head><body><h1>TestBrand</h1></body></html>"""
-            }]
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["http://127.0.0.1:8080/admin"]}</script></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
         }
         with open(self.test_inv, "w") as f:
             json.dump(inv_data, f)
         with open(self.test_state, "w") as f:
-            json.dump({"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f)
+            json.dump(
+                {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f
+            )
 
-        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv, "--state", self.test_state], capture_output=True, text=True)
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--state",
+                self.test_state,
+            ],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(res.returncode, 0)
         out = json.loads(res.stdout)
         # 127.0.0.1 is blocked by safe_fetch so treated as broken anchor
@@ -102,8 +171,20 @@ class TestCorroborationDeep(unittest.TestCase):
         self.assertIn("BROKEN_AUTHORITY_ANCHOR", cause_ids)
 
     def test_corroboration_empty_inventory(self):
-        res = subprocess.run(["python3", self.script, "--site", "https://testbrand.com", "--inventory", os.path.join(tempfile.gettempdir(), "non_existent.json")], capture_output=True, text=True)
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                os.path.join(tempfile.gettempdir(), "non_existent.json"),
+            ],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(res.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
