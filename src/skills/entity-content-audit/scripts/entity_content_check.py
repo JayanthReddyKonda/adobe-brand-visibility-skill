@@ -469,6 +469,9 @@ def audit(base, domain, inv=None, state_file=None):
                 "estimatedsalary": "Estimated Salary rich result retired by Google.",
                 "learningvideo": "Learning Video rich result retired by Google.",
                 "specialannouncement": "Special Announcement rich result deprecated by Google.",
+                "practiceproblem": "Practice Problem rich result retired by Google (January 2026).",
+                "bookactions": "Book Actions rich result retired by Google.",
+                "courseinfo": "Course Info rich result retired by Google.",
             }
             for obj in typed_objects:
                 t_raw = obj.get("@type", "")

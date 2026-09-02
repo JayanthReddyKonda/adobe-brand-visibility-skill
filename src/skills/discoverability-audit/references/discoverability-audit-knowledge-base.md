@@ -273,3 +273,16 @@ Disallow: /checkout/
 Disallow: /api/
 
 Sitemap: https://example.com/sitemap.xml
+
+
+---
+
+## 4. User-Triggered Fetchers vs. Autonomous Crawlers (from `claude-seo/seo-geo`)
+
+Understanding crawler behavior is critical for accurate audit diagnosis:
+
+| Category | Crawlers | Obeys robots.txt? | Role & Governance |
+| :--- | :--- | :--- | :--- |
+| **User-Triggered Fetchers** | `ChatGPT-User`, `Google-Agent` (Project Mariner), `Google-NotebookLM`, `Perplexity-User` | **NO (by design)** | Initiated directly by an active user session asking the assistant to fetch a specific URL. Per RFC 9309, robots.txt applies to autonomous web indexing, not user-directed agent requests. Cannot be governed by robots.txt; requires WAF/HTTP authentication. |
+| **AI Retrieval Crawlers** | `OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`, `Amazonbot`, `Meta-ExternalAgent` | **YES** | Proactively crawl and index web pages for real-time citation synthesis in generative search answers. Blocking these breaks AI visibility. |
+| **Foundation Training Crawlers** | `GPTBot`, `Google-Extended`, `ClaudeBot`, `Bytespider`, `Applebot-Extended`, `CCBot`, `cohere-ai` | **YES** | Collect bulk offline training data for model pre-training. Blocking these is an acceptable copyright governance decision that does NOT impair live search citations. |

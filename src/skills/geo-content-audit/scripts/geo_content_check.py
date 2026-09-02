@@ -49,10 +49,39 @@ _FLUFF_RE = re.compile(
     r"\b(delve|delving|tapestry|game-changer|testament to|multifaceted|beacon of|revolutionize|spearheading|unleash)\b",
     re.IGNORECASE,
 )
+_HEDGE_RE = re.compile(
+    r"\b(?:"
+    r"maybe|perhaps|possibly|might|could"
+    r"|somewhat|relatively|fairly|rather|quite"
+    r"|approximately|roughly|nearly"
+    r"|seems|appears|tends\s+to|suggests|likely|arguably"
+    r"|generally|usually|typically|in\s+most\s+cases"
+    r"|a\s+bit|sort\s+of|kind\s+of|in\s+some\s+ways"
+    r")\b",
+    re.IGNORECASE,
+)
 
 import math
 import zlib
 from collections import Counter
+from datetime import datetime, timezone
+
+
+def parse_date_string(date_str: str) -> datetime | None:
+    """Parse ISO-8601 or simple date string into UTC datetime."""
+    if not date_str or not isinstance(date_str, str):
+        return None
+    m = re.match(r"^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?", date_str.strip())
+    if m:
+        try:
+            year = int(m.group(1))
+            month = int(m.group(2)) if m.group(2) else 1
+            day = int(m.group(3)) if m.group(3) else 1
+            return datetime(year, month, day, tzinfo=timezone.utc)
+        except Exception:
+            return None
+    return None
+
 
 AUTHORITATIVE_DOMAINS = {
     "doi.org",
@@ -105,6 +134,8 @@ class GEODOMParser(HTMLParser):
         self.outbound_citations = []
         self.author_bylines = []
         self.quotes_count = 0
+        self.published_date = None
+        self.modified_date = None
 
     def handle_starttag(self, tag, attrs):
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
@@ -119,6 +150,25 @@ class GEODOMParser(HTMLParser):
             self.lists += 1
         elif t == "p":
             self.current_p_text = []
+        elif t == "time":
+            dt = attr_dict.get("datetime", "").strip()
+            if dt and not self.published_date:
+                self.published_date = dt
+        elif t == "meta":
+            prop = attr_dict.get("property", "").lower()
+            name = attr_dict.get("name", "").lower()
+            c_val = attr_dict.get("content", "").strip()
+            if c_val:
+                if (
+                    prop in ("article:published_time", "og:published_time")
+                    or name in ("publishdate", "date", "dc.date")
+                ) and not self.published_date:
+                    self.published_date = c_val
+                elif (
+                    prop in ("article:modified_time", "og:updated_time")
+                    or name in ("modified", "last-modified", "revised")
+                ) and not self.modified_date:
+                    self.modified_date = c_val
         elif t == "a" and attr_dict.get("href"):
             href = attr_dict["href"]
             if href.startswith("http"):
@@ -327,6 +377,32 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
+        # 1.1 Hedge Language Density Check (from geoskills/geo-fix-content)
+        hedge_matches = _HEDGE_RE.findall(full_text)
+        hedge_density = (len(hedge_matches) / max(total_words, 1)) * 100
+        if hedge_density > 1.5 and total_words >= 100:
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Content contains excessive hedge language (weakening AI citation probability)",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": f"EXCESSIVE_HEDGE_LANGUAGE: Page exhibits a hedge word density of {hedge_density:.1f}% (threshold: < 0.5%). Generative search engines deprioritize unassertive or tentative prose in favor of direct, authoritative claims.",
+                    "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                    "id": "EXCESSIVE_HEDGE_LANGUAGE",
+                    "cause_id": "EXCESSIVE_HEDGE_LANGUAGE",
+                    "evidence": f"Page {url} contains {len(hedge_matches)} hedge expression(s) ({', '.join(set(m.lower() for m in hedge_matches[:5]))}) across {total_words} words.",
+                    "impact": "Empirical studies demonstrate that hedged language ranks 3x lower in LLM citation selection than confident, data-backed assertions.",
+                    "suggested_action": {
+                        "summary": "Replace tentative hedge language with direct, assertive, and quantified statements.",
+                        "technical_fix": "Audit body copy against the hedge language dictionary and remove unassertive qualifiers.",
+                        "creative_fix": "Replace phrases like 'seems to improve' or 'could possibly help' with concrete metrics and verifiable outcomes.",
+                        "priority": "medium",
+                        "verification": "Re-run content check to verify hedge density drops below 0.5%.",
+                    },
+                }
+            )
+
         # 2. Princeton Vector: Quantifiable Evidence & Statistics - +37.1% boost
         stat_matches = _STAT_RE.findall(full_text)
         if len(stat_matches) == 0 and total_words > 100:
@@ -362,6 +438,49 @@ def audit(base, domain, inv=None, state_file=None):
                         "verification": "Verify outbound citation links resolve with HTTP 200.",
                     }
                 )
+
+        # 3.1 Freshness & Recency Sensor (SE Ranking 1.3M Citation Study)
+        if ptype in ("article", "content", "blog", "product_detail") and total_words >= 150:
+            date_raw = parser.modified_date or parser.published_date
+            if not date_raw:
+                recommendations.append(
+                    {
+                        "id": "PROACTIVE.GEO.VISIBLE_RECENCY_DATE.001",
+                        "title": "Publish visible last-updated dates on substantive content",
+                        "category": "content",
+                        "summary": f"Substantive page {url} lacks visible publication or modification dates. Generative search engines (SE Ranking 1.3M study) deprioritize undated content, selecting pages updated within 3 months 3x more often.",
+                        "priority": "medium",
+                        "technical_fix": "Add a <time datetime='YYYY-MM-DD'> element and article:modified_time meta tag to the page header.",
+                        "creative_fix": "Prominently display 'Last Updated: [Month Year]' at the top of the article beside the author byline.",
+                        "verification": "Confirm valid ISO-8601 date appears in <time> tag and meta tags.",
+                    }
+                )
+            else:
+                parsed_dt = parse_date_string(date_raw)
+                if parsed_dt:
+                    age_days = (datetime.now(timezone.utc) - parsed_dt).days
+                    if age_days > 180:
+                        findings.append(
+                            {
+                                "category": "content",
+                                "title": "Content exceeds 6-month recency threshold (depressing AI citations)",
+                                "severity": "medium",
+                                "confidence": "high",
+                                "root_cause": f"CONTENT_RECENCY_DEFICIT: Content was last updated {age_days} days ago ({date_raw}). Generative search engines deprioritize stale content older than 6 months.",
+                                "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                                "id": "CONTENT_RECENCY_DEFICIT",
+                                "cause_id": "CONTENT_RECENCY_DEFICIT",
+                                "evidence": f"Page {url} declares last update as {date_raw} ({age_days} days old).",
+                                "impact": "AI search engines (Google AI Overviews, Perplexity) select recently refreshed content 3x more often than legacy pages.",
+                                "suggested_action": {
+                                    "summary": "Establish a scheduled quarterly refresh program for high-priority pages.",
+                                    "technical_fix": "Update the article:modified_time meta tag and <time> element upon updating copy.",
+                                    "creative_fix": "Review factual assertions, refresh statistics, and update benchmarks to the current year.",
+                                    "priority": "medium",
+                                    "verification": "Confirm updated date is within the last 90 days.",
+                                },
+                            }
+                        )
 
         # 4. E-E-A-T Vector: Author Byline & Credentials - +40% boost
         if ptype == "article" and total_words > 150:

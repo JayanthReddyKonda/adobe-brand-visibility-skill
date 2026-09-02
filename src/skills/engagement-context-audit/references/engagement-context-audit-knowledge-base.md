@@ -204,3 +204,28 @@ Derived from `agent-friendly-pages` and web.dev criteria:
 - **`PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001` (Low Priority):**
   Triggered when content pages lack HTML5 semantic landmarks (`<main>`, `<nav>`, `<article>`).
   *Remediation:* Wrap primary article/product content in `<main>` and primary navigation in `<nav>`.
+
+
+---
+
+## 6. Search Experience Optimization (SXO) & Value-Driven CTAs (from `claude-seo/seo-sxo` & `marketingskills/cro`)
+
+### SXO Core Principle:
+A page can achieve a 95/100 technical SEO score and still fail completely in AI search and visitor retention if there is a **page-type intent mismatch**:
+- If an AI query is commercial/comparison ("Best Cloud Database for SaaS"), an informational blog post lacking comparison tables and transparent pricing will immediately bounce AI-referred users.
+- **The 5-Second Orientation Test:** A visitor arriving from an AI summary must comprehend what the product is, who it is for, and why it is uniquely relevant within 5 seconds.
+
+### Value-Driven CTAs vs. Weak Action Verbs:
+- **Weak Generic CTAs:** `Submit`, `Click Here`, `Learn More`, `Read More`, `Continue`, `Go`. (Depress conversion rates and lose intent context scent).
+- **Strong Value-Driven CTAs:** `Start Free Trial`, `See Live Pricing`, `Explore Documentation`, `Download Architecture PDF`.
+- **Formula:** `[Action Verb] + [Specific Desired Outcome/Asset]`.
+
+---
+
+## 7. Autonomous AI Buying Agent Readiness (`/pricing.md`)
+
+Autonomous AI agents (OpenAI Operator, Google Project Mariner) increasingly evaluate software and service options programmatically before human buyers ever visit the site:
+- **Opaque Pricing Failure:** If pricing is locked behind client-rendered dynamic JavaScript or a forced "Contact Sales" wall, automated agents skip the vendor and recommend competitors with machine-readable plans.
+- **Standard Machine-Readable Manifests:**
+  - `/pricing.md` or `/pricing.txt`: A structured markdown summary of tiers, monthly/annual rates, usage limits, and core features.
+  - Trivially ingestible by LLMs with zero HTML parsing or browser rendering overhead.

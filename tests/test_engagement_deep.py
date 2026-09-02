@@ -204,6 +204,62 @@ class TestEngagementDeep(unittest.TestCase):
         cause_ids = [f.get("cause_id") for f in out.get("findings", [])]
         self.assertIn("AGENT_INTERACTION_BARRIER", cause_ids)
 
+    def test_weak_cta_detection(self):
+        long_body = "Explore our cloud native solutions and distributed databases. " * 15
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": f'<html><body><h1>Cloud Platform</h1><p>{long_body}</p><button>Submit</button></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        rec_ids = [r.get("id") for r in out.get("recommendations", [])]
+        self.assertIn("PROACTIVE.ENGAGEMENT.VALUE_DRIVEN_CTA.001", rec_ids)
+
+    def test_pricing_manifest_probe(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": "<html><body><h1>TestBrand</h1><p>Pricing starts at $29/mo.</p></body></html>",
+                }
+            ],
+            "infrastructure": {
+                "pricing_manifest": {"present": True, "status": 200, "snippet": "# Pricing"}
+            },
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        obs = [o.get("observation", "") for o in out.get("observations", [])]
+        self.assertTrue(any("Found machine-readable /pricing.md manifest" in o for o in obs))
+
 
 if __name__ == "__main__":
     unittest.main()

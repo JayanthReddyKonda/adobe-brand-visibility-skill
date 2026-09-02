@@ -87,6 +87,80 @@ class TestGeoContentAudit(unittest.TestCase):
         rec_ids = [r.get("id") for r in data.get("recommendations", [])]
         self.assertIn("PROACTIVE.GEO.RAG_PASSAGE_CHUNKING.001", rec_ids)
 
+    def test_hedge_language_density_detection(self):
+        hedged_text = (
+            "Our solution maybe provides some improvements. It seems to help roughly 50 users and appears to be "
+            "fairly useful. In some ways, it could possibly improve workflow because it tends to reduce latency. "
+            "Generally, it might sort of be a bit faster than legacy tools in most cases."
+        ) * 3
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/overview",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": f"<html><body><h1>Overview</h1><p>{hedged_text}</p></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script_path,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("EXCESSIVE_HEDGE_LANGUAGE", cause_ids)
+
+    def test_content_recency_detection(self):
+        long_body = "Generative Engine Optimization evaluates passage chunking and recency signals. " * 25
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/stale-guide",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": f"<html><head><meta property='article:modified_time' content='2023-01-01T00:00:00Z'></head><body><h1>Stale Guide</h1><p>{long_body}</p></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script_path,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("CONTENT_RECENCY_DEFICIT", cause_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

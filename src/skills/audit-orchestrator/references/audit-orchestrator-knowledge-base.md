@@ -632,3 +632,63 @@ Tailor `suggested_action.technical_fix` and `creative_fix` to the detected websi
 - **Publishing & Content Portals:**
   - *Technical Fix:* Embed named author `Person` markup with credentials (`jobTitle`, `alumniOf`) and primary source citation links (DOI, academic institutions, standards bodies).
   - *Creative Fix:* Adopt the "Direct Answer Inversion" pattern: an H2 question heading followed immediately by a concise 40-60 word answer lead, followed by 100 words of mechanistic explanation.
+
+
+## 8. Scoring Model v2 & Composite GEO Score
+
+To produce a single, holistic benchmark of AI search readiness while retaining empirical rigor, the orchestrator computes the Composite GEO Score (0–100):
+
+### Mathematical Formulation:
+$$\\text{GEO Score} = (\\text{Technical} \\times 0.20) + (\\text{Citability} \\times 0.35) + (\\text{Schema} \\times 0.20) + (\\text{Brand} \\times 0.25)$$
+
+1. **Technical Accessibility (Weight: 20%):**
+   - 11-Crawler matrix access (retrieval bots weighted 2x training bots).
+   - llms.txt discovery and parseability.
+   - Clean canonical and meta tag compliance.
+2. **Content Citability (Weight: 35%):**
+   - Head-First Information Cues and 40–60 word Direct Answer Inversion leads.
+   - Quantifiable statistics and causal conjunction density (Princeton KDD 2024).
+   - Low hedge language density (< 0.5% target).
+   - Content recency (< 3 months bonus, > 6 months deficit).
+3. **Structured Data Completeness (Weight: 20%):**
+   - Machine-explicit JSON-LD schemas (`Organization`, `Product`, `Offer`, `BreadcrumbList`).
+   - Server-side rendering compliance (no client-only schema injection).
+   - Zero retired/deprecated schema types.
+4. **Brand Corroboration & Authority (Weight: 25%):**
+   - Bidirectional external sameAs linkbacks.
+   - External third-party substantiation (Wikidata, Wikipedia, LinkedIn, GitHub).
+   - First-party fact ledger consistency across all sampled routes.
+
+### Letter Grade Scale:
+- **A (85–100):** Elite AI Readiness. Fully optimized for instant multi-engine citation.
+- **B (70–84):** Good AI Readiness. Minor structural or recency optimizations needed.
+- **C (50–69):** Moderate Visibility. Notable entity or citability gaps depress selection.
+- **D (30–49):** High Risk. Severe crawl blockers or material entity ambiguity.
+- **F (0–29):** Critical Failure. Complete absence from generative search engines.
+
+---
+
+## 9. Machine-Readable `GEO-AUDIT-META` Specification
+
+For programmatic integration, CI/CD gates, and automated trend monitoring, the orchestrator embeds a machine-readable HTML comment block in the report preamble:
+
+```html
+<!-- GEO-AUDIT-META
+{
+  "version": "2.1.0",
+  "site": "https://example.com",
+  "timestamp": "2026-09-02T17:40:00Z",
+  "composite_geo_score": 78.5,
+  "letter_grade": "B",
+  "archetype": "saas_software",
+  "breakdown": {
+    "technical_accessibility": 92.0,
+    "content_citability": 68.5,
+    "structured_data": 80.0,
+    "brand_authority": 76.0
+  },
+  "critical_blockers": 0,
+  "total_findings": 3
+}
+-->
+```
