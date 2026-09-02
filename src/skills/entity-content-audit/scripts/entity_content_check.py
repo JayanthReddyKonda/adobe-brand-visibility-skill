@@ -461,6 +461,63 @@ def audit(base, domain, inv=None, state_file=None):
                             }
                         )
 
+            # 3.1 Google Deprecated Schema Check (from schema_ecommerce_validate.py)
+            deprecated_types = {
+                "vehicle": "Vehicle Listing rich result retired by Google.",
+                "vehiclelisting": "Vehicle Listing rich result retired by Google.",
+                "claimreview": "Claim Review rich result retired by Google.",
+                "estimatedsalary": "Estimated Salary rich result retired by Google.",
+                "learningvideo": "Learning Video rich result retired by Google.",
+                "specialannouncement": "Special Announcement rich result deprecated by Google.",
+            }
+            for obj in typed_objects:
+                t_raw = obj.get("@type", "")
+                types_to_check = t_raw if isinstance(t_raw, list) else [t_raw]
+                for t in types_to_check:
+                    if isinstance(t, str) and t.lower() in deprecated_types:
+                        findings.append(
+                            {
+                                "category": "schema-deprecation",
+                                "title": f"Declared Schema.org type '{t}' is retired by search engines",
+                                "severity": "medium",
+                                "confidence": "high",
+                                "root_cause": f"SCHEMA_DEPRECATION: Schema type '{t}' was retired in search engine rich results updates.",
+                                "cause_family": "ENTITY.IDENTITY",
+                                "id": "SCHEMA_DEPRECATION",
+                                "cause_id": "SCHEMA_DEPRECATION",
+                                "impact": "Search and generative AI engines ignore retired structured data types, failing to generate enhanced knowledge panel features.",
+                                "evidence": f"Page {purl} declares retired type '{t}'. {deprecated_types[t.lower()]}",
+                                "suggested_action": {
+                                    "summary": f"Migrate or remove deprecated '{t}' schema from {purl}.",
+                                    "technical_fix": f"Replace '{t}' with modern standard Schema.org types (e.g. Product, VideoObject, Organization).",
+                                    "creative_fix": "Audit structured data markup against current search documentation.",
+                                    "priority": "medium",
+                                    "verification": "Confirm Google Rich Results Test passes without deprecation warnings.",
+                                },
+                            }
+                        )
+
+            # 3.2 Merchant Listing Return & Shipping Policies Check
+            for obj in typed_objects:
+                if matches_schema_type(obj, ("product", "individualproduct")):
+                    offers = obj.get("offers", {})
+                    if isinstance(offers, dict):
+                        has_return = "hasMerchantReturnPolicy" in offers or "hasMerchantReturnPolicy" in obj
+                        has_shipping = "shippingDetails" in offers or "shippingDetails" in obj
+                        if not (has_return and has_shipping):
+                            recommendations.append(
+                                {
+                                    "id": "PROACTIVE.ENTITY.MERCHANT_RETURN_SHIPPING.001",
+                                    "title": "Add hasMerchantReturnPolicy and shippingDetails to Product Offer schema",
+                                    "category": "entity-answerability",
+                                    "summary": f"Product on {purl} declares pricing but omits merchant return policy and shipping details. Search engines and AI shopping assistants require explicit shipping and return terms for automated merchant listing eligibility.",
+                                    "priority": "low",
+                                    "technical_fix": "Add hasMerchantReturnPolicy and shippingDetails objects inside the Offer JSON-LD schema.",
+                                    "creative_fix": "Clearly state shipping timeframes and return windows in human-readable policy blocks adjacent to pricing.",
+                                    "verification": "Confirm Google Merchant Listing test recognizes valid return policy and shipping details.",
+                                }
+                            )
+
     if state_file:
         if "entities" not in state:
             state["entities"] = {}

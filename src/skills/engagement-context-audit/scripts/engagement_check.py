@@ -486,6 +486,47 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 }
             )
 
+    # 3. Agent UX & Accessibility Barrier (<div onclick> vs semantic buttons)
+    div_onclicks = len(re.findall(r"<div\b[^>]*\bonclick\s*=", html_content, re.IGNORECASE))
+    if div_onclicks >= 3:
+        findings.append(
+            {
+                "category": "engagement",
+                "title": "Interactive elements implemented as non-semantic div-onclick widgets",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "AGENT_INTERACTION_BARRIER: Interactive buttons and CTAs are rendered using <div onclick> rather than semantic <button> or <a> tags.",
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "id": "AGENT_INTERACTION_BARRIER",
+                "cause_id": "AGENT_INTERACTION_BARRIER",
+                "evidence": f"Page {url} contains {div_onclicks} non-semantic <div onclick> element(s).",
+                "impact": "Autonomous AI agents and browser automation assistants cannot discover, tab through, or trigger non-semantic onclick divs.",
+                "suggested_action": {
+                    "summary": "Replace <div onclick> elements with native <button> or <a href> tags.",
+                    "technical_fix": "Refactor interactive div handlers to semantic HTML5 <button type='button'> or <a href> elements with keyboard focusability.",
+                    "creative_fix": "Ensure all call-to-action buttons have accessible, human-readable text labels rather than icon-only divs.",
+                    "priority": "medium",
+                    "verification": "Confirm grep for '<div[^>]*onclick' returns 0 matches in HTML.",
+                },
+            }
+        )
+
+    # 4. Semantic Landmarks (<main>, <article>, <nav>)
+    has_landmarks = bool(re.search(r"<(main|article|nav|aside|header|footer)\b", html_content, re.IGNORECASE))
+    if not has_landmarks and len(" ".join(dom.body_text).split()) > 150:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001",
+                "title": "Implement HTML5 semantic landmarks (<main>, <article>, <nav>)",
+                "category": "engagement",
+                "summary": f"Page {url} lacks HTML5 semantic landmarks. AI browsing agents and screen readers use landmarks to orient and extract core content without header/footer noise.",
+                "priority": "low",
+                "technical_fix": "Wrap primary content in <main> and navigational blocks in <nav>.",
+                "creative_fix": "Organize page layout into clear hierarchical sections with distinctive headings.",
+                "verification": "Verify HTML contains <main> and <nav> landmarks.",
+            }
+        )
+
     return (
         findings,
         recommendations,

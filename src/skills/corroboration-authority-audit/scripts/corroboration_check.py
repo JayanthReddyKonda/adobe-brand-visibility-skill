@@ -43,6 +43,15 @@ class SameAsExtractor(HTMLParser):
             self.json_ld_contents.append(data.strip())
 
 
+def extract_sld(netloc: str) -> str:
+    """Extract registered domain name / SLD (e.g., 'miruro' from 'www.miruro.tv' or 'miruro.to')."""
+    clean = (netloc or "").lower().replace("www.", "")
+    parts = clean.split(".")
+    if len(parts) >= 2:
+        return parts[-2]
+    return clean
+
+
 def extract_sameas_links(html):
     """Extract sameAs URLs from JSON-LD blocks, supporting strings and @id objects."""
     parser = SameAsExtractor()
@@ -136,21 +145,106 @@ def audit(base, domain, inv=None, state_file=None):
         )
         return {"status": "ok", "findings": findings, "recommendations": recommendations, "observations": observations}
 
+    # 3.1 Classify sameAs URLs: Separate internal mirror domain clusters from genuine external authorities
+    target_sld = extract_sld(domain)
+    target_clean = domain.lower().replace("www.", "")
+    mirror_domains = []
+    external_authorities = []
+
+    for u in sameas_urls:
+        u_netloc = urlparse(u).netloc.lower()
+        if not u_netloc:
+            continue
+        u_clean = u_netloc.replace("www.", "")
+        u_sld = extract_sld(u_netloc)
+        if u_sld == target_sld and u_clean != target_clean:
+            mirror_domains.append(u)
+        elif not u.startswith(base):
+            external_authorities.append(u)
+
+    # If sameAs contains 2+ self-referential mirror domains, flag CIRCULAR_SAMEAS_SELF_REFERENCE
+    if len(mirror_domains) >= 2:
+        findings.append(
+            {
+                "title": "Inverted sameAs links point to internal mirror domain cluster",
+                "severity": "high",
+                "category": "corroboration",
+                "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+                "id": "CIRCULAR_SAMEAS_SELF_REFERENCE",
+                "cause_id": "CIRCULAR_SAMEAS_SELF_REFERENCE",
+                "root_cause": f"The Organization schema points sameAs properties to alternate domain mirrors ({', '.join(mirror_domains[:4])}) rather than independent third-party knowledge graph entities (Wikidata, Wikipedia, Crunchbase), causing entity fragmentation and trust dilution in AI search engines.",
+                "confidence": "high",
+                "evidence": f"Declared sameAs array contains {len(mirror_domains)} mirror domain(s) sharing the root SLD '{target_sld}': {', '.join(mirror_domains[:5])}.",
+                "suggested_action": {
+                    "summary": "Remove alternate mirror domain URLs from sameAs and link to verified external knowledge graph entities.",
+                    "priority": "high",
+                    "technical_fix": "Remove self-referential mirror domains from the Organization sameAs array in JSON-LD. Reserve sameAs strictly for verified external third-party profiles (Wikidata, Wikipedia, verified social channels).",
+                    "creative_fix": "Establish an official verification page or press kit rather than linking mirror domains inside structured data.",
+                    "verification": "Confirm all sameAs links resolve to independent third-party platforms with matching brand attribution.",
+                },
+            }
+        )
+
+    # 3.2 Check for Tier-1 Knowledge Graph anchors (Wikidata, Wikipedia, Crunchbase)
+    has_tier1 = any(
+        any(td in u.lower() for td in ["wikidata.org", "wikipedia.org", "crunchbase.com"]) for u in sameas_urls
+    )
+    if not has_tier1:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.AUTHORITY.KNOWLEDGE_GRAPH_ANCHOR.001",
+                "title": "Establish an authoritative third-party Knowledge Graph entity (Wikidata / Wikipedia)",
+                "category": "corroboration",
+                "summary": f"Brand '{brand_name or domain}' has no declared Wikidata or Wikipedia entity link in sameAs. Establishing an independent knowledge graph entity anchors the brand into LLM pre-training corpora and RAG indexers.",
+                "priority": "low",
+                "technical_fix": "Register the brand entity on Wikidata (obtaining a QID) and include the permanent Wikidata URI in the Organization sameAs array.",
+                "creative_fix": "Document corporate milestones, executive leadership, and primary offerings in public registries to substantiate independent notability.",
+                "verification": "Verify that sameAs includes a valid https://www.wikidata.org/wiki/Q... URI.",
+            }
+        )
+
+    # 3.3 Check for High-Correlation AI Citation Channels (YouTube: 0.737 correlation, Reddit)
+    has_youtube = any("youtube.com" in u.lower() or "youtu.be" in u.lower() for u in sameas_urls)
+    if not has_youtube:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.AUTHORITY.YOUTUBE_PRESENCE.001",
+                "title": "Establish an official YouTube video authority channel",
+                "category": "corroboration",
+                "summary": f"Brand '{brand_name or domain}' has no declared YouTube channel in sameAs. Empirical studies reveal YouTube brand mentions correlate most strongly (~0.737) with generative AI citations, outperforming backlinks 3:1.",
+                "priority": "low",
+                "technical_fix": "Add official YouTube channel URL to Organization sameAs in JSON-LD.",
+                "creative_fix": "Publish educational, tutorial, and demonstration video assets with structured chapters and accurate transcripts.",
+                "verification": "Verify YouTube URL is present in sameAs and resolves with HTTP 200.",
+            }
+        )
+
+    has_reddit = any("reddit.com" in u.lower() for u in sameas_urls)
+    if not has_reddit:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.AUTHORITY.COMMUNITY_DISCUSSION.001",
+                "title": "Build organic community footprint in relevant discussion forums (Reddit)",
+                "category": "corroboration",
+                "summary": f"Brand '{brand_name or domain}' has no community discussion anchors. AI models (ChatGPT Search, Perplexity) frequently retrieve and synthesize consensus from active Reddit and forum discussions.",
+                "priority": "low",
+                "technical_fix": "Include verified community discussion or support profile links in sameAs where applicable.",
+                "creative_fix": "Participate authentically in category subreddits with transparent product expertise and helpful solutions.",
+                "verification": "Verify community URLs resolve with HTTP 200.",
+            }
+        )
+
     checked = []
     broken = []
 
-    for u in sameas_urls[:5]:
-        if u.startswith(base):
-            continue
-
+    # Probe external authorities (excluding internal mirror domains)
+    for u in external_authorities[:5]:
         checked.append(u)
         status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512 * 1024, method="GET")
         if status != 200:
             broken.append(f"{u} (HTTP {status})")
 
         elif brand_name and ext_html:
-            # Bounded Claim Corroboration: Does the external authority corroborate the identity claim?
-            # We specifically look for the brand name in the external page's <title> or <meta property="og:site_name">
             ext_title = ""
             ext_title_match = re.search(r"<title>(.*?)</title>", ext_html, re.IGNORECASE)
             if ext_title_match:

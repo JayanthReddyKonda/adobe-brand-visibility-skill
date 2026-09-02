@@ -190,6 +190,40 @@ class TestCorroborationDeep(unittest.TestCase):
         )
         self.assertEqual(res.returncode, 0)
 
+    def test_circular_sameas_mirror_cluster_detection(self):
+        inv_data = {
+            "site": "https://testbrand.tv",
+            "pages": [
+                {
+                    "url": "https://testbrand.tv/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><title>TestBrand</title><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://testbrand.to", "https://testbrand.bz", "https://testbrand.ru", "https://testbrand.com"]}</script></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.tv",
+                "--inventory",
+                self.test_inv,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in out.get("findings", [])]
+        self.assertIn("CIRCULAR_SAMEAS_SELF_REFERENCE", cause_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

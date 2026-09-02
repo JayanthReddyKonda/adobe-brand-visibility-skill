@@ -90,9 +90,12 @@ AUDIT TAXONOMY
 │
 ├── AUTHORITY
 │   ├── IDENTITY_CORROBORATION
-│   │   └── BROKEN_AUTHORITY_ANCHOR         (Declared sameAs profile URL returns 4xx/5xx HTTP error)
-│   └── CLAIM_CORROBORATION
-│       └── CLAIM_CORROBORATION_GAP         (Material factual assertions lack external verification)
+│   │   ├── BROKEN_AUTHORITY_ANCHOR         (Declared sameAs profile URL returns 4xx/5xx HTTP error)
+│   │   └── CIRCULAR_SAMEAS_SELF_REFERENCE  (sameAs points to alternate mirror domains rather than 3rd-party knowledge graph)
+│   ├── CLAIM_CORROBORATION
+│   │   └── CLAIM_CORROBORATION_GAP         (Material factual assertions lack external verification)
+│   └── PROVENANCE_AND_RIGHTS
+│       └── UNVERIFIED_CONTENT_RIGHTS       (Media/streaming/catalog lacks machine-verifiable licensing disclosures)
 │
 ├── EXPERIENCE
 │   └── CONTINUITY
@@ -607,3 +610,25 @@ Heuristics (like counting `<table>` tags or measuring keyword density) may be us
 
 ## 5. Output Delivery Mandate (Output Standard)
 The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+
+## 6. Query-Intent Scenario Modeling
+When authoring `root_cause` and `impact` for findings, articulate the specific query mode failure in conversational AI search engines:
+1. **Navigational / Brand Query ("What is [Brand]?"):**
+   - Explain why the LLM fails to recognize the brand, hallucinates facts, or refuses attribution (e.g., lack of Wikidata entity, circular sameAs mirror networks, ambiguous Organization schema).
+2. **Categorical / Discovery Query ("Where can I buy/stream/find [Topic]?"):**
+   - Explain why the LLM selects competitors over this domain (e.g., competitors have verified licensing disclosures, structured Product/Offer/VideoObject schemas, and modular 120-180 word RAG passage chunks with high causal depth).
+
+## 7. Domain-Specific Remediation Catalog
+Tailor `suggested_action.technical_fix` and `creative_fix` to the detected website archetype:
+- **Media & Streaming Services:**
+  - *Technical Fix:* Implement structured `TVSeries`, `TVEpisode`, or `VideoObject` with licensed stream descriptors, canonical media IDs, and rich server-rendered HTML descriptions.
+  - *Creative Fix:* Add original editorial overviews, episode guides, and thematic synopses using explanatory conjunctions (because, enables, features).
+- **SaaS & Cloud Software:**
+  - *Technical Fix:* Expose transparent pricing matrices with structured `OfferCatalog`, semantic comparison `<table>` elements, and developer API documentation.
+  - *Creative Fix:* Detail technical specifications, integration workflows, and quantifiable benchmark statistics (percentage latency reductions, throughput metrics).
+- **E-Commerce & Commercial Retail:**
+  - *Technical Fix:* Complete all material attributes (`price`, `priceCurrency`, `availability`, `itemCondition`, `returnPolicy`) within JSON-LD `Product` and `Offer` graphs.
+  - *Creative Fix:* Provide transparent pricing terms, exact billing cadences, and scannable feature lists.
+- **Publishing & Content Portals:**
+  - *Technical Fix:* Embed named author `Person` markup with credentials (`jobTitle`, `alumniOf`) and primary source citation links (DOI, academic institutions, standards bodies).
+  - *Creative Fix:* Adopt the "Direct Answer Inversion" pattern: an H2 question heading followed immediately by a concise 40-60 word answer lead, followed by 100 words of mechanistic explanation.

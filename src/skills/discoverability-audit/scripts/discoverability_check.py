@@ -21,7 +21,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_check_status, safe_fetch
+from safe_fetch import safe_fetch
 
 AI_BOTS = [
     "OAI-SearchBot",
@@ -588,16 +588,35 @@ def audit(base, domain, inv=None, state_file=None):
             )
 
     # 4. Proactive /llms.txt content manifest discovery
-    if inv is None:
-        llms_status = safe_check_status(f"{base}/llms.txt", timeout=5)
-        if llms_status == 404:
-            observations.append(
-                {
-                    "observation": "No /llms.txt standard manifest found.",
-                    "impact": "While not required for AI Overviews, providing an /llms.txt file gives AI research agents a clean, curated summary of brand facts without HTML parsing friction.",
-                    "role": "informational",
-                }
-            )
+    llms_info = inv.get("infrastructure", {}).get("llms_txt") if inv else None
+    llms_present = False
+    if llms_info:
+        llms_present = llms_info.get("present", False)
+    else:
+        status, l_body, _, _ = safe_fetch(f"{base}/llms.txt", timeout=5, max_bytes=512 * 1024)
+        llms_present = (status == 200 and bool(l_body))
+
+    if llms_present:
+        observations.append(
+            {
+                "observation": "Found valid /llms.txt content manifest.",
+                "impact": "Clean markdown manifest facilitates direct LLM agent ingestion.",
+                "role": "discovery",
+            }
+        )
+    else:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.DISCOVERY.LLMS_TXT.001",
+                "title": "Publish an /llms.txt markdown index for AI agents",
+                "category": "discoverability",
+                "summary": "The website does not publish an /llms.txt file. Modern generative search systems (ChatGPT, Perplexity, Claude) and agentic web workers prioritize /llms.txt to ingest clean, hierarchical markdown summaries without HTML parsing overhead.",
+                "priority": "low",
+                "technical_fix": "Publish an /llms.txt file at the root of the domain linking to key markdown documentation and product pages.",
+                "creative_fix": "Write clear 1-line descriptions for each section in /llms.txt explaining the primary problem it solves.",
+                "verification": f"Verify {base}/llms.txt returns HTTP 200 with text/plain or text/markdown content.",
+            }
+        )
 
     if state_file:
         import tempfile as _tf

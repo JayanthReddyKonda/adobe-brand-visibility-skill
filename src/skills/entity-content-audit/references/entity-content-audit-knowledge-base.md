@@ -270,6 +270,24 @@ Embed this on product detail pages to satisfy all commercial AI shopping agents:
     "priceCurrency": "USD",
     "priceValidUntil": "2027-12-31",
     "availability": "https://schema.org/InStock",
+    "hasMerchantReturnPolicy": {
+      "@type": "MerchantReturnPolicy",
+      "applicableCountry": "US",
+      "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+      "merchantReturnDays": 30
+    },
+    "shippingDetails": {
+      "@type": "OfferShippingDetails",
+      "shippingDestination": {
+        "@type": "DefinedRegion",
+        "addressCountry": "US"
+      },
+      "deliveryTime": {
+        "@type": "ShippingDeliveryTime",
+        "handlingTime": { "@type": "QuantitativeValue", "minValue": 0, "maxValue": 1, "unitCode": "DAY" },
+        "transitTime": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 3, "unitCode": "DAY" }
+      }
+    },
     "seller": {
       "@id": "https://example.com/#organization"
     }
@@ -277,3 +295,22 @@ Embed this on product detail pages to satisfy all commercial AI shopping agents:
 }
 </script>
 ```
+
+---
+
+## 3. Google 2025/2026 Merchant Listing & Schema Deprecation Rules
+
+Derived from Google Search Merchant Listing documentation and `schema_ecommerce_validate.py`:
+
+### Retired / Deprecated Schema Types (Emit Finding `SCHEMA_DEPRECATION`):
+- `Vehicle` / `VehicleListing` (retired June 2025)
+- `ClaimReview` (retired June 2025)
+- `EstimatedSalary` (retired June 2025)
+- `LearningVideo` (retired June 2025)
+- `SpecialAnnouncement` (deprecated July 2025)
+
+### Merchant Listing Minimum Property Groups:
+- **Mandatory Minimum:** `name` + `image` + `offers`
+- **Offer Type Constraint:** `offers.@type` must be `Offer` (never `AggregateOffer` on specific SKU pages)
+- **Essential Attributes:** `price`, `priceCurrency`, `availability`
+- **Trust Policies:** `hasMerchantReturnPolicy` (return windows and conditions) and `shippingDetails` (transit times and regional delivery rates) are essential for automated shopping inclusion by generative search engines.

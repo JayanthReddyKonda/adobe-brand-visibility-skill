@@ -185,3 +185,22 @@ Specialized landing routes must immediately satisfy the intent implied by their 
 
 - **Pricing Route (`/pricing`, `/plans`):** Must display transparent numerical prices, starting price figures, tier names, or plan breakdown tables above the fold. Omitting price figures triggers `INTENT_TO_LANDING_MISMATCH` (Severity: `medium`).
 - **Product Route (`/product/*`, `/shop/*`):** Must present the product name, primary specification, availability state, and purchase/inquiry CTA.
+
+---
+
+## 5. Agent UX & Accessibility Architecture (AI Browsing Readiness)
+
+Derived from `agent-friendly-pages` and web.dev criteria:
+
+### The Three AI Agent Interaction Channels:
+1. **Accessibility Tree Quality:** Clean semantic roles (`button`, `link`, `heading`, `main`).
+2. **Raw HTML Semantics:** Real `<button type="button">` and `<a href="...">` vs non-semantic `<div onclick>` / `<span onclick>` widgets.
+3. **Interactive Element Discoverability:** Distinct visible text labels and accessible ARIA attributes.
+
+### Defect Taxonomy:
+- **`AGENT_INTERACTION_BARRIER` (Medium Severity):**
+  Triggered when interactive conversion buttons or navigation triggers are implemented using `<div onclick>` or `<span onclick>` without semantic elements. Autonomous AI browsing agents (e.g. OpenAI Operator, Claude Computer Use) cannot discover or trigger non-semantic onclick divs.
+  *Remediation:* Refactor to semantic HTML5 `<button type="button">` or `<a href="...">` elements.
+- **`PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001` (Low Priority):**
+  Triggered when content pages lack HTML5 semantic landmarks (`<main>`, `<nav>`, `<article>`).
+  *Remediation:* Wrap primary article/product content in `<main>` and primary navigation in `<nav>`.

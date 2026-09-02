@@ -197,3 +197,33 @@ Independent empirical studies reveal that traditional Domain Rating (DR/backlink
 - Reddit Community Discussions: High correlation
 - Wikipedia / Wikidata Entity: High correlation
 - Traditional Domain Backlinks: ~0.266 correlation (Weak)
+
+---
+
+## 4. Role-Augmented Intent-Driven GEO (RAID G-SEO Research, arXiv:2508.11158v2)
+
+Recent state-of-the-art research demonstrates that static keyword optimization and single-perspective rewriting fail in Generative Search Engines (GSE - Perplexity, ChatGPT Search, BingChat) because user queries are hidden in a black box. RAID G-SEO establishes an intent-aware optimization pathway:
+
+### 1. The 4-Stage Optimization Pipeline
+1. **Content Summarization:** Distill the source content's core informational essence, eliminating stylistic noise and filler.
+2. **Intent Inference via 4W Multi-Role Deep Reflection:**
+   - **Who:** Identifies 1–3 representative user roles likely to seek this content (e.g. Knowledge Producers, Civic Everyday Actors, Economic Decision Makers).
+   - **What:** Models role-specific information needs and domain knowledge expectations.
+   - **Why:** Diagnoses semantic gaps between original content expression and user intent needs.
+   - **How:** Reconstructs and generalizes the intent to cover broad retrieval variations without overfitting.
+3. **Step Planning:** Decomposes generalized intent into actionable revisions (restructuring, head-first cue placement, technical enrichment).
+4. **Intent-Aligned Content Rewriting:** Synthesizes optimized passages preserving factual integrity while maximizing relevance to diverse retrieval scenarios.
+
+### 2. The Head-First Information Cue Principle
+RAID G-SEO proves that front-loading key factual definitions, specifications, or answers into the introductory sentence ("head-first cues") significantly elevates citation frequency and positional prominence in AI answers, outperforming traditional linear or chronological exposition.
+
+### 3. G-EVAL 2.0 Multi-Dimensional Evaluation Rubric
+AI content visibility is measured across seven fine-grained dimensions (0–5 scale):
+- **Relevance:** Direct topical pertinence to the retrieval query.
+- **Fluency:** Grammatical coherence and natural phrasing.
+- **Uniqueness:** Distinctive domain-specific vocabulary and differentiated perspective.
+- **Diversity:** Multi-angle coverage addressing diverse sub-questions.
+- **Click-Follow Likelihood:** Persuasiveness and intent satisfaction prompting citation clicks.
+- **Subjective Positional Prominence:** Early placement in synthesized AI answer text.
+- **Subjective Content Volume:** Share of voice within the generated response.
+

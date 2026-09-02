@@ -52,6 +52,41 @@ class TestGeoContentAudit(unittest.TestCase):
         data = json.loads(res.stdout)
         self.assertEqual(data["status"], "ok")
 
+    def test_geo_rag_passage_chunking_recommendation(self):
+        long_body = "TestBrand provides comprehensive solutions for distributed systems and enterprise infrastructure. " * 20
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/overview",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": f"<html><body><p>{long_body}</p></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script_path,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        rec_ids = [r.get("id") for r in data.get("recommendations", [])]
+        self.assertIn("PROACTIVE.GEO.RAG_PASSAGE_CHUNKING.001", rec_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

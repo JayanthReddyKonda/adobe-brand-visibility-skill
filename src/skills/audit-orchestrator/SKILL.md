@@ -188,18 +188,27 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py \
 Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over all 6 outputs:
 
 1. **Deduplicate:** Merge findings that share the same `cause_id` across multiple specialists into a single authoritative finding. Elevate severity to the highest observed.
-2. **Root-Cause Map:** Assign each finding a `cause_id` from the canonical taxonomy (e.g. `AI_RETRIEVAL_BLOCKED`, `MATERIAL_ENTITY_AMBIGUITY`, `FIRST_PARTY_FACT_CONFLICT`). Every finding MUST have a `cause_id`.
+2. **Root-Cause Map:** Assign each finding a `cause_id` from the canonical taxonomy (e.g. `AI_RETRIEVAL_BLOCKED`, `MATERIAL_ENTITY_AMBIGUITY`, `FIRST_PARTY_FACT_CONFLICT`, `CIRCULAR_SAMEAS_SELF_REFERENCE`). Every finding MUST have a `cause_id`.
 3. **Confidence Calibration:** Apply the confidence model — a single homepage cannot produce `high` confidence for site-wide claims.
-4. **Dual-Track Remediation:** For every finding, write a `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers) AND a `verification` step. Use the remediation catalog in the knowledge base as your reference.
-5. **Proactive Recommendations:** Add recommendations for issues that are not defects but would improve AI citability (e.g. adding causal conjunctions to improve GEO score).
+4. **Dual-Track Remediation (Domain-Aware):** For every finding, write a `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers) AND a `verification` step. Tailor fixes to the detected website archetype (Media/Streaming, SaaS/Software, E-Commerce, or Publishing) using Knowledge Base Section 7.
+5. **Query-Intent Scenario Modeling:** In each finding's `impact`, clearly contrast how the defect impairs both:
+   - **Navigational Brand Queries** (e.g., *"What is [Brand]?"* — entity resolution failure, hallucination, lack of knowledge graph anchor).
+   - **Categorical / Discovery Queries** (e.g., *"Where can I buy/stream/find [Topic]?"* — competitor selection due to superior schema attributes, licensing provenance, or causal depth).
+6. **Proactive Recommendations:** Add recommendations that genuinely strengthen AI discoverability beyond defects (e.g., modular 120-180 word RAG passage chunking with direct answer leads, Wikidata entity registration, or JSON-LD structured consolidation).
+7. **Platform-Specific Citation Breakdown:** In your reasoning and executive summary, contrast visibility across the Big 3 Generative Engines:
+   - **Google AI Overviews (Gemini):** Traditional SEO gateway (top 10 correlation), table extractability, direct 40–60 word answer leads, and query fan-out topical clusters.
+   - **ChatGPT Search (Bing):** Wikipedia/Wikidata entity grounding (47.9% share), comprehensive 2000+ word deep guides, and autonomous buying agent manifests (`/pricing.md`).
+   - **Perplexity AI:** Community consensus validation (Reddit 46.7%), recency (<3 months 3x boost), and multi-source corroboration.
 
-**Step 11: Compute Composite Metrics**
+**Step 11: Calculate Summary Metrics & Scoring Model**
 
-Calculate the following and include in `summary`:
-- `answerability_index`: Fraction of audited product/pricing pages with complete `price`, `availability`, and `description` attributes (0.0–1.0).
-- `geo_readiness_score`: Average causal depth score across article/product pages (0.0–1.0).
-- `contradiction_index`: Number of verified cross-page factual conflicts found.
-- `overall_health`: `"critical"` if any critical findings exist, `"needs_work"` if any high/medium, `"good"` if only low/proactive.
+1. Calculate and populate the exact integer counts for `summary`:
+   - `total_findings`, `critical`, `high`, `medium`, and `low` strictly conforming to `references/report-schema.json`.
+2. Compute the **Scoring Model Composite GEO Score** (0–100) using Knowledge Base Section 8:
+   - Technical Accessibility (20%), Content Citability (35%), Structured Data (20%), and Brand Signals (25%).
+   - Apply Business Type Multipliers (SaaS, E-Commerce, Publisher, Local, Agency).
+   - Assign the Letter Grade: **A** (85–100), **B** (70–84), **C** (50–69), **D** (30–49), **F** (0–29).
+3. Serialize the machine-readable `<!-- GEO-AUDIT-META ... -->` block in your report's executive summary to support automated monitoring and delta comparison.
 
 ---
 

@@ -102,6 +102,32 @@ class TestEntityContentAudit(unittest.TestCase):
         data = json.loads(res.stdout)
         self.assertEqual(data["status"], "ok")
 
+    def test_deprecated_schema_detection(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/listing",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "product",
+                    "html": '<html><head><title>Vehicle</title><script type="application/ld+json">{"@context": "https://schema.org", "@type": "VehicleListing", "name": "Used Sedan"}</script></head><body><h1>Used Sedan</h1></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("SCHEMA_DEPRECATION", cause_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

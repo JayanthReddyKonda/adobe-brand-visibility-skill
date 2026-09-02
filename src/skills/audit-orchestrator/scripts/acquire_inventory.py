@@ -276,6 +276,14 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     inv["robots"] = {"status": r_status, "text": robots_txt if r_status == 200 else None}
     inv["infrastructure"]["robots"] = inv["robots"]
 
+    # 2.1 llms.txt Discovery
+    ll_status, llms_txt, _, _ = safe_fetch(base_url + "/llms.txt", timeout=5, max_bytes=512 * 1024)
+    inv["infrastructure"]["llms_txt"] = {
+        "status": ll_status,
+        "present": (ll_status == 200 and bool(llms_txt)),
+        "snippet": (llms_txt[:400] if ll_status == 200 and llms_txt else None),
+    }
+
     sitemap_candidates = []
     if robots_txt and r_status == 200:
         sitemap_candidates = [

@@ -178,6 +178,32 @@ class TestEngagementDeep(unittest.TestCase):
         )
         self.assertEqual(res.returncode, 0)
 
+    def test_agent_interaction_barrier_div_onclick(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/portal",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "product_detail",
+                    "html": '<html><body><h1>TestBrand</h1><div onclick="checkout()">Buy</div><div onclick="pay()">Pay</div><div onclick="submit()">Submit</div></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in out.get("findings", [])]
+        self.assertIn("AGENT_INTERACTION_BARRIER", cause_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

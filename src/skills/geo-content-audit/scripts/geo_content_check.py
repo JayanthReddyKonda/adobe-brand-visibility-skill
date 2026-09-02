@@ -161,6 +161,79 @@ def _word_count(text: str) -> int:
     return len(_WORD_RE.findall(text))
 
 
+def score_passage_citability(text: str, headings: list) -> dict:
+    """Score passage citability (0-100) based on optimal passage length (134-167 words),
+
+    definition patterns, direct answers, clarity, and statistics.
+    Derived from empirical Generative Engine Optimization research (Wu et al. / CMU AutoGEO).
+    """
+    words = re.findall(r"\b\w+\b", text)
+    word_count = len(words)
+    if word_count == 0:
+        return {"total": 0, "breakdown": {}}
+
+    # 1. Answer Block Quality (max 30 pts)
+    abq = 0
+    definition_patterns = [
+        r"\b\w+\s+is\s+(?:a|an|the)\s",
+        r"\b\w+\s+refers?\s+to\s",
+        r"\b\w+\s+means?\s",
+        r"\b\w+\s+(?:can be|are)?\s*defined\s+as\s",
+    ]
+    if any(re.search(p, text, re.IGNORECASE) for p in definition_patterns):
+        abq += 15
+
+    first_60 = " ".join(words[:60])
+    if any(
+        re.search(p, first_60, re.IGNORECASE)
+        for p in [r"\b(is|are|was|were|means|refers|provides|enables)\b", r"\d+%", r"\$\d+"]
+    ):
+        abq += 10
+
+    if any(h.strip().endswith("?") or QUESTION_RE.search(h.strip()) for h in headings):
+        abq += 5
+
+    # 2. Self-Containment & Optimal Length (max 25 pts)
+    sc = 0
+    if 134 <= word_count <= 167:
+        sc += 15
+    elif 100 <= word_count <= 250:
+        sc += 10
+    elif word_count > 60:
+        sc += 5
+
+    pronouns = re.findall(r"\b(it|they|them|he|she|this|these|those)\b", text.lower())
+    if word_count > 0 and (len(pronouns) / word_count) <= 0.03:
+        sc += 10
+
+    # 3. Structural Readability (max 20 pts)
+    sr = 0
+    sentences = re.split(r"[.!?]+", text)
+    clear_sentences = sum(1 for s in sentences if 5 <= len(s.split()) <= 25)
+    if sentences and (clear_sentences / max(len(sentences), 1)) >= 0.6:
+        sr += 10
+    if len(headings) >= 1:
+        sr += 10
+
+    # 4. Statistical Density (max 15 pts)
+    stats_matches = len(_STAT_RE.findall(text))
+    sd = min(stats_matches * 5, 15)
+
+    # 5. Lexical & Information Uniqueness (max 10 pts)
+    entropy = compute_passage_entropy(text)
+    uq = 10 if entropy >= 4.2 else (5 if entropy >= 3.5 else 0)
+
+    total = min(abq + sc + sr + sd + uq, 100)
+    return {
+        "total": total,
+        "answer_block_quality": min(abq, 30),
+        "self_containment": min(sc, 25),
+        "structural_readability": min(sr, 20),
+        "statistical_density": sd,
+        "uniqueness_signals": uq,
+    }
+
+
 def audit(base, domain, inv=None, state_file=None):
     findings = []
     recommendations = []
@@ -174,6 +247,7 @@ def audit(base, domain, inv=None, state_file=None):
         return {"status": "inconclusive", "findings": [], "recommendations": []}
 
     target_pages = [p for p in html_pages if p.get("page_type") in ("product_detail", "article", "pricing", "about")]
+    page_citability_map = {}
 
     for p in target_pages:
         url = p.get("url")
@@ -223,6 +297,32 @@ def audit(base, domain, inv=None, state_file=None):
                         "creative_fix": "Rewrite product descriptions to use causal conjunctions ('because', 'due to', 'enables').",
                         "priority": "medium",
                         "verification": "Scan text for causal depth markers and ensure depth score >= 3.",
+                    },
+                }
+            )
+
+        citability = score_passage_citability(full_text, parser.headings)
+        page_citability_map[url] = citability
+
+        if depth_score >= 2 and citability["total"] < 35 and total_words >= 120:
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Substantive page has low passage citability score",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": "LOW_CITABILITY_SCORE: Page lacks structured answer blocks, self-contained passage chunks (134-167w), and direct definition leads, reducing LLM extraction probability.",
+                    "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                    "id": "LOW_CITABILITY_SCORE",
+                    "cause_id": "LOW_CITABILITY_SCORE",
+                    "evidence": f"Page {url} achieved a citability score of {citability['total']}/100 (Answer Block Quality: {citability['answer_block_quality']}/30, Self-Containment: {citability['self_containment']}/25).",
+                    "impact": "Generative engines (Perplexity, ChatGPT Search) downrank the page in passage retrieval because it lacks extractable 134-167 word answer blocks.",
+                    "suggested_action": {
+                        "summary": "Structure content under question headings with 40-60 word direct answers and self-contained 134-167 word passage chunks.",
+                        "technical_fix": "Format key sections under <h2> question headings with an immediate direct answer in the first sentence.",
+                        "creative_fix": "Adopt the Direct Answer Inversion pattern: state what the entity/topic is, why it matters, and concrete statistics in the lead paragraph.",
+                        "priority": "medium",
+                        "verification": "Re-run citability scorer and confirm score >= 60/100.",
                     },
                 }
             )
@@ -329,7 +429,38 @@ def audit(base, domain, inv=None, state_file=None):
                     }
                 )
 
-    return {"status": "ok", "findings": findings, "recommendations": recommendations, "observations": observations}
+        # 9. RAG Passage Chunk Architecture Vector (120-180 words per modular section)
+        if ptype in ("article", "product_detail", "other") and total_words >= 150:
+            avg_words_per_heading = total_words / max(len(parser.headings), 1)
+            if avg_words_per_heading > 300 or len(parser.headings) == 0:
+                recommendations.append(
+                    {
+                        "id": "PROACTIVE.GEO.RAG_PASSAGE_CHUNKING.001",
+                        "title": "Format informational content into modular 120-180 word RAG passage chunks",
+                        "category": "content",
+                        "summary": f"Page {url} has long unstructured text blocks (avg {avg_words_per_heading:.0f} words/heading). AI search systems (Perplexity, ChatGPT Search) retrieve text in 120-180 word passage chunks. Formatting content under question headings with 40-60 word direct answers maximizes retrieval relevance.",
+                        "priority": "low",
+                        "technical_fix": "Structure long body copy into discrete semantic <section> blocks under <h2>/<h3> headings, keeping each section between 120 and 180 words.",
+                        "creative_fix": "Place an immediate direct answer in the first sentence after each heading before expanding into technical nuances.",
+                        "verification": "Confirm headings divide body text into modular 120-180 word sections.",
+                    }
+                )
+
+    avg_cit = (
+        round(sum(c["total"] for c in page_citability_map.values()) / max(len(page_citability_map), 1), 1)
+        if page_citability_map
+        else 0.0
+    )
+    return {
+        "status": "ok",
+        "findings": findings,
+        "recommendations": recommendations,
+        "observations": observations,
+        "coverage": {
+            "target_pages_evaluated": len(target_pages),
+            "average_citability_score": avg_cit,
+        },
+    }
 
 
 def main():
