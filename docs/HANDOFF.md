@@ -54,7 +54,7 @@ All modules, knowledge bases, schemas, and test suites conform to:
    - Strict `additionalProperties: false` — no extra fields silently pass.
 
 7. **Comprehensive Automated Test Suite:**
-   - **59 unit tests across 17 test files** covering security, extraction accuracy, multi-currency, GEO vectors, and schema validation.
+   - **65 unit tests across 18 test files** covering security, extraction accuracy, multi-currency, Microdata/RDFa, Shannon entropy, GEO vectors, and schema validation.
    - 100% clean passes under Ruff, Flake8, MyPy, and Pytest.
 
 ---

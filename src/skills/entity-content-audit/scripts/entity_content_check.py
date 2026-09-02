@@ -16,6 +16,7 @@ Enforces strict Resource Invariant:
 import argparse
 import json
 import os
+import re
 import sys
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -163,8 +164,61 @@ def matches_schema_type(entity, target_types):
     return bool(types.intersection({t.lower() for t in target_types}))
 
 
-def parse_json_ld(raw_json_list):
-    """Extract Schema.org typed objects and resolve decoupled @graph node references (@id linking)."""
+def extract_microdata_and_rdfa(html_str: str) -> list:
+    """Extract inline HTML Microdata (itemscope/itemtype/itemprop) and RDFa (typeof/property)."""
+    entities: list[dict] = []
+    if not html_str:
+        return entities
+
+    # 1. Microdata scopes
+    scope_pattern = re.compile(
+        r"<([a-zA-Z0-9]+)[^>]*?\bitemscope\b[^>]*?\bitemtype=['\"]https?://schema\.org/([a-zA-Z0-9_]+)['\"][^>]*>(.*?)</\1>",
+        re.DOTALL | re.IGNORECASE,
+    )
+    for match in scope_pattern.finditer(html_str):
+        etype = match.group(2)
+        inner = match.group(3)
+        props = {}
+        prop_pattern = re.compile(
+            r"<[^>]*?\bitemprop=['\"]([a-zA-Z0-9_]+)['\"][^>]*?(?:content=['\"]([^'\"]+)['\"]|value=['\"]([^'\"]+)['\"]|>([^<]+)<)",
+            re.IGNORECASE,
+        )
+        for pm in prop_pattern.finditer(inner):
+            pname = pm.group(1)
+            val = pm.group(2) or pm.group(3) or (pm.group(4).strip() if pm.group(4) else "")
+            if val:
+                props[pname] = val
+        ent = {"@context": "https://schema.org", "@type": etype}
+        ent.update(props)
+        entities.append(ent)
+
+    # 2. RDFa typeof scopes
+    rdfa_pattern = re.compile(
+        r"<([a-zA-Z0-9]+)[^>]*?\btypeof=['\"](?:schema:)?([a-zA-Z0-9_]+)['\"][^>]*>(.*?)</\1>",
+        re.DOTALL | re.IGNORECASE,
+    )
+    for match in rdfa_pattern.finditer(html_str):
+        etype = match.group(2)
+        inner = match.group(3)
+        props = {}
+        prop_pattern = re.compile(
+            r"<[^>]*?\bproperty=['\"](?:schema:)?([a-zA-Z0-9_]+)['\"][^>]*?(?:content=['\"]([^'\"]+)['\"]|>([^<]+)<)",
+            re.IGNORECASE,
+        )
+        for pm in prop_pattern.finditer(inner):
+            pname = pm.group(1)
+            val = pm.group(2) or (pm.group(3).strip() if pm.group(3) else "")
+            if val:
+                props[pname] = val
+        ent = {"@context": "https://schema.org", "@type": etype}
+        ent.update(props)
+        entities.append(ent)
+
+    return entities
+
+
+def parse_json_ld(raw_json_list, raw_html=""):
+    """Extract Schema.org typed objects from JSON-LD, Microdata, and RDFa with decoupled @graph resolution."""
     raw_objects = []
     for raw in raw_json_list:
         try:
@@ -177,6 +231,9 @@ def parse_json_ld(raw_json_list):
                     raw_objects.append(item)
         except Exception:
             pass
+
+    if raw_html:
+        raw_objects.extend(extract_microdata_and_rdfa(raw_html))
 
     # 1. Index all entities by @id
     id_map = {}
@@ -317,7 +374,7 @@ def audit(base, domain, inv=None, state_file=None):
     except Exception:
         pass
 
-    json_ld_entities = parse_json_ld(dom.json_ld_contents)
+    json_ld_entities = parse_json_ld(dom.json_ld_contents, home_html)
 
     # 2. Organization Entity Recognition (supports array @type)
     org_entity = None
@@ -377,7 +434,7 @@ def audit(base, domain, inv=None, state_file=None):
                 pdom.feed(phtml)
             except Exception:
                 pass
-            typed_objects = parse_json_ld(pdom.json_ld_contents)
+            typed_objects = parse_json_ld(pdom.json_ld_contents, phtml)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
             if ans and ans.get("status") == "present":
                 for res in ans.get("results", []):
@@ -418,7 +475,7 @@ def audit(base, domain, inv=None, state_file=None):
                     pdom.feed(phtml)
                 except Exception:
                     pass
-                for o in parse_json_ld(pdom.json_ld_contents):
+                for o in parse_json_ld(pdom.json_ld_contents, phtml):
                     if isinstance(o, dict) and o.get("name") and o.get("name") not in state["entities"][u]:
                         state["entities"][u].append(o["name"])
             if brand_name and brand_name not in state["entities"][u]:

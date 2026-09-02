@@ -50,6 +50,10 @@ _FLUFF_RE = re.compile(
     re.IGNORECASE,
 )
 
+import math
+import zlib
+from collections import Counter
+
 AUTHORITATIVE_DOMAINS = {
     "doi.org",
     "wikipedia.org",
@@ -64,6 +68,26 @@ AUTHORITATIVE_DOMAINS = {
     "w3.org",
     "schema.org",
 }
+
+
+def compute_passage_entropy(text: str) -> float:
+    """Compute Shannon Token Entropy in bits/token to evaluate information density."""
+    words = re.findall(r"\b\w+\b", text.lower())
+    if not words:
+        return 0.0
+    counts = Counter(words)
+    total = len(words)
+    entropy = -sum((c / total) * math.log2(c / total) for c in counts.values())
+    return round(entropy, 2)
+
+
+def compute_compression_ratio(text: str) -> float:
+    """Compute lexical compression ratio (compressed/raw) to detect promotional filler."""
+    if not text.strip():
+        return 0.0
+    raw_bytes = text.encode("utf-8")
+    compressed = zlib.compress(raw_bytes)
+    return round(len(compressed) / max(1, len(raw_bytes)), 2)
 
 
 class GEODOMParser(HTMLParser):
@@ -287,21 +311,23 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
-        # 7. AI Fluff Penalty Warning
-        fluff_matches = _FLUFF_RE.findall(full_text)
-        if len(fluff_matches) >= 3:
-            recommendations.append(
-                {
-                    "id": "PROACTIVE.GEO.REDUCE_FLUFF.001",
-                    "title": "Replace promotional filler and buzzwords with concrete facts",
-                    "category": "content",
-                    "summary": f"Page {url} contains repetitive AI buzzword intensifiers ({', '.join(set(fluff_matches[:3]))}). Replacing filler with concrete metrics improves citation credibility.",
-                    "priority": "low",
-                    "technical_fix": "Audit copy to remove empty intensifiers and focus on mechanistic details.",
-                    "creative_fix": "Replace vague adjectives with specific technical parameters.",
-                    "verification": "Confirm marketing fluff density is minimized across body text.",
-                }
-            )
+        # 8. Information Density & Entropy Vector
+        if total_words >= 150:
+            entropy = compute_passage_entropy(full_text)
+            comp_ratio = compute_compression_ratio(full_text)
+            if entropy < 4.0:
+                recommendations.append(
+                    {
+                        "id": "PROACTIVE.GEO.INFORMATION_DENSITY.001",
+                        "title": "Increase factual vocabulary diversity and information density",
+                        "category": "content",
+                        "summary": f"Page {url} has low lexical token entropy ({entropy:.2f} bits/token, comp ratio {comp_ratio:.2f}). Increasing vocabulary specificity and technical depth improves neural retrieval ranking.",
+                        "priority": "low",
+                        "technical_fix": "Add technical terminology, specific feature nouns, and precise specifications.",
+                        "creative_fix": "Replace generic marketing phrasing with distinct, domain-specific terminology.",
+                        "verification": "Confirm passage token entropy >= 4.2 bits/token.",
+                    }
+                )
 
     return {"status": "ok", "findings": findings, "recommendations": recommendations, "observations": observations}
 

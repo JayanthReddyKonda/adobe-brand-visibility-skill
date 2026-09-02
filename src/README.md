@@ -132,7 +132,7 @@ python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 
 ## 6. Verification & Quality Metrics
 
-- **59 Automated Unit Tests:** 100% passing across 17 test modules in ~1.4 seconds.
+- **65 Automated Unit Tests:** 100% passing across 18 test modules in ~1.6 seconds.
 - **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
 - **Static Type Safety:** 0 errors under MyPy across all 7 skills.
 - **SSRF Hardening:** Pure stdlib socket-level IP validation against RFC-1918, link-local, loopback, and IPv4-mapped IPv6 ranges.

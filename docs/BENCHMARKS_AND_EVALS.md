@@ -32,7 +32,7 @@ Each skill in the marketplace contains a self-contained `evals/evals.json` fixtu
 
 ## 2. Automated Unit Test Suite
 
-The `tests/` directory contains **59 unit tests across 17 test files** providing full regression coverage of every specialist skill's extraction logic.
+The `tests/` directory contains **65 unit tests across 18 test files** providing full regression coverage of every specialist skill's extraction logic.
 
 | Test File | What It Covers |
 |---|---|
@@ -41,6 +41,7 @@ The `tests/` directory contains **59 unit tests across 17 test files** providing
 | `tests/test_discoverability.py` | robots.txt parsing, OAI-SearchBot vs GPTBot classification, noindex detection, canonical check |
 | `tests/test_dom_parsers.py` | HTML parser edge cases: malformed tags, nested structures, encoding |
 | `tests/test_entity_content.py` | JSON-LD @graph extraction (Organization/Product), answerability attribute scoring |
+| `tests/test_microdata_rdfa.py` | HTML5 Microdata (itemscope/itemtype/itemprop) and RDFa 1.1 Lite (typeof/property) extraction |
 | `tests/test_fact_consistency.py` | Cross-page price contradiction, contact email conflict, copyright year drift |
 | `tests/test_fact_extractor_deep.py` | Scoped fact ledger extraction: currency normalisation, entity matching |
 | `tests/test_price_and_currency_utils.py` | Price parsing across locales, currency symbol normalisation |
@@ -49,6 +50,7 @@ The `tests/` directory contains **59 unit tests across 17 test files** providing
 | `tests/test_geo_content.py` | Causal conjunction scoring, statistical evidence detection, question heading detection |
 | `tests/test_geo_scoring_engine.py` | Deep GEO: passage chunk analysis, pronoun density, direct answer lead |
 | `tests/test_geo_princeton_vectors.py` | Princeton KDD 2024 citation vectors: outbound primary citations, author bylines, statistics, causal depth |
+| `tests/test_passage_entropy.py` | Shannon token entropy ($H(X)$) and lexical compression ratio for factual density scoring |
 | `tests/test_engagement.py` | H1 information scent, CTA reachability, navigation element count |
 | `tests/test_engagement_deep.py` | Multilingual scent anchoring, granular page classifier, intent handoff |
 | `tests/test_specialist_sensors.py` | Standalone CLI subprocess execution across all 6 specialist sensors |
