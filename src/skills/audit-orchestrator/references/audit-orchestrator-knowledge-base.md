@@ -347,8 +347,9 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
 
 ```json
 {
-  "site": "frescopa.coffee",
+  "site": "https://frescopa.coffee",
   "audited_at": "2026-08-28T16:52:37Z",
+  "audit_status": "complete",
   "summary": {
     "total_findings": 2,
     "critical": 0,
@@ -358,36 +359,74 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
   },
   "findings": [
     {
-      "id": "F-001",
+      "id": "FACT.INTEGRITY.PRICE_CONFLICT.001",
       "title": "Product price is inconsistent across first-party surfaces",
       "severity": "high",
       "category": "fact-integrity",
       "root_cause": "The same product is represented with different current prices on the product and category pages.",
       "confidence": "high",
-      "evidence": "Product page: ₹5,499. Category page: ₹4,999. Both refer to the same product and offer context.",
+      "impact": "AI assistants quote conflicting prices across multi-page retrieval contexts.",
+      "evidence": {
+        "summary": "Product page states ₹5,499 while category page states ₹4,999 for the same product.",
+        "scope": "product-catalog",
+        "sources": [
+          {
+            "url": "https://frescopa.coffee/products/ethiopia-guji",
+            "type": "html_dom",
+            "observation": "Price rendered as ₹5,499"
+          },
+          {
+            "url": "https://frescopa.coffee/products",
+            "type": "html_dom",
+            "observation": "Price rendered as ₹4,999"
+          }
+        ]
+      },
       "suggested_action": {
         "summary": "Establish one authoritative offer value and synchronize visible content and structured data across affected pages.",
+        "technical_fix": "Synchronize pricing database feeds to both product and catalog templates.",
+        "creative_fix": "Audit promotional banners to ensure legacy discounts are not displayed.",
+        "verification": "Crawl product and listing pages to verify matching ₹5,499 price tags.",
         "priority": "high"
       }
     },
     {
-      "id": "F-002",
+      "id": "DISCOVERY.REPRESENTATION_AVAILABILITY.RENDERED_CONTENT_GAP.002",
       "title": "Important product information is difficult to retrieve",
       "severity": "medium",
       "category": "discoverability",
       "root_cause": "Material product facts are absent from the initial machine-readable representation of sampled product pages.",
       "confidence": "medium",
-      "evidence": "Across sampled product pages, key factual attributes were unavailable in the initial HTML representation.",
+      "impact": "AI crawlers unable to render client-side JavaScript miss core product specifications.",
+      "evidence": {
+        "summary": "Across sampled product pages, raw HTML word count < 25 words with unrendered app container.",
+        "scope": "product-pages",
+        "sources": [
+          {
+            "url": "https://frescopa.coffee/products/ethiopia-guji",
+            "type": "raw_html",
+            "observation": "Body contains <div id='root'></div> with only 12 words of static text."
+          }
+        ]
+      },
       "suggested_action": {
         "summary": "Expose core product facts directly in crawlable HTML and keep structured representation consistent.",
+        "technical_fix": "Implement Server-Side Rendering (SSR) for product detail pages.",
+        "creative_fix": "Ensure primary value proposition is present in server-rendered markup.",
+        "verification": "Fetch raw HTML via curl and confirm full specification text is present.",
         "priority": "medium"
       }
     }
   ],
   "proactive_actions": [
     {
+      "id": "PROACTIVE.ENTITY.BRAND_IDENTITY.001",
       "title": "Strengthen canonical brand identity",
+      "category": "entity",
       "summary": "Maintain a consistent organization identity, canonical name, logo and authoritative external references across major brand surfaces.",
+      "technical_fix": "Embed Schema.org Organization JSON-LD with sameAs social links on homepage.",
+      "creative_fix": "Ensure official legal company name is displayed in footer.",
+      "verification": "Validate Organization schema with Google Rich Results Test.",
       "priority": "low"
     }
   ]

@@ -1,9 +1,11 @@
 ---
 name: fact-consistency-audit
 description: >
-  Use this skill to detect cross-page factual contradictions across a website. Builds a scoped
-  first-party fact ledger (prices, contacts, lifecycle states) and identifies verified
-  conflicts that cause AI assistants to quote hallucinated or inconsistent brand information.
+  Detect cross-page factual contradictions, pricing discrepancies, outdated contact info, and legacy
+  content drift across a website. Use this skill whenever the user mentions "fact conflicts",
+  "pricing inconsistencies", "hallucination risks", "outdated copyright dates", "stale content",
+  or asks why AI search assistants quote wrong or conflicting prices/details about a brand. Builds
+  a scoped first-party fact ledger to isolate verified contradictions.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -60,12 +62,12 @@ Load these resources as needed during factual consistency checks:
 Execute the fact ledger and consistency script with `--format json`:
 
 ```bash
-python3 scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/fact_consistency_check.py --site https://example.com --format json
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json
 ```
 
 

@@ -1,9 +1,12 @@
 ---
 name: discoverability-audit
 description: >
-  Use this skill to audit whether AI retrieval engines (ChatGPT Search, Claude, Perplexity)
-  can reach and extract content from a website. Evaluates robots.txt crawler permissions,
-  meta robots directives (noindex/none), canonical tags, and raw HTML rendering completeness.
+  Audit whether AI retrieval engines (ChatGPT Search, Claude Search, PerplexityBot, Google AI Overviews)
+  can crawl, reach, and extract content from a website. Use this skill whenever the user mentions
+  "robots.txt", "crawler access", "AI bot blocking", "searchbot permissions", "noindex directives",
+  "canonical tags", "client-side rendering gaps", or asks why AI search engines cannot index or
+  retrieve web pages. Evaluates RFC 9309 crawler matrices, meta directives, canonical consolidation,
+  and raw HTML rendering completeness.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -64,12 +67,12 @@ Load these resources as needed during discoverability checks:
 Execute the deterministic extraction script using the shared inventory and `--format json`:
 
 ```bash
-python3 scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/discoverability_check.py --site https://example.com --format json
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json
 ```
 
 

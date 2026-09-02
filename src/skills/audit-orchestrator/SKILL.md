@@ -1,10 +1,13 @@
 ---
 name: audit-orchestrator
 description: >
-  Use this skill to perform a comprehensive, end-to-end Brand AI-Readiness and Visibility audit
-  on any website. The AI Agent IS the orchestrator — it reads 6 specialist skills, runs their
-  diagnostic scripts directly, reasons over the telemetry, and emits a schema-validated JSON
-  report with dual-track remediation. Zero external dependencies. Runs in < 5 minutes.
+  Perform a comprehensive, end-to-end Brand AI-Readiness, Generative Engine Optimization (GEO),
+  and AI Search Visibility audit on any website. Use this skill whenever the user asks to
+  "audit a website", "check AI readiness", "evaluate LLM search visibility", "optimize for
+  ChatGPT/Claude/Perplexity citations", "find brand SEO/AEO defects", or wants an end-to-end brand
+  visibility assessment. Coordinates 6 specialist skills, executes diagnostic sensors directly,
+  applies cognitive reasoning over multi-signal evidence, and emits a Draft-07 schema-validated
+  JSON report with dual-track remediation. Zero external dependencies. Runs in < 5 minutes.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:

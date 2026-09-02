@@ -1,9 +1,11 @@
 ---
 name: corroboration-authority-audit
 description: >
-  Use this skill to verify external identity-link authority and claim corroboration. Probes
-  declared sameAs URLs (Wikidata, LinkedIn, Wikipedia) to ensure they resolve with HTTP 200
-  and substantiate the brand canonical identity.
+  Verify external identity-link authority, knowledge graph nodes, and claim corroboration.
+  Use this skill whenever the user mentions "sameAs links", "Wikidata", "Wikipedia",
+  "LinkedIn profile verification", "authority signals", "brand entity links", or asks whether
+  external third-party sources substantiate a brand's canonical digital identity. Probes external
+  identity anchors with zero-trust HTTP verification.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -60,12 +62,12 @@ Load these resources as needed during authority corroboration checks:
 Execute the authority link verification script with `--format json`:
 
 ```bash
-python3 scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/corroboration_check.py --site https://example.com --format json
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json
 ```
 
 

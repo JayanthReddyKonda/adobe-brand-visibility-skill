@@ -1,9 +1,11 @@
 ---
 name: engagement-context-audit
 description: >
-  Use this skill to evaluate visitor orientation and intent-handoff continuity for AI-referred
-  traffic. Evaluates heading information scent (Entity-to-H1 anchoring), commercial call-to-action
-  reachability, and destination navigation to prevent post-citation bounce.
+  Evaluate visitor orientation, information scent, and intent-handoff continuity for traffic arriving
+  from AI search citations. Use this skill whenever the user mentions "visitor bounce",
+  "information scent", "H1 alignment", "CTA reachability", "post-citation continuity",
+  "landing page orientation", or asks why AI-referred users bounce after clicking a citation link.
+  Evaluates Entity-to-H1 anchoring, CTA reachability in the first 3 elements, and destination navigation.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -64,12 +66,12 @@ Load these resources as needed during engagement context checks:
 Execute the engagement and intent continuity script with `--format json`:
 
 ```bash
-python3 scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 

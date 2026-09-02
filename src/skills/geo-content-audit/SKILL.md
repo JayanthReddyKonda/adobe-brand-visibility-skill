@@ -1,9 +1,12 @@
 ---
 name: geo-content-audit
 description: >
-  Use this skill to audit content for Generative Engine Optimization (GEO) based on Princeton
-  KDD 2024 research. Evaluates mechanistic depth ('how' and 'why' causal conjunctions), quantifiable
-  statistical evidence, question-driven answer blocks, and semantic tabular layouts.
+  Audit web content for Generative Engine Optimization (GEO) and LLM citation selection based on
+  Princeton KDD 2024 and AutoGEO research. Use this skill whenever the user mentions "GEO",
+  "Generative Engine Optimization", "AI citation probability", "answer engine optimization",
+  "causal conjunctions", "statistical evidence density", "passage chunking", or asks how to
+  get a brand's content cited by ChatGPT, Perplexity, and Claude. Evaluates mechanistic depth
+  ('how' and 'why'), quantitative statistics, Q&A answer blocks, and semantic table layouts.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -64,12 +67,12 @@ Load these resources as needed during GEO content checks:
 Execute the deterministic GEO evaluation script using the shared inventory and `--format json`:
 
 ```bash
-python3 scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/geo_content_check.py --site https://example.com --format json
+python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --format json
 ```
 
 ---

@@ -1,9 +1,11 @@
 ---
 name: entity-content-audit
 description: >
-  Use this skill to determine whether AI systems can understand WHO a brand is and WHAT it
-  offers. Evaluates machine-explicit Organization entity schema, OpenGraph identity tags,
-  and weighted Answerability attribute completeness (price, availability, specifications).
+  Audit machine-explicit entity identity and commercial answerability attributes across web pages.
+  Use this skill whenever the user asks about "structured data", "Schema.org", "JSON-LD",
+  "Organization schema", "Product schema", "rich results", "entity clarity", or asks whether
+  AI models understand WHO a brand is and WHAT products/services it offers with complete pricing,
+  availability, and specifications.
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -64,12 +66,12 @@ Load these resources as needed during entity analysis:
 Execute the deterministic entity and answerability script with `--format json`:
 
 ```bash
-python3 scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 Direct standalone execution:
 ```bash
-python3 scripts/entity_content_check.py --site https://example.com --format json
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json
 ```
 
 
