@@ -64,6 +64,12 @@ def is_html_response(headers, body_snippet=""):
     return bool("<!doctype html" in snippet or "<html" in snippet)
 
 
+def is_same_domain(netloc1: str, netloc2: str) -> bool:
+    n1 = (netloc1 or "").lower().replace("www.", "")
+    n2 = (netloc2 or "").lower().replace("www.", "")
+    return bool(n1 and n2 and (n1 == n2 or n1.endswith("." + n2) or n2.endswith("." + n1)))
+
+
 def is_sitemap_or_non_html_url(url):
     u_lower = url.lower().split("?")[0].split("#")[0]
     if u_lower.endswith(NON_HTML_EXTENSIONS):
@@ -290,7 +296,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         if sm_url in processed_sitemaps:
             continue
         sm_netloc = urlparse(sm_url).netloc.lower()
-        if sm_netloc and sm_netloc != target_netloc:
+        if sm_netloc and not is_same_domain(sm_netloc, target_netloc):
             continue
 
         processed_sitemaps.add(sm_url)
@@ -301,10 +307,10 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             inv["infrastructure"]["sitemaps_processed"] += 1
             child_sms, raw_page_urls = _parse_sitemap_xml(s_body)
             for c_sm in child_sms:
-                if c_sm not in processed_sitemaps and urlparse(c_sm).netloc.lower() == target_netloc:
+                if c_sm not in processed_sitemaps and is_same_domain(urlparse(c_sm).netloc, target_netloc):
                     sitemaps_to_process.append(c_sm)
             for pu in raw_page_urls:
-                if urlparse(pu).netloc.lower() == target_netloc and not is_sitemap_or_non_html_url(pu):
+                if is_same_domain(urlparse(pu).netloc, target_netloc) and not is_sitemap_or_non_html_url(pu):
                     extracted_page_urls.append(pu)
 
     # Also extract in-HTML links from homepage if sitemap yielded few URLs
@@ -312,7 +318,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         for m in re.finditer(r'href=["\'](https?://[^"\']+|/[^"\']+)["\']', html, re.IGNORECASE):
             href = m.group(1).split("#")[0].split("?")[0]
             full_u = urljoin(base_url, href)
-            if urlparse(full_u).netloc.lower() == target_netloc and not is_sitemap_or_non_html_url(full_u):
+            if is_same_domain(urlparse(full_u).netloc, target_netloc) and not is_sitemap_or_non_html_url(full_u):
                 extracted_page_urls.append(full_u)
 
     inv["infrastructure"]["urls_extracted"] = len(extracted_page_urls)

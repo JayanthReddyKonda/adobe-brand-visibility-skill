@@ -28,7 +28,7 @@ allowed-tools:
 
 > **True Agentic Principle:** YOU are the orchestrator. There is no master Python runner. YOU read each skill, YOU run each script, YOU synthesize the findings using your reasoning. Scripts are deterministic sensors — they extract raw facts. You decide what they mean.
 
-The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist skill's context into memory, runs each specialist's diagnostic script directly, applies multi-signal cognitive reasoning against the knowledge bases, deduplicates and root-causes all findings, and emits a strictly validated JSON audit report conforming to the Adobe Round 3 Draft-07 schema.
+The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist skill's context into memory, runs each specialist's diagnostic script directly, applies multi-signal cognitive reasoning against the knowledge bases, deduplicates and root-causes all findings, and emits a strictly validated JSON audit report conforming to the Draft-07 JSON report schema.
 
 ---
 
@@ -56,13 +56,13 @@ The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist 
 Read these before synthesizing findings. They define your cognitive reasoning rules.
 
 ### Core Knowledge Base (Load First — MANDATORY)
-- [ Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Root cause taxonomy, multi-signal evidence reconciliation rules, severity rubric, confidence model, dual-track remediation catalog, and the full Draft-07 report schema contract.
+- [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Root cause taxonomy, multi-signal evidence reconciliation rules, severity rubric, confidence model, dual-track remediation catalog, and the full Draft-07 report schema contract.
 
 ### Output Schema (Load Before Writing Report — MANDATORY)
-- [ Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
+- [Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
 
 ### Technical Foundations (Load on Technical Inquiries)
-- [ SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
+- [SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
 
 ---
 
@@ -73,18 +73,18 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 
 ### Phase 1 — Knowledge Loading
 
-**Step 1: Load Your Own References**
+**Step 1: Load Orchestrator References and Schemas**
 
-Read these 3 files NOW before anything else:
+Read these 3 core files before anything else:
 ```bash
 cat skills/audit-orchestrator/references/audit-orchestrator-knowledge-base.md
 cat skills/audit-orchestrator/references/report-schema.json
 cat skills/audit-orchestrator/references/seo-foundations.md
 ```
 
-**Step 2: Load All 6 Specialist SKILL.mds**
+**Step 2: Load All 6 Specialist SKILL.md Runbooks**
 
-Read each specialist's SKILL.md to understand exactly what their script checks, what signals constitute a defect, and what false-positive boundaries apply:
+Read each specialist's SKILL.md to understand execution commands and output contracts:
 ```bash
 cat skills/discoverability-audit/SKILL.md
 cat skills/entity-content-audit/SKILL.md
@@ -94,11 +94,38 @@ cat skills/geo-content-audit/SKILL.md
 cat skills/engagement-context-audit/SKILL.md
 ```
 
----
+**Step 3: Load All Specialist Knowledge Bases and Domain Reference Schemas**
+
+Read all 12 domain knowledge bases, specialized guides, and JSON reference schemas across specialists:
+```bash
+# Discoverability Knowledge Base & International SEO Guide
+cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
+cat skills/discoverability-audit/references/international-seo.md
+
+# Entity Content Knowledge Base & Master Schema Templates (JSON-LD)
+cat skills/entity-content-audit/references/entity-content-audit-knowledge-base.md
+cat skills/entity-content-audit/references/organization.json
+cat skills/entity-content-audit/references/product.json
+
+# Fact Consistency Knowledge Base & Multi-Currency Ledger Rules
+cat skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md
+
+# Corroboration & Authority Verification Knowledge Base
+cat skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md
+
+# GEO Content Citability Knowledge Base & AI Writing Analysis Guide
+cat skills/geo-content-audit/references/geo-content-audit-knowledge-base.md
+cat skills/geo-content-audit/references/ai-writing-detection.md
+
+# Engagement Context Knowledge Base & Intent Handoff Reference Templates
+cat skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md
+cat skills/engagement-context-audit/references/pricing-comparison.json
+cat skills/engagement-context-audit/references/product-purchase.json
+```
 
 ### Phase 2 — Site Inventory Acquisition
 
-**Step 3: Crawl the Target Site**
+**Step 4: Crawl the Target Site**
 
 Build the shared typed HTML inventory (homepage + robots.txt + sitemaps → sampled HTML pages):
 ```bash
@@ -116,13 +143,13 @@ The inventory JSON contains: `site`, `pages[]` (each with `url`, `status`, `cont
 
 Run each specialist script sequentially. Each returns a JSON payload with `status`, `findings[]`, `recommendations[]`. Collect all outputs — you will synthesize them in Phase 4.
 
-**Step 4: Discoverability & Retrieval Audit**
+**Step 5: Discoverability & Retrieval Audit**
 ```bash
 python3 skills/discoverability-audit/scripts/discoverability_check.py \
   --site https://example.com --inventory inv.json --format json
 ```
 
-**Step 5: Entity Identity & Answerability Audit**
+**Step 6: Entity Identity & Answerability Audit**
 ```bash
 python3 skills/entity-content-audit/scripts/entity_content_check.py \
   --site https://example.com --inventory inv.json --format json
@@ -140,7 +167,7 @@ python3 skills/corroboration-authority-audit/scripts/corroboration_check.py \
   --site https://example.com --inventory inv.json --format json
 ```
 
-**Step 8: Generative Engine Optimization (GEO) Audit**
+**Step 9: Generative Engine Optimization (GEO) Audit**
 ```bash
 python3 skills/geo-content-audit/scripts/geo_content_check.py \
   --site https://example.com --inventory inv.json --format json
@@ -178,20 +205,24 @@ Calculate the following and include in `summary`:
 
 ### Phase 5 — Report Generation & Validation
 
-**Step 12: Write the Final JSON Report**
+**Step 12: Construct the Final JSON Report**
 
-Construct the final Draft-07 schema-compliant JSON report. Save to `final_report.json`. Use the exact schema from `references/report-schema.json` — every required field must be present.
+Construct the final Draft-07 schema-compliant JSON report object. Use the exact schema from `references/report-schema.json` — every required field (`site`, `audited_at`, `summary`, `findings[]`, `proactive_actions[]`) must be present with valid types and allowed severities.
 
-**Step 13: Validate**
+**Step 13: Validate via Schema Gate**
 ```bash
 python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json
 ```
+Ensure the validator exits with status code `0` and reports 0 schema errors. If validation fails, immediately correct the JSON structure to comply with `report-schema.json`.
 
-If validation fails, fix the JSON to comply with the schema and re-validate. Do NOT emit an unvalidated report.
+**Step 14: Output Delivery (MANDATORY)**
 
-**Step 14: Present**
+The entrypoint skill's primary deliverable is the **complete, unabridged audit report JSON object emitted directly in your response**:
 
-Emit a human-readable Executive Summary followed by the raw validated JSON in a `json` code block.
+- **CRITICAL REQUIREMENT:** Output the entire, fully-populated JSON report directly inside a `json` code block in your response.
+- **DO NOT** merely write a file to disk and summarize it. The client application and users consume the output emitted by the agent directly.
+- **DO NOT** truncate, summarize, or omit any findings or recommendations from the JSON payload.
+- You may include a concise Executive Summary preceding the JSON block, but the complete, schema-valid JSON object MUST be present in full.
 
 ---
 

@@ -54,10 +54,17 @@ Evaluates external entity authority by verifying that declared identity links (`
 Load these resources as needed during authority corroboration checks:
 
 ### Core Knowledge Base (Load First)
-- [📖 Corroboration Authority Knowledge Base](references/corroboration-authority-audit-knowledge-base.md): External sameAs probing protocols, bounded HTTP verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
+- [Corroboration Authority Knowledge Base](references/corroboration-authority-audit-knowledge-base.md): External sameAs probing protocols, bounded HTTP verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
 ## Procedure
 
-### Step 1: Execution Command
+### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+
+Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+```bash
+cat skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md
+```
+
+### Step 2: Execution Command
 
 Execute the authority link verification script with `--format json`:
 
@@ -73,7 +80,7 @@ python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --si
 
 ---
 
-### Step 2: Decision Protocol & Check Logic
+### Step 3: Decision Protocol & Check Logic
 
 1. **Identity Link Verification (`AUTHORITY.IDENTITY_CORROBORATION.BROKEN_AUTHORITY_ANCHOR`):**
    - Extract declared `sameAs` URLs from Organization schema.

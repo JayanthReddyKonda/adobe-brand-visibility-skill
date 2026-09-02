@@ -56,13 +56,21 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 Load these resources as needed during discoverability checks:
 
 ### Core Knowledge Base (Load First)
-- [📖 Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, and raw HTML extractability thresholds.
+- [Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, and raw HTML extractability thresholds.
 
 ### Specialized Reference Guides (Load on Condition)
-- [🌐 International SEO & Localization](references/international-seo.md): Read when auditing multi-lingual or multi-region websites to verify hreflang reciprocity, x-default tags, and ISO 639-1 / ISO 3166-1 Alpha 2 codes.
+- [International SEO & Localization](references/international-seo.md): Read when auditing multi-lingual or multi-region websites to verify hreflang reciprocity, x-default tags, and ISO 639-1 / ISO 3166-1 Alpha 2 codes.
 ## Procedure
 
-### Step 1: Execution Command
+### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+
+Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+```bash
+cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
+cat skills/discoverability-audit/references/international-seo.md
+```
+
+### Step 2: Execution Command
 
 Execute the deterministic extraction script using the shared inventory and `--format json`:
 
@@ -78,7 +86,7 @@ python3 skills/discoverability-audit/scripts/discoverability_check.py --site htt
 
 ---
 
-### Step 2: Decision Protocol & Check Logic
+### Step 3: Decision Protocol & Check Logic
 
 1. **HTTP Status Verification (`DISCOVERY.ACCESS.AI_RETRIEVAL_BLOCKED`):**
    - If root landing URL returns HTTP 4xx or 5xx: report `critical` severity.

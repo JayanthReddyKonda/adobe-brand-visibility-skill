@@ -54,10 +54,17 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 Load these resources as needed during factual consistency checks:
 
 ### Core Knowledge Base (Load First)
-- [📖 Fact Consistency Knowledge Base](references/fact-consistency-audit-knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
+- [Fact Consistency Knowledge Base](references/fact-consistency-audit-knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
 ## Procedure
 
-### Step 1: Execution Command
+### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+
+Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+```bash
+cat skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md
+```
+
+### Step 2: Execution Command
 
 Execute the fact ledger and consistency script with `--format json`:
 
@@ -73,7 +80,7 @@ python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site h
 
 ---
 
-### Step 2: Decision Protocol & Check Logic
+### Step 3: Decision Protocol & Check Logic
 
 1. **Scoped Price Contradictions (`FACT.CONSISTENCY.FIRST_PARTY_FACT_CONFLICT`):**
    - Flag a defect ONLY when two or more first-party pages state conflicting prices for the **same scoped entity** (e.g. "Velocity X9" is \$5,499 on `/product/x9` but \$4,999 on `/promo`).

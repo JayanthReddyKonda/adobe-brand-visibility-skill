@@ -11,7 +11,7 @@
 
 Each of the 7 skills in this marketplace ships an identical copy of `safe_fetch.py` in its `scripts/` directory. This is a deliberate, principled design decision:
 
-- **Independent Deployability:** Any skill can be installed and run standalone — the evaluator or agent can invoke a single specialist without any other skill being present.
+- **Independent Deployability:** Any skill can be installed and run standalone — an agent or client application can invoke a single specialist without any other skill being present.
 - **No Cross-Skill Import Paths:** A skill must never reach into a sibling skill's directory to import shared code. This prevents accidental coupling and deployment failures.
 - **Isolated Security Boundary:** Each skill's SSRF protection governs only that skill's network egress. If one skill's fetch boundary were ever compromised, it cannot affect another skill's boundary.
 - **Agentskills.io Portability:** The `agentskills.io` standard requires each skill to be self-contained. Bundling `safe_fetch.py` per skill satisfies this requirement without requiring a runtime package manager.

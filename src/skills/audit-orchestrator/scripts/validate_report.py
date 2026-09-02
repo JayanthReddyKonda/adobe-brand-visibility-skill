@@ -74,10 +74,21 @@ def validate_type(instance, schema, path="root"):
 
 
 def main():
-    if "-" in sys.argv:
-        data = sys.stdin.read()
+    if len(sys.argv) > 1 and sys.argv[1] != "-":
+        filepath = sys.argv[1]
+        if not os.path.exists(filepath):
+            print(f"File not found: {filepath}", file=sys.stderr)
+            sys.exit(2)
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = f.read()
     else:
-        print("Usage: python3 validate_report.py - < report.json", file=sys.stderr)
+        data = sys.stdin.read()
+
+    if not data.strip():
+        print(
+            "Usage: python3 validate_report.py [report.json | - < report.json]",
+            file=sys.stderr,
+        )
         sys.exit(2)
 
     try:

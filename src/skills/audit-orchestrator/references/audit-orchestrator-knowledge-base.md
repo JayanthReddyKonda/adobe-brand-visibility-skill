@@ -357,8 +357,7 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
     "medium": 1,
     "low": 0
   },
-  "findings": [
-    {
+  "findings": [{
       "id": "FACT.INTEGRITY.PRICE_CONFLICT.001",
       "title": "Product price is inconsistent across first-party surfaces",
       "severity": "high",
@@ -369,8 +368,7 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
       "evidence": {
         "summary": "Product page states ₹5,499 while category page states ₹4,999 for the same product.",
         "scope": "product-catalog",
-        "sources": [
-          {
+        "sources": [{
             "url": "https://frescopa.coffee/products/ethiopia-guji",
             "type": "html_dom",
             "observation": "Price rendered as ₹5,499"
@@ -401,8 +399,7 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
       "evidence": {
         "summary": "Across sampled product pages, raw HTML word count < 25 words with unrendered app container.",
         "scope": "product-pages",
-        "sources": [
-          {
+        "sources": [{
             "url": "https://frescopa.coffee/products/ethiopia-guji",
             "type": "raw_html",
             "observation": "Body contains <div id='root'></div> with only 12 words of static text."
@@ -418,8 +415,7 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
       }
     }
   ],
-  "proactive_actions": [
-    {
+  "proactive_actions": [{
       "id": "PROACTIVE.ENTITY.BRAND_IDENTITY.001",
       "title": "Strengthen canonical brand identity",
       "category": "entity",
@@ -608,3 +604,6 @@ Rules:
 
 ## 4. No Heuristic Defects Rule
 Heuristics (like counting `<table>` tags or measuring keyword density) may be used to build a classifier profile, but **cannot alone trigger a finding**. Findings must require semantic corroboration or explicit logic breakdown (e.g., missing `<title>` tag).
+
+## 5. Output Delivery Mandate (Output Standard)
+The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.

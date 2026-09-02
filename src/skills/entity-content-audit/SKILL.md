@@ -54,14 +54,23 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 Load these resources as needed during entity analysis:
 
 ### Core Knowledge Base (Load First)
-- [📖 Entity Content Knowledge Base](references/entity-content-audit-knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, and the 7-attribute Answerability Index formula.
+- [Entity Content Knowledge Base](references/entity-content-audit-knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, and the 7-attribute Answerability Index formula.
 
 ### Schema.org Reference Templates
-- [🏢 Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
-- [📦 Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
+- [Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
+- [Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
 ## Procedure
 
-### Step 1: Execution Command
+### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+
+Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+```bash
+cat skills/entity-content-audit/references/entity-content-audit-knowledge-base.md
+cat skills/entity-content-audit/references/organization.json
+cat skills/entity-content-audit/references/product.json
+```
+
+### Step 2: Execution Command
 
 Execute the deterministic entity and answerability script with `--format json`:
 
@@ -77,7 +86,7 @@ python3 skills/entity-content-audit/scripts/entity_content_check.py --site https
 
 ---
 
-### Step 2: Decision Protocol & Check Logic
+### Step 3: Decision Protocol & Check Logic
 
 1. **Organization Entity Resolution (`ENTITY.IDENTITY.MATERIAL_ENTITY_AMBIGUITY`):**
    - Extract JSON-LD (`Organization`, `Brand`, `Corporation`), OpenGraph (`og:site_name`), and `<title>`.

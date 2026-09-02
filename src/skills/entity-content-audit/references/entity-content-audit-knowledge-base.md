@@ -104,15 +104,13 @@ Implementation rules for JSON-LD structured data to ensure unambiguous entity re
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@graph": [
-    {
+  "@graph": [{
       "@type": "Organization",
       "@id": "https://example.com/#organization",
       "name": "Acme Aerospace",
       "url": "https://example.com",
       "logo": "https://example.com/logo.png",
-      "sameAs": [
-        "https://www.wikidata.org/wiki/Q12345",
+      "sameAs": ["https://www.wikidata.org/wiki/Q12345",
         "https://www.linkedin.com/company/acme"
       ]
     },
@@ -210,15 +208,13 @@ Embed this single linked JSON-LD block inside the `<head>` of the homepage:
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@graph": [
-    {
+  "@graph": [{
       "@type": "Organization",
       "@id": "https://example.com/#organization",
       "name": "Acme Corporation",
       "url": "https://example.com",
       "logo": "https://example.com/assets/logo.png",
-      "sameAs": [
-        "https://www.wikidata.org/wiki/Q123456",
+      "sameAs": ["https://www.wikidata.org/wiki/Q123456",
         "https://en.wikipedia.org/wiki/Acme_Corp",
         "https://www.linkedin.com/company/acme-corp",
         "https://twitter.com/acme"

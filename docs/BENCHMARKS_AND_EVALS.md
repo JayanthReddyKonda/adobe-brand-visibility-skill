@@ -13,13 +13,11 @@ Each skill in the marketplace contains a self-contained `evals/evals.json` fixtu
 ```json
 {
   "skill_name": "discoverability-audit",
-  "evals": [
-    {
+  "evals": [{
       "id": 1,
       "prompt": "Check if AI retrieval crawlers (OAI-SearchBot, Claude-SearchBot, PerplexityBot) are allowed in robots.txt on https://example.com.",
       "expected_output": "Access status per crawler distinguishing retrieval from training bots.",
-      "assertions": [
-        "Retrieval crawlers are evaluated per RFC 9309 rules",
+      "assertions": ["Retrieval crawlers are evaluated per RFC 9309 rules",
         "Training token blocks (e.g. GPTBot) are reported as observations, not critical defects",
         "Raw HTML visible word count is reported"
       ]
@@ -79,8 +77,7 @@ pytest tests/ -q
 All specialist scripts expose a `--format json` flag for machine-readable deterministic output. This makes them testable via `subprocess` from any test harness:
 
 ```python
-result = subprocess.run([
-    "python3", "src/skills/discoverability-audit/scripts/discoverability_check.py",
+result = subprocess.run(["python3", "src/skills/discoverability-audit/scripts/discoverability_check.py",
     "--site", "https://testbrand.com",
     "--inventory", "test_inv.json",
     "--format", "json"

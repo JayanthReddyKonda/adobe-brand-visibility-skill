@@ -54,14 +54,23 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 Load these resources as needed during engagement context checks:
 
 ### Core Knowledge Base (Load First)
-- [📖 Engagement Context Knowledge Base](references/engagement-context-audit-knowledge-base.md): Entity-to-H1 information scent evaluation, commercial intent CTA reachability, and post-referral bounce prevention.
+- [Engagement Context Knowledge Base](references/engagement-context-audit-knowledge-base.md): Entity-to-H1 information scent evaluation, commercial intent CTA reachability, and post-referral bounce prevention.
 
 ### Reference Page Schemas
-- [💳 Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
-- [🛒 Product Purchase Template](references/product-purchase.json): Standard conversion and purchase handoff structure.
+- [Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
+- [Product Purchase Template](references/product-purchase.json): Standard conversion and purchase handoff structure.
 ## Procedure
 
-### Step 1: Execution Command
+### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+
+Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+```bash
+cat skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md
+cat skills/engagement-context-audit/references/pricing-comparison.json
+cat skills/engagement-context-audit/references/product-purchase.json
+```
+
+### Step 2: Execution Command
 
 Execute the engagement and intent continuity script with `--format json`:
 
@@ -77,7 +86,7 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 
 ---
 
-### Step 2: Decision Protocol & Check Logic
+### Step 3: Decision Protocol & Check Logic
 
 1. **Multi-Signal 5-Second Orientation (`EXPERIENCE.CONTINUITY.LOW_INFORMATION_SCENT`):**
    - If a content-bearing page lacks an `<h1>`, lacks descriptive subheadings (`<h2>`), AND has an uninformative `<title>` -> flag `LOW_INFORMATION_SCENT` (Severity: `medium`).

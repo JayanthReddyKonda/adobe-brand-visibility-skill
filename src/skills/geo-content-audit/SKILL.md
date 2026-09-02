@@ -54,15 +54,23 @@ Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) 
 Load these resources as needed during GEO content checks:
 
 ### Core Knowledge Base (Load First)
-- [📖 GEO Content Knowledge Base](references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO benchmarks, 134–167 word optimal chunk scoring, causal conjunction cheatsheets, and comparison table patterns.
+- [GEO Content Knowledge Base](references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO benchmarks, 134–167 word optimal chunk scoring, causal conjunction cheatsheets, and comparison table patterns.
 
 ### Specialized Reference Guides (Load on Condition)
-- [✍️ AI Writing Detection & Natural Content Patterns](references/ai-writing-detection.md): Read when evaluating content quality to eliminate em dash overuse, buzzword fluff, and empty intensifiers in favor of mechanistic depth.
+- [AI Writing Detection & Natural Content Patterns](references/ai-writing-detection.md): Read when evaluating content quality to eliminate em dash overuse, buzzword fluff, and empty intensifiers in favor of mechanistic depth.
 ---
 
 ## Procedure
 
-### Step 1: Execution Command
+### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+
+Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+```bash
+cat skills/geo-content-audit/references/geo-content-audit-knowledge-base.md
+cat skills/geo-content-audit/references/ai-writing-detection.md
+```
+
+### Step 2: Execution Command
 
 Execute the deterministic GEO evaluation script using the shared inventory and `--format json`:
 
@@ -77,7 +85,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
 
 ---
 
-### Step 2: Decision Protocol & Check Logic
+### Step 3: Decision Protocol & Check Logic
 
 1. **In-Depth Causal Mechanisms (`CONTENT.SHALLOW_COVERAGE.MISSING_IN_DEPTH_MECHANISMS`):**
    - Evaluates content pages (`product_detail`, `article`, `pricing`) for word-bounded causal conjunctions (`\bhow\b`, `\bwhy\b`, `\bbecause\b`, `\btherefore\b`, `\ballows\b`, `\benables\b`, `\bresults in\b`).

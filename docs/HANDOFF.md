@@ -15,7 +15,7 @@ This project delivers a production-grade, zero-dependency **True Agentic Agent S
 The defining principle of v2.1.0: **the AI Agent IS the orchestrator.** There is no monolithic Python runner in `src/`. The AI reads each skill's `SKILL.md` and knowledge base, runs each specialist diagnostic sensor directly, applies multi-signal cognitive reasoning, and synthesizes the final Draft-07 validated JSON report.
 
 All modules, knowledge bases, schemas, and test suites conform to:
-1. **Adobe Hackathon Round 3 Specification** (`round3_PS.pdf`)
+1. **Production Architecture Specification** (the architecture specification)
 2. **Official `agentskills.io` Standard Specification**
 3. **Anthropic Skill Authoring Guidelines** (`skill-creator`)
 
@@ -24,7 +24,7 @@ All modules, knowledge bases, schemas, and test suites conform to:
 ## 2. Key Architectural Deliverables
 
 1. **Root Marketplace Manifest (`marketplace.json`):**
-   - Strictly conforms to `round3_PS.pdf`: only `name`, `version`, and `skills` list.
+   - Strictly conforms to the `agentskills.io` marketplace specification: only `name`, `version`, and `skills` list.
    - Declares exactly 1 entrypoint: `audit-orchestrator` + 6 independent domain specialists.
 
 2. **True Agentic Execution Model:**
@@ -59,7 +59,7 @@ All modules, knowledge bases, schemas, and test suites conform to:
 
 ---
 
-## 3. Evaluator Quick-Start & Verification
+## 3. Quick-Start & Verification
 
 ```bash
 # Step 1: Crawl the site inventory

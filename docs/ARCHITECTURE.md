@@ -2,7 +2,7 @@
 
 **Author:** Jayanth Reddy Konda
 **Version:** 2.0.0
-**Specification Compliance:** Adobe Round 3 Hackathon (`round3_PS.pdf`) & `agentskills.io`
+**Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 
 ---
 

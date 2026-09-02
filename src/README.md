@@ -2,7 +2,7 @@
 
 **Author:** Jayanth Reddy Konda  
 **Version:** 2.1.0  
-**Specification Compliance:** Adobe Round 3 Hackathon (`round3_PS.pdf`) & `agentskills.io`
+**Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 
 ---
 
@@ -63,7 +63,7 @@ graph TD
 
 ## 4. Output Report Schema Guarantees
 
-Every report emitted by `audit-orchestrator` adheres strictly to the Adobe Round 3 specification:
+Every report emitted by `audit-orchestrator` adheres strictly to the Production Draft-07 schema specification:
 
 ```json
 {
@@ -77,8 +77,7 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Adobe Round
     "medium": 1,
     "low": 0
   },
-  "findings": [
-    {
+  "findings": [{
       "id": "finding-1",
       "title": "AI Search Crawlers Blocked in robots.txt",
       "severity": "high",
@@ -87,8 +86,7 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Adobe Round
       "evidence": {
         "summary": "Disallow: / found for OAI-SearchBot.",
         "scope": "robots.txt",
-        "sources": [
-          {"url": "https://example.com/robots.txt", "type": "robots_txt", "observation": "Disallow: /"}
+        "sources": [{"url": "https://example.com/robots.txt", "type": "robots_txt", "observation": "Disallow: /"}
         ]
       },
       "suggested_action": {
