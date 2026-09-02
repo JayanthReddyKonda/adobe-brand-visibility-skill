@@ -1,8 +1,9 @@
-import unittest
 import sys
+import unittest
 
-sys.path.insert(0, "brand-ai-readiness-audit/skills/fact-consistency-audit/scripts")
+sys.path.insert(0, "src/skills/fact-consistency-audit/scripts")
 import fact_consistency_check
+
 
 class TestPriceAndCurrencyUtils(unittest.TestCase):
     def test_currency_symbol_extraction(self):
@@ -13,7 +14,7 @@ class TestPriceAndCurrencyUtils(unittest.TestCase):
             ("₹1,499", "INR"),
             ("USD 99", "USD"),
             ("EUR 45", "EUR"),
-            ("INR 500", "INR")
+            ("INR 500", "INR"),
         ]
         for raw, expected in test_cases:
             self.assertEqual(fact_consistency_check.extract_currency(raw), expected, f"Failed on {raw}")
@@ -35,7 +36,7 @@ class TestPriceAndCurrencyUtils(unittest.TestCase):
         self.assertFalse(fact_consistency_check.is_valid_product_entity("About Us"))
         self.assertFalse(fact_consistency_check.is_valid_product_entity("Privacy Policy"))
         self.assertFalse(fact_consistency_check.is_valid_product_entity("Frequently Asked Questions"))
-        
+
         # Genuine product names should pass
         self.assertTrue(fact_consistency_check.is_valid_product_entity("Enterprise Cloud Suite Pro"))
 
@@ -43,6 +44,7 @@ class TestPriceAndCurrencyUtils(unittest.TestCase):
         text = "Call our sales team at +1 (800) 555-0199 or support at 415-555-2671."
         matches = list(fact_consistency_check.PHONE_PATTERN.finditer(text))
         self.assertTrue(len(matches) >= 1)
+
 
 if __name__ == "__main__":
     unittest.main()

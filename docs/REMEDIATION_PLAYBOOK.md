@@ -2,7 +2,7 @@
 
 **Author:** Jayanth Reddy Konda  
 **Version:** 1.0.0  
-**Standard:** Adobe Round 3 AI-Readiness Evaluation & Implementation Guide
+**Standard:** Production Brand AI-Readiness & GEO Remediation Guide
 
 ---
 
@@ -45,15 +45,13 @@ Every brand AI-readiness defect has two complementary remediation vectors:
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@graph": [
-      {
+    "@graph": [{
         "@type": "Organization",
         "@id": "https://brand.com/#org",
         "name": "Canonical Brand Name",
         "url": "https://brand.com",
         "logo": "https://brand.com/assets/logo.png",
-        "sameAs": [
-          "https://www.wikidata.org/wiki/Q12345",
+        "sameAs": ["https://www.wikidata.org/wiki/Q12345",
           "https://www.linkedin.com/company/brand",
           "https://twitter.com/brand"
         ]

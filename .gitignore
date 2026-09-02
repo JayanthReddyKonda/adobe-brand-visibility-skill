@@ -1,14 +1,30 @@
-.agents/
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Testing & QA Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS / IDE
 .DS_Store
 .omo
+.vscode/
+.idea/
 
-# Generated audit-report artifacts (runtime output — the report is presented in chat, not stored)
+# Project-Specific & Build
+.agents/
+build/
+legacy_reference/
+resources/
+
+# Generated Artifacts
+*.zip
 *.audit-report.json
-
-brand-ai-readiness-audit.zip
-
-resources
