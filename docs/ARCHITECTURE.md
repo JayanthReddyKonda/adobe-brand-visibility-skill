@@ -1,126 +1,126 @@
-# Brand AI-Readiness Audit — Architecture
+# Brand AI-Readiness Audit — System Architecture
 
-**Author:** Jayanth Reddy Konda
-**Version:** 2.0.0
-**Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
+**Author:** Jayanth Reddy Konda  
+**Version:** 3.0.0  
+**Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07  
 
 ---
 
-## 1. Core Architectural Philosophy: The AI Agent IS the Orchestrator
+## 1. The Core Architectural Philosophy: The AI Agent IS the Orchestrator
 
-This system is a **True Agentic Marketplace**. There is no master Python runner that ties everything together. The AI Agent is the intelligent coordinator. Python scripts are pure, deterministic sensors.
+This system implements a **True Agentic Marketplace**. There is no monolithic master Python runner in `src/` that conceals decision logic in procedural code. 
+
+The AI Agent acts as the cognitive engine:
+1. The AI reads each skill's `SKILL.md` and domain knowledge bases to understand decision boundaries.
+2. The AI invokes pure-Python deterministic sensor scripts via CLI to gather telemetry.
+3. The AI applies multi-signal cognitive reasoning to diagnose root causes, deduplicate findings, and map evidence.
+4. The AI synthesizes the final report and validates it against the Draft-07 schema gate.
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        AI AGENT (Reasoner)                          │
-│                                                                     │
-│  1. Reads SKILL.mds → Understands each domain's decision rules     │
-│  2. Runs acquire_inventory.py → Gets typed HTML pages               │
-│  3. Runs each of 6 specialist scripts → Collects raw telemetry      │
-│  4. Applies cognitive reasoning → Deduplicates, root-causes, fixes  │
-│  5. Writes final JSON → Validates with validate_report.py           │
-└────────────────────────────┬────────────────────────────────────────┘
-                              │
-         ┌────────────────────┼──────────────────────┐
-         ▼                    ▼                       ▼
-   Orchestrator Tools    6 Specialist Skills    Validation Tool
-   acquire_inventory.py  (each independent)    validate_report.py
-   safe_fetch.py         SKILL.md              report-schema.json
-                         _check.py
-                         safe_fetch.py (own)
-                         knowledge-base.md
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           AI AGENT (Reasoner)                           │
+│                                                                         │
+│  1. Reads SKILL.md files & Knowledge Bases                             │
+│  2. Executes acquire_inventory.py → Builds typed page inventory         │
+│  3. Executes 6 Specialist Diagnostic Scripts → Collects pure telemetry   │
+│  4. Applies Multi-Signal Reasoning → Root-causes defects (HF-01 to W-08)│
+│  5. Computes 6 Orthogonal Scores & Wilson 95% Confidence Intervals      │
+│  6. Generates Final JSON Report → Validates with validate_report.py     │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+           ┌─────────────────────────┼────────────────────────┐
+           ▼                         ▼                        ▼
+     Orchestration Tools      6 Specialist Skills       Validation Gate
+     acquire_inventory.py     discoverability-audit     validate_report.py
+     safe_fetch.py            entity-content-audit      report-schema.json
+                              fact-consistency-audit
+                              corroboration-authority
+                              geo-content-audit
+                              engagement-context
 ```
 
 ### Two-Layer Separation of Concerns
-
-| Layer | What It Contains | What It Does | What It Does NOT Do |
-|---|---|---|---|
-| **AI Cognitive Layer** | SKILL.md files, knowledge bases | Reads rules, runs scripts, reasons, synthesizes | Execute raw HTTP calls or parse HTML directly |
-| **Deterministic Sensor Layer** | Python scripts (`_check.py`, `safe_fetch.py`) | Fetch HTML, extract facts, return structured JSON | Reason, deduplicate, or assign root causes |
-
-This separation is fundamental. It means:
-- **Scripts never go stale from domain knowledge changes** — only SKILL.md files need updating as the AI-SEO landscape evolves
-- **Scripts are fully testable in isolation** — unit tests verify extraction accuracy without needing an AI
-- **The AI's reasoning is transparent** — the AI explains its conclusions in natural language, not buried in Python logic
+- **AI Cognitive Layer (`SKILL.md`, Knowledge Bases):** Responsible for judgment, causal inference, dual-track remediation, and qualitative synthesis. Never executes unvalidated HTTP requests directly.
+- **Deterministic Sensor Layer (`_check.py`, `safe_fetch.py`):** Responsible for raw data extraction, RFC parsing, DOM evaluation, and mathematical calculations. Completely isolated, testable with unit tests, and 100% pure Python standard library.
 
 ---
 
-## 2. The Two-Stage AI Visibility Funnel
+## 2. The Layered Probability Model (The Master Formula)
 
-Modern generative search engines (ChatGPT Search, Perplexity Pro, Google AI Overviews, Claude) evaluate web content in two distinct, sequential phases:
+Modern generative engines operate as multi-stage, partially observable probabilistic retrieval pipelines. The audit models generative visibility as a multiplicative chain:
 
-```mermaid
-graph TD
-    A["Target Website / Web Assets"] --> B["Stage 1: Retrieval & Indexation Funnel"]
-    B --> C{"Retrieved into LLM Context?"}
-    C -- "No" --> D["Zero Citation Potential (Invisible)"]
-    C -- "Yes" --> E["Stage 2: Generative Citation Selection"]
-    E --> F{"Passes Citability Threshold?"}
-    F -- "No" --> G["Summarized without Attribution"]
-    F -- "Yes" --> H["Direct Brand Citation & Referral Handoff"]
-```
+$$\boxed{ \text{AI Visibility} \approx \text{Crawl Eligibility} \times \text{Retrieval Eligibility} \times \text{Content Citability} \times \text{Entity/Source Authority} \times \text{Citation Fidelity} }$$
 
-**Stage 1 (Retrieval & Indexation):** Audited by `discoverability-audit` & `entity-content-audit`.
-- robots.txt permissions for AI retrieval bots (OAI-SearchBot, PerplexityBot, Claude-SearchBot)
-- noindex directives, HTTP status codes, raw HTML rendering completeness
-- Schema.org `@graph` Organization and Product machine anchors
+with an adjacent **Agentic Commerce Readiness** layer for transactional products and services.
 
-**Stage 2 (Generative Citation Selection):** Audited by `geo-content-audit`, `fact-consistency-audit`, `corroboration-authority-audit`, and `engagement-context-audit`.
-- Empirical depth: 134–167 word passage chunks, causal conjunctions (because, due to, therefore)
-- Grounded truth: Multi-page fact consistency, verified third-party authority node links (sameAs)
+### Methodological Rule: Prominence vs. Presence
+In the canonical GEO paper (Aggarwal et al., KDD 2024), the documented "+40% visibility improvement" refers to a change in **Position-Adjusted Word Count (PAWC)** *among an already retrieved set of sources*. It is NOT a flat 40% increase in retrieval probability.
+
+$$\text{PAWC}(r) = \frac{\sum_{s_i \in S_c} wc(s_i) e^{-pos(s_i)}}{\sum_j wc(s_j)}$$
+
+The audit measures citation prominence, citation position, and answer share rather than binary citation presence.
 
 ---
 
-## 3. Skill Isolation & Modular Decomposition
+## 3. The 6 Orthogonal Scoring Dimensions
 
-Each skill has exactly one isolated responsibility and security boundary:
+To avoid collapsing distinct technical vectors into a single misleading score, the audit evaluates six orthogonal dimensions:
 
-| Skill | Role | Isolated Responsibility |
-|---|---|---|
-| **audit-orchestrator** | Entrypoint | AI runbook — coordinates the full audit, validates the final report |
-| **discoverability-audit** | Specialist | HTTP status, robots.txt bot matrix (RFC 9309), noindex directives, canonical consolidation, raw HTML extractability |
-| **entity-content-audit** | Specialist | JSON-LD @graph extraction (Organization, Product), weighted Answerability attribute completeness |
-| **fact-consistency-audit** | Specialist | Scoped first-party fact ledger, cross-page price & contact contradiction detection |
-| **corroboration-authority-audit** | Specialist | The ONLY skill permitted to probe external sameAs links (Wikidata, LinkedIn, Wikipedia) |
-| **geo-content-audit** | Specialist | Generative Engine Optimization (Princeton KDD 2024): causal depth, statistical evidence density, answer blocks |
-| **engagement-context-audit** | Specialist | Post-citation continuity, Entity-to-H1 information scent, commercial CTA reachability |
-
----
-
-## 4. Why Each Skill Ships Its Own `safe_fetch.py`
-
-Each specialist skill ships an identical copy of `safe_fetch.py` in its `scripts/` directory. This is a deliberate `agentskills.io` portability requirement:
-
-- **Independent deployability:** Any skill can be installed and run standalone without depending on sibling skills being present.
-- **No import path assumptions:** A skill must not reach into another skill's directory to import shared code.
-- **Security boundary enforcement:** Each skill's SSRF sandbox is self-contained. The orchestrator's `safe_fetch.py` governs `acquire_inventory.py`. Each specialist's `safe_fetch.py` governs its own network egress.
-
----
-
-## 5. Black-Box CLI Execution Standard
-
-Following the `agentskills.io` and Anthropic skill authoring guidelines:
-- **No Source Code Ingestion:** The AI agent never reads Python script source code. It executes scripts as black-box CLI tools.
-- **CLI Subprocess Invocations:** `python3 scripts/<check>.py --site <url> --inventory <inv> --format json`
-- **Stream Separation:** Pure JSON data emits to `stdout`; diagnostic warnings emit to `stderr`.
+1. **Crawlability Score (Weight: 20%):**
+   - Deterministic HTTP 200 responses, RFC 9309 compliance (500 KiB cap, 5xx fail-closed).
+   - Unrestricted permissions for AI search indexers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`).
+2. **Retrieval Readiness (Weight: 20%):**
+   - Main content extractability, Signal-to-Noise Ratio ($\text{SNR} \ge 0.12$).
+   - Content Availability Gap ($\text{CAG} < 0.15$), server-side rendering completeness.
+3. **Citation Readiness (Weight: 20%):**
+   - Atomic Fact-to-Token Ratio ($\text{FTR} \ge 0.080$).
+   - Evidence genre density (code, stats, definitions, comparisons).
+   - Low hedge density ($\le 1.2\%$) and BLUF top-30% placement.
+4. **Entity / Authority Score (Weight: 15%):**
+   - Machine-explicit Schema.org `@graph` Organization and Product nodes.
+   - Authoritative `sameAs` density ($\ge 2$ external authority links).
+   - Cross-page first-party fact ledger consistency.
+5. **Cross-Engine Visibility Score (Weight: 15%):**
+   - Cross-Engine Citation Coverage ($\text{CECO}$ across the Big 5 engines).
+   - Statistical uncertainty bound by **Wilson 95% Confidence Intervals** ($z=1.96, n \ge 10$).
+6. **Agentic Commerce Score (Weight: 10%):**
+   - Clean float pricing, ISO 4217 currency validation.
+   - Zero contradictions between HTML text and JSON-LD (`ProductConsistency = 1.0`).
+   - Universal Commerce Protocol (UCP), Agent Payments (AP2), and Agent2Agent (A2A) readiness.
 
 ---
 
-## 6. Dual-Track Remediation
+## 4. The Canonical 16-Defect Taxonomy
 
-Every finding in the final report strictly conforms to the dual-track requirement:
-- **`technical_fix`:** Concrete code patches, schema markup, or server configuration (for developers).
-- **`creative_fix`:** Content rewriting guidelines, heading restructurings, or positioning adjustments (for copywriters/marketers).
-- **`verification`:** Step-by-step instructions to validate the remediation resolved the defect.
+Findings must be classified into the canonical defect taxonomy:
+
+### Hard Failures (HF-01 to HF-08) — Deterministic Blocker Gate
+- `HF-01`: Target page unreachable or non-200 HTTP status.
+- `HF-02`: Contradictory, missing, or conflicting canonical declarations.
+- `HF-03`: AI search retrieval crawler disallowed in `robots.txt`.
+- `HF-04`: `noindex` directive active on indexable content.
+- `HF-05`: `nosnippet` or restrictive `max-snippet` active on core text.
+- `HF-06`: Product price contradiction between visible HTML and JSON-LD `Offer.price`.
+- `HF-07`: Critical factual claims exist solely in images/PDF/JS without equivalent HTML.
+- `HF-08`: Structured data directly contradicts visible page content.
+
+### High-Value Warnings (W-01 to W-08) — Probabilistic Quality Risks
+- `W-01`: Initial HTML extraction deficit (SSR content gap).
+- `W-02`: High-value claims lack independent source attribution.
+- `W-03`: Commercial pricing or stock drift across routes.
+- `W-04`: Brand entity discordance across Organization schema and external nodes.
+- `W-05`: Excessive discovery depth (authoritative evidence requires > 3 hops).
+- `W-06`: `llms.txt` manifest contains broken or non-canonical links.
+- `W-07`: Low atomic fact density ($\text{FTR} < 0.040$).
+- `W-08`: Cross-engine citation divergence ($\text{CECO} < 0.50$).
 
 ---
 
-## 7. Execution Timeline (< 5 Minutes)
+## 5. Security & SSRF Protection Architecture
 
-| Phase | Duration | What Happens |
-|---|---|---|
-| Knowledge Loading (Phases 1) | ~0s (AI reads) | AI reads 3 orchestrator references + 6 specialist SKILL.mds |
-| Inventory Acquisition | < 60s | `acquire_inventory.py` crawls up to 25 HTML pages |
-| 6 Specialist Scripts | ~5–30s each | Each script runs, extracts telemetry, returns JSON |
-| AI Synthesis | ~0s (AI reasons) | Deduplication, root-cause mapping, remediation writing |
-| Validation | < 1s | `validate_report.py` confirms schema compliance |
+The audit suite adheres to a zero-trust model when fetching external domains:
+- **RFC 1918 Private Address Blocking:** Blocks `10.0.0.0/8`, `172.16.0.0/12`, `169.254.0.0/16`, `192.168.0.0/16`.
+- **Loopback & Link-Local Blocking:** Blocks `127.0.0.0/8`, `::1`, `fe80::/10`.
+- **IPv4-Mapped IPv6 Protection:** Disallows `::ffff:127.0.0.1` and encoded hexadecimal loopbacks.
+- **Payload Limits:** Maximum fetch size capped at 2 MiB to prevent memory exhaustion / decompression bombs.
+- **Timeout Bounds:** Bounded socket timeouts (5–10s) prevent hang conditions.

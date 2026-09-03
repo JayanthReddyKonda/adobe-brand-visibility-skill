@@ -1,89 +1,81 @@
-# Benchmarking, Evals & Automated Quality Assurance
+# Benchmarks, Evals, and Quality Assurance Guide
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 2.0.0  
-**Standard:** `agentskills.io` Evaluation Specification  
+**Version:** 3.0.0  
+**Status:** 83 Automated Tests Passing · 100% Green QA Pipeline  
 
 ---
 
-## 1. Machine-Readable Evals Suite (`evals/evals.json`)
+## 1. The Consolidated 17-Rule Matrix (`CR01` to `TX06`)
 
-Each skill in the marketplace contains a self-contained `evals/evals.json` fixture providing deterministic test prompts and verifiable assertions matching the Anthropic `skill-creator` eval schema:
-
-```json
-{
-  "skill_name": "discoverability-audit",
-  "evals": [{
-      "id": 1,
-      "prompt": "Check if AI retrieval crawlers (OAI-SearchBot, Claude-SearchBot, PerplexityBot) are allowed in robots.txt on https://example.com.",
-      "expected_output": "Access status per crawler distinguishing retrieval from training bots.",
-      "assertions": ["Retrieval crawlers are evaluated per RFC 9309 rules",
-        "Training token blocks (e.g. GPTBot) are reported as observations, not critical defects",
-        "Raw HTML visible word count is reported"
-      ]
-    }
-  ]
-}
+```
+┌──────┬─────────────────────────────┬──────────────────────────┬─────────────────────────────┐
+│ Code │ Category                    │ Algorithmic Test         │ Benchmark / Pass Threshold  │
+├──────┼─────────────────────────────┼──────────────────────────┼─────────────────────────────┤
+│ CR01 │ Crawler Access              │ RFC 9309 Parser          │ OAI-SearchBot Allowed = True│
+│ CR02 │ Crawler Access              │ RFC 9309 Parser          │ Claude-SearchBot Allow= True│
+│ CR03 │ Crawler Access              │ RFC 9309 Parser          │ PerplexityBot Allowed = True│
+│ CR04 │ Crawler Access              │ robots.txt File Size     │ <= 500 KiB (512,000 octets) │
+│ CR05 │ Crawler Access              │ robots.txt Status Code   │ HTTP 200 (Fail if 5xx)      │
+│ LL01 │ Machine-Readable Standards  │ Root /llms.txt Fetch     │ HTTP 200, Content: MD/Plain │
+│ LL02 │ Machine-Readable Standards  │ /llms.txt Structure      │ Has H1 Title + Blockquote   │
+│ RD01 │ Rendering & Delivery        │ Content Availability Gap │ CAG = 1 - (NoJS/JS) < 0.15  │
+│ RD02 │ Content Extraction          │ Signal-to-Noise Ratio    │ Text Bytes / HTML Bytes>0.12│
+│ SC01 │ Structured Data             │ Extruct JSON-LD          │ Organization with >=2 sameAs│
+│ SC02 │ Structured Data             │ Extruct JSON-LD          │ Product offers: valid ISO4217│
+│ SC03 │ Structured Data             │ Extruct JSON-LD          │ Schema dateModified <= 60d  │
+│ TX01 │ Information Architecture    │ BLUF Top-30% Check       │ Entity answer in top 250 w  │
+│ TX02 │ Linguistic Hedging          │ Hyland Lexicon Density   │ HedgeRate <= 1.2%           │
+│ TX03 │ Information Density         │ Atomic Fact Ratio (FTR)  │ FTR >= 0.080                │
+│ TX04 │ Passage Self-Containment    │ Exophoric Pronoun Check  │ Leading sentence ExoRatio=0 │
+│ TX05 │ Context Complexity          │ Shannon Entropy          │ 6.8 <= H(X) <= 7.6 bits     │
+│ TX06 │ Empirical Lift Factor       │ Princeton GEO Criteria   │ >=1 stat + 1 quote / 150 w  │
+└──────┴─────────────────────────────┴──────────────────────────┴─────────────────────────────┘
 ```
 
 ---
 
-## 2. Automated Unit Test Suite
+## 2. The 0–30 CITE Citability Score Rubric
 
-The `tests/` directory contains **65 unit tests across 18 test files** providing full regression coverage of every specialist skill's extraction logic.
+Adapted from `zilisrikle/geo-audit-skill`:
 
-| Test File | What It Covers |
-|---|---|
-| `tests/test_fetch_security.py` | SSRF filters, IPv4-mapped IPv6 bypass protection, private network blocking |
-| `tests/test_safe_fetch_unit.py` | safe_fetch unit behaviour: redirect limits, decompression bounds |
-| `tests/test_discoverability.py` | robots.txt parsing, OAI-SearchBot vs GPTBot classification, noindex detection, canonical check |
-| `tests/test_dom_parsers.py` | HTML parser edge cases: malformed tags, nested structures, encoding |
-| `tests/test_entity_content.py` | JSON-LD @graph extraction (Organization/Product), answerability attribute scoring |
-| `tests/test_microdata_rdfa.py` | HTML5 Microdata (itemscope/itemtype/itemprop) and RDFa 1.1 Lite (typeof/property) extraction |
-| `tests/test_fact_consistency.py` | Cross-page price contradiction, contact email conflict, copyright year drift |
-| `tests/test_fact_extractor_deep.py` | Scoped fact ledger extraction: currency normalisation, entity matching |
-| `tests/test_price_and_currency_utils.py` | Price parsing across locales, currency symbol normalisation |
-| `tests/test_price_multicurrency.py` | Global multi-currency parsing (USD, EUR, GBP, INR, JPY, BRL, AED, CAD, AUD) & interval normalization |
-| `tests/test_corroboration_deep.py` | sameAs identity link verification, HTTP 200 corroboration, broken authority detection |
-| `tests/test_geo_content.py` | Causal conjunction scoring, statistical evidence detection, question heading detection |
-| `tests/test_geo_scoring_engine.py` | Deep GEO: passage chunk analysis, pronoun density, direct answer lead |
-| `tests/test_geo_princeton_vectors.py` | Princeton KDD 2024 citation vectors: outbound primary citations, author bylines, statistics, causal depth |
-| `tests/test_passage_entropy.py` | Shannon token entropy ($H(X)$) and lexical compression ratio for factual density scoring |
-| `tests/test_engagement.py` | H1 information scent, CTA reachability, navigation element count |
-| `tests/test_engagement_deep.py` | Multilingual scent anchoring, granular page classifier, intent handoff |
-| `tests/test_specialist_sensors.py` | Standalone CLI subprocess execution across all 6 specialist sensors |
-| `tests/test_schema_validation.py` | Report schema validation gate: required fields, enum values, additionalProperties |
-| `tests/test_schema_edge_cases.py` | Schema edge cases: empty arrays, null fields, boundary severities |
+| Code | Dimension | Points | Core Criteria |
+| :--- | :--- | :---: | :--- |
+| **DA** | Direct Answer | 0–5 | Standalone 40–60 word answer lead directly resolving search intent. |
+| **DD** | Data Density | 0–5 | Quantitative statistics, benchmarks, FTR $\ge 0.080$. |
+| **AS** | Authority Signals | 0–5 | Named experts, external DOIs, verified `sameAs` identity links. |
+| **SQ** | Structure Quality | 0–5 | Strict heading hierarchy, comparison tables, code blocks. |
+| **FR** | Freshness | 0–5 | `dateModified` within last 60 days, recent temporal anchors. |
+| **UQ** | Uniqueness | 0–5 | Proprietary case studies, original data, zero marketing buzzwords. |
+
+**Grading Scale:** A (27–30) / B (22–26) / C (17–21) / D (12–16) / F (<12).
 
 ---
 
-## 3. Running the Test Suite
+## 3. Production QA Pipeline (`./scripts/qa_check.sh`)
+
+Every build and commit must cleanly pass all five automated stages:
+
+1. **Ruff Linter & Formatter:** Strict syntax, formatting, and PEP 8 enforcement (`0 errors`).
+2. **Flake8 Style Checker:** Zero unused imports, clean indentation (`0 errors`).
+3. **MyPy Static Typing:** Strict type-checking across all 7 skills (`0 errors`).
+4. **JSON Schema Gate:** Draft-07 JSON Schema gate validating `report-schema.json` and all sample manifests (`0 errors`).
+5. **Pytest Unit Test Suite:** **83 automated unit tests** across 21 test modules running in ~2.3 seconds (`100% passing`).
+
+---
+
+## 4. How to Execute Tests & Rebuild Submission
 
 ```bash
-# Run all 59 unit tests with python unittest
-python3 -m unittest discover -s tests
-
-# Run with pytest
-pytest tests/ -q
-
-# Run with full production QA pipeline (Ruff + Flake8 + MyPy + Pytest)
+# 1. Run full production QA pipeline
 ./scripts/qa_check.sh
+
+# 2. Run specific test suite
+python3 -m unittest tests/test_geo_content.py
+
+# 3. Verify zero emojis across all documentation
+./scripts/qa_check.sh
+
+# 4. Rebuild submission package
+./scripts/build.sh
 ```
-
----
-
-## 4. Continuous Verification Architecture
-
-All specialist scripts expose a `--format json` flag for machine-readable deterministic output. This makes them testable via `subprocess` from any test harness:
-
-```python
-result = subprocess.run(["python3", "src/skills/discoverability-audit/scripts/discoverability_check.py",
-    "--site", "https://testbrand.com",
-    "--inventory", "test_inv.json",
-    "--format", "json"
-], check=False, capture_output=True, text=True)
-data = json.loads(result.stdout)
-assert data["status"] == "ok"
-```
-
-The `acquire_inventory.py` script accepts a pre-built `--inventory` fixture to enable fast offline testing without live network calls.
