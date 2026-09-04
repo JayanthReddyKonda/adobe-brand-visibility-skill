@@ -270,6 +270,24 @@ Embed this on product detail pages to satisfy all commercial AI shopping agents:
     "priceCurrency": "USD",
     "priceValidUntil": "2027-12-31",
     "availability": "https://schema.org/InStock",
+    "hasMerchantReturnPolicy": {
+      "@type": "MerchantReturnPolicy",
+      "applicableCountry": "US",
+      "returnPolicyCategory": "https://schema.org/MerchantReturnFiniteReturnWindow",
+      "merchantReturnDays": 30
+    },
+    "shippingDetails": {
+      "@type": "OfferShippingDetails",
+      "shippingDestination": {
+        "@type": "DefinedRegion",
+        "addressCountry": "US"
+      },
+      "deliveryTime": {
+        "@type": "ShippingDeliveryTime",
+        "handlingTime": { "@type": "QuantitativeValue", "minValue": 0, "maxValue": 1, "unitCode": "DAY" },
+        "transitTime": { "@type": "QuantitativeValue", "minValue": 1, "maxValue": 3, "unitCode": "DAY" }
+      }
+    },
     "seller": {
       "@id": "https://example.com/#organization"
     }
@@ -277,3 +295,33 @@ Embed this on product detail pages to satisfy all commercial AI shopping agents:
 }
 </script>
 ```
+
+---
+
+## 3. Google 2025/2026 Merchant Listing & Schema Deprecation Rules
+
+Derived from Google Search Merchant Listing documentation and `schema_ecommerce_validate.py`:
+
+### Retired / Deprecated Schema Types (Emit Finding `SCHEMA_DEPRECATION`):
+- `Vehicle` / `VehicleListing` (retired June 2025)
+- `ClaimReview` (retired June 2025)
+- `EstimatedSalary` (retired June 2025)
+- `LearningVideo` / `CourseInfo` (retired June 2025)
+- `SpecialAnnouncement` (deprecated July 2025)
+- `Practice Problem` (Search Console / Rich Results support removed January 2026)
+- `Book Actions` (deprecated from search rich results)
+
+### FAQPage Rich Result Status (May 2026 Update):
+- Google retired FAQ rich results for **all websites** on May 7, 2026 (superseding the August 2023 gov/health restriction).
+- FAQPage markup is still ingested by non-Google LLMs (ChatGPT, Claude, Perplexity) as structured text, but has zero Google SERP rich result benefit.
+- For genuine user Q&A communities, implement **`QAPage`** or **`DiscussionForumPosting`**.
+
+### Server-Side Rendering (SSR) Mandate for Structured Data:
+- Per Google's December 2025 JavaScript SEO guidelines, JSON-LD injected purely via client-side JavaScript (`useEffect`, client component hydration) faces severe queuing delays and may be missed during rapid AI retrieval crawls.
+- Core commercial schemas (`Organization`, `Product`, `Offer`) MUST be delivered in the initial server-rendered HTML payload.
+
+### Merchant Listing Minimum Property Groups:
+- **Mandatory Minimum:** `name` + `image` + `offers`
+- **Offer Type Constraint:** `offers.@type` must be `Offer` (never `AggregateOffer` on specific SKU pages)
+- **Essential Attributes:** `price`, `priceCurrency`, `availability`
+- **Trust Policies:** `hasMerchantReturnPolicy` (return windows and conditions) and `shippingDetails` (transit times and regional delivery rates) are essential for automated shopping inclusion by generative search engines.

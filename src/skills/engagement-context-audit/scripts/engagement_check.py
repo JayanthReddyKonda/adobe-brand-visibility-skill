@@ -220,6 +220,10 @@ class EngagementDOMParser(HTMLParser):
         self.current_href = ""
         self.ctas = []
         self.meta_tags = {}
+        self.in_button = False
+        self.current_button_text = []
+        self.current_is_cta = False
+        self.cta_texts = []
 
     def handle_starttag(self, tag, attrs):
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
@@ -237,16 +241,21 @@ class EngagementDOMParser(HTMLParser):
         elif tag_lower in ("h1", "h2"):
             self.current_tag = tag_lower
             self.current_text = []
+        elif tag_lower == "button":
+            self.in_button = True
+            self.current_button_text = []
         elif tag_lower == "a":
             self.in_anchor = True
             self.current_anchor_text = []
             self.current_href = attr_dict.get("href", "")
+            self.current_is_cta = False
             if self.current_href:
                 self.nav_links.append(self.current_href)
                 cls = attr_dict.get("class", "").lower()
                 role = attr_dict.get("role", "").lower()
                 if "btn" in cls or "button" in cls or "cta" in cls or role == "button":
                     self.ctas.append(self.current_href)
+                    self.current_is_cta = True
 
     def handle_endtag(self, tag):
         tag_lower = tag.lower()
@@ -262,9 +271,18 @@ class EngagementDOMParser(HTMLParser):
             if self.current_text:
                 self.h2_list.append(" ".join(self.current_text).strip())
             self.current_tag = None
+        elif tag_lower == "button":
+            if self.current_button_text:
+                b_text = " ".join(self.current_button_text).strip()
+                if b_text:
+                    self.cta_texts.append(b_text)
+            self.in_button = False
         elif tag_lower == "a":
             if self.in_anchor and self.current_anchor_text:
-                self.nav_link_texts.append(" ".join(self.current_anchor_text).strip())
+                a_text = " ".join(self.current_anchor_text).strip()
+                self.nav_link_texts.append(a_text)
+                if self.current_is_cta and a_text:
+                    self.cta_texts.append(a_text)
             self.in_anchor = False
 
     def handle_data(self, data):
@@ -272,6 +290,8 @@ class EngagementDOMParser(HTMLParser):
             self.title += " " + data.strip()
         if self.current_tag in ("h1", "h2"):
             self.current_text.append(data.strip())
+        if self.in_button:
+            self.current_button_text.append(data.strip())
         if self.in_anchor:
             self.current_anchor_text.append(data.strip())
         if not self.in_script:
@@ -281,6 +301,10 @@ class EngagementDOMParser(HTMLParser):
 
 
 GENERIC_H1_TERMS = {"welcome", "home", "main", "untitled", "test", "page", "index", "default"}
+
+WEAK_CTA_PATTERNS = re.compile(
+    r"^(submit|click here|learn more|read more|continue|see more|view more|go)$", re.IGNORECASE
+)
 
 VALID_CONTACT_TERMS = {
     "contact",
@@ -486,6 +510,63 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 }
             )
 
+    # 3. Agent UX & Accessibility Barrier (<div onclick> vs semantic buttons)
+    div_onclicks = len(re.findall(r"<div\b[^>]*\bonclick\s*=", html_content, re.IGNORECASE))
+    if div_onclicks >= 3:
+        findings.append(
+            {
+                "category": "engagement",
+                "title": "Interactive elements implemented as non-semantic div-onclick widgets",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "AGENT_INTERACTION_BARRIER: Interactive buttons and CTAs are rendered using <div onclick> rather than semantic <button> or <a> tags.",
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "id": "AGENT_INTERACTION_BARRIER",
+                "cause_id": "AGENT_INTERACTION_BARRIER",
+                "evidence": f"Page {url} contains {div_onclicks} non-semantic <div onclick> element(s).",
+                "impact": "Autonomous AI agents and browser automation assistants cannot discover, tab through, or trigger non-semantic onclick divs.",
+                "suggested_action": {
+                    "summary": "Replace <div onclick> elements with native <button> or <a href> tags.",
+                    "technical_fix": "Refactor interactive div handlers to semantic HTML5 <button type='button'> or <a href> elements with keyboard focusability.",
+                    "creative_fix": "Ensure all call-to-action buttons have accessible, human-readable text labels rather than icon-only divs.",
+                    "priority": "medium",
+                    "verification": "Confirm grep for '<div[^>]*onclick' returns 0 matches in HTML.",
+                },
+            }
+        )
+
+    # 4. Semantic Landmarks (<main>, <article>, <nav>)
+    has_landmarks = bool(re.search(r"<(main|article|nav|aside|header|footer)\b", html_content, re.IGNORECASE))
+    if not has_landmarks and len(" ".join(dom.body_text).split()) > 150:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001",
+                "title": "Implement HTML5 semantic landmarks (<main>, <article>, <nav>)",
+                "category": "engagement",
+                "summary": f"Page {url} lacks HTML5 semantic landmarks. AI browsing agents and screen readers use landmarks to orient and extract core content without header/footer noise.",
+                "priority": "low",
+                "technical_fix": "Wrap primary content in <main> and navigational blocks in <nav>.",
+                "creative_fix": "Organize page layout into clear hierarchical sections with distinctive headings.",
+                "verification": "Verify HTML contains <main> and <nav> landmarks.",
+            }
+        )
+
+    # 5. Value-Driven CTA Copy Check (CRO & SXO best practices)
+    weak_ctas = [txt for txt in dom.cta_texts if WEAK_CTA_PATTERNS.match(txt.strip())]
+    if weak_ctas and len(" ".join(dom.body_text).split()) > 100:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.ENGAGEMENT.VALUE_DRIVEN_CTA.001",
+                "title": "Replace generic action-verb CTAs with outcome-oriented value copy",
+                "category": "engagement",
+                "summary": f"Found generic CTA button/link copy ('{weak_ctas[0]}') on {url}. AI search visitors arrive with high intent; value-driven CTAs ('Start Free Trial', 'See Live Pricing', 'Explore Documentation') preserve context scent and elevate conversion rates.",
+                "priority": "low",
+                "technical_fix": "Update button and anchor text to state the specific value or asset delivered upon click.",
+                "creative_fix": "Adopt the [Action Verb] + [Specific Value] pattern: 'Get Instant Access', 'Compare All Plans', 'Download Integration Guide'.",
+                "verification": "Confirm CTA buttons contain descriptive value nouns rather than isolated action verbs.",
+            }
+        )
+
     return (
         findings,
         recommendations,
@@ -540,6 +621,41 @@ def audit(base, domain, inv=None, state_file=None):
         findings.extend(p_findings)
         recommendations.extend(p_recs)
         page_metrics.append(p_data)
+
+    # 6. AI Buying Agent Readiness: Machine-Readable Pricing Manifest (/pricing.md)
+    pricing_info = inv.get("infrastructure", {}).get("pricing_manifest") if inv else None
+    pricing_present = False
+    if pricing_info:
+        pricing_present = pricing_info.get("present", False)
+    else:
+        status_pm, p_body, _, _ = safe_fetch(f"{base}/pricing.md", timeout=5, max_bytes=512 * 1024)
+        if status_pm == 200 and bool(p_body):
+            pricing_present = True
+        else:
+            status_pt, pt_body, _, _ = safe_fetch(f"{base}/pricing.txt", timeout=5, max_bytes=512 * 1024)
+            pricing_present = status_pt == 200 and bool(pt_body)
+
+    if pricing_present:
+        observations.append(
+            {
+                "observation": "Found machine-readable /pricing.md manifest for AI buying agents.",
+                "impact": "Autonomous procurement and shopping agents can evaluate plan tiers programmatically.",
+                "role": "purchasing",
+            }
+        )
+    else:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.ENGAGEMENT.AGENT_PRICING_MANIFEST.001",
+                "title": "Publish a machine-readable /pricing.md manifest for AI buying agents",
+                "category": "engagement",
+                "summary": "The site does not publish a machine-readable /pricing.md or /pricing.txt manifest. Autonomous AI purchasing agents (OpenAI Operator, Google Project Mariner) evaluate tools and services programmatically before human buyers visit.",
+                "priority": "low",
+                "technical_fix": "Publish a structured /pricing.md file at the domain root with tier names, price limits, and feature bullets.",
+                "creative_fix": "Include transparent plan thresholds and billing cadences without contact-sales gates.",
+                "verification": f"Confirm {base}/pricing.md returns HTTP 200 with text/markdown.",
+            }
+        )
 
     if not page_metrics:
         return {

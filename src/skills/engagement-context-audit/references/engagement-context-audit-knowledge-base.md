@@ -185,3 +185,47 @@ Specialized landing routes must immediately satisfy the intent implied by their 
 
 - **Pricing Route (`/pricing`, `/plans`):** Must display transparent numerical prices, starting price figures, tier names, or plan breakdown tables above the fold. Omitting price figures triggers `INTENT_TO_LANDING_MISMATCH` (Severity: `medium`).
 - **Product Route (`/product/*`, `/shop/*`):** Must present the product name, primary specification, availability state, and purchase/inquiry CTA.
+
+---
+
+## 5. Agent UX & Accessibility Architecture (AI Browsing Readiness)
+
+Derived from `agent-friendly-pages` and web.dev criteria:
+
+### The Three AI Agent Interaction Channels:
+1. **Accessibility Tree Quality:** Clean semantic roles (`button`, `link`, `heading`, `main`).
+2. **Raw HTML Semantics:** Real `<button type="button">` and `<a href="...">` vs non-semantic `<div onclick>` / `<span onclick>` widgets.
+3. **Interactive Element Discoverability:** Distinct visible text labels and accessible ARIA attributes.
+
+### Defect Taxonomy:
+- **`AGENT_INTERACTION_BARRIER` (Medium Severity):**
+  Triggered when interactive conversion buttons or navigation triggers are implemented using `<div onclick>` or `<span onclick>` without semantic elements. Autonomous AI browsing agents (e.g. OpenAI Operator, Claude Computer Use) cannot discover or trigger non-semantic onclick divs.
+  *Remediation:* Refactor to semantic HTML5 `<button type="button">` or `<a href="...">` elements.
+- **`PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001` (Low Priority):**
+  Triggered when content pages lack HTML5 semantic landmarks (`<main>`, `<nav>`, `<article>`).
+  *Remediation:* Wrap primary article/product content in `<main>` and primary navigation in `<nav>`.
+
+
+---
+
+## 6. Search Experience Optimization (SXO) & Value-Driven CTAs (from `claude-seo/seo-sxo` & `marketingskills/cro`)
+
+### SXO Core Principle:
+A page can achieve a 95/100 technical SEO score and still fail completely in AI search and visitor retention if there is a **page-type intent mismatch**:
+- If an AI query is commercial/comparison ("Best Cloud Database for SaaS"), an informational blog post lacking comparison tables and transparent pricing will immediately bounce AI-referred users.
+- **The 5-Second Orientation Test:** A visitor arriving from an AI summary must comprehend what the product is, who it is for, and why it is uniquely relevant within 5 seconds.
+
+### Value-Driven CTAs vs. Weak Action Verbs:
+- **Weak Generic CTAs:** `Submit`, `Click Here`, `Learn More`, `Read More`, `Continue`, `Go`. (Depress conversion rates and lose intent context scent).
+- **Strong Value-Driven CTAs:** `Start Free Trial`, `See Live Pricing`, `Explore Documentation`, `Download Architecture PDF`.
+- **Formula:** `[Action Verb] + [Specific Desired Outcome/Asset]`.
+
+---
+
+## 7. Autonomous AI Buying Agent Readiness (`/pricing.md`)
+
+Autonomous AI agents (OpenAI Operator, Google Project Mariner) increasingly evaluate software and service options programmatically before human buyers ever visit the site:
+- **Opaque Pricing Failure:** If pricing is locked behind client-rendered dynamic JavaScript or a forced "Contact Sales" wall, automated agents skip the vendor and recommend competitors with machine-readable plans.
+- **Standard Machine-Readable Manifests:**
+  - `/pricing.md` or `/pricing.txt`: A structured markdown summary of tiers, monthly/annual rates, usage limits, and core features.
+  - Trivially ingestible by LLMs with zero HTML parsing or browser rendering overhead.

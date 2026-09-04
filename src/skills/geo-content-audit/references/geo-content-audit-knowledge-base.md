@@ -197,3 +197,95 @@ Independent empirical studies reveal that traditional Domain Rating (DR/backlink
 - Reddit Community Discussions: High correlation
 - Wikipedia / Wikidata Entity: High correlation
 - Traditional Domain Backlinks: ~0.266 correlation (Weak)
+
+---
+
+## 4. Role-Augmented Intent-Driven GEO (RAID G-SEO Research, arXiv:2508.11158v2)
+
+Recent state-of-the-art research demonstrates that static keyword optimization and single-perspective rewriting fail in Generative Search Engines (GSE - Perplexity, ChatGPT Search, BingChat) because user queries are hidden in a black box. RAID G-SEO establishes an intent-aware optimization pathway:
+
+### 1. The 4-Stage Optimization Pipeline
+1. **Content Summarization:** Distill the source content's core informational essence, eliminating stylistic noise and filler.
+2. **Intent Inference via 4W Multi-Role Deep Reflection:**
+   - **Who:** Identifies 1–3 representative user roles likely to seek this content (e.g. Knowledge Producers, Civic Everyday Actors, Economic Decision Makers).
+   - **What:** Models role-specific information needs and domain knowledge expectations.
+   - **Why:** Diagnoses semantic gaps between original content expression and user intent needs.
+   - **How:** Reconstructs and generalizes the intent to cover broad retrieval variations without overfitting.
+3. **Step Planning:** Decomposes generalized intent into actionable revisions (restructuring, head-first cue placement, technical enrichment).
+4. **Intent-Aligned Content Rewriting:** Synthesizes optimized passages preserving factual integrity while maximizing relevance to diverse retrieval scenarios.
+
+### 2. The Head-First Information Cue Principle
+RAID G-SEO proves that front-loading key factual definitions, specifications, or answers into the introductory sentence ("head-first cues") significantly elevates citation frequency and positional prominence in AI answers, outperforming traditional linear or chronological exposition.
+
+### 3. G-EVAL 2.0 Multi-Dimensional Evaluation Rubric
+AI content visibility is measured across seven fine-grained dimensions (0–5 scale):
+- **Relevance:** Direct topical pertinence to the retrieval query.
+- **Fluency:** Grammatical coherence and natural phrasing.
+- **Uniqueness:** Distinctive domain-specific vocabulary and differentiated perspective.
+- **Diversity:** Multi-angle coverage addressing diverse sub-questions.
+- **Click-Follow Likelihood:** Persuasiveness and intent satisfaction prompting citation clicks.
+- **Subjective Positional Prominence:** Early placement in synthesized AI answer text.
+- **Subjective Content Volume:** Share of voice within the generated response.
+
+
+
+---
+
+## 5. The Hedge Language Dictionary & Density Metric (from `geoskills/geo-fix-content`)
+
+### Why Hedge Language Destroys AI Citations:
+- Hedged language ranks **3x lower** than confident assertions in AI citation selection.
+- Generative engines prefer authoritative, definitive statements when selecting text chunks to quote.
+- Content with statistics and direct assertion increases AI citation probability by **30%** (Aggarwal et al., 2023).
+
+### Six Hedge Word Categories:
+1. **Uncertainty (High Severity):** `maybe`, `perhaps`, `possibly`, `might`, `could`.
+   *Fix:* Remove qualifier or state exact verified conditions.
+2. **Qualification (Medium Severity):** `somewhat`, `relatively`, `fairly`, `rather`, `quite`.
+   *Fix:* Replace with specific comparative benchmark data.
+3. **Approximation (Medium Severity):** `about`, `around`, `approximately`, `roughly`, `nearly`.
+   *Fix:* Use exact numbers or explicit tolerance ranges (`±X%`).
+4. **Distancing (High Severity):** `seems`, `appears`, `tends to`, `suggests`, `likely`, `arguably`.
+   *Fix:* Transform passive distancing into active claims (`X appears to improve Y` -> `X improves Y`).
+5. **Generalization (Medium Severity):** `generally`, `usually`, `often`, `sometimes`, `typically`, `in most cases`.
+   *Fix:* Quantify the operational scope (`in 85% of customer deployments`).
+6. **Weakening (High Severity):** `a bit`, `sort of`, `kind of`, `in some ways`, `to some extent`.
+   *Fix:* Eliminate filler or articulate the precise technical dimension.
+
+### Mathematical Formula:
+$$\text{Hedge Density} = \frac{\text{Total Hedge Words}}{\text{Total Words}} \times 100$$
+- **Target:** $< 0.5\%$ (Authoritative)
+- **Warning:** $0.5\% - 1.5\%$ (Moderate qualification)
+- **Defect Threshold:** $> 1.5\%$ (`EXCESSIVE_HEDGE_LANGUAGE`)
+
+---
+
+## 6. Demand-Side Conversational Query Alignment (23-Word Prompts)
+
+- **Research Finding:** The average user prompt submitted to conversational AI systems (ChatGPT, Claude, Perplexity) is **23 words long**, contrasted with 2–3 words in legacy keyword search.
+- **Structural Requirement:** Content headings must reflect natural conversational question phrasing:
+  - *Poor Keyword Heading:* `Cloud Security Features`
+  - *Conversational AI-Aligned Heading:* `How does [Product] protect sensitive multi-tenant data in AWS environments?`
+- **Immediate Direct Lead:** The first 1–2 sentences under the heading must directly resolve the question before expanding into technical nuances.
+
+---
+
+## 7. Multi-Platform Citation Dynamics & Query Fan-Out (from `claude-seo` & `geo-seo-claude`)
+
+### 1. Cross-Platform Source Selection Divergence:
+Only **11% of domains** are cited by BOTH ChatGPT and Google AI Overviews for the same query. Each AI search engine employs different retrieval pipelines:
+- **Google AI Overviews (Gemini):**
+  - 92% of citations come from the top 10 organic Google results (traditional SEO is the gateway).
+  - 47% come from below position 5, heavily favoring direct 40–60 word answer leads and semantic HTML `<table>` structures.
+  - Generates **Query Fan-Out**: concurrent related queries synthesized together.
+- **ChatGPT Search (Bing Index):**
+  - 47.9% of domain citations derive from Wikipedia; 11.3% from Reddit and YouTube.
+  - Strongly weights machine-verifiable Wikidata entity items and 2000+ word comprehensive guides.
+- **Perplexity AI:**
+  - 46.7% of citations derive from Reddit and community discussion threads.
+  - Cites 5–15 distinct sources per response, allowing mid-authority sites to win citations if community-validated.
+
+### 2. The Recency / Freshness Imperative (SE Ranking 1.3M Study):
+- Pages updated within the last **3 months are 3x more likely to be cited** in generative AI search results.
+- Pages left un-refreshed for **6+ months lose citation eligibility** across time-sensitive queries.
+- A scheduled quarterly refresh program updating statistics, publication dates (`article:modified_time`), and case studies is high-leverage GEO.

@@ -96,3 +96,40 @@ AI search engines (Perplexity, ChatGPT Search, Claude Search) do not rely solely
 
 ## Audit Rule:
 Declaring sameAs links to 4xx/5xx dead profiles damages the brand entity trust score. Probing declared links in real time ensures only live, authoritative anchors enter the Stateful Knowledge Graph.
+
+---
+
+## CHECK 3: Internal Mirror Domain Cluster Detection (`CIRCULAR_SAMEAS_SELF_REFERENCE`)
+
+- **Measures**: Whether declared `sameAs` links point to external verifying authorities versus an internal cluster of mirror domains (`.to`, `.bz`, `.ru`, `.com`).
+- **Defect**: When 2+ `sameAs` entries share the target brand's second-level domain (SLD) across different TLDs, indicating an alternate domain mirror cluster rather than independent verification.
+- **Classification**: `CIRCULAR_SAMEAS_SELF_REFERENCE` (Family: `AUTHORITY.IDENTITY_CORROBORATION`).
+- **Severity**: `high`.
+- **Confidence**: `high`.
+- **Impact**: In AI knowledge graphs, self-referencing mirrors trigger duplicate content penalties, domain-spoofing flags, and entity fragmentation.
+- **Remediation**: Remove internal mirror domains from `sameAs` array in JSON-LD. Reserve `sameAs` strictly for independent third-party authorities (Wikidata, Wikipedia, Crunchbase, verified social hubs).
+
+---
+
+## Three-Tier Authority Classification Matrix
+
+| Tier | Category | Target Examples | Knowledge Graph Value |
+|---|---|---|:---:|
+| **Tier 1** | **Global Knowledge Graph Nodes** | `wikidata.org`, `wikipedia.org`, `crunchbase.com` | **Highest (+100% Trust)**: Anchors entity in pre-training corpora |
+| **Tier 2** | **Verified Social / Code Footprints** | `x.com`, `linkedin.com/company`, `github.com` | **High (+70% Trust)**: Validates continuous operational activity |
+| **Tier 3** | **Internal Mirror Domains (Defect)** | Same SLD across `.to`, `.bz`, `.ru`, `.com` | **Negative (Domain Spoofing / Entity Fragmentation)** |
+
+---
+
+## Empirical Platform Correlation with AI Citations (Ahrefs 75,000 Brand Study)
+
+Brand mentions correlate 3x more strongly with AI visibility than traditional backlinks:
+
+| Platform | Correlation Coefficient | AI Search Weight | Strategic Mechanism |
+|---|:---:|:---:|---|
+| **YouTube** | **0.737** | **Highest (25%)** | Video titles, chapters, and auto-transcripts are indexed by multimodal search (Perplexity, Google AI Overviews). |
+| **Reddit** | **High** | **High (25%)** | Conversational forums provide experiential, unvarnished peer consensus queried during intent fan-out. |
+| **Wikipedia** | **High** | **High (20%)** | Foundation model pre-training corpora establish base entity identity from Wikipedia. |
+| **LinkedIn** | **Moderate** | **Moderate (15%)** | Validates corporate founding, employee count, and B2B operational scale. |
+| **Backlinks (DR)** | **0.266** | **Low (15%)** | Traditional PageRank signals have weak correlation with generative citation selection. |
+

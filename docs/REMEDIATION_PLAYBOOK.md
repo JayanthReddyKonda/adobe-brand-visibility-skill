@@ -28,7 +28,7 @@ Every brand AI-readiness defect has two complementary remediation vectors:
   User-agent: PerplexityBot
   Allow: /
 
-  User-agent: Claude-Web
+  User-agent: Claude-SearchBot
   Allow: /
   ```
 - **Creative Fix:** Update legal/governance disclosures to clarify that retrieval access for brand citations is permitted while reserving foundation model training rights.

@@ -102,6 +102,110 @@ class TestEntityContentAudit(unittest.TestCase):
         data = json.loads(res.stdout)
         self.assertEqual(data["status"], "ok")
 
+    def test_deprecated_schema_detection(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/listing",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "product",
+                    "html": '<html><head><title>Vehicle</title><script type="application/ld+json">{"@context": "https://schema.org", "@type": "VehicleListing", "name": "Used Sedan"}</script></head><body><h1>Used Sedan</h1></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("SCHEMA_DEPRECATION", cause_ids)
+
+    def test_expanded_deprecated_schema_2026(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/math-prep",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "product",
+                    "html": '<html><head><title>Prep</title><script type="application/ld+json">{"@context": "https://schema.org", "@type": "PracticeProblem", "name": "Algebra Problem"}</script></head><body><h1>Algebra Problem</h1></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("SCHEMA_DEPRECATION", cause_ids)
+
+    def test_offer_clean_float_price_validation(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/product-a",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "product",
+                    "html": '<html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Tool", "offers": {"@type": "Offer", "price": "$99.00", "priceCurrency": "USD"}}</script></head><body><h1>Tool</h1></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("SCHEMA_PRICE_FORMAT_INVALID", cause_ids)
+
+    def test_hf06_product_price_contradiction(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/shoes",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "product",
+                    "html": '<html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Product", "name": "Shoes", "offers": {"@type": "Offer", "price": "149.00", "priceCurrency": "USD"}}</script></head><body><h1>Shoes</h1><p>Special price: $99.00 today only!</p></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in data.get("findings", [])]
+        self.assertIn("COMMERCIAL_PRODUCT_DATA_CONTRADICTION", cause_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

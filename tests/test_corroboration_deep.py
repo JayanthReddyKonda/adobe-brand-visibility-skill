@@ -190,6 +190,80 @@ class TestCorroborationDeep(unittest.TestCase):
         )
         self.assertEqual(res.returncode, 0)
 
+    def test_circular_sameas_mirror_cluster_detection(self):
+        inv_data = {
+            "site": "https://testbrand.tv",
+            "pages": [
+                {
+                    "url": "https://testbrand.tv/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><title>TestBrand</title><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://testbrand.to", "https://testbrand.bz", "https://testbrand.ru", "https://testbrand.com"]}</script></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.tv",
+                "--inventory",
+                self.test_inv,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        cause_ids = [f.get("cause_id") for f in out.get("findings", [])]
+        self.assertIn("CIRCULAR_SAMEAS_SELF_REFERENCE", cause_ids)
+
+    def test_offsite_third_party_footprint_gap(self):
+        # Inventory with no sameAs links on third-party authority hubs
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": '<html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "url": "https://testbrand.com", "sameAs": ["https://twitter.com/testbrand"]}</script></head><body><h1>TestBrand</h1></body></html>',
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        with open(self.test_state, "w") as f:
+            json.dump(
+                {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f
+            )
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--state",
+                self.test_state,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        rec_ids = [r.get("id") for r in data.get("recommendations", [])]
+        self.assertIn("PROACTIVE.AUTHORITY.OFFSITE_FOOTPRINT_GAP.001", rec_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

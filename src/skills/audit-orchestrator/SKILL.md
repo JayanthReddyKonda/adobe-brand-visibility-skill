@@ -188,18 +188,59 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py \
 Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over all 6 outputs:
 
 1. **Deduplicate:** Merge findings that share the same `cause_id` across multiple specialists into a single authoritative finding. Elevate severity to the highest observed.
-2. **Root-Cause Map:** Assign each finding a `cause_id` from the canonical taxonomy (e.g. `AI_RETRIEVAL_BLOCKED`, `MATERIAL_ENTITY_AMBIGUITY`, `FIRST_PARTY_FACT_CONFLICT`). Every finding MUST have a `cause_id`.
+2. **Root-Cause Map:** Assign each finding a `cause_id` from the canonical taxonomy (e.g. `AI_RETRIEVAL_BLOCKED`, `MATERIAL_ENTITY_AMBIGUITY`, `FIRST_PARTY_FACT_CONFLICT`, `CIRCULAR_SAMEAS_SELF_REFERENCE`). Every finding MUST have a `cause_id`.
 3. **Confidence Calibration:** Apply the confidence model — a single homepage cannot produce `high` confidence for site-wide claims.
-4. **Dual-Track Remediation:** For every finding, write a `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers) AND a `verification` step. Use the remediation catalog in the knowledge base as your reference.
-5. **Proactive Recommendations:** Add recommendations for issues that are not defects but would improve AI citability (e.g. adding causal conjunctions to improve GEO score).
+4. **Dual-Track Remediation (Domain-Aware):** For every finding, write a `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers) AND a `verification` step. Tailor fixes to the detected website archetype (Media/Streaming, SaaS/Software, E-Commerce, or Publishing) using Knowledge Base Section 7.
+5. **Query-Intent Scenario Modeling:** In each finding's `impact`, clearly contrast how the defect impairs both:
+   - **Navigational Brand Queries** (e.g., *"What is [Brand]?"* — entity resolution failure, hallucination, lack of knowledge graph anchor).
+   - **Categorical / Discovery Queries** (e.g., *"Where can I buy/stream/find [Topic]?"* — competitor selection due to superior schema attributes, licensing provenance, or causal depth).
+6. **Proactive Recommendations:** Add recommendations that genuinely strengthen AI discoverability beyond defects (e.g., modular 120-180 word RAG passage chunking with direct answer leads, Wikidata entity registration, or JSON-LD structured consolidation).
+7. **The 17-Rule Consolidated Matrix (`CR01`–`TX06`):**
+   Audit reasoning must evaluate the target domain against the complete consolidated benchmark suite defined in `references/state-of-the-art-geo-benchmarks.md`:
+   - **Crawler Access (`CR01`–`CR05`):** RFC 9309 compliance, 500 KiB file cap, HTTP 5xx fail-closed state, and explicit permissions for `OAI-SearchBot`, `Claude-SearchBot`, and `PerplexityBot`.
+   - **Machine-Readable Manifests (`LL01`–`LL02`):** Root `/llms.txt` availability with H1 title and blockquote, plus first-100-word executive summaries.
+   - **Rendering & Delivery (`RD01`–`RD02`):** Content Availability Gap ($	ext{CAG} < 0.15$) and text-to-HTML Signal-to-Noise Ratio ($	ext{SNR} > 0.12$).
+   - **Structured Data (`SC01`–`SC03`):** Organization $\ge 2$ authoritative `sameAs` nodes, clean float Offer prices with ISO 4217 currencies, and 60-day freshness.
+   - **Text & Citability (`TX01`–`TX06`):** BLUF top-30% placement, Hyland hedge density $\le 1.2\%$, Atomic Fact-to-Token Ratio $	ext{FTR} \ge 0.080$, Exophoric Pronoun Ratio $0\%$, Shannon Token Entropy $6.8 - 7.6	ext{ bits}$, and Princeton GEO evidence density ($\ge 1	ext{ stat} + 1	ext{ quote} / 150	ext{ words}$).
 
-**Step 11: Compute Composite Metrics**
+8. **The 6 Orthogonal Scores Model & Wilson Confidence Intervals:**
+   Audit synthesis must evaluate the target brand across the 6 orthogonal dimensions defined in `references/sota-ai-readiness-framework-2026.md`:
+   - **Crawlability Score (20%):** Deterministic HTTP, RFC 9309, crawler access.
+   - **Retrieval Readiness (20%):** Text extraction, SNR, Content Availability Gap.
+   - **Citation Readiness (20%):** Atomic Fact-to-Token Ratio (FTR), hedge rate, BLUF top-30%.
+   - **Entity Authority (15%):** Schema graph, sameAs nodes, fact ledger consistency.
+   - **Cross-Engine Visibility (15%):** CECO and Wilson 95% confidence intervals.
+   - **Agentic Commerce Readiness (10%):** Product consistency, UCP, AP2, and A2A interoperability.
 
-Calculate the following and include in `summary`:
-- `answerability_index`: Fraction of audited product/pricing pages with complete `price`, `availability`, and `description` attributes (0.0–1.0).
-- `geo_readiness_score`: Average causal depth score across article/product pages (0.0–1.0).
-- `contradiction_index`: Number of verified cross-page factual conflicts found.
-- `overall_health`: `"critical"` if any critical findings exist, `"needs_work"` if any high/medium, `"good"` if only low/proactive.
+9. **The Canonical 16-Defect Classification (HF-01 to HF-08 and W-01 to W-08):**
+   Every finding must be mapped to its corresponding Hard Failure (`HF`) or High-Value Warning (`W`) code from the defect catalog.
+
+10. **The Citation Failure Modes Decision Tree (Tian et al. 2026):**
+   Structure root cause analysis using the 5-stage failure taxonomy:
+   - **Retrieval Failure:** robots.txt disallow, HTTP 4xx/5xx, noindex, or empty SSR application shell.
+   - **Relevance Failure:** Title/H1 query-intent mismatch or semantic drift.
+   - **Redundancy Failure:** Generic, commoditized content losing context attention to higher-authority domains.
+   - **Trust Failure:** FTR < 0.040, excessive hedge language (>2.5%), or uncorroborated entity claims.
+   - **Extraction Failure:** nosnippet directives, low text Signal-to-Noise Ratio (<0.12), or DOM fragmentation.
+
+11. **The 57% Off-Site Authority Rule & CITE Rubric:**
+   Reasoning must acknowledge that 57% of branded AI citations derive from third-party reviews and authority nodes (Reddit, Wikipedia, YouTube, LinkedIn), and evaluate pages against the 0–30 CITE rubric.
+
+12. **Platform-Specific Citation Breakdown & PAWC Scoring:**
+   In your reasoning and executive summary, contrast visibility across the Big 3 Generative Engines using the Position-Adjusted Word Count ($	ext{PAWC}$) framework:
+   - **Google AI Overviews (Gemini):** Traditional SEO gateway (top 10 correlation), table extractability, direct 40–60 word answer leads, and query fan-out topical clusters.
+   - **ChatGPT Search (Bing):** Wikipedia/Wikidata entity grounding (47.9% share), comprehensive 2000+ word deep guides, and autonomous buying agent manifests (`/pricing.md`).
+   - **Perplexity AI:** Community consensus validation (Reddit 46.7%), recency (<3 months 3x boost), and multi-source corroboration.
+
+**Step 11: Calculate Summary Metrics & Scoring Model**
+
+1. Calculate and populate the exact integer counts for `summary`:
+   - `total_findings`, `critical`, `high`, `medium`, and `low` strictly conforming to `references/report-schema.json`.
+2. Compute the **Scoring Model Composite GEO Score** (0–100) using Knowledge Base Section 8:
+   - Technical Accessibility (20%), Content Citability (35%), Structured Data (20%), and Brand Signals (25%).
+   - Apply Business Type Multipliers (SaaS, E-Commerce, Publisher, Local, Agency).
+   - Assign the Letter Grade: **A** (85–100), **B** (70–84), **C** (50–69), **D** (30–49), **F** (0–29).
+3. Serialize the machine-readable `<!-- GEO-AUDIT-META ... -->` block in your report's executive summary to support automated monitoring and delta comparison.
 
 ---
 

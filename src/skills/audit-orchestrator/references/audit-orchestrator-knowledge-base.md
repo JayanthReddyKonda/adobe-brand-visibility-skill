@@ -90,9 +90,12 @@ AUDIT TAXONOMY
 │
 ├── AUTHORITY
 │   ├── IDENTITY_CORROBORATION
-│   │   └── BROKEN_AUTHORITY_ANCHOR         (Declared sameAs profile URL returns 4xx/5xx HTTP error)
-│   └── CLAIM_CORROBORATION
-│       └── CLAIM_CORROBORATION_GAP         (Material factual assertions lack external verification)
+│   │   ├── BROKEN_AUTHORITY_ANCHOR         (Declared sameAs profile URL returns 4xx/5xx HTTP error)
+│   │   └── CIRCULAR_SAMEAS_SELF_REFERENCE  (sameAs points to alternate mirror domains rather than 3rd-party knowledge graph)
+│   ├── CLAIM_CORROBORATION
+│   │   └── CLAIM_CORROBORATION_GAP         (Material factual assertions lack external verification)
+│   └── PROVENANCE_AND_RIGHTS
+│       └── UNVERIFIED_CONTENT_RIGHTS       (Media/streaming/catalog lacks machine-verifiable licensing disclosures)
 │
 ├── EXPERIENCE
 │   └── CONTINUITY
@@ -607,3 +610,131 @@ Heuristics (like counting `<table>` tags or measuring keyword density) may be us
 
 ## 5. Output Delivery Mandate (Output Standard)
 The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+
+## 6. Query-Intent Scenario Modeling
+When authoring `root_cause` and `impact` for findings, articulate the specific query mode failure in conversational AI search engines:
+1. **Navigational / Brand Query ("What is [Brand]?"):**
+   - Explain why the LLM fails to recognize the brand, hallucinates facts, or refuses attribution (e.g., lack of Wikidata entity, circular sameAs mirror networks, ambiguous Organization schema).
+2. **Categorical / Discovery Query ("Where can I buy/stream/find [Topic]?"):**
+   - Explain why the LLM selects competitors over this domain (e.g., competitors have verified licensing disclosures, structured Product/Offer/VideoObject schemas, and modular 120-180 word RAG passage chunks with high causal depth).
+
+## 7. Domain-Specific Remediation Catalog
+Tailor `suggested_action.technical_fix` and `creative_fix` to the detected website archetype:
+- **Media & Streaming Services:**
+  - *Technical Fix:* Implement structured `TVSeries`, `TVEpisode`, or `VideoObject` with licensed stream descriptors, canonical media IDs, and rich server-rendered HTML descriptions.
+  - *Creative Fix:* Add original editorial overviews, episode guides, and thematic synopses using explanatory conjunctions (because, enables, features).
+- **SaaS & Cloud Software:**
+  - *Technical Fix:* Expose transparent pricing matrices with structured `OfferCatalog`, semantic comparison `<table>` elements, and developer API documentation.
+  - *Creative Fix:* Detail technical specifications, integration workflows, and quantifiable benchmark statistics (percentage latency reductions, throughput metrics).
+- **E-Commerce & Commercial Retail:**
+  - *Technical Fix:* Complete all material attributes (`price`, `priceCurrency`, `availability`, `itemCondition`, `returnPolicy`) within JSON-LD `Product` and `Offer` graphs.
+  - *Creative Fix:* Provide transparent pricing terms, exact billing cadences, and scannable feature lists.
+- **Publishing & Content Portals:**
+  - *Technical Fix:* Embed named author `Person` markup with credentials (`jobTitle`, `alumniOf`) and primary source citation links (DOI, academic institutions, standards bodies).
+  - *Creative Fix:* Adopt the "Direct Answer Inversion" pattern: an H2 question heading followed immediately by a concise 40-60 word answer lead, followed by 100 words of mechanistic explanation.
+
+
+## 8. Scoring Model v2 & Composite GEO Score
+
+To produce a single, holistic benchmark of AI search readiness while retaining empirical rigor, the orchestrator computes the Composite GEO Score (0–100):
+
+### Mathematical Formulation:
+$$\\text{GEO Score} = (\\text{Technical} \\times 0.20) + (\\text{Citability} \\times 0.35) + (\\text{Schema} \\times 0.20) + (\\text{Brand} \\times 0.25)$$
+
+1. **Technical Accessibility (Weight: 20%):**
+   - 11-Crawler matrix access (retrieval bots weighted 2x training bots).
+   - llms.txt discovery and parseability.
+   - Clean canonical and meta tag compliance.
+2. **Content Citability (Weight: 35%):**
+   - Head-First Information Cues and 40–60 word Direct Answer Inversion leads.
+   - Quantifiable statistics and causal conjunction density (Princeton KDD 2024).
+   - Low hedge language density (< 0.5% target).
+   - Content recency (< 3 months bonus, > 6 months deficit).
+3. **Structured Data Completeness (Weight: 20%):**
+   - Machine-explicit JSON-LD schemas (`Organization`, `Product`, `Offer`, `BreadcrumbList`).
+   - Server-side rendering compliance (no client-only schema injection).
+   - Zero retired/deprecated schema types.
+4. **Brand Corroboration & Authority (Weight: 25%):**
+   - Bidirectional external sameAs linkbacks.
+   - External third-party substantiation (Wikidata, Wikipedia, LinkedIn, GitHub).
+   - First-party fact ledger consistency across all sampled routes.
+
+### Letter Grade Scale:
+- **A (85–100):** Elite AI Readiness. Fully optimized for instant multi-engine citation.
+- **B (70–84):** Good AI Readiness. Minor structural or recency optimizations needed.
+- **C (50–69):** Moderate Visibility. Notable entity or citability gaps depress selection.
+- **D (30–49):** High Risk. Severe crawl blockers or material entity ambiguity.
+- **F (0–29):** Critical Failure. Complete absence from generative search engines.
+
+---
+
+## 9. Machine-Readable `GEO-AUDIT-META` Specification
+
+For programmatic integration, CI/CD gates, and automated trend monitoring, the orchestrator embeds a machine-readable HTML comment block in the report preamble:
+
+```html
+<!-- GEO-AUDIT-META
+{
+  "version": "2.1.0",
+  "site": "https://example.com",
+  "timestamp": "2026-09-02T17:40:00Z",
+  "composite_geo_score": 78.5,
+  "letter_grade": "B",
+  "archetype": "saas_software",
+  "breakdown": {
+    "technical_accessibility": 92.0,
+    "content_citability": 68.5,
+    "structured_data": 80.0,
+    "brand_authority": 76.0
+  },
+  "critical_blockers": 0,
+  "total_findings": 3
+}
+-->
+```
+
+
+## 10. The Canonical 16-Defect Matrix (HF-01 to HF-08 and W-01 to W-08)
+
+To eliminate subjective ambiguity, audit findings must map directly to the canonical defect taxonomy:
+
+### A. Hard Failures (HF-01 to HF-08) — Deterministic Blockers
+| Code | Title | Category | Severity | Root Cause Definition |
+| :--- | :--- | :--- | :--- | :--- |
+| **HF-01** | Target URL Unreachable / Non-200 | Crawlability | Critical | HTTP status >= 400 or network timeout. |
+| **HF-02** | Canonical URL Contradictory | Discoverability | High | Target page declares contradictory or missing canonical tag. |
+| **HF-03** | Search Crawler Blocked in robots.txt | Crawlability | Critical | `OAI-SearchBot`, `Claude-SearchBot`, or `PerplexityBot` disallowed. |
+| **HF-04** | noindex Directive Active | Indexability | Critical | `<meta name="robots" content="noindex">` or HTTP `X-Robots-Tag`. |
+| **HF-05** | nosnippet on Core Content | Snippet Control | High | `nosnippet`, restrictive `max-snippet`, or `data-nosnippet` on text. |
+| **HF-06** | Product Data Contradiction | Commerce | Critical | HTML visible price differs from JSON-LD `Offer.price`. |
+| **HF-07** | Critical Claims in Non-Text Media | Extractability | High | Core facts exist solely in images, PDFs, or dynamic JS rendering. |
+| **HF-08** | Schema Directly Contradicts Visible HTML | Structured Data | High | Schema entities state values incompatible with on-page copy. |
+
+### B. High-Value Warnings (W-01 to W-08) — Probabilistic & Quality Risks
+| Code | Title | Category | Severity | Root Cause Definition |
+| :--- | :--- | :--- | :--- | :--- |
+| **W-01** | Initial HTML Extraction Deficit | Retrieval | Medium | SSR content availability gap exceeds 15% (CAG >= 0.15). |
+| **W-02** | High-Value Facts Lack Source Attribution | Citability | Medium | Crucial commercial claims lack verifiable sources or citations. |
+| **W-03** | Commercial Pricing / Inventory Drift | Consistency | Medium | Cross-page or feed discrepancy in price, currency, or stock status. |
+| **W-04** | Brand Entity Discordance | Authority | Medium | Organization name or sameAs links conflict across routes. |
+| **W-05** | Excessive Discovery Depth | Architecture | Low | Authoritative evidence requires > 3 clicks/hops from homepage. |
+| **W-06** | llms.txt Link Decay | Manifest | Low | Links inside `/llms.txt` return 4xx redirects or non-canonical URLs. |
+| **W-07** | Low Atomic Fact Density | Content | Medium | FTR < 0.040; prose lacks verifiable dates, figures, or metrics. |
+| **W-08** | Cross-Engine Citation Divergence | Visibility | Medium | CECO < 0.50; brand cited on only 1 engine while absent on others. |
+
+---
+
+## 11. The 6 Orthogonal Scoring Dimensions & Statistical Formulation
+
+To avoid conflating crawlability with empirical visibility, the audit synthesizes six distinct, orthogonal scores:
+
+$$\text{Crawlability (20\%)} + \text{Retrieval (20\%)} + \text{Citation Readiness (20\%)} + \text{Entity Authority (15\%)} + \text{Cross-Engine Visibility (15\%)} + \text{Agentic Commerce (10\%)}$$
+
+### Mathematical Formulations:
+1. **Cross-Engine Citation Coverage (CECO):**
+   $$\text{CECO} = \frac{\#\text{engines citing brand/domain}}{\#\text{engines tested}}$$
+2. **Wilson 95% Score Confidence Interval:**
+   $$\text{CI}_{95\%} = \frac{\hat p + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat p(1-\hat p)}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}$$
+   Where $\hat p$ is the observed sample citation rate, $n$ is total query runs (minimum $n \ge 10$), and $z = 1.96$.
+3. **Product Consistency Index:**
+   $$\text{ProductConsistency} = 1 - \frac{\#\text{conflicting fields}}{\#\text{checked fields}}$$

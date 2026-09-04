@@ -276,6 +276,27 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     inv["robots"] = {"status": r_status, "text": robots_txt if r_status == 200 else None}
     inv["infrastructure"]["robots"] = inv["robots"]
 
+    # 2.1 llms.txt Discovery
+    ll_status, llms_txt, _, _ = safe_fetch(base_url + "/llms.txt", timeout=5, max_bytes=512 * 1024)
+    inv["infrastructure"]["llms_txt"] = {
+        "status": ll_status,
+        "present": (ll_status == 200 and bool(llms_txt)),
+        "snippet": (llms_txt[:400] if ll_status == 200 and llms_txt else None),
+    }
+
+    # 2.2 Machine-Readable Pricing Manifest Discovery (/pricing.md)
+    pm_status, pricing_md, _, _ = safe_fetch(base_url + "/pricing.md", timeout=5, max_bytes=512 * 1024)
+    if pm_status != 200 or not pricing_md:
+        pt_status, pt_txt, _, _ = safe_fetch(base_url + "/pricing.txt", timeout=5, max_bytes=512 * 1024)
+        if pt_status == 200 and pt_txt:
+            pm_status, pricing_md = pt_status, pt_txt
+
+    inv["infrastructure"]["pricing_manifest"] = {
+        "status": pm_status,
+        "present": (pm_status == 200 and bool(pricing_md)),
+        "snippet": (pricing_md[:400] if pm_status == 200 and pricing_md else None),
+    }
+
     sitemap_candidates = []
     if robots_txt and r_status == 200:
         sitemap_candidates = [

@@ -1,51 +1,110 @@
-# Empirical Generative Engine Optimization (GEO) Synthesis
+# Generative Engine Optimization (GEO) & Retrieval Science Synthesis
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 2.0.0  
-**Foundational Research:** 
-- Princeton University, Georgia Tech, Allen AI (*KDD 2024*): *"GEO: Generative Engine Optimization"*
-- Carnegie Mellon University (*AutoGEO 2024*): *"Automated Generative Engine Optimization"*
-- TU Darmstadt (*C-SEO Bench 2024*): *"C-SEO: Benchmarking Generative Citation Potential"*
+**Version:** 3.0.0  
+**Scope:** Peer-Reviewed Academic Literature, Empirical Benchmarks & Citation Science  
 
 ---
 
-## 1. The Core Scientific Findings
+## 1. Foundational Academic Literature
 
-Traditional SEO optimizes for keyword rank order across 10 blue links. In contrast, Generative Engine Optimization (GEO) optimizes for **selection and citation probability** during LLM answer generation across ChatGPT Search, Perplexity Pro, Claude, and Google AI Overviews.
-
-### Key Factors Governing LLM Citation Probability
-
-| Optimization Vector | Empirical Visibility Impact | Research Source | Mechanics & Operational Definition |
-|---|:---:|---|---|
-| **Outbound Authority Citations** | **+115.0% Citation Boost** | Princeton KDD 2024 | Citing authoritative primary sources (DOI papers, academic `.edu`, governmental `.gov`, standards bodies `w3.org`/`schema.org`) provides grounding anchors that RAG retrieval systems score with highest authority weight. |
-| **Mechanistic Causal Depth** | **+40.3% Visibility Boost** | Princeton KDD 2024 | Conjunctions (`because`, `due to`, `therefore`, `enables`, `results in`) provide deep mechanistic explanations ('how' and 'why') that RAG generators prioritize when synthesizing solutions. |
-| **Author Byline & Credentials (E-E-A-T)** | **+40.0% Trust Weight** | C-SEO Bench 2024 | Explicit professional credentials (`MD`, `PhD`, `Dr.`, `Lead Scientist`) embedded in `rel="author"` and Schema.org Person markup boost entity authority. |
-| **Quantifiable Metrics & Statistics** | **+37.1% Visibility Boost** | Princeton KDD 2024 | Concrete numerical facts, percentages (`%`), latency metrics, benchmark scores, and price figures provide unambiguous evidence blocks for synthetic reasoning. |
-| **Passage Chunk Window (134–167 words)** | **Optimal Citability Band** | CMU AutoGEO 2024 | Dense, self-contained paragraphs matching standard embedding chunk boundaries maximize chunk-level vector similarity and recall. |
-| **Direct Answer Lead (First 40–60 words)** | **Highest Ingestion Priority** | Princeton KDD 2024 | Inverted-pyramid answer structures provide instant question resolution before introductory filler or marketing copy. |
-| **Semantic Tables & Specification Lists** | **Deterministic Extraction** | CMU AutoGEO 2024 | Structuring multi-attribute parameters in `<table>` or `<dl>` formats ensures table-aware retrieval engines extract structured rows without semantic drift. |
-| **Pronoun Minimization (< 2%)** | **Unambiguous Entity Resolution** | C-SEO Bench 2024 | Eliminating ambiguous pronouns (`it`, `they`, `this`) in favor of explicit canonical brand/product names prevents attribution loss in multi-document synthesis. |
-| **Anti-Fluff / Buzzword Density** | **Penalty Reduction** | Princeton KDD 2024 | Removing promotional filler (`delve`, `tapestry`, `game-changer`, `beacon of`) improves token information density and prevents model dismissal. |
+### A. "GEO: Generative Engine Optimization" (Aggarwal et al., ACM SIGKDD 2024)
+- **arXiv:** [2311.09735](https://arxiv.org/abs/2311.09735)
+- **Core Contribution:** First formal mathematical model of generative search engines across 10,000 queries in the GEO-bench.
+- **The Empirical Lift Table:**
+  - Quotation Addition: **+40.9% PAWC lift** (highest position-adjusted impact).
+  - Statistics Addition: **+30.6% PAWC lift** (replaces qualitative claims with numerical facts).
+  - Fluency Optimization: **+28.0% lift**.
+  - Cite Sources: **+27.5% lift**.
+  - Technical Terminology: **+17.6% lift**.
+  - Easy-to-Understand: **+14.0% lift**.
+  - Authoritative Tone: **+10.4% lift** (+18.7% on subjective impression).
+  - Keyword Stuffing: **-8.3% to -10.0% (actively harmful)**.
+- **The Inverse Rank Correlation Discovery:**
+  GEO gains are inversely correlated with baseline organic Google rank. A page ranked #5 gains up to **+115%** from adding citations, whereas a #1 page can experience diminished returns. **Target long-tail and niche pages for highest GEO ROI.**
 
 ---
 
-## 2. The Two-Stage Funnel Model
+### B. "From Citation Selection to Citation Absorption" (Zhang, He, Yao — 2026)
+- **arXiv:** [2604.25707](https://arxiv.org/abs/2604.25707) · Dataset: `geo-citation-lab`
+- **Scope:** 602 prompts, 21,143 citations, 72 extracted features across ChatGPT Search, Perplexity AI, and Google AI Overviews.
+- **The Mathematical `Influence_i` Model:**
+  $$\text{Influence}_i = 0.20 \cdot \min\left(\frac{\text{ref\_count}_i}{3}, 1\right) + 0.15 \cdot (1 - \text{first\_position\_ratio}_i) + 0.20 \cdot \text{paragraph\_coverage\_ratio}_i + 0.25 \cdot \text{tfidf\_cosine}_i + 0.20 \cdot \frac{\text{bigram\_overlap}_i + \text{trigram\_overlap}_i}{2}$$
+- **Evidence-Genre Relative Lift:**
+  - Code Snippets / Blocks: **+76.9% lift** (highest influence).
+  - Numbers / Statistics: **+61.6% lift**.
+  - Definition Markers: **+57.3% lift**.
+  - Comparison Structures / Tables: **+55.3% lift**.
+  - How-To Steps: **+41.2% lift**.
+  - **Standalone Q&A / FAQ Format Alone: -5.7% (Negative Penalty!)**
+  - **Critical Rule:** Never reward FAQ format alone. FAQ blocks without data, code, or comparisons suffer an empirical citation penalty.
 
-```mermaid
-graph TD
-    subgraph Stage 1: Retrieval & Indexation
-    A["Crawl Access & TTFB"] --> B["RFC 9309 robots.txt Permissions"]
-    B --> C["Raw HTML SSR / SSG Payload"]
-    C --> D["Schema.org @graph Anchors"]
-    end
-    subgraph Stage 2: Synthesis & Citation Selection
-    D --> E["134–167w Passage Chunks"]
-    E --> F["Outbound Authority Citations (+115%)"]
-    F --> G["Causal Depth & Explanations (+40.3%)"]
-    G --> H["Statistical Evidence & Metrics (+37.1%)"]
-    H --> I["Direct Brand Citation & Referral Handoff"]
-    end
-```
+---
 
-1. **Top-K Document Retrieval:** If robots.txt blocks AI search bots (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) or the server serves an unhydrated Single-Page Application shell, the document never enters the Top-K context window.
-2. **Synthesizer Selection:** If the retrieved text is fluffy, vague, or pronoun-heavy, the LLM extracts general knowledge but omits the brand citation. Passing the citability threshold requires explicit causal depth, primary source citations, and quantifiable numbers.
+### C. "Citation Failure Modes in GEO" (Tian et al. — 2026)
+- **arXiv:** [2603.09296](https://arxiv.org/abs/2603.09296)
+- **Key Finding:** **43% of topically relevant pages receive zero citation** under baseline conditions.
+- **The 5-Stage Failure Taxonomy:**
+  1. **Retrieval Failure:** Crawler block (`robots.txt`), 4xx/5xx errors, `noindex`, unrendered SPA shell.
+  2. **Relevance Failure:** Title/H1 query-intent mismatch or semantic drift.
+  3. **Redundancy Failure:** Generic prose losing context allocation to authoritative domain summaries.
+  4. **Trust Failure:** Low fact density ($\text{FTR} < 0.040$), excessive hedging ($>2.5\%$), missing `sameAs`.
+  5. **Extraction Failure:** `nosnippet`, low text Signal-to-Noise Ratio ($<0.12$), DOM fragmentation.
+
+---
+
+### D. "Lost in the Middle" & Context Retention (Liu et al., Stanford, TACL 2024)
+- **arXiv:** [2307.03172](https://arxiv.org/abs/2307.03172)
+- **Finding:** LLM attention follows a U-shaped curve; information placed in the middle of long contexts degrades in retrieval accuracy by **30%–40%**.
+- **Empirical Corroboration (Zyppy 2025/2026):** **44.2% of citations in ChatGPT Search and Perplexity are extracted from the top 30% of a page.**
+- **Rule:** BLUF (Bottom Line Up Front). Core answers and definitions must appear within the first 250 words.
+
+---
+
+### E. Citation Faithfulness vs. Correctness (Wallat et al. — 2024)
+- **arXiv:** [2412.18004](https://arxiv.org/abs/2412.18004)
+- **Key Finding:** Up to **57% of citations lack faithfulness** due to model post-rationalization. A citation may be factually correct while not being the actual source the model relied upon. Systems must evaluate both entailment and factual faithfulness.
+
+---
+
+## 2. Real-World AI Search Empirical Benchmarks
+
+### 1. The Google AI Overviews 2026 Shift (Query Fan-Out)
+- **Ahrefs Empirical Dataset (863K SERPs, 4M Citations):**
+  - Google Top-10 Organic Overlap collapsed from **76.1% (2024)** to **37.9% (2026)**.
+  - Rank 11–100 accounts for **31.2%** of citations.
+  - Outside Top 100 / Non-ranking URLs account for **31.0%** of citations.
+- **Mechanism:** Google AI Mode uses **Query Fan-Out**, decomposing one user question into multiple sub-queries. Traditional search rank is no longer a prerequisite for AI inclusion.
+
+### 2. The 57% Off-Site Branded Footprint Discovery (Omniscient Digital 2026)
+- **Dataset:** 23,387 branded query citations analyzed across ChatGPT, Perplexity, and Claude.
+- **Distribution:**
+  - **57% of branded citations** come from third-party reviews, comparison listicles, Reddit, Wikipedia, and press.
+  - **Only ~4.5% of citations** derive from the brand's own official About, FAQ, or Homepage!
+  - Top 15 third-party authority domains capture **~68%** of all AI citations.
+- **Takeaway:** On-page optimization governs only a fraction of branded AI visibility; external third-party corroboration nodes are essential.
+
+### 3. Multi-Platform Divergence
+- Only **11% of domains** are cited by both ChatGPT and Perplexity for identical queries.
+- **ChatGPT Search:** Encyclopedic bias (Wikipedia $7.8\% - 47.9\%$), high per-citation influence ($0.271$).
+- **Perplexity AI:** Community discussion bias (Reddit $46.7\%$), recency bias ($76.4\%$ citations $<30$ days old).
+- **Google AI Overviews:** Multimodal bias (YouTube $23.3\%$).
+
+---
+
+## 3. Mathematical Formulations for Evaluation
+
+### 1. Lakoff & Hyland Linguistic Hedging Rate
+$$\text{HedgeRate} = \left( \frac{\sum w_{\text{hedge}}}{N_{\text{total\_words}}} \right) \times 100$$
+- Authoritative / Highly Cited: $\le 1.2\%$
+- Neutral Informational: $1.2\% - 2.2\%$
+- Speculative / Low Trust: $> 2.5\%$
+
+### 2. Atomic Fact-to-Token Ratio (FTR / FActScore)
+$$\text{FTR} = \frac{N_{\text{atomic\_facts}}}{N_{\text{tokens}}}$$
+- Citable AI-Engineered: $\ge 0.080$
+- Thin / Marketing Fluff: $< 0.040$
+
+### 3. Wilson 95% Score Confidence Interval
+$$\text{CI}_{95\%} = \frac{\hat p + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat p(1-\hat p)}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}$$
+Where $z = 1.96$, $\hat p$ is observed citation rate, and $n \ge 10$ runs per engine.
