@@ -23,7 +23,7 @@ htmlcov/
 .agents/
 build/
 legacy_reference/
-resources/
+
 
 # Generated Artifacts
 *.zip
