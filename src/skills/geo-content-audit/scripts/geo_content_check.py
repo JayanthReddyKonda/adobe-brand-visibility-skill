@@ -45,6 +45,32 @@ _STAT_RE = re.compile(
 _CREDENTIAL_RE = re.compile(
     r"\b(Dr\.|MD|PhD|MBA|Prof\.|Professor|M\.S\.|B\.S\.|Lead Researcher|Chief Scientist)\b", re.IGNORECASE
 )
+_QUOTATION_RE = re.compile(r'["“]([^"”]{12,300})["”]', re.MULTILINE)
+_SPEAKER_ATTRIBUTION_RE = re.compile(
+    r"\b(?:said|says|stated|noted|according to|argues|explains|writes|reported by|explained by)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
+    re.IGNORECASE,
+)
+_CREDENTIAL_TITLE_RE = re.compile(
+    r"\b(?:Dr\.|PhD|MD|Professor|Prof\.|Chief Scientist|VP of|Director of|Lead Researcher|Principal Scientist)\b",
+    re.IGNORECASE,
+)
+_COMMON_STOPWORDS = {
+    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
+    "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
+    "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't",
+    "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have",
+    "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him",
+    "himself", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't",
+    "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor",
+    "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out",
+    "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some",
+    "such", "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there",
+    "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to",
+    "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were",
+    "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's",
+    "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're",
+    "you've", "your", "yours", "yourself", "yourselves",
+}
 _FLUFF_RE = re.compile(
     r"\b(delve|delving|tapestry|game-changer|testament to|multifaceted|beacon of|revolutionize|spearheading|unleash)\b",
     re.IGNORECASE,
@@ -122,6 +148,151 @@ def parse_date_string(date_str: str) -> datetime | None:
     return None
 
 
+def extract_attributed_quotations(html: str, full_text: str) -> dict:
+    """Extract and analyze attributed quotations (Princeton KDD 2024: +40.9% PAWC lift).
+
+    Verifies whether quotes are tied to named speakers or credentials rather than raw punctuation marks.
+    """
+    quotes = _QUOTATION_RE.findall(full_text)
+    has_blockquote = bool(re.search(r"<(?:blockquote|q)\b[^>]*>", html, re.IGNORECASE))
+
+    speakers = _SPEAKER_ATTRIBUTION_RE.findall(full_text)
+    has_credentials = bool(_CREDENTIAL_TITLE_RE.search(full_text))
+
+    attributed_count = 0
+    if speakers or (quotes and has_credentials) or (has_blockquote and has_credentials):
+        attributed_count = max(len(speakers), 1 if (quotes and has_credentials) else 0)
+
+    return {
+        "total_quotes": len(quotes) + (1 if has_blockquote else 0),
+        "attributed_quotes": attributed_count,
+        "has_named_expert": bool(speakers or has_credentials),
+        "speakers_identified": list(set(speakers[:5])),
+    }
+
+
+def analyze_evidence_genres(html: str, full_text: str, parser) -> dict:
+    """Analyze the 5 high-influence evidence genres based on Zhang et al. 2026 (arXiv:2604.25707):
+    - Code (+76.9%)
+    - Statistics (+61.6%)
+    - Definition Copula (+57.3%)
+    - Comparison Table (+55.3%)
+    - Procedural Steps (+41.2%)
+    Also evaluates Standalone FAQ Deficit (-5.7% citation penalty).
+    """
+    genres = []
+    details = {}
+
+    has_code = getattr(parser, "code_blocks", 0) > 0 or bool(re.search(r"<(?:pre|code)\b|```", html, re.IGNORECASE))
+    if has_code:
+        genres.append("code")
+    details["has_code"] = has_code
+
+    stat_matches = len(_STAT_RE.findall(full_text))
+    has_stats = stat_matches >= 1
+    if has_stats:
+        genres.append("statistics")
+    details["statistics_count"] = stat_matches
+
+    has_definition = bool(
+        re.search(
+            r"\b(?:\w+\s+is\s+(?:a|an|the)|is defined as|refers to|is characterized by|denotes|means that)\b",
+            full_text,
+            re.IGNORECASE,
+        )
+    )
+    if has_definition:
+        genres.append("definition_copula")
+    details["has_definition"] = has_definition
+
+    has_table = getattr(parser, "tables", 0) > 0 or bool(
+        re.search(r"<table\b|\b(?:versus|compared to|in contrast to|unlike|differs from)\b", html, re.IGNORECASE)
+    )
+    if has_table:
+        genres.append("comparison_table")
+    details["has_comparison_table"] = has_table
+
+    has_steps = getattr(parser, "ordered_lists", 0) > 0 or bool(
+        re.search(r"<ol\b|\b(?:step\s+\d+|1\.\s+[A-Z])\b", html, re.IGNORECASE)
+    )
+    if has_steps:
+        genres.append("procedural_steps")
+    details["has_procedural_steps"] = has_steps
+
+    has_qa_format = bool(
+        re.search(
+            r"<(?:details|faq|dl)\b[^>]*>|\b(?:frequently asked questions|faq|q&a)\b",
+            html,
+            re.IGNORECASE,
+        )
+    ) or any(h.strip().endswith("?") or QUESTION_RE.search(h.strip()) for h in getattr(parser, "headings", []))
+
+    standalone_faq_deficit = has_qa_format and len(genres) < 2
+
+    return {
+        "genres_detected": genres,
+        "genre_count": len(genres),
+        "standalone_faq_deficit": standalone_faq_deficit,
+        "has_qa_format": has_qa_format,
+        "details": details,
+    }
+
+
+def detect_keyword_stuffing(full_text: str) -> dict:
+    """Detect keyword stuffing and token over-concentration (-8.3% to -10% citation degradation in LLMs).
+    Evaluates non-stopword token frequencies. A density > 4.5% triggers degradation penalty.
+    """
+    words = re.findall(r"\b[a-zA-Z]{3,}\b", full_text.lower())
+    if len(words) < 150:
+        return {"is_stuffed": False, "max_density": 0.0, "top_repeated_words": []}
+
+    content_words = [w for w in words if w not in _COMMON_STOPWORDS]
+    if not content_words:
+        return {"is_stuffed": False, "max_density": 0.0, "top_repeated_words": []}
+
+    counts = Counter(content_words)
+    total_words = len(words)
+    top_items = []
+    max_density = 0.0
+
+    for word, count in counts.most_common(5):
+        density = count / total_words
+        top_items.append((word, round(density, 4)))
+        if density > max_density:
+            max_density = density
+
+    is_stuffed = max_density > 0.045
+    return {
+        "is_stuffed": is_stuffed,
+        "max_density": round(max_density, 4),
+        "top_repeated_words": top_items,
+    }
+
+
+def analyze_bluf_placement(full_text: str, total_words: int) -> dict:
+    """Analyze Bottom Line Up Front (BLUF) answer placement (Liu et al. Stanford 'Lost in the Middle').
+    44.2% of citations are extracted from the top 30% / first 250 words.
+    """
+    words_list = full_text.split()
+    if not words_list:
+        return {"bluf_present_in_top30": False, "first_answer_position_pct": 1.0, "lead_word_count": 0}
+
+    top_30_cutoff = min(250, max(60, int(len(words_list) * 0.30)))
+    lead_text = " ".join(words_list[:top_30_cutoff])
+
+    definition_lead_re = re.compile(
+        r"\b(?:is|are|provides|delivers|enables|accelerates|offers|means|defined as|refers to)\b",
+        re.IGNORECASE,
+    )
+    has_lead_answer = bool(definition_lead_re.search(lead_text))
+
+    return {
+        "bluf_present_in_top30": has_lead_answer,
+        "lead_word_count": top_30_cutoff,
+        "first_answer_position_pct": 0.15 if has_lead_answer else 0.65,
+    }
+
+
 AUTHORITATIVE_DOMAINS = {
     "doi.org",
     "wikipedia.org",
@@ -173,6 +344,9 @@ class GEODOMParser(HTMLParser):
         self.outbound_citations = []
         self.author_bylines = []
         self.quotes_count = 0
+        self.code_blocks = 0
+        self.blockquotes = 0
+        self.ordered_lists = 0
         self.published_date = None
         self.modified_date = None
 
@@ -185,8 +359,15 @@ class GEODOMParser(HTMLParser):
             self.in_script = True
         elif t == "table":
             self.tables += 1
-        elif t in ("ul", "ol", "dl"):
+        elif t in ("ul", "dl"):
             self.lists += 1
+        elif t == "ol":
+            self.ordered_lists += 1
+            self.lists += 1
+        elif t in ("pre", "code"):
+            self.code_blocks += 1
+        elif t == "blockquote":
+            self.blockquotes += 1
         elif t == "p":
             self.current_p_text = []
         elif t == "time":
@@ -250,7 +431,7 @@ def _word_count(text: str) -> int:
     return len(_WORD_RE.findall(text))
 
 
-def score_passage_citability(text: str, headings: list) -> dict:
+def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
     """Score passage citability (0-100) based on optimal passage length (134-167 words),
 
     definition patterns, direct answers, clarity, and statistics.
@@ -259,7 +440,18 @@ def score_passage_citability(text: str, headings: list) -> dict:
     words = re.findall(r"\b\w+\b", text)
     word_count = len(words)
     if word_count == 0:
-        return {"total": 0, "breakdown": {}}
+        return {
+            "total": 0,
+            "answer_block_quality": 0,
+            "self_containment": 0,
+            "structural_readability": 0,
+            "statistical_density": 0,
+            "uniqueness_signals": 0,
+            "evidence_genres_score": 0,
+            "attributed_quotations_score": 0,
+            "bluf_primacy_score": 0,
+            "breakdown": {},
+        }
 
     # 1. Answer Block Quality (max 30 pts)
     abq = 0
@@ -312,6 +504,33 @@ def score_passage_citability(text: str, headings: list) -> dict:
     entropy = compute_passage_entropy(text)
     uq = 10 if entropy >= 4.2 else (5 if entropy >= 3.5 else 0)
 
+    # 6. Deep GEO Empirical Sub-dimensions (Zhang et al. 2026, Princeton KDD 2024)
+    evidence_score = 0
+    if stats_matches > 0:
+        evidence_score += 4
+    if any(re.search(p, text, re.IGNORECASE) for p in definition_patterns):
+        evidence_score += 4
+    if html and ("<table" in html.lower() or "versus" in text.lower()):
+        evidence_score += 4
+    if html and ("<pre" in html.lower() or "<code" in html.lower() or "```" in text):
+        evidence_score += 4
+    if html and ("<ol" in html.lower() or "step 1" in text.lower()):
+        evidence_score += 4
+
+    quotes_score = (
+        10
+        if (_SPEAKER_ATTRIBUTION_RE.search(text) or _CREDENTIAL_TITLE_RE.search(text))
+        else (5 if ('"' in text or "“" in text) else 0)
+    )
+    bluf_score = (
+        10
+        if any(
+            re.search(p, first_60, re.IGNORECASE)
+            for p in [r"\b(is|are|was|were|means|refers|provides|enables)\b"]
+        )
+        else 0
+    )
+
     total = min(abq + sc + sr + sd + uq, 100)
     return {
         "total": total,
@@ -320,6 +539,9 @@ def score_passage_citability(text: str, headings: list) -> dict:
         "structural_readability": min(sr, 20),
         "statistical_density": sd,
         "uniqueness_signals": uq,
+        "evidence_genres_score": min(evidence_score, 20),
+        "attributed_quotations_score": quotes_score,
+        "bluf_primacy_score": bluf_score,
     }
 
 
@@ -354,6 +576,12 @@ def audit(base, domain, inv=None, state_file=None):
         total_words = _word_count(full_text)
         has_auth_citation = False
         has_credentials = False
+
+        # Run deep empirical sensors
+        attributed_quotes_data = extract_attributed_quotations(html, full_text)
+        evidence_genre_data = analyze_evidence_genres(html, full_text, parser)
+        kw_stuffing_data = detect_keyword_stuffing(full_text)
+        bluf_data = analyze_bluf_placement(full_text, total_words)
 
         # 1. Princeton Vector: In-Depth Mechanisms ('how', 'why', 'because', 'therefore') - +40.3% boost
         mechanism_words = [
@@ -393,7 +621,7 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
-        citability = score_passage_citability(full_text, parser.headings)
+        citability = score_passage_citability(full_text, parser.headings, html=html)
         page_citability_map[url] = citability
 
         if depth_score >= 2 and citability["total"] < 35 and total_words >= 120:
@@ -419,39 +647,29 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
-        # Evidence Genre Detection (Zhang et al. 2026 Citation Absorption Model)
-        has_code_genre = bool(re.search(r"<(?:pre|code)[^>]*>|[\`]{3}", html, re.IGNORECASE))
-        has_stats_genre = bool(re.search(r"\b\d+(?:\.\d+)?%?\b|\$\d+", full_text))
-        has_definition_genre = bool(
-            re.search(
-                r"\b(?:is defined as|refers to|is characterized by|denotes|means that|describes)\b",
-                full_text,
-                re.IGNORECASE,
+        # Standalone Q&A / FAQ Format Alone Penalty (-5.7% citation penalty from Zhang et al. 2026)
+        if evidence_genre_data["standalone_faq_deficit"]:
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Standalone FAQ format lacks supporting empirical evidence genres",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": "STANDALONE_FAQ_DEFICIT: Page uses isolated Q&A/FAQ format without supporting empirical evidence (code, statistics, definition copulas, or comparison tables). Research shows standalone FAQ formats suffer an empirical -5.7% citation penalty.",
+                    "cause_family": "CONTENT.STANDALONE_FAQ_DEFICIT",
+                    "id": "STANDALONE_FAQ_DEFICIT",
+                    "cause_id": "STANDALONE_FAQ_DEFICIT",
+                    "evidence": f"Page {url} utilizes FAQ/Q&A structure but contains only {evidence_genre_data['genre_count']} of the 5 high-influence evidence genres ({', '.join(evidence_genre_data['genres_detected']) or 'none'}).",
+                    "impact": "LLM retrieval engines heavily discount unverified FAQ prose in favor of multi-dimensional evidence passages.",
+                    "suggested_action": {
+                        "summary": "Reinforce FAQ answers with concrete statistics, code snippets, or comparative tables.",
+                        "technical_fix": "Add benchmark metrics, code examples, or comparison matrices directly into the FAQ answer blocks.",
+                        "creative_fix": "Rewrite answers from conversational soundbites into substantive technical explanations with verifiable figures.",
+                        "priority": "medium",
+                        "verification": "Confirm at least 2 evidence genres are present within the page body.",
+                    },
+                }
             )
-        )
-        has_comparison_genre = bool(
-            re.search(
-                r"\b(?:versus|compared to|in contrast to|unlike|differs from|alternative to)\b|<table",
-                html,
-                re.IGNORECASE,
-            )
-        )
-        has_qa_format = bool(
-            re.search(
-                r"<(?:details|faq|dl)[^>]*>|\b(?:frequently asked questions|faq|q&a)\b",
-                html,
-                re.IGNORECASE,
-            )
-        )
-
-        # Rule: Standalone Q&A / FAQ Format Alone Penalty (-5.7% influence penalty)
-        if (
-            has_qa_format
-            and not has_code_genre
-            and not has_stats_genre
-            and not has_comparison_genre
-            and not has_definition_genre
-        ):
             recommendations.append(
                 {
                     "id": "PROACTIVE.GEO.BEYOND_FAQ_FORMAT.001",
@@ -465,11 +683,55 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
+        # Keyword Stuffing Sensor (-8.3% to -10% citation degradation in LLMs)
+        if kw_stuffing_data["is_stuffed"]:
+            top_word, top_density = kw_stuffing_data["top_repeated_words"][0]
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Unnatural keyword concentration depresses neural citation retrieval",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": f"EXCESSIVE_KEYWORD_DENSITY: Term '{top_word}' occurs at {top_density * 100:.1f}% density (threshold: < 4.5%). Repetitive keyword targeting degrades neural embedding perplexity and incurs an empirical -8.3% to -10% citation penalty in modern LLM generative engines.",
+                    "cause_family": "CONTENT.KEYWORD_STUFFING_DEGRADATION",
+                    "id": "EXCESSIVE_KEYWORD_DENSITY",
+                    "cause_id": "EXCESSIVE_KEYWORD_DENSITY",
+                    "evidence": f"Page {url} contains extreme term frequency for '{top_word}' ({top_density * 100:.1f}% of body tokens). Top repeated terms: {', '.join(f'{w} ({d * 100:.1f}%)' for w, d in kw_stuffing_data['top_repeated_words'][:3])}.",
+                    "impact": "Generative retrieval models (Perplexity, ChatGPT Search, Claude) penalize keyword-stuffed passages during neural reranking.",
+                    "suggested_action": {
+                        "summary": "Diversify lexical vocabulary with domain synonyms, semantic co-occurrences, and natural phrasing.",
+                        "technical_fix": "Audit body copy and reduce repetitive token occurrences until term density falls below 3.5%.",
+                        "creative_fix": "Replace repetitive brand or keyword phrases with varied conceptual terms, semantic attributes, and contextual pronouns.",
+                        "priority": "medium",
+                        "verification": "Confirm maximum individual non-stopword density is under 4.0%.",
+                    },
+                }
+            )
+
         # TX01: Rule_BLUF_Top30Percent (Bottom Line Up Front in top 30% / first 250 words)
-        words_list = full_text.split()
-        lead_250 = " ".join(words_list[:250]).lower()
-        has_lead_definition = bool(re.search(r"\b(?:is|are|provides|delivers|enables|accelerates|offers)\b", lead_250))
+        has_lead_definition = bluf_data["bluf_present_in_top30"]
         if ptype in ("article", "content", "product_detail") and total_words >= 250 and not has_lead_definition:
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Core answer proposition delayed beyond top 30% of document (Lost in the Middle)",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": "CONTEXT_PLACEMENT_DEGRADATION: Primary definitional proposition or answer is delayed beyond the first 250 words / top 30% of content. Stanford research proves that 44.2% of citations occur in the top 30% of content, while mid-document claims suffer 30-40% lower retrieval recall.",
+                    "cause_family": "CONTENT.CONTEXT_PLACEMENT_DEGRADATION",
+                    "id": "CONTEXT_PLACEMENT_DEGRADATION",
+                    "cause_id": "CONTEXT_PLACEMENT_DEGRADATION",
+                    "evidence": f"Page {url} ({total_words} words) does not state its definitive resolution or entity proposition within the top {bluf_data['lead_word_count']} words.",
+                    "impact": "Generative search engines truncate or downweight answers buried deep within long narrative text blocks.",
+                    "suggested_action": {
+                        "summary": "Front-load the core answer and canonical proposition in the first 50-75 words immediately beneath the primary heading.",
+                        "technical_fix": "Restructure page layout using the Inverted Pyramid pattern: answer H1 query in paragraph 1.",
+                        "creative_fix": "Craft a crisp 40-60 word definitive BLUF summary paragraph before diving into secondary features.",
+                        "priority": "medium",
+                        "verification": "Confirm opening 200 words contain direct definition copulas or quantitative propositions.",
+                    },
+                }
+            )
             recommendations.append(
                 {
                     "id": "PROACTIVE.GEO.BLUF_TOP30_PERCENT.001",
@@ -480,6 +742,25 @@ def audit(base, domain, inv=None, state_file=None):
                     "technical_fix": "Invert paragraph structure: place the definitive resolution or entity answer in the lead 40-60 words.",
                     "creative_fix": "Adopt the Direct Answer Inversion format: answer the title's core question immediately before providing background.",
                     "verification": "Confirm first 250 words contain a direct answer proposition.",
+                }
+            )
+
+        # Attributed Quotations Check (Princeton KDD 2024: +40.9% lift)
+        if (
+            ptype in ("article", "content", "product_detail")
+            and total_words >= 150
+            and attributed_quotes_data["attributed_quotes"] == 0
+        ):
+            recommendations.append(
+                {
+                    "id": "PROACTIVE.GEO.ATTRIBUTED_EXPERT_QUOTES.001",
+                    "title": "Integrate attributed quotations from named domain experts (+40.9% GEO citation lift)",
+                    "category": "content",
+                    "summary": f"Page {url} lacks attributed quotations from named experts or recognized authorities. Princeton KDD 2024 empirical research demonstrated that incorporating Attributed Quotations yields the single highest citation lift (+40.9% PAWC boost) among all tested optimization vectors, outperforming raw statistical claims alone.",
+                    "priority": "medium",
+                    "technical_fix": "Incorporate <blockquote> elements with <cite> tags attributing direct insights to credentialed industry specialists or named leaders.",
+                    "creative_fix": "Quote internal or external domain authorities with their title and organization (e.g., 'according to Dr. Jane Doe, Chief Scientist...').",
+                    "verification": "Confirm quotation is explicitly attributed to a named individual with professional credentials.",
                 }
             )
 
@@ -806,6 +1087,28 @@ def audit(base, domain, inv=None, state_file=None):
                 "Embed an author byline box with verified professional credentials (MD, PhD, title) and Schema.org Person markup."
             )
 
+        if evidence_genre_data["standalone_faq_deficit"]:
+            gaps.append("Standalone FAQ format lacks supporting empirical evidence genres (Zhang et al. 2026 -5.7% citation penalty).")
+            text_actions.append("Reinforce FAQ answers with concrete data points, comparison tables, or code blocks.")
+
+        if kw_stuffing_data["is_stuffed"]:
+            gaps.append(
+                f"Unnatural keyword concentration: term '{kw_stuffing_data['top_repeated_words'][0][0]}' exceeds 4.5% density (-8.3% to -10% LLM degradation)."
+            )
+            text_actions.append("Diversify vocabulary and prune repetitive keyword instances to restore natural token distribution.")
+
+        if (
+            ptype in ("article", "content", "product_detail")
+            and total_words >= 150
+            and attributed_quotes_data["attributed_quotes"] == 0
+        ):
+            gaps.append("Zero attributed expert quotations detected (missing Princeton KDD 2024 +40.9% PAWC lift).")
+            immediate_actions.append("Incorporate at least one blockquote attributing empirical insights to a credentialed specialist.")
+
+        if ptype in ("article", "content", "product_detail") and total_words >= 250 and not has_lead_definition:
+            gaps.append("Core resolution proposition absent from top 30% of document (Stanford 'Lost in the Middle').")
+            immediate_actions.append("Front-load direct answer proposition into the first 50-75 words under primary heading.")
+
         chunking_plan = (
             "Divide body copy into modular 120-180 word passage chunks under question headings, each opening with a direct declarative claim."
             if total_words > 250
@@ -828,9 +1131,30 @@ def audit(base, domain, inv=None, state_file=None):
                 "structural_readability": citability["structural_readability"],
                 "statistical_density": citability["statistical_density"],
                 "uniqueness_signals": citability["uniqueness_signals"],
+                "evidence_genres_score": citability.get("evidence_genres_score", 0),
+                "attributed_quotes_score": citability.get("attributed_quotations_score", 0),
+                "bluf_primacy_score": citability.get("bluf_primacy_score", 0),
                 "mechanistic_depth_score": depth_score,
                 "atomic_fact_ratio": ftr,
                 "hedge_density_pct": round(hedge_density, 2),
+            },
+            "evidence_genres": {
+                "detected": evidence_genre_data["genres_detected"],
+                "count": evidence_genre_data["genre_count"],
+                "standalone_faq_deficit": evidence_genre_data["standalone_faq_deficit"],
+            },
+            "attributed_quotations": {
+                "total_quotes": attributed_quotes_data["total_quotes"],
+                "attributed_quotes": attributed_quotes_data["attributed_quotes"],
+                "has_named_expert": attributed_quotes_data["has_named_expert"],
+            },
+            "bluf_placement": {
+                "present_in_top_30_pct": bluf_data["bluf_present_in_top30"],
+                "lead_word_count": bluf_data["lead_word_count"],
+            },
+            "keyword_stuffing": {
+                "is_stuffed": kw_stuffing_data["is_stuffed"],
+                "max_density": kw_stuffing_data["max_density"],
             },
             "gap_analysis": gaps if gaps else ["Content meets or exceeds baseline citability thresholds across evaluated dimensions."],
             "prescribed_actions": {
@@ -852,12 +1176,34 @@ def audit(base, domain, inv=None, state_file=None):
         if page_citability_map
         else 0.0
     )
+
+    geo_citability_summary = {
+        "average_citability_score": avg_cit,
+        "pages_analyzed": len(target_pages),
+        "evidence_genres_distribution": {
+            genre: sum(
+                1 for p in page_improvement_plans if genre in p.get("evidence_genres", {}).get("detected", [])
+            )
+            for genre in ["code", "statistics", "definition_copula", "comparison_table", "procedural_steps"]
+        },
+        "pages_with_attributed_quotes": sum(
+            1 for p in page_improvement_plans if p.get("attributed_quotations", {}).get("attributed_quotes", 0) > 0
+        ),
+        "pages_with_bluf_alignment": sum(
+            1 for p in page_improvement_plans if p.get("bluf_placement", {}).get("present_in_top_30_pct", False)
+        ),
+        "pages_with_keyword_stuffing": sum(
+            1 for p in page_improvement_plans if p.get("keyword_stuffing", {}).get("is_stuffed", False)
+        ),
+    }
+
     return {
         "status": "ok",
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,
         "page_improvement_plans": page_improvement_plans,
+        "geo_citability_summary": geo_citability_summary,
         "coverage": {
             "target_pages_evaluated": len(target_pages),
             "average_citability_score": avg_cit,

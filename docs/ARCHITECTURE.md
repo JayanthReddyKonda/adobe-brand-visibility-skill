@@ -160,3 +160,20 @@ Derived algorithmically from the 9 Princeton KDD 2024 / AutoGEO citability dimen
 - **120–180 Word Passage Chunking Plan:** Reorganizes body content into standalone, self-contained semantic passages optimized for RAG chunk extraction.
 - **Epistemic Qualification:** Every plan explicitly states that recommendations are static heuristic optimizations grounded in empirical GEO research, **not** live citation log measurements or guarantees of search engine ranking.
 
+### 6.5 Empirical Evidence Genres & Standalone FAQ Deficit (Zhang et al. 2026)
+Research across 21,143 empirical citations demonstrates that citation absorption is non-uniform across presentation structures:
+- **High-Influence Genres:** Code blocks (+76.9%), Statistics (+61.6%), Definition copulas (+57.3%), Comparison tables (+55.3%), and Procedural steps (+41.2%).
+- **Standalone FAQ Penalty (-5.7%):** Using isolated question-and-answer formats without empirical data, code, or tables reduces citation probability. The sensor flags `STANDALONE_FAQ_DEFICIT` to mandate multi-genre reinforcement.
+
+### 6.6 Attention Primacy & Token Distribution
+- **BLUF Top-30% Attention Primacy:** Grounded in Stanford ("Lost in the Middle") and Zyppy 2026 findings proving that 44.2% of citations occur in the top 30% / first 250 words of a document. Answers delayed beyond this threshold suffer 30–40% retrieval degradation.
+- **Neural Perplexity Penalty:** Non-stopword token density exceeding 4.5% triggers `EXCESSIVE_KEYWORD_DENSITY`, reflecting the empirical -8.3% to -10% citation degradation caused by neural embedding reranker penalties on unnatural token repetition.
+
+### 6.7 Post-Citation Intent Handoff & CTA Reachability Index
+Evaluates the arrival experience of high-intent citation traffic:
+- **Viewport Answer Anchoring:** The cited proposition must be visible within the top 600px viewport (first 150 words / 2 paragraphs) to prevent orientation shock and immediate bounce (`VIEWPORT_ANSWER_ABSENCE`).
+- **CTA Reachability Index:** Quantifies transactional continuation accessibility:
+  $$\text{Reachability Index} = \frac{1}{1 + \text{Preceding Interactive Elements}}$$
+  If the primary commercial action is delayed behind $>3$ auxiliary header/nav links, the sensor flags `CTA_REACHABILITY_FRICTION`.
+
+

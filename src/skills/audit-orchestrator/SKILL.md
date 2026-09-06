@@ -239,7 +239,10 @@ Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over a
     When first-party analytics are provided, cross-correlate static UX proxies with observed visitor retention. Escalate empirically corroborated defects, mitigate false alarms when observed engagement is healthy, and detect `AI_REFERRAL_DISCONTINUITY`. If omitted, maintain heuristic-only mode with clear limitations.
 
 15. **Deterministic Page-Level Content Improvement Plans (`page_improvement_plans`):**
-    Synthesize deterministic, page-level improvement plans derived from the 9 Princeton & AutoGEO citability dimensions, complete with gap analysis, prioritized structural/textual actions, and the mandatory epistemic qualification.
+    Synthesize deterministic, page-level improvement plans derived from the 9 Princeton & AutoGEO citability dimensions and Zhang et al. 2026 Citation Absorption findings. Each plan explicitly audits the 5 high-influence evidence genres (Code +76.9%, Stats +61.6%, Definitions +57.3%, Tables +55.3%, Steps +41.2%), flags Standalone FAQ Deficits (-5.7% citation penalty), detects unnatural keyword stuffing (-8.3% to -10% neural perplexity penalty), enforces BLUF Top-30% attention primacy, and mandates attributed expert quotes (+40.9% Princeton KDD lift).
+
+16. **Post-Citation Viewport Anchoring & Intent Continuity (`engagement_continuity_summary`):**
+    Evaluate arriving AI referral traffic orientation. Flag `VIEWPORT_ANSWER_ABSENCE` if cited claims are pushed below the top 600px / first 150 words by decorative banners. Flag `CTA_REACHABILITY_FRICTION` if the primary commercial conversion action is delayed behind more than 3 auxiliary interactive elements. Mitigate heuristic warnings when first-party analytics reflect healthy visitor retention, and prioritize value-driven outcome copy over generic action verbs.
 
 **Step 11: Calculate Summary Metrics & Scoring Model**
 

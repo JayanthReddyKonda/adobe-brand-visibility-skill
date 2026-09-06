@@ -104,8 +104,20 @@ AUDIT TAXONOMY
 │   └── CONTINUITY
 │       ├── INTENT_TO_LANDING_MISMATCH      (Landing page fails to retain referral query intent)
 │       ├── LOW_INFORMATION_SCENT           (Headline / hero uses vague filler lacking descriptive nouns)
+│       ├── VIEWPORT_ANSWER_ABSENCE         (Core cited proposition missing from top 600px viewport, triggering orientation shock)
+│       ├── CTA_REACHABILITY_FRICTION       (First commercial continuation action delayed behind >3 auxiliary interactive links)
 │       ├── DESTINATION_NAVIGATION_FRICTION (Absence of semantic navigation to key brand destinations)
 │       └── AI_REFERRAL_DISCONTINUITY       (First-party analytics confirm excessive bounce on AI search traffic)
+│
+├── CONTENT
+│   ├── SHALLOW_COVERAGE
+│   │   ├── MISSING_IN_DEPTH_MECHANISMS     (Content lacks explanatory mechanisms 'how' and 'why' prioritized by generative search)
+│   │   └── STANDALONE_FAQ_DEFICIT          (Isolated Q&A format lacking empirical code/statistics/tables, incurring -5.7% penalty)
+│   ├── RETRIEVAL_OPTIMIZATION
+│   │   ├── LACK_OF_SPECIFIC_EVIDENCE       (Content lacks concrete statistics, numbers, or verifiable metrics)
+│   │   └── EXCESSIVE_KEYWORD_DENSITY       (Term frequency >4.5% degrading neural embedding perplexity by -8.3% to -10%)
+│   └── CONTEXT_PLACEMENT
+│       └── CONTEXT_PLACEMENT_DEGRADATION   (Primary answer delayed beyond top 30% / first 250 words; Lost in the Middle)
 │
 └── REPRESENTATION
     └── ACCURACY
@@ -134,10 +146,15 @@ AUDIT TAXONOMY
 | `AUTHORITY.IDENTITY_CORROBORATION` | `CANDIDATE_BACKLINK_UNREACHABLE` | Candidate backlink from referring domain returns 4xx/5xx or is unreachable. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `INTENT_TO_LANDING_MISMATCH` | Landing page omits answers to referral query intent above the fold. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `LOW_INFORMATION_SCENT` | Primary H1 uses generic filler words ("Welcome", "Home") lacking information scent. | `low` |
+| `EXPERIENCE.CONTINUITY` | `VIEWPORT_ANSWER_ABSENCE` | Core cited proposition missing from top 600px viewport, triggering orientation shock. | `medium` |
+| `EXPERIENCE.CONTINUITY` | `CTA_REACHABILITY_FRICTION` | Commercial continuation CTA delayed behind >3 auxiliary interactive elements. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `AI_REFERRAL_DISCONTINUITY` | First-party analytics confirm excessive bounce (>= 60%) and low dwell (< 30s) on AI search traffic. | `high` |
 | `EXPERIENCE.CONTINUITY` | `DESTINATION_NAVIGATION_FRICTION` | Landing page lacks navigation links to core brand destinations. | `medium` |
 | `CONTENT.SHALLOW_COVERAGE` | `MISSING_IN_DEPTH_MECHANISMS` | Content lacks explanatory mechanisms ('how' and 'why') prioritized by generative search. | `medium` |
+| `CONTENT.SHALLOW_COVERAGE` | `STANDALONE_FAQ_DEFICIT` | Standalone FAQ format without empirical code, statistics, or comparison tables (-5.7% penalty). | `medium` |
 | `CONTENT.RETRIEVAL_OPTIMIZATION` | `LACK_OF_SPECIFIC_EVIDENCE` | Content lacks concrete statistics, numbers, or verifiable metrics. | `low` |
+| `CONTENT.KEYWORD_STUFFING_DEGRADATION` | `EXCESSIVE_KEYWORD_DENSITY` | Term frequency >4.5% degrading neural embedding perplexity (-8.3% to -10% citation degradation). | `medium` |
+| `CONTENT.CONTEXT_PLACEMENT_DEGRADATION` | `CONTEXT_PLACEMENT_DEGRADATION` | Primary answer delayed beyond top 30% / first 250 words (Stanford 'Lost in the Middle'). | `medium` |
 | `FACT.CONSISTENCY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
 
 
@@ -579,8 +596,11 @@ Findings are clustered by standardized taxonomy families:
 - `ENTITY.ANSWERABILITY`: Material attribute gaps across product, pricing, service pages.
 - `FACT.CONSISTENCY`: Cross-page price, contact, or brand contradictions.
 - `FACT.FRESHNESS`: Stale copyright years, missing modification timestamps.
-- `AUTHORITY.CORROBORATION`: Broken sameAs authority profiles.
-- `EXPERIENCE.CONTINUITY`: Heading information scent, missing navigation, orientation gaps.
+- `AUTHORITY.CORROBORATION`: Broken sameAs authority profiles and unreachable backlink sources.
+- `EXPERIENCE.CONTINUITY`: Heading information scent, missing navigation, viewport answer anchoring, CTA reachability, and AI referral bounce.
+- `CONTENT.SHALLOW_COVERAGE`: Mechanistic explanations ('how'/'why') and standalone FAQ deficits (-5.7% citation penalty).
+- `CONTENT.KEYWORD_STUFFING_DEGRADATION`: Excessive keyword density (>4.5%) degrading neural embedding perplexity.
+- `CONTENT.CONTEXT_PLACEMENT_DEGRADATION`: Core answers delayed beyond top 30% / first 250 words (Stanford 'Lost in the Middle').
 - `REPRESENTATION.ACCURACY`: Divergence between observed AI claims and first-party facts.
 
 ---

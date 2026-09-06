@@ -348,9 +348,33 @@
           },
           "epistemic_qualification": {
             "type": "string"
+          },
+          "evidence_genres": {
+            "type": "object"
+          },
+          "attributed_quotations": {
+            "type": "object"
+          },
+          "bluf_placement": {
+            "type": "object"
+          },
+          "keyword_stuffing": {
+            "type": "object"
+          },
+          "url": {
+            "type": "string"
+          },
+          "citability_score": {
+            "type": "number"
           }
         }
       }
+    },
+    "geo_citability_summary": {
+      "type": "object"
+    },
+    "engagement_continuity_summary": {
+      "type": "object"
     }
   },
   "additionalProperties": false

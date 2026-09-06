@@ -571,11 +571,45 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
         u for u in sameas_urls
         if any(td in u.lower() for td in ["wikidata.org", "wikipedia.org", "crunchbase.com"])
     ]
+    archetype_coverage = {
+        "knowledge_graph": [u for u in sameas_urls if any(d in u.lower() for d in ["wikidata.org", "wikipedia.org"])],
+        "community_consensus": [
+            u for u in sameas_urls if any(d in u.lower() for d in ["reddit.com", "stackoverflow.com", "quora.com"])
+        ],
+        "media_evidence": [u for u in sameas_urls if any(d in u.lower() for d in ["youtube.com"])],
+        "corporate_identity": [
+            u for u in sameas_urls if any(d in u.lower() for d in ["linkedin.com", "crunchbase.com", "github.com"])
+        ],
+        "customer_reviews": [
+            u for u in sameas_urls if any(d in u.lower() for d in ["trustpilot.com", "g2.com", "capterra.com"])
+        ],
+    }
+    missing_archetypes = [arch for arch, urls in archetype_coverage.items() if not urls]
+
+    if len(missing_archetypes) >= 3 and sameas_urls:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.AUTHORITY.OFFSITE_CORROBORATION_DISTRIBUTION.001",
+                "title": "Diversify off-site entity corroboration footprint across multi-source platforms",
+                "category": "corroboration",
+                "summary": (
+                    f"Brand entity identity is missing representation across {len(missing_archetypes)} key off-site authority archetypes ({', '.join(missing_archetypes)}). "
+                    "Empirical research demonstrates that generative AI search engines (ChatGPT Search, Claude, Perplexity) derive 57% of citations from off-site multi-source platforms "
+                    "(Wikidata, Wikipedia, Reddit, YouTube, LinkedIn, G2/Trustpilot). Relying solely on declared sameAs links without broad corroboration limits AI trust scoring."
+                ),
+                "priority": "medium",
+                "technical_fix": "Add verified sameAs links to official LinkedIn company profiles, Wikidata item nodes, and verified review platforms.",
+                "creative_fix": "Cultivate genuine community discussions on Reddit and publish technical demonstration videos on YouTube to build third-party consensus.",
+                "verification": "Confirm sameAs array includes links to knowledge graph, corporate registry, and verified community profiles.",
+            }
+        )
+
     evidence_classes = {
         "declared_identity_nodes": {
             "count": len(sameas_urls),
             "declared_urls": sameas_urls,
             "tier1_anchors": tier1_list,
+            "archetype_coverage": {k: len(v) for k, v in archetype_coverage.items()},
             "verified_external_nodes": checked,
             "broken_anchors": broken,
             "internal_mirror_domains": mirror_domains,

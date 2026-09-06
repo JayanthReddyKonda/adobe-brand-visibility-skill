@@ -186,6 +186,17 @@ class SemanticIntentEngine:
         return missing
 
 
+COMMERCIAL_ACTION_PATTERNS = re.compile(
+    r"\b(buy|order|purchase|checkout|add to cart|subscribe|start free trial|try free|sign up|get started|book demo|contact sales|request demo|get quote)\b",
+    re.IGNORECASE,
+)
+
+MARKETING_FLUFF_PATTERNS = re.compile(
+    r"\b(game-changer|delve|revolutionize|spearhead|testament to|unleash|beacon of|tapestry|multifaceted|cutting-edge|seamless|world-class|next-level)\b",
+    re.IGNORECASE,
+)
+
+
 class EngagementDOMParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -208,6 +219,10 @@ class EngagementDOMParser(HTMLParser):
         self.current_button_text = []
         self.current_is_cta = False
         self.cta_texts = []
+        self.in_p = False
+        self.current_p_text = []
+        self.paragraphs = []
+        self.interactive_elements = []
 
     def handle_starttag(self, tag, attrs):
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
@@ -225,6 +240,9 @@ class EngagementDOMParser(HTMLParser):
         elif tag_lower in ("h1", "h2"):
             self.current_tag = tag_lower
             self.current_text = []
+        elif tag_lower == "p":
+            self.in_p = True
+            self.current_p_text = []
         elif tag_lower == "button":
             self.in_button = True
             self.current_button_text = []
@@ -255,16 +273,30 @@ class EngagementDOMParser(HTMLParser):
             if self.current_text:
                 self.h2_list.append(" ".join(self.current_text).strip())
             self.current_tag = None
+        elif tag_lower == "p":
+            self.in_p = False
+            ptxt = " ".join(self.current_p_text).strip()
+            if ptxt:
+                self.paragraphs.append(ptxt)
+            self.current_p_text = []
         elif tag_lower == "button":
             if self.current_button_text:
                 b_text = " ".join(self.current_button_text).strip()
                 if b_text:
                     self.cta_texts.append(b_text)
+                    is_comm = bool(COMMERCIAL_ACTION_PATTERNS.search(b_text))
+                    self.interactive_elements.append(
+                        {"tag": "button", "text": b_text, "href": "", "is_commercial_cta": is_comm}
+                    )
             self.in_button = False
         elif tag_lower == "a":
             if self.in_anchor and self.current_anchor_text:
                 a_text = " ".join(self.current_anchor_text).strip()
                 self.nav_link_texts.append(a_text)
+                is_comm = bool(COMMERCIAL_ACTION_PATTERNS.search(a_text)) or self.current_is_cta
+                self.interactive_elements.append(
+                    {"tag": "a", "text": a_text, "href": self.current_href, "is_commercial_cta": is_comm}
+                )
                 if self.current_is_cta and a_text:
                     self.cta_texts.append(a_text)
             self.in_anchor = False
@@ -274,6 +306,8 @@ class EngagementDOMParser(HTMLParser):
             self.title += " " + data.strip()
         if self.current_tag in ("h1", "h2"):
             self.current_text.append(data.strip())
+        if self.in_p:
+            self.current_p_text.append(data.strip())
         if self.in_button:
             self.current_button_text.append(data.strip())
         if self.in_anchor:
@@ -282,6 +316,149 @@ class EngagementDOMParser(HTMLParser):
             txt = data.strip()
             if txt:
                 self.body_text.append(txt)
+
+
+def compute_viewport_answer_anchoring(dom: EngagementDOMParser, full_text: str, page_type: str, facts: dict) -> dict:
+    """Evaluate whether arriving visitors from an AI citation find the core answer
+
+    anchored immediately in the top viewport (first 2 paragraphs or first 150 words).
+    Addresses post-citation disorientation and bounce.
+    """
+    lead_paragraphs = dom.paragraphs[:2] if dom.paragraphs else []
+    lead_text = " ".join(lead_paragraphs)
+    if not lead_text:
+        words = full_text.split()
+        lead_text = " ".join(words[:150])
+
+    lead_words_count = len(lead_text.split())
+    lead_lower = lead_text.lower()
+    missing_propositions = []
+
+    anchored = True
+
+    if page_type == "pricing":
+        has_price = bool(
+            re.search(
+                r"(?:\$|€|£|¥|\d+\.\d{2}|\b(?:free|starter|pro|tier|plan|month|annual)\b)",
+                lead_lower,
+            )
+        )
+        if not has_price:
+            anchored = False
+            missing_propositions.append("pricing_figures_or_tiers")
+
+    elif page_type == "product_detail":
+        has_function = bool(
+            re.search(
+                r"\b(?:is|provides|enables|offers|designed for|allows|features|built for)\b",
+                lead_lower,
+            )
+        )
+        if not has_function:
+            anchored = False
+            missing_propositions.append("product_core_functionality")
+
+    elif page_type in ("article", "documentation"):
+        has_answer = bool(
+            re.search(
+                r"\b(?:is|are|means|refers to|defined as|explains|provides)\b",
+                lead_lower,
+            )
+        )
+        if not has_answer:
+            anchored = False
+            missing_propositions.append("direct_answer_definition")
+
+    return {
+        "anchored_in_viewport": anchored,
+        "lead_words_count": lead_words_count,
+        "missing_propositions": missing_propositions,
+        "lead_snippet": lead_text[:120],
+    }
+
+
+def compute_cta_reachability_index(dom: EngagementDOMParser) -> dict:
+    """Evaluate CTA Reachability Index (CRO / Post-Citation Intent Handoff).
+
+    Measures whether a primary commercial continuation action is available within
+    the first 3 interactive elements, or delayed behind excessive auxiliary links.
+    """
+    elements = dom.interactive_elements
+    first_comm_idx = None
+    first_comm_text = ""
+
+    for idx, el in enumerate(elements):
+        if el.get("is_commercial_cta"):
+            first_comm_idx = idx
+            first_comm_text = el.get("text", "")
+            break
+
+    if first_comm_idx is None:
+        return {
+            "first_commercial_cta_index": None,
+            "preceding_interactive_elements": len(elements),
+            "reachability_score": 0.0,
+            "is_delayed": True,
+            "first_cta_text": "",
+        }
+
+    preceding = first_comm_idx
+    reachability_score = round(1.0 / (1.0 + preceding), 3)
+    is_delayed = preceding > 3
+
+    return {
+        "first_commercial_cta_index": first_comm_idx,
+        "preceding_interactive_elements": preceding,
+        "reachability_score": reachability_score,
+        "is_delayed": is_delayed,
+        "first_cta_text": first_comm_text,
+    }
+
+
+def compute_information_scent(h1_text: str, lead_text: str) -> dict:
+    """Measure information scent purity between H1 and lead content.
+
+    Flags marketing fluff ratio vs substantive value nouns.
+    """
+    combined = f"{h1_text} {lead_text}".strip()
+    words = re.findall(r"\b[a-zA-Z]{3,}\b", combined.lower())
+    if not words:
+        return {"scent_ratio": 1.0, "fluff_matches": [], "is_diluted": False}
+
+    fluff_found = MARKETING_FLUFF_PATTERNS.findall(combined)
+    fluff_count = len(fluff_found)
+    fluff_ratio = fluff_count / max(len(words), 1)
+
+    is_diluted = fluff_ratio > 0.03 or fluff_count >= 2
+    scent_ratio = round(max(0.0, 1.0 - (fluff_ratio * 10)), 2)
+
+    return {
+        "scent_ratio": scent_ratio,
+        "fluff_matches": list(set(f.lower() for f in fluff_found)),
+        "is_diluted": is_diluted,
+    }
+
+
+def compute_cognitive_readability(text: str) -> dict:
+    """Compute Automated Readability Index (ARI) to evaluate cognitive load for citation traffic."""
+    words = re.findall(r"\b\w+\b", text)
+    if not words:
+        return {"ari_score": 0.0, "avg_sentence_length": 0.0, "is_complex": False}
+
+    characters = sum(len(w) for w in words)
+    sentences = max(1, len(re.split(r"[.!?]+", text)) - 1)
+    word_count = len(words)
+
+    ari = 4.71 * (characters / word_count) + 0.5 * (word_count / sentences) - 21.43
+    ari_score = round(max(0.0, ari), 1)
+    avg_sentence_len = round(word_count / sentences, 1)
+    is_complex = ari_score > 15.0 or avg_sentence_len > 30.0
+
+    return {
+        "ari_score": ari_score,
+        "avg_sentence_length": avg_sentence_len,
+        "is_complex": is_complex,
+    }
 
 
 GENERIC_H1_TERMS = {"welcome", "home", "main", "untitled", "test", "page", "index", "default"}
@@ -652,14 +829,122 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
             }
         )
 
+    total_body_words = len(" ".join(dom.body_text).split())
+
+    # Deep Post-Citation Engagement Sensors
+    viewport_data = compute_viewport_answer_anchoring(dom, " ".join(dom.body_text), page_type, facts)
+    cta_data = compute_cta_reachability_index(dom)
+    lead_text = " ".join(dom.paragraphs[:2]) if dom.paragraphs else " ".join(dom.body_text[:150])
+    h1_str = " ".join(dom.h1_list)
+    scent_data = compute_information_scent(h1_str, lead_text)
+    readability_data = compute_cognitive_readability(lead_text)
+
+    # 1.1 Viewport Answer Anchoring Check (Post-Citation Orientation Shock)
+    if (
+        page_type in ("pricing", "product_detail", "article", "documentation")
+        and total_body_words >= 120
+        and not viewport_data["anchored_in_viewport"]
+    ):
+        findings.append(
+            {
+                "category": "engagement",
+                "title": "Cited proposition missing from above-the-fold viewport (Orientation Shock)",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": (
+                    "VIEWPORT_ANSWER_ABSENCE: The initial viewport (first 150 words / top 2 paragraphs) fails to anchor "
+                    f"the core proposition ({', '.join(viewport_data['missing_propositions'])}). AI search visitors arriving from citations "
+                    "experience orientation shock when the cited fact is pushed below the fold by decorative banners."
+                ),
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "id": "VIEWPORT_ANSWER_ABSENCE",
+                "cause_id": "VIEWPORT_ANSWER_ABSENCE",
+                "evidence": f"Page {url} ({page_type}) lacks immediate proposition anchoring in its lead {viewport_data['lead_words_count']} words.",
+                "suggested_action": {
+                    "summary": "Anchor the core product proposition, pricing figures, or direct answer in the lead 60 words.",
+                    "technical_fix": "Insert an above-the-fold answer summary box directly beneath the H1 before auxiliary navigation blocks.",
+                    "creative_fix": "Adopt the Direct Answer Inversion format: state the primary resolution immediately in paragraph 1.",
+                    "priority": "high" if page_type == "pricing" else "medium",
+                    "verification": "Confirm lead 100 words contain explicit entity prices or core definitions.",
+                },
+            }
+        )
+
+    # 1.2 CTA Reachability Index (CRO / Transactional Continuation)
+    if page_type in ("product_detail", "pricing", "subscription_flow") and cta_data["is_delayed"]:
+        findings.append(
+            {
+                "category": "engagement",
+                "title": "Commercial continuation CTA delayed behind auxiliary interactive elements",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": (
+                    f"CTA_REACHABILITY_FRICTION: The first commercial continuation action is preceded by "
+                    f"{cta_data['preceding_interactive_elements']} auxiliary interactive elements (Reachability Index: {cta_data['reachability_score']:.2f}). "
+                    "High-intent citation traffic arriving from AI search bounces when the primary transactional next-step is buried beneath header navigation."
+                ),
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "id": "CTA_REACHABILITY_FRICTION",
+                "cause_id": "CTA_REACHABILITY_FRICTION",
+                "evidence": f"Page {url} ({page_type}) places its first commercial CTA at position #{cta_data['first_commercial_cta_index'] + 1 if cta_data['first_commercial_cta_index'] is not None else 'N/A'}.",
+                "suggested_action": {
+                    "summary": "Position a prominent commercial continuation CTA within the first 3 interactive elements on the page.",
+                    "technical_fix": "Place a prominent primary action button ('Buy', 'Start Free Trial', 'Contact Sales') directly in the hero block above the fold.",
+                    "creative_fix": "Pair the primary value proposition with an instant action trigger to eliminate navigational friction.",
+                    "priority": "medium",
+                    "verification": "Confirm commercial CTA appears within the first 3 interactive DOM elements.",
+                },
+            }
+        )
+
+    # 1.3 Information Scent Purity
+    if scent_data["is_diluted"] and total_body_words >= 100:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.ENGAGEMENT.INFORMATION_SCENT_PURITY.001",
+                "title": "Replace buzzword marketing fluff with substantive domain nouns in lead copy",
+                "category": "engagement",
+                "summary": (
+                    f"Lead content on {url} exhibits diluted information scent (detected promotional terms: {', '.join(scent_data['fluff_matches'])}). "
+                    "Visitors arriving from AI citations seek immediate confirmation of technical attributes and commercial details; subjective marketing fluff elevates bounce rates."
+                ),
+                "priority": "low",
+                "technical_fix": "Purge promotional descriptors and replace with specific feature names, specifications, and verified capabilities.",
+                "creative_fix": "Adopt crisp, informative prose that directly fulfills the promise of the page title and citation snippet.",
+                "verification": "Confirm fluff ratio is under 3% of lead text tokens.",
+            }
+        )
+
+    # 1.4 Cognitive Simplicity / Readability
+    if readability_data["is_complex"] and total_body_words >= 100:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.ENGAGEMENT.COGNITIVE_SIMPLICITY.001",
+                "title": "Streamline sentence structure in lead copy to lower cognitive friction",
+                "category": "engagement",
+                "summary": (
+                    f"Lead paragraph on {url} has an elevated reading complexity score (ARI: {readability_data['ari_score']}, avg sentence: {readability_data['avg_sentence_length']} words). "
+                    "Arriving AI referral visitors skim for immediate answers; high sentence complexity increases abandonment.",
+                ),
+                "priority": "low",
+                "technical_fix": "Break long compound sentences (exceeding 25 words) into concise declarative statements.",
+                "creative_fix": "Use the 15-20 word sentence standard for introductory explanations and value propositions.",
+                "verification": "Confirm average sentence length in opening paragraphs is <= 22 words.",
+            }
+        )
+
     return (
         findings,
         recommendations,
         {
-            "visible_words": len(" ".join(dom.body_text).split()),
+            "visible_words": total_body_words,
             "h1": len(dom.h1_list) > 0,
             "navigation_links_found": len(dom.nav_links),
             "anchor_links_found": len(dom.nav_links),
+            "cta_reachability_score": cta_data["reachability_score"],
+            "viewport_anchored": viewport_data["anchored_in_viewport"],
+            "information_scent_score": scent_data["scent_ratio"],
+            "ari_readability_score": readability_data["ari_score"],
         },
     )
 
@@ -856,10 +1141,23 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
             "Engagement evaluation operated in heuristic-only mode based on static HTML layout proxies (heading hierarchy, CTA placement, information scent). First-party behavioral analytics (bounce rates, dwell times, scroll depths, AI-referral cohort drop-offs) were not provided. Static proxies indicate structural risks, not observed visitor drop-off."
         )
 
+    engagement_continuity_summary = {
+        "mode": mode,
+        "pages_audited": len(page_metrics),
+        "pages_with_viewport_anchoring": sum(1 for pm in page_metrics if pm.get("viewport_anchored", False)),
+        "average_cta_reachability_score": round(
+            sum(pm.get("cta_reachability_score", 0.0) for pm in page_metrics) / max(1, len(page_metrics)), 2
+        ),
+        "average_information_scent_score": round(
+            sum(pm.get("information_scent_score", 1.0) for pm in page_metrics) / max(1, len(page_metrics)), 2
+        ),
+    }
+
     return {
         "status": "ok",
         "engagement_mode": mode,
         "analytics_summary": analytics_summary,
+        "engagement_continuity_summary": engagement_continuity_summary,
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,

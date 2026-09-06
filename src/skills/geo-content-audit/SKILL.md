@@ -101,10 +101,29 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
    - For product pages: flags absence of semantic `<table>` and `<ul>`/`<ol>` elements as an advisory extractability recommendation.
    - For informational/article pages: flags absence of question-oriented headings (`<h2>What is...</h2>`, `<h2>How does...</h2>`) as a recommendation to adopt FAQ/direct answer formatting.
 
-4. **Deterministic Page-Level Content Improvement Plans (`page_improvement_plans`):**
+4. **Zhang et al. 2026 Evidence Genres & Standalone FAQ Deficit (`CONTENT.STANDALONE_FAQ_DEFICIT`):**
+   - Audits the 5 high-influence evidence genres: Code (+76.9%), Statistics (+61.6%), Definition Copulas (+57.3%), Comparison Tables (+55.3%), and Procedural Steps (+41.2%).
+   - Flags `STANDALONE_FAQ_DEFICIT` (Severity: `medium`, Confidence: `high`) when pages use isolated Q&A/FAQ format without supporting empirical evidence (code, stats, or comparison tables), which research proves incurs an empirical -5.7% citation penalty.
+
+5. **Keyword Stuffing & Neural Perplexity Degradation (`CONTENT.KEYWORD_STUFFING_DEGRADATION.EXCESSIVE_KEYWORD_DENSITY`):**
+   - Evaluates non-stopword token frequencies across substantive pages (>= 150 words).
+   - If any individual content word exceeds 4.5% term frequency, emits `EXCESSIVE_KEYWORD_DENSITY` (Severity: `medium`, Confidence: `high`).
+   - *Rationale:* Unnatural keyword repetition degrades neural embedding perplexity and incurs an empirical -8.3% to -10% citation degradation in LLMs.
+
+6. **BLUF Top-30% Attention Primacy (`CONTENT.CONTEXT_PLACEMENT_DEGRADATION`):**
+   - Verifies whether core definitional propositions or commercial answers are stated in the top 30% / first 250 words of content.
+   - If missing on substantive content, emits `CONTEXT_PLACEMENT_DEGRADATION` (Severity: `medium`, Confidence: `high`).
+   - *Rationale (Stanford "Lost in the Middle" & Zyppy 2026):* 44.2% of citations occur in the top 30% of content; middle-buried answers suffer 30-40% lower retrieval recall.
+
+7. **Attributed Expert Quotations (`PROACTIVE.GEO.ATTRIBUTED_EXPERT_QUOTES.001`):**
+   - Checks for quotations attributed to named domain authorities or credentialed specialists (Dr., PhD, MD, Professor, Chief Scientist).
+   - *Rationale (Princeton KDD 2024):* Attributed Quotations yield the single highest citation lift (+40.9% PAWC boost) among all tested optimization vectors.
+
+8. **Deterministic Page-Level Content Improvement Plans (`page_improvement_plans`):**
    - For each substantive evaluated page, derives a deterministic, actionable remediation plan:
      * Current dimension scores across Answer Block Quality, Self-Containment, Mechanistic Depth, Statistical Density, Table/List Formatting, Hedge Control, and FTR.
-     * Concrete gap analysis benchmarking against empirical thresholds (e.g., FTR $\ge 0.080$, hedge density $\le 0.5\%$, depth score $\ge 3$).
+     * Evidence genres analysis, attributed quotation coverage, BLUF placement, and keyword density diagnostics.
+     * Concrete gap analysis benchmarking against empirical thresholds (e.g., FTR $\ge 0.080$, hedge density $\le 0.5\%$, depth score $\ge 3$, max keyword density $\le 4.0\%$).
      * Prioritized action tracks: `immediate_structural_actions`, `textual_modifications`, and `passage_chunking_plan` (120–180 word modular sections).
      * Mandatory epistemic qualification on every plan.
 

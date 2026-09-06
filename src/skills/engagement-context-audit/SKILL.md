@@ -102,7 +102,13 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
    - Flag when a landing page has fewer than 3 navigation links and omits discoverable pathways to core brand destinations (Pricing, Products, Documentation, Contact).
 3. **Intent-to-Landing Match (`EXPERIENCE.CONTINUITY.INTENT_TO_LANDING_MISMATCH`):**
    - Flag when a specialized landing route (e.g. `/pricing`) fails to expose core expected commercial answers (price figures, plan tiers, starting ranges) above the fold.
-4. **First-Party Analytics Cross-Correlation (Dual-Track Evaluation):**
+4. **Viewport Answer Anchoring (`EXPERIENCE.CONTINUITY.VIEWPORT_ANSWER_ABSENCE`):**
+   - Evaluates whether the top 600px viewport (first 2 paragraphs / first 150 words) anchors the specific core propositions (prices, product functionality, direct definitions).
+   - If decorative banners push answers below the fold, flag `VIEWPORT_ANSWER_ABSENCE` (Severity: `medium`, Confidence: `high`).
+5. **CTA Reachability Index (`EXPERIENCE.CONTINUITY.CTA_REACHABILITY_FRICTION`):**
+   - Evaluates the order of interactive DOM elements.
+   - If the first commercial conversion action ('Buy', 'Start Free Trial', 'Contact Sales') is preceded by more than 3 auxiliary interactive elements, flag `CTA_REACHABILITY_FRICTION` (Reachability Index = $1 / (1 + \text{preceding})$).
+6. **First-Party Analytics Cross-Correlation (Dual-Track Evaluation):**
    - **Empirical Corroboration:** When analytics are ingested and a static UX defect aligns with high bounce rate ($\ge 60\%$) or low dwell time ($\le 20\text{s}$), elevate confidence and severity to `high`.
    - **Static Flag Mitigation:** When observed user retention is healthy (bounce rate $\le 35\%$, dwell time $\ge 60\text{s}$), downgrade static heuristic severity to `low` or informational.
    - **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds organic search baseline by $\ge 25\%$, flag `AI_REFERRAL_DISCONTINUITY` as a high-severity intent mismatch.
