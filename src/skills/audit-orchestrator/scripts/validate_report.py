@@ -88,6 +88,9 @@ def validate_type(instance, schema, path="root"):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+        print("Usage: python3 validate_report.py [report.json | - < report.json]")
+        sys.exit(0)
     if len(sys.argv) > 1 and sys.argv[1] != "-":
         filepath = sys.argv[1]
         if not os.path.exists(filepath):
@@ -96,6 +99,12 @@ def main():
         with open(filepath, "r", encoding="utf-8") as f:
             data = f.read()
     else:
+        if sys.stdin.isatty():
+            print(
+                "Usage: python3 validate_report.py [report.json | - < report.json]",
+                file=sys.stderr,
+            )
+            sys.exit(2)
         data = sys.stdin.read()
 
     if not data.strip():

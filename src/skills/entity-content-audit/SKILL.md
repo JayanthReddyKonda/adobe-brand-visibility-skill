@@ -1,11 +1,6 @@
 ---
 name: entity-content-audit
-description: >
-  Audit machine-explicit entity identity and commercial answerability attributes across web pages.
-  Use this skill whenever the user asks about "structured data", "Schema.org", "JSON-LD",
-  "Organization schema", "Product schema", "rich results", "entity clarity", or asks whether
-  AI models understand WHO a brand is and WHAT products/services it offers with complete pricing,
-  availability, and specifications.
+description: "Use when auditing machine-explicit entity identity, Schema.org structured data, and commercial answerability attributes across web pages. Triggers on queries regarding structured data, Schema.org, JSON-LD, Organization schema, Product schema, rich results, or entity clarity. Evaluates whether AI search engines resolve brand identity and offerings with complete pricing and availability."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -14,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Entity & Content Audit Skill
@@ -33,7 +28,7 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 
@@ -97,7 +92,7 @@ python3 skills/entity-content-audit/scripts/entity_content_check.py --site https
 3. **Mathematical Answerability Engine (`ENTITY.ANSWERABILITY.MISSING_MATERIAL_FACT`):**
    - Evaluate sampled **HTML pages** (excluding homepage and non-HTML resources).
    - Compute weighted completeness:
-     $$\text{Index} = \frac{\sum w_i \cdot \text{present}_i}{\sum w_i}$$
+     Index = sum(w_i * present_i) / sum(w_i)
    - If coverage ratio on a specialized page < 0.60 -> flag `MISSING_MATERIAL_FACT` (Severity: `low`).
 
 ---

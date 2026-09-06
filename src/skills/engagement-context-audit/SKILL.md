@@ -1,11 +1,6 @@
 ---
 name: engagement-context-audit
-description: >
-  Evaluate visitor orientation, information scent, and intent-handoff continuity for traffic arriving
-  from AI search citations. Use this skill whenever the user mentions "visitor bounce",
-  "information scent", "H1 alignment", "CTA reachability", "post-citation continuity",
-  "landing page orientation", or asks why AI-referred users bounce after clicking a citation link.
-  Evaluates Entity-to-H1 anchoring, CTA reachability in the first 3 elements, and destination navigation.
+description: "Use when evaluating visitor orientation, information scent, and intent-handoff continuity for traffic arriving from AI search citations. Triggers on mentions of visitor bounce, information scent, H1 alignment, CTA reachability, post-citation continuity, landing page orientation, or AI referral drop-off. Evaluates above-the-fold clarity, heading scent, and destination friction."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -14,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Engagement & Context Continuity Audit Skill
@@ -33,7 +28,7 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 
@@ -107,11 +102,11 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
    - If decorative banners push answers below the fold, flag `VIEWPORT_ANSWER_ABSENCE` (Severity: `medium`, Confidence: `high`).
 5. **CTA Reachability Index (`EXPERIENCE.CONTINUITY.CTA_REACHABILITY_FRICTION`):**
    - Evaluates the order of interactive DOM elements.
-   - If the first commercial conversion action ('Buy', 'Start Free Trial', 'Contact Sales') is preceded by more than 3 auxiliary interactive elements, flag `CTA_REACHABILITY_FRICTION` (Reachability Index = $1 / (1 + \text{preceding})$).
+   - If the first commercial conversion action ('Buy', 'Start Free Trial', 'Contact Sales') is preceded by more than 3 auxiliary interactive elements, flag `CTA_REACHABILITY_FRICTION` (Reachability Index = 1 / (1 + preceding)).
 6. **First-Party Analytics Cross-Correlation (Dual-Track Evaluation):**
-   - **Empirical Corroboration:** When analytics are ingested and a static UX defect aligns with high bounce rate ($\ge 60\%$) or low dwell time ($\le 20\text{s}$), elevate confidence and severity to `high`.
-   - **Static Flag Mitigation:** When observed user retention is healthy (bounce rate $\le 35\%$, dwell time $\ge 60\text{s}$), downgrade static heuristic severity to `low` or informational.
-   - **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds organic search baseline by $\ge 25\%$, flag `AI_REFERRAL_DISCONTINUITY` as a high-severity intent mismatch.
+   - **Empirical Corroboration:** When analytics are ingested and a static UX defect aligns with high bounce rate (>= 60%) or low dwell time (<= 20s), elevate confidence and severity to `high`.
+   - **Static Flag Mitigation:** When observed user retention is healthy (bounce rate <= 35%, dwell time >= 60s), downgrade static heuristic severity to `low` or informational.
+   - **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds organic search baseline by >= 25%, flag `AI_REFERRAL_DISCONTINUITY` as a high-severity intent mismatch.
    - **Heuristic-Only Fallback:** When analytics are omitted, operate with explicit limitations stating findings are structural proxies, not verified visitor abandonment.
 
 ---

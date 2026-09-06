@@ -130,28 +130,43 @@ AUDIT TAXONOMY
 | :--- | :--- | :--- | :--- |
 | `DISCOVERY.ACCESS` | `AI_RETRIEVAL_BLOCKED` | robots.txt blocks AI search retrieval crawlers (`OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot`). | `critical` / `high` |
 | `DISCOVERY.ACCESS` | `NOINDEX_EXCLUSION` | Meta robots or headers exclude public content from AI ingestion. | `critical` |
+| `DISCOVERY.ACCESS` | `ROBOTS_5XX_FAIL_CLOSED` | robots.txt returns HTTP 5xx causing fail-closed block of all AI crawlers. | `critical` |
+| `DISCOVERY.ACCESS` | `ROBOTS_TXT_OVERSIZED` | robots.txt exceeds 500 KiB RFC 9309 ceiling resulting in truncated directive processing. | `medium` |
+| `DISCOVERY.ACCESS` | `NOSNIPPET_ON_CORE_CONTENT` | Meta nosnippet directive prevents generative answer engine extraction. | `high` |
 | `DISCOVERY.DISCOVERY_PATH` | `CANONICAL_FRAGMENTATION` | Canonical URL consolidates onto a different un-audited host. | `medium` |
+| `DISCOVERY.DISCOVERY_PATH` | `LOCALE_MISCONFIGURATION` | Hreflang language/country code misconfiguration causing cross-regional routing failure. | `medium` |
 | `DISCOVERY.REPRESENTATION_AVAILABILITY` | `RENDERED_CONTENT_GAP` | Primary copy missing from raw HTML (client-side rendering dependency). | `high` |
 | `ENTITY.IDENTITY` | `MATERIAL_ENTITY_AMBIGUITY` | Brand entity is missing machine-explicit Organization identity. | `medium` |
 | `ENTITY.ANSWERABILITY` | `INCOMPLETE_OFFER_ATTRIBUTES` | Product/Offer schema omits required commercial fields (price, availability). | `low` |
+| `ENTITY.ANSWERABILITY` | `ATTRIBUTE_INCOMPLETENESS` | Product/Offer schema omits required commercial attributes (price, currency, availability). | `low` |
 | `ENTITY.ANSWERABILITY` | `MISSING_MATERIAL_FACT` | Page type missing core factual attributes expected for user query answerability. | `low` |
+| `ENTITY.ANSWERABILITY` | `COMMERCIAL_PRODUCT_DATA_CONTRADICTION` | Discrepancy between on-page visible price and JSON-LD structured schema price. | `high` |
+| `ENTITY.STRUCTURE` | `SCHEMA_DEPRECATION` | Outdated Schema.org types or deprecated properties degrade machine extraction. | `low` |
+| `ENTITY.STRUCTURE` | `SCHEMA_PRICE_FORMAT_INVALID` | Schema price contains unparsed currency symbols or string format rather than clean float. | `low` |
 | `FACT.CONSISTENCY` | `FIRST_PARTY_FACT_CONFLICT` | Conflicting prices or specifications published for the same product/plan across pages. | `high` |
 | `FACT.FRESHNESS` | `LEGACY_FACT_PROPAGATION` | Outdated slogans, legacy pricing, or stale copyright years persist across pages. | `medium` |
 | `FACT.LIFECYCLE` | `DISCONTINUED_VS_CURRENT_CONFLICT` | Discontinued product marketed as active or in-stock on secondary pages. | `high` |
+| `FACT.CONSISTENCY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
 | `AUTHORITY.IDENTITY_CORROBORATION` | `BROKEN_AUTHORITY_ANCHOR` | Declared sameAs profile URL returns 4xx/5xx HTTP error. | `medium` |
+| `AUTHORITY.IDENTITY_CORROBORATION` | `CIRCULAR_SAMEAS_SELF_REFERENCE` | sameAs points to internal mirrors/redirects rather than external authority knowledge graphs. | `medium` |
 | `AUTHORITY.IDENTITY_CORROBORATION` | `CANDIDATE_BACKLINK_UNREACHABLE` | Candidate backlink from referring domain returns 4xx/5xx or is unreachable. | `medium` |
+| `AUTHORITY.CLAIM_CORROBORATION` | `CLAIM_CORROBORATION_GAP` | Material factual assertions lack external verification or corroboration. | `low` |
 | `EXPERIENCE.CONTINUITY` | `INTENT_TO_LANDING_MISMATCH` | Landing page omits answers to referral query intent above the fold. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `LOW_INFORMATION_SCENT` | Primary H1 uses generic filler words ("Welcome", "Home") lacking information scent. | `low` |
 | `EXPERIENCE.CONTINUITY` | `VIEWPORT_ANSWER_ABSENCE` | Core cited proposition missing from top 600px viewport, triggering orientation shock. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `CTA_REACHABILITY_FRICTION` | Commercial continuation CTA delayed behind >3 auxiliary interactive elements. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `AI_REFERRAL_DISCONTINUITY` | First-party analytics confirm excessive bounce (>= 60%) and low dwell (< 30s) on AI search traffic. | `high` |
 | `EXPERIENCE.CONTINUITY` | `DESTINATION_NAVIGATION_FRICTION` | Landing page lacks navigation links to core brand destinations. | `medium` |
+| `EXPERIENCE.CONTINUITY` | `AGENT_INTERACTION_BARRIER` | Conversion action requires multi-step interactive friction blocking autonomous agent task completion. | `medium` |
 | `CONTENT.SHALLOW_COVERAGE` | `MISSING_IN_DEPTH_MECHANISMS` | Content lacks explanatory mechanisms ('how' and 'why') prioritized by generative search. | `medium` |
 | `CONTENT.SHALLOW_COVERAGE` | `STANDALONE_FAQ_DEFICIT` | Standalone FAQ format without empirical code, statistics, or comparison tables (-5.7% penalty). | `medium` |
 | `CONTENT.RETRIEVAL_OPTIMIZATION` | `LACK_OF_SPECIFIC_EVIDENCE` | Content lacks concrete statistics, numbers, or verifiable metrics. | `low` |
 | `CONTENT.KEYWORD_STUFFING_DEGRADATION` | `EXCESSIVE_KEYWORD_DENSITY` | Term frequency >4.5% degrading neural embedding perplexity (-8.3% to -10% citation degradation). | `medium` |
 | `CONTENT.CONTEXT_PLACEMENT_DEGRADATION` | `CONTEXT_PLACEMENT_DEGRADATION` | Primary answer delayed beyond top 30% / first 250 words (Stanford 'Lost in the Middle'). | `medium` |
-| `FACT.CONSISTENCY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
+| `CONTENT.CITABILITY` | `LOW_CITABILITY_SCORE` | Composite citability index falls below benchmark threshold for LLM selection. | `medium` |
+| `CONTENT.INFORMATION_DENSITY` | `LOW_FACT_TO_TOKEN_RATIO` | Atomic Fact-to-Token Ratio (FTR < 0.040) indicates thin, non-citable marketing copy. | `medium` |
+| `CONTENT.LINGUISTIC` | `EXCESSIVE_HEDGE_LANGUAGE` | High frequency of epistemic hedge words (>1.5%) conveys speculative low confidence. | `low` |
+| `CONTENT.FRESHNESS` | `CONTENT_RECENCY_DEFICIT` | Core substantive content lacks recent modification signals (>365 days stale). | `low` |
 
 ---
 

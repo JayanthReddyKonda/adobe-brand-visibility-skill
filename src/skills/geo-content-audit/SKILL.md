@@ -1,12 +1,6 @@
 ---
 name: geo-content-audit
-description: >
-  Audit web content for Generative Engine Optimization (GEO) and LLM citation selection based on
-  Princeton KDD 2024 and AutoGEO research. Use this skill whenever the user mentions "GEO",
-  "Generative Engine Optimization", "AI citation probability", "answer engine optimization",
-  "causal conjunctions", "statistical evidence density", "passage chunking", or asks how to
-  get a brand's content cited by ChatGPT, Perplexity, and Claude. Evaluates mechanistic depth
-  ('how' and 'why'), quantitative statistics, Q&A answer blocks, and semantic table layouts.
+description: "Use when auditing web content for Generative Engine Optimization (GEO) and LLM citation selection based on Princeton KDD 2024 and AutoGEO research. Triggers on requests regarding GEO, Generative Engine Optimization, AI citation probability, answer engine optimization, causal conjunctions, statistical evidence density, or passage chunking to maximize ChatGPT, Perplexity, and Claude citations."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -15,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Generative Engine Optimization (GEO) Audit Skill
@@ -33,7 +27,7 @@ Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) 
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 
@@ -88,7 +82,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
 ### Step 3: Decision Protocol & Check Logic
 
 1. **In-Depth Causal Mechanisms (`CONTENT.SHALLOW_COVERAGE.MISSING_IN_DEPTH_MECHANISMS`):**
-   - Evaluates content pages (`product_detail`, `article`, `pricing`) for word-bounded causal conjunctions (`\bhow\b`, `\bwhy\b`, `\bbecause\b`, `\btherefore\b`, `\ballows\b`, `\benables\b`, `\bresults in\b`).
+   - Evaluates content pages (`product_detail`, `article`, `pricing`) for word-bounded causal conjunctions ('how', 'why', 'because', 'therefore', 'allows', 'enables', 'results in').
    - If depth score < 2 on a substantive page: emit a finding (`MISSING_IN_DEPTH_MECHANISMS`, Severity: `medium`, Confidence: `high`).
    - *Rationale (Princeton KDD 2024):* Generative engines strongly prefer sources providing explanatory mechanisms over surface-level marketing statements (+28% selection preference).
 
@@ -123,7 +117,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
    - For each substantive evaluated page, derives a deterministic, actionable remediation plan:
      * Current dimension scores across Answer Block Quality, Self-Containment, Mechanistic Depth, Statistical Density, Table/List Formatting, Hedge Control, and FTR.
      * Evidence genres analysis, attributed quotation coverage, BLUF placement, and keyword density diagnostics.
-     * Concrete gap analysis benchmarking against empirical thresholds (e.g., FTR $\ge 0.080$, hedge density $\le 0.5\%$, depth score $\ge 3$, max keyword density $\le 4.0\%$).
+     * Concrete gap analysis benchmarking against empirical thresholds (e.g., FTR >= 0.080, hedge density <= 0.5%, depth score >= 3, max keyword density <= 4.0%).
      * Prioritized action tracks: `immediate_structural_actions`, `textual_modifications`, and `passage_chunking_plan` (120–180 word modular sections).
      * Mandatory epistemic qualification on every plan.
 

@@ -1,13 +1,6 @@
 ---
 name: web-scraper
-description: >
-  Autonomous, zero-dependency, SSRF-hardened web crawler and AI content extractor. Use this skill
-  whenever the user asks to "crawl a website", "scrape web pages", "extract clean markdown",
-  "audit robots.txt", "parse sitemaps", "extract JSON-LD", "check AI crawler permissions",
-  or needs a structured site inventory for AI search readiness and downstream audit agents.
-  Crawls public websites within strict monotonic budgets, parses RFC 9309 robots.txt permissions
-  across 16 AI retrieval & training bots, extracts Trafilatura-grade clean Markdown with SNR scoring,
-  scores commercial routes, and emits structured site inventories.
+description: "Use when crawling a target website or extracting AI-ready content, clean markdown, and metadata without dependencies. Triggers on requests to crawl a website, scrape web pages, extract clean markdown, audit robots.txt, parse sitemaps, extract JSON-LD, or check AI crawler permissions across 16 AI retrieval bots. Emits a structured site inventory for AI search readiness."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -16,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Web Scraper Skill (Autonomous AI Retrieval Acquisition)
@@ -40,6 +33,12 @@ Invoke this skill whenever an AI agent or workflow needs to:
 - `--timeout <float>` (float, optional, default: `30.0`): Monotonic deadline budget in seconds.
 - `--max-depth <int>` (integer, optional, default: `3`): Maximum link traversal hops from homepage.
 - `--format <json|markdown|both>` (enum, optional, default: `json`): Output format.
+
+---
+
+## References & Documentation Library
+
+- [Web Scraper Knowledge Base](references/web-scraper-knowledge-base.md): Complete architecture reference, 16 AI retrieval crawler matrix, RFC 9309 longest-match precedence rules, and Trafilatura-grade SNR extraction heuristics.
 
 ---
 
@@ -87,7 +86,7 @@ The skill emits a structured JSON document conforming to the following shape:
   "crawled_at": "2026-09-06T12:00:00Z",
   "robots": {
     "status": 200,
-    "raw": "User-agent: *\nAllow: /",
+    "raw": "User-agent: * Allow: /",
     "sitemaps": ["https://example.com/sitemap.xml"],
     "matrix": {
       "OAI-SearchBot": true,
@@ -143,21 +142,11 @@ The skill emits a structured JSON document conforming to the following shape:
 
 ```bash
 # 1. Standard Crawl: Acquire up to 15 pages into inv.json
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com \
-  --output inv.json \
-  --format json
+python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
 
 # 2. Fast Snapshot: 5 pages with 10-second timeout
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com \
-  --max-pages 5 \
-  --timeout 10.0 \
-  --output inv.json
+python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 5 --timeout 10.0 --output inv.json
 
 # 3. Terminal Markdown Summary:
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com \
-  --max-pages 3 \
-  --format markdown
+python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 3 --format markdown
 ```

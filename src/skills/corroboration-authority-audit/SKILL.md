@@ -1,11 +1,6 @@
 ---
 name: corroboration-authority-audit
-description: >
-  Verify external identity-link authority, knowledge graph nodes, and claim corroboration.
-  Use this skill whenever the user mentions "sameAs links", "Wikidata", "Wikipedia",
-  "LinkedIn profile verification", "authority signals", "brand entity links", or asks whether
-  external third-party sources substantiate a brand's canonical digital identity. Probes external
-  identity anchors with zero-trust HTTP verification.
+description: "Use when verifying external identity-link authority, knowledge graph nodes, and entity corroboration. Triggers on mentions of sameAs links, Wikidata, Wikipedia, LinkedIn verification, authority signals, or brand entity links. Probes declared external identity anchors under zero-trust SSRF protection to confirm third-party identity substantiation."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -14,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Corroboration & Authority Audit Skill
@@ -33,7 +28,7 @@ Evaluates external entity authority by verifying that declared identity links (`
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 

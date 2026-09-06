@@ -1,13 +1,6 @@
 ---
 name: audit-orchestrator
-description: >
-  Perform a comprehensive, end-to-end Brand AI-Readiness, Generative Engine Optimization (GEO),
-  and AI Search Visibility audit on any website. Use this skill whenever the user asks to
-  "audit a website", "check AI readiness", "evaluate LLM search visibility", "optimize for
-  ChatGPT/Claude/Perplexity citations", "find brand SEO/AEO defects", or wants an end-to-end brand
-  visibility assessment. Coordinates 7 specialist skills (including web-scraper), executes diagnostic sensors directly,
-  applies cognitive reasoning over multi-signal evidence, and emits a Draft-07 schema-validated
-  JSON report with dual-track remediation.
+description: "Use when performing a comprehensive Brand AI-Readiness, Generative Engine Optimization (GEO), and AI Search Visibility audit on any website. Triggers on requests to audit a website, check AI readiness, evaluate LLM search visibility, optimize for ChatGPT, Claude, and Perplexity citations, or diagnose brand SEO and AEO defects. Coordinates 7 specialist skills, runs diagnostic sensors, and emits a Draft-07 schema-validated report with dual-track remediation."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -15,8 +8,8 @@ metadata:
   version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Audit Orchestrator (Entrypoint Skill)
@@ -34,7 +27,7 @@ The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist 
 ---
 
 > [!TIP]
-> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/`. Find the absolute path to the marketplace root before running any scripts. Adapt shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to your host OS (Linux, macOS, Windows).
+> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/`. Find the absolute path to the marketplace root before running any scripts. Adapt shell commands (`python3`, `python`, `cat`, `type`) to your host OS (Linux, macOS, Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 
@@ -65,12 +58,17 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 ### Technical Foundations (Load on Technical Inquiries)
 - [SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
 
+### Advanced Citability & Research Specifications
+- [State-of-the-Art GEO Benchmarks](references/state-of-the-art-geo-benchmarks.md): The 17-rule consolidated matrix (CR01-TX06) covering crawler access, machine-readable manifests, text citability, and Princeton GEO evidence density.
+- [SOTA AI Readiness Framework (2026)](references/sota-ai-readiness-framework-2026.md): 6-dimensional orthogonal readiness scoring model and Wilson 95% score confidence intervals across retrieval engines.
+- [Citation Absorption & SFE (2026)](references/citation-absorption-and-geo-sfe-2026.md): Mathematical formulations for Citation Absorption Index, Synthetic Flywheel Effect, and multi-sentence context decay.
+
 ---
 
 ## Procedure
 
 > [!CAUTION]
-> **MANDATORY READING GATE:** You MUST read your own 3 references AND all 6 specialist SKILL.mds BEFORE running any scripts. This loads the domain knowledge and decision rules that your synthesis reasoning depends on. Do not skip this. Do not execute scripts first.
+> **MANDATORY READING GATE:** You MUST read your own reference files AND all 7 specialist SKILL.mds BEFORE running any scripts. This loads the domain knowledge and decision rules that your synthesis reasoning depends on. Do not skip this. Do not execute scripts first.
 
 ### Phase 1 — Knowledge Loading
 
@@ -83,10 +81,11 @@ cat skills/audit-orchestrator/references/report-schema.json
 cat skills/audit-orchestrator/references/seo-foundations.md
 ```
 
-**Step 2: Load All 6 Specialist SKILL.md Runbooks**
+**Step 2: Load All 7 Specialist SKILL.md Runbooks**
 
 Read each specialist's SKILL.md to understand execution commands and output contracts:
 ```bash
+cat skills/web-scraper/SKILL.md
 cat skills/discoverability-audit/SKILL.md
 cat skills/entity-content-audit/SKILL.md
 cat skills/fact-consistency-audit/SKILL.md
@@ -97,8 +96,11 @@ cat skills/engagement-context-audit/SKILL.md
 
 **Step 3: Load All Specialist Knowledge Bases and Domain Reference Schemas**
 
-Read all 12 domain knowledge bases, specialized guides, and JSON reference schemas across specialists:
+Read all 13 domain knowledge bases, specialized guides, and JSON reference schemas across specialists:
 ```bash
+# Web Scraper Architecture & Crawler Matrix
+cat skills/web-scraper/references/web-scraper-knowledge-base.md
+
 # Discoverability Knowledge Base & International SEO Guide
 cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
 cat skills/discoverability-audit/references/international-seo.md
@@ -131,16 +133,10 @@ cat skills/engagement-context-audit/references/product-purchase.json
 Execute the single-pass web scraper to build the shared canonical site inventory (`inv.json`). This ensures the target domain is crawled **exactly once**, completely eliminating redundant scraping across the 6 downstream specialist skills:
 ```bash
 # Option A: Directly invoke web-scraper skill
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com \
-  --output inv.json \
-  --format json
+python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
 
 # Option B: Run orchestrator acquisition wrapper
-python3 skills/audit-orchestrator/scripts/acquire_inventory.py \
-  --site https://example.com \
-  --output inv.json \
-  --format json
+python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 ```
 
 The inventory JSON contains: `site`, `pages[]` (each with `url`, `status`, `content_type`, `page_type`, `snr_ratio`, `word_count`, `jsonld`, `clean_markdown`, `html`), `robots` (RFC 9309 16 AI crawler matrix), `sitemaps[]`, and `infrastructure`.
@@ -153,38 +149,32 @@ Run each specialist script sequentially. Each returns a JSON payload with `statu
 
 **Step 5: Discoverability & Retrieval Audit**
 ```bash
-python3 skills/discoverability-audit/scripts/discoverability_check.py \
-  --site https://example.com --inventory inv.json --format json
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 **Step 6: Entity Identity & Answerability Audit**
 ```bash
-python3 skills/entity-content-audit/scripts/entity_content_check.py \
-  --site https://example.com --inventory inv.json --format json
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 **Step 6: Fact Consistency & Lifecycle Audit**
 ```bash
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py \
-  --site https://example.com --inventory inv.json --format json
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 **Step 7: Authority & SameAs Corroboration Audit**
 ```bash
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py \
-  --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
 ```
 
 **Step 8: Generative Engine Optimization (GEO) Audit**
 ```bash
-python3 skills/geo-content-audit/scripts/geo_content_check.py \
-  --site https://example.com --inventory inv.json --format json
+python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
 **Step 9: Engagement & Context Continuity Audit**
 ```bash
-python3 skills/engagement-context-audit/scripts/engagement_check.py \
-  --site https://example.com --inventory inv.json --analytics analytics.json --format json
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --analytics analytics.json --format json
 ```
 
 ---
@@ -207,9 +197,9 @@ Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over a
    Audit reasoning must evaluate the target domain against the complete consolidated benchmark suite defined in `references/state-of-the-art-geo-benchmarks.md`:
    - **Crawler Access (`CR01`–`CR05`):** RFC 9309 compliance, 500 KiB file cap, HTTP 5xx fail-closed state, and explicit permissions for `OAI-SearchBot`, `Claude-SearchBot`, and `PerplexityBot`.
    - **Machine-Readable Manifests (`LL01`–`LL02`):** Root `/llms.txt` availability with H1 title and blockquote, plus first-100-word executive summaries.
-   - **Rendering & Delivery (`RD01`–`RD02`):** Content Availability Gap ($	ext{CAG} < 0.15$) and text-to-HTML Signal-to-Noise Ratio ($	ext{SNR} > 0.12$).
-   - **Structured Data (`SC01`–`SC03`):** Organization $\ge 2$ authoritative `sameAs` nodes, clean float Offer prices with ISO 4217 currencies, and 60-day freshness.
-   - **Text & Citability (`TX01`–`TX06`):** BLUF top-30% placement, Hyland hedge density $\le 1.2\%$, Atomic Fact-to-Token Ratio $	ext{FTR} \ge 0.080$, Exophoric Pronoun Ratio $0\%$, Shannon Token Entropy $6.8 - 7.6	ext{ bits}$, and Princeton GEO evidence density ($\ge 1	ext{ stat} + 1	ext{ quote} / 150	ext{ words}$).
+   - **Rendering & Delivery (`RD01`–`RD02`):** Content Availability Gap (CAG < 0.15) and text-to-HTML Signal-to-Noise Ratio (SNR > 0.12).
+   - **Structured Data (`SC01`–`SC03`):** Organization >= 2 authoritative `sameAs` nodes, clean float Offer prices with ISO 4217 currencies, and 60-day freshness.
+   - **Text & Citability (`TX01`–`TX06`):** BLUF top-30% placement, Hyland hedge density <= 1.2%, Atomic Fact-to-Token Ratio FTR >= 0.080, Exophoric Pronoun Ratio 0%, Shannon Token Entropy 6.8 - 7.6 bits, and Princeton GEO evidence density (>= 1 stat + 1 quote / 150 words).
 
 8. **The 6 Orthogonal Scores Model & Wilson Confidence Intervals:**
    Audit synthesis must evaluate the target brand across the 6 orthogonal dimensions defined in `references/sota-ai-readiness-framework-2026.md`:
@@ -304,7 +294,7 @@ The entrypoint skill's primary deliverable is the **complete, unabridged audit r
 
 ## Gotchas & False-Positive Boundaries
 
-- **Never modify live sites:** This audit is strictly read-only and analytical. Never execute POST/PUT/DELETE requests.
+- **Non-Destructive Execution & User Approval Gate:** All diagnostic audits are strictly read-only, non-destructive, and analytical. Never execute destructive operations such as HTTP POST, PUT, DELETE, data purging, or file removal. Any operation that modifies or deletes resources requires explicit user confirmation and approval before execution.
 - **SSRF Hard Boundary:** All fetches pass through `safe_fetch.py`. Never probe private RFC-1918 subnets, cloud metadata (169.254.169.254), or loopback interfaces.
 - **Non-HTML Resource Invariant:** XML sitemaps, robots.txt, JSON feeds, and PDFs are infrastructure metadata and must NEVER be audited for narrative or heading content.
 - **Training Bot vs Retrieval Bot:** Blocking `GPTBot` (training) is a governance decision — NOT a critical defect. Blocking `OAI-SearchBot` or `PerplexityBot` (retrieval) IS a critical defect. See `discoverability-audit/SKILL.md` for the full crawler matrix.

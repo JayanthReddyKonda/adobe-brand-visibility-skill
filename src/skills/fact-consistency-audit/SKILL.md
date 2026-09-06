@@ -1,11 +1,6 @@
 ---
 name: fact-consistency-audit
-description: >
-  Detect cross-page factual contradictions, pricing discrepancies, outdated contact info, and legacy
-  content drift across a website. Use this skill whenever the user mentions "fact conflicts",
-  "pricing inconsistencies", "hallucination risks", "outdated copyright dates", "stale content",
-  or asks why AI search assistants quote wrong or conflicting prices/details about a brand. Builds
-  a scoped first-party fact ledger to isolate verified contradictions.
+description: "Use when detecting cross-page factual contradictions, pricing discrepancies, outdated contact information, or legacy content drift across a website. Triggers on mentions of fact conflicts, pricing inconsistencies, hallucination risks, outdated copyright dates, or stale content. Constructs a multi-attribute first-party fact ledger to isolate verified contradictions."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -14,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Fact Consistency & Lifecycle Audit Skill
@@ -33,7 +28,7 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 
@@ -83,8 +78,8 @@ python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site h
 ### Step 3: Decision Protocol & Check Logic
 
 1. **Scoped Price Contradictions (`FACT.CONSISTENCY.FIRST_PARTY_FACT_CONFLICT`):**
-   - Flag a defect ONLY when two or more first-party pages state conflicting prices for the **same scoped entity** (e.g. "Velocity X9" is \$5,499 on `/product/x9` but \$4,999 on `/promo`).
-   - **Do NOT compare distinct tiers:** A \$10 Starter Plan and \$50 Pro Plan share the attribute `price` but possess different entity scopes.
+   - Flag a defect ONLY when two or more first-party pages state conflicting prices for the **same scoped entity** (e.g. "Velocity X9" is $5,499 on `/product/x9` but $4,999 on `/promo`).
+   - **Do NOT compare distinct tiers:** A $10 Starter Plan and $50 Pro Plan share the attribute `price` but possess different entity scopes.
 2. **Product Lifecycle Conflicts (`FACT.LIFECYCLE.DISCONTINUED_VS_CURRENT_CONFLICT`):**
    - Flag when a product is marked as `discontinued` or `out of production` on one page but listed as `in_stock` or `current` on another (Severity: `high`).
 3. **Legacy Fact Propagation (`FACT.FRESHNESS.LEGACY_FACT_PROPAGATION`):**

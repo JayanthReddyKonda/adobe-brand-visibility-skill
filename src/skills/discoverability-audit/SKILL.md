@@ -1,12 +1,6 @@
 ---
 name: discoverability-audit
-description: >
-  Audit whether AI retrieval engines (ChatGPT Search, Claude Search, PerplexityBot, Google AI Overviews)
-  can crawl, reach, and extract content from a website. Use this skill whenever the user mentions
-  "robots.txt", "crawler access", "AI bot blocking", "searchbot permissions", "noindex directives",
-  "canonical tags", "client-side rendering gaps", or asks why AI search engines cannot index or
-  retrieve web pages. Evaluates RFC 9309 crawler matrices, meta directives, canonical consolidation,
-  and raw HTML rendering completeness.
+description: "Use when auditing whether AI retrieval engines like ChatGPT Search, Claude Search, Perplexity, and Google AI Overviews can crawl and index a website. Triggers on mentions of robots.txt, crawler access, AI bot blocking, searchbot permissions, noindex directives, canonical tags, or client-side rendering gaps. Evaluates RFC 9309 crawler matrices, meta directives, and raw HTML rendering completeness."
 license: MIT
 compatibility: ">=Python-3.9"
 metadata:
@@ -15,8 +9,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - run_command
-  - view_file
+  - Bash
+  - Read
 ---
 
 # Discoverability Audit Skill
@@ -34,7 +28,7 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt your shell commands (`python3`, `python`, `cat`, `type`, `/`, `\`) to match your host operating system (Linux, macOS, or Windows).
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## When to use
 
