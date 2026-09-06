@@ -117,6 +117,13 @@ def make_defective_inventory(site: str = "https://example.com") -> dict:
             word_count=0,
         )
         .add_page(
+            url=f"{site}/pricing",
+            html=PRICING_PAGE_HTML,
+            page_type="pricing",
+            snr_ratio=0.28,
+            word_count=320,
+        )
+        .add_page(
             url=f"{site}/pricing-conflicted",
             html=CONFLICTING_PRICING_HTML,  # HF-06
             page_type="pricing",

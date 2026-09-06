@@ -93,6 +93,20 @@ CONFLICTING_PRICING_HTML = """<!DOCTYPE html>
     <meta charset="utf-8">
     <title>Legacy Pricing - Enterprise AI Cloud</title>
     <link rel="canonical" href="https://example.com/old-pricing">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "Enterprise Cloud Starter",
+        "description": "Legacy cloud cluster tier.",
+        "offers": {
+            "@type": "Offer",
+            "price": "99.00",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock"
+        }
+    }
+    </script>
 </head>
 <body>
     <main>

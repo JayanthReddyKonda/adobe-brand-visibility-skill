@@ -842,7 +842,7 @@ def audit(base, domain, inv=None, state_file=None):
         # 1.1 Hedge Language Density Check (from geoskills/geo-fix-content)
         hedge_matches = _HEDGE_RE.findall(full_text)
         hedge_density = (len(hedge_matches) / max(total_words, 1)) * 100
-        if hedge_density > 1.5 and total_words >= 100:
+        if hedge_density > 0.5 and (total_words >= 25 or len(hedge_matches) >= 3):
             findings.append(
                 {
                     "category": "content",

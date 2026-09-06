@@ -417,8 +417,38 @@ def extract_scoped_facts(html_str, url):
     if "og:site_name" in parser.meta_tags:
         facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
 
-    # 4. Text-based scoped price extraction (ONLY within explicitly named, valid product sections)
+    # 4. Text-based scoped price extraction (within valid sections or explicit inline assertions)
     for ctx, txt in parser.text_with_context:
+        inline_m = re.search(
+            r"(?:our|the)?\s*([A-Za-z0-9\s\-]{2,30}?)\s+(?:tier|plan)?\s*(?:is\s+)?priced at\s*(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)",
+            txt,
+            re.IGNORECASE,
+        )
+        if inline_m:
+            candidate_ent = inline_m.group(1).strip()
+            if candidate_ent and is_valid_product_entity(candidate_ent):
+                curr = extract_currency(txt)
+                norm_p = normalize_price_str(inline_m.group(2), curr)
+                if norm_p and float(norm_p) > 0:
+                    invl = extract_interval(txt)
+                    if not any(
+                        sp["price"] == norm_p
+                        and sp["entity"].lower() == candidate_ent.lower()
+                        and sp["currency"] == curr
+                        and sp["interval"] == invl
+                        for sp in facts["scoped_prices"]
+                    ):
+                        facts["scoped_prices"].append(
+                            {
+                                "entity": candidate_ent,
+                                "price": norm_p,
+                                "currency": curr,
+                                "interval": invl,
+                                "variant": "default",
+                                "raw": inline_m.group(0),
+                            }
+                        )
+
         if not ctx or ctx == "General" or not is_valid_product_entity(ctx):
             continue
         for m in re.finditer(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", txt, re.IGNORECASE):

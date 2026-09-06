@@ -79,6 +79,7 @@ class TestE2EScenarios(unittest.TestCase):
                 {
                     "id": "proactive-1",
                     "title": "Maintain structured llms.txt manifest",
+                    "summary": "Deploy and maintain an llms.txt manifest to guide AI retrieval engines.",
                     "priority": "low",
                     "technical_fix": "Deploy /llms.txt with modular documentation links",
                     "creative_fix": "Keep executive summaries clear and concise",
