@@ -224,15 +224,9 @@ Fine-grained controls to govern how search engines and AI assistants quote conte
 This standard `robots.txt` configuration allows real-time AI search retrieval crawlers (ChatGPT Search, Claude, Perplexity) while cleanly opting out of foundation model training datasets (if desired by brand governance):
 
 ```text
----
-
-## ==============================================================================
----
-
-## AI Search Retrieval Crawlers (ALLOWED: Required for Citations & AI Overviews)
----
-
-## ==============================================================================
+# ==============================================================================
+# AI Search Retrieval Crawlers (ALLOWED: Required for Citations & AI Overviews)
+# ==============================================================================
 User-agent: OAI-SearchBot
 Allow: /
 
@@ -242,18 +236,10 @@ Allow: /
 User-agent: PerplexityBot
 Allow: /
 
----
-
-## ==============================================================================
----
-
-## Foundation Model Training Tokens (OPTIONAL: Disallow to Opt Out of Training)
----
-
-## Note: Blocking training tokens does NOT affect live AI search retrieval citations.
----
-
-## ==============================================================================
+# ==============================================================================
+# Foundation Model Training Tokens (OPTIONAL: Disallow to Opt Out of Training)
+# Note: Blocking training tokens does NOT affect live AI search retrieval citations.
+# ==============================================================================
 User-agent: GPTBot
 Disallow: /
 
@@ -269,15 +255,9 @@ Disallow: /
 User-agent: CCBot
 Disallow: /
 
----
-
-## ==============================================================================
----
-
-## General Web Indexers & Sitemaps
----
-
-## ==============================================================================
+# ==============================================================================
+# General Web Indexers & Sitemaps
+# ==============================================================================
 User-agent: *
 Allow: /
 Disallow: /admin/
@@ -285,10 +265,11 @@ Disallow: /checkout/
 Disallow: /api/
 
 Sitemap: https://example.com/sitemap.xml
+```
 
 ---
 
-## 4. User-Triggered Fetchers vs. Autonomous Crawlers
+## 6. User-Triggered Fetchers vs. Autonomous Crawlers
 
 Understanding crawler behavior is critical for accurate audit diagnosis:
 

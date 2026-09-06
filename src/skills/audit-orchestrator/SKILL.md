@@ -16,11 +16,14 @@ allowed-tools:
 
 | Tool | Command | Output |
 |---|---|---|
+| **Master Audit Runner (Deterministic)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json` | Complete Draft-07 Validated Report JSON |
 | **Web Scraper (Unified Acquisition)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical Site Inventory JSON |
 | **Site Inventory Wrapper** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Typed HTML page inventory (JSON) |
 | **Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json` | Exit Code 0 (pass) or 1 (fail) |
 
-> **True Agentic Principle:** YOU are the orchestrator. There is no master Python runner. YOU read each skill, YOU run each script, YOU synthesize the findings using your reasoning. Scripts are deterministic sensors — they extract raw facts. You decide what they mean.
+> **Dual Execution Architecture:**
+> 1. **Agentic Runbook (Cognitive Reasoning):** As the AI agent, you load specialist contexts, execute individual sensors, apply the Causal DAG and Epistemic Falsification gates, and synthesize an executive diagnosis.
+> 2. **Deterministic Master Runner (Automated CI/CD):** `orchestrator.py` coordinates single-pass acquisition, executes all 6 specialist sensors, performs Causal DAG deduplication, and emits a Draft-07 validated report in a single headless CLI invocation.
 
 The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist skill's context into memory, runs each specialist's diagnostic script directly, applies multi-signal cognitive reasoning against the knowledge bases, deduplicates and root-causes all findings, and emits a strictly validated JSON audit report conforming to the Draft-07 JSON report schema.
 

@@ -107,18 +107,18 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Production 
 
 ## 5. Quick Start & Execution Guide
 
+### Option A: Complete End-to-End Audit (Single Command)
 ```bash
-# 1. Run the production QA pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
-./scripts/qa_check.sh
+# Execute full multi-skill audit with automatic single-pass crawl & Causal DAG synthesis
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
+```
 
-# 2. Acquire site inventory via single-pass web scraper
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com --output inv.json --format json
+### Option B: Step-by-Step Specialist Invocations (Agentic Runbook)
+```bash
+# 1. Acquire site inventory via single-pass web scraper
+python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
 
-# (Or run orchestrator acquisition wrapper)
-# python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
-
-# 3. Execute specialist sensors
+# 2. Execute specialist sensors against inv.json
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
@@ -126,7 +126,7 @@ python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --si
 python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 
-# 4. Validate output report against Draft-07 schema gate
+# 3. Validate output report against Draft-07 schema gate
 python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 ```
 

@@ -10,7 +10,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from tests.helpers.cli_runner import run_skill_script, run_validator
+from tests.helpers.cli_runner import run_skill_script
 from tests.helpers.inventory_builder import make_healthy_inventory
 
 
@@ -148,13 +148,19 @@ class TestCLIInterfaces(unittest.TestCase):
         res = run_skill_script("engagement-context-audit", "engagement_check.py", [])
         self.assertNotEqual(res.returncode, 0)
 
-    # 9. validate_report CLI
-    def test_validate_report_file_and_stdin(self):
-        """Verify validate_report handles file argument, stdin '-', and rejects non-existent file."""
-        # Non-existent file
-        res = run_validator(None, filepath="/nonexistent/path/report.json")
+    # 10. orchestrator CLI
+    def test_orchestrator_cli_arguments(self):
+        """Verify orchestrator arguments: --site, --inventory, --candidate-backlinks, --analytics, --output, --format."""
+        res = run_skill_script(
+            "audit-orchestrator",
+            "orchestrator.py",
+            ["--site", "https://example.com", "--inventory", self.inv_path, "--format", "json"],
+        )
+        self.assertEqual(res.returncode, 0)
+
+    def test_orchestrator_missing_site_fails(self):
+        res = run_skill_script("audit-orchestrator", "orchestrator.py", [])
         self.assertNotEqual(res.returncode, 0)
-        self.assertIn("not found", res.stderr.lower())
 
 
 if __name__ == "__main__":

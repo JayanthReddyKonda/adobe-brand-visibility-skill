@@ -11,14 +11,16 @@
 ### A. The Mathematical `Influence_i` Model
 The paper formalizes citation influence as a multi-component metric reflecting how deeply an AI engine incorporates source content into the synthesized answer:
 
-$$\text{Influence}_i = 0.20 \cdot \min\left(\frac{\text{ref\_count}_i}{3}, 1\right) + 0.15 \cdot (1 - \text{first\_position\_ratio}_i) + 0.20 \cdot \text{paragraph\_coverage\_ratio}_i + 0.25 \cdot \text{tfidf\_cosine}_i + 0.20 \cdot \frac{\text{bigram\_overlap}_i + \text{trigram\_overlap}_i}{2}$$
+```text
+Influence_i = 0.20 * min(ref_count_i / 3, 1) + 0.15 * (1 - first_position_ratio_i) + 0.20 * paragraph_coverage_ratio_i + 0.25 * tfidf_cosine_i + 0.20 * ((bigram_overlap_i + trigram_overlap_i) / 2)
+```
 
 Where:
-- $\text{ref\_count}_i$: Number of times source $i$ is cited across distinct sentences in the answer.
-- $\text{first\_position\_ratio}_i$: Normalized token offset of the source's first citation (earlier placement yields higher influence).
-- $\text{paragraph\_coverage\_ratio}_i$: Proportion of generated paragraphs attributing facts to source $i$.
-- $\text{tfidf\_cosine}_i$: Cosine similarity between source text and synthesized answer.
-- $\text{bigram/trigram\_overlap}_i$: Lexical phrase absorption into final output.
+- `ref_count_i`: Number of times source i is cited across distinct sentences in the answer.
+- `first_position_ratio_i`: Normalized token offset of the source's first citation (earlier placement yields higher influence).
+- `paragraph_coverage_ratio_i`: Proportion of generated paragraphs attributing facts to source i.
+- `tfidf_cosine_i`: Cosine similarity between source text and synthesized answer.
+- `phrase_overlap_i` (bigram / trigram): Lexical phrase absorption into final output.
 
 ### B. Actionable Evidence-Genre Lift Table
 Content genres exhibit vastly divergent influence on generative engine answer generation:
@@ -33,16 +35,16 @@ Content genres exhibit vastly divergent influence on generative engine answer ge
 | **Standalone Q&A / FAQ Format Alone** | **-5.7% (Negative Penalty)** | **Do not rely on FAQ format alone!** Augment with data and comparisons. |
 
 ### C. Semantic-Role Influence Hierarchy
-1. **Definition Content:** Mean influence $0.153$
-2. **Comparison Content:** Mean influence $0.142$
-3. **Statistical Data:** Mean influence $0.138$
-4. **Procedural Steps:** Mean influence $0.119$
-5. **Pure Background / Reference:** Mean influence $0.053$ (lowest)
+1. **Definition Content:** Mean influence 0.153
+2. **Comparison Content:** Mean influence 0.142
+3. **Statistical Data:** Mean influence 0.138
+4. **Procedural Steps:** Mean influence 0.119
+5. **Pure Background / Reference:** Mean influence 0.053 (lowest)
 
 ### D. Platform Divergence: Selection Breadth vs. Absorption Depth
-- **ChatGPT Search:** Cites fewer sources (mean $6.9$ sources/query) but with substantially higher per-citation influence ($0.271$). Deeply absorbs core sources. Encyclopedic bias (Wikipedia $7.8\% - 47.9\%$).
-- **Perplexity AI:** Cites broadest surface (mean $16.4$ sources/query) with lower per-citation influence ($0.065$). Community discussion bias (Reddit $46.7\%$).
-- **Google AI Overviews:** Intermediate breadth ($12.1$ sources/query, $0.058$ influence). Multimodal bias (YouTube $23.3\%$). Overlaps with Google AI Mode only $13.7\%$ of the time!
+- **ChatGPT Search:** Cites fewer sources (mean 6.9 sources/query) but with substantially higher per-citation influence (0.271). Deeply absorbs core sources. Encyclopedic bias (Wikipedia 7.8% - 47.9%).
+- **Perplexity AI:** Cites broadest surface (mean 16.4 sources/query) with lower per-citation influence (0.065). Community discussion bias (Reddit 46.7%).
+- **Google AI Overviews:** Intermediate breadth (12.1 sources/query, 0.058 influence). Multimodal bias (YouTube 23.3%). Overlaps with Google AI Mode only 13.7% of the time!
 
 ---
 
@@ -50,9 +52,9 @@ Content genres exhibit vastly divergent influence on generative engine answer ge
 - **Citation:** Yu, Yang, Ding, & Sato (Tokyo/Tsukuba/Hiroshima, 2026). arXiv:2603.29979.
 - **Key Finding:** Structure-aware rewriting alone—holding textual content constant—delivers **+17.3% citation improvement and +18.5% perceptual quality gain**.
 - **Three Structural Tiers:**
-  1. **Macro Architecture:** Strict heading hierarchy (`<h1>` $\rightarrow$ `<h2>` $\rightarrow$ `<h3>`), table of contents, and executive takeaways.
+  1. **Macro Architecture:** Strict heading hierarchy (`<h1>` -> `<h2>` -> `<h3>`), table of contents, and executive takeaways.
   2. **Meso Chunking:** Standalone section self-containment (134–167 words per section) that can be extracted independently without antecedent loss.
-  3. **Micro Visual Emphasis:** Semantic bullet lists (density $\ge 0.40$), comparison tables, and bold key takeaway leads.
+  3. **Micro Visual Emphasis:** Semantic bullet lists (density >=0.40$), comparison tables, and bold key takeaway leads.
 
 ---
 
@@ -97,9 +99,9 @@ The 0–30 CITE Citability Score Rubric defines the objective criteria for evalu
 | Code | Dimension | Points | Evaluation Metric |
 | :--- | :--- | :---: | :--- |
 | **DA** | Direct Answer | 0–5 | Section openers provide standalone, extractable 40–60 word answer leads. |
-| **DD** | Data Density | 0–5 | Specific numbers, percentages, durations, benchmark statistics (FTR $\ge 0.080$). |
+| **DD** | Data Density | 0–5 | Specific numbers, percentages, durations, benchmark statistics (FTR >=0.080$). |
 | **AS** | Authority Signals | 0–5 | Named researchers, DOIs, authoritative outbound citations, verified `sameAs` nodes. |
-| **SQ** | Structure Quality | 0–5 | Heading hierarchy, comparison tables, list density $\ge 0.40$, code blocks. |
+| **SQ** | Structure Quality | 0–5 | Heading hierarchy, comparison tables, list density >=0.40$, code blocks. |
 | **FR** | Freshness | 0–5 | Visible dateModified $< 60$ days, recent temporal grounding. |
 | **UQ** | Uniqueness | 0–5 | Proprietary case data, original frameworks, zero generic boilerplate. |
 

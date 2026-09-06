@@ -54,11 +54,11 @@ The parser discards tags that do not contain core semantic content:
 ### Signal-to-Noise Ratio (SNR)
 SNR quantifies the informational density of an HTML document:
 
-$$\text{SNR} = \frac{\text{Length of Extracted Clean Text (characters)}}{\text{Length of Raw HTML Source (characters)}}$$
+SNR = (Length of Extracted Clean Text characters) / (Length of Raw HTML Source characters)
 
-- **$\text{SNR} \ge 0.15$**: High semantic density (typical of articles, docs, and structured product pages).
-- **$0.05 \le \text{SNR} < 0.15$**: Moderate density (typical of commercial landing pages with rich UI).
-- **$\text{SNR} < 0.05$**: Low density / potential Single Page Application (SPA) shell risk.
+- **SNR >= 0.15**: High semantic density (typical of articles, docs, and structured product pages).
+- **0.05 <= SNR < 0.15**: Moderate density (typical of commercial landing pages with rich UI).
+- **SNR < 0.05**: Low density / potential Single Page Application (SPA) shell risk.
 
 ### Sparse SPA Shell Detection
 A page is classified as a **Sparse SPA Shell** when:

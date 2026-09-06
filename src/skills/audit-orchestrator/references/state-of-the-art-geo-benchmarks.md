@@ -19,8 +19,8 @@ This document establishes the empirical, algorithmic, and architectural benchmar
     - **Authoritative Tone:** **+10.4%** on position-adjusted metrics, **+18.7%** on subjective impression.
     - **Keyword Stuffing:** Caused a **-10% to negative effect**, actively harming attribution.
 - **Mathematical Formulation:**
-  $$\text{PAWC}(S, R) = \sum_{c \in C_S} \frac{\text{WordCount}(c)}{\log_2(\text{Rank}(c) + 1)}$$
-  Where $C_S$ is the set of citations to source $S$ in response $R$, $\text{WordCount}(c)$ is the token volume attributed to the citation, and $\text{Rank}(c)$ is the 1-indexed position of the citation within the synthesized response.
+  PAWC(S, R) = sum(WordCount(c) / log2(Rank(c) + 1))
+  Where $C_S$ is the set of citations to source $S$ in response $R$, $WordCount(c)$ is the token volume attributed to the citation, and $Rank(c)$ is the 1-indexed position of the citation within the synthesized response.
 - **Audit Rule (`TX06` / `Rule_GEO_EvidenceDensity`):**
   Every 150–200 words of substantive copy must contain at least one verifiable quantitative statistic (`\d+(\.\d+)?%?|\$[\d,]+`) and at least one cited entity reference or quotation.
 
@@ -99,25 +99,33 @@ This document establishes the empirical, algorithmic, and architectural benchmar
 ## 3. Quantitative Scoring Formulas & Benchmarks
 
 ### 1. Lakoff & Hyland Linguistic Hedging Metric
-$$\text{HedgeRate} = \left( \frac{\sum w_{\text{hedge}}}{N_{\text{total\_words}}} \right) \times 100$$
-- **Authoritative / Highly Cited Content:** $\text{HedgeRate} \le 1.2\%$
-- **Neutral Informational Content:** $1.2\% < \text{HedgeRate} \le 2.2\%$
-- **Speculative / Low-Trust Content (Penalized):** $\text{HedgeRate} > 2.5\%$
+```text
+HedgeRate = ( sum(w_hedge) / N_total_words ) * 100
+```
+- **Authoritative / Highly Cited Content:** `HedgeRate <= 1.2%`
+- **Neutral Informational Content:** `1.2% < HedgeRate <= 2.2%`
+- **Speculative / Low-Trust Content (Penalized):** `HedgeRate > 2.5%`
 
 ### 2. Atomic Fact-to-Token Ratio (FTR)
-$$\text{FTR} = \frac{N_{\text{atomic\_facts}}}{N_{\text{tokens}}}$$
-- **Citable AI-Engineered Tier:** $\text{FTR} \ge 0.080$ (at least 1 atomic verifiable fact per 12.5 tokens).
-- **Fluff / Thin Content Tier:** $\text{FTR} \le 0.035$ (verbose marketing prose lacking verifiable claims).
+```text
+FTR = N_atomic_facts / N_tokens
+```
+- **Citable AI-Engineered Tier:** `FTR >= 0.080` (at least 1 atomic verifiable fact per 12.5 tokens).
+- **Fluff / Thin Content Tier:** `FTR <= 0.035` (verbose marketing prose lacking verifiable claims).
 
 ### 3. Shannon Text Entropy
-$$H(X) = -\sum_{i=1}^{n} p(x_i) \log_2 p(x_i)$$
-- **Optimized Range for RAG Comprehension:** $6.8 \le H(X) \le 7.6\text{ bits}$ (for English text chunks of 150–200 words).
+```text
+H(X) = -sum(p(x_i) * log2(p(x_i)))
+```
+- **Optimized Range for RAG Comprehension:** `6.8 <= H(X) <= 7.6 bits` (for English text chunks of 150–200 words).
 
 ### 4. Passage Extractability & Self-Containment Rubric
 - **Optimal RAG Chunk Size:** **134 to 167 words** per section under each semantic header (`<h2>`/`<h3>`).
 - **Exophoric Pronoun Ratio:**
-  $$\text{ExoRatio} = \frac{\text{Count of leading pronouns lacking intra-chunk antecedents}}{\text{Total section lead sentences}}$$
-  - **Target:** $0.0\%$. Brand entity must explicitly replace ambiguous pronouns in the first sentence of every section.
+  ```text
+  ExoRatio = Count(leading pronouns lacking intra-chunk antecedents) / Total section lead sentences
+  ```
+  - **Target:** `0.0%`. Brand entity must explicitly replace ambiguous pronouns in the first sentence of every section.
 
 ---
 

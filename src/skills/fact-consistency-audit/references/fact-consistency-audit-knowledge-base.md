@@ -118,9 +118,9 @@ AI retrieval systems weight first-party brand statements based on temporal signa
 
 | Signal | Criteria | Finding / Classification | Action |
 |---|---|---|---|
-| **Multi-Year Copyright Drift** | Copyright year on one active page is $\ge 2$ years older than the homepage (e.g. 2022 on `/terms` vs 2026 on `/`). | **Low** (`LEGACY_FACT_PROPAGATION`) | Update legacy page templates to dynamically inherit current copyright year. |
+| **Multi-Year Copyright Drift** | Copyright year on one active page is >= 2 years older than the homepage (e.g. 2022 on `/terms` vs 2026 on `/`). | **Low** (`LEGACY_FACT_PROPAGATION`) | Update legacy page templates to dynamically inherit current copyright year. |
 | **Outdated Tagline Drift** | An old slogan is stated in footer markup while an active repositioning campaign exists on the homepage. | **Low** (`LEGACY_FACT_PROPAGATION`) | Harmonize brand tagline strings across all active layouts. |
-| **Current Copyright Year** | Copyright year matches current calendar year or current year $\pm 1$. | **Pass** | No action required. |
+| **Current Copyright Year** | Copyright year matches current calendar year or current year $+/- 1$. | **Pass** | No action required. |
 
 ---
 
@@ -179,7 +179,7 @@ Formal check contracts, decision thresholds, and evidence criteria for first-par
 ## C1. Scoped Price Contradictions
 - **Measures:** Numeric prices, plan tier figures, and currency symbols across sampled first-party pages for the identical named entity.
 - **Defect:** Two or more pages publishing different active prices for the same product without qualifying scope (`FIRST_PARTY_FACT_CONFLICT`, Severity: `high`, Confidence: `high`).
-- **Not a defect:** Distinct commercial plan tiers (e.g. Basic \$10 vs Pro \$50) or seasonal promotions clearly scoped with temporal qualifiers.
+- **Not a defect:** Distinct commercial plan tiers (e.g. Basic $10 vs Pro $50) or seasonal promotions clearly scoped with temporal qualifiers.
 
 ---
 
@@ -212,12 +212,14 @@ This reference defines the mathematical normalization algorithms and strict cont
 
 A finding of `FIRST_PARTY_FACT_CONFLICT` is **valid ONLY when two or more first-party statements share the EXACT SAME entity, attribute, and scope**:
 
-$$\text{Conflict}(\text{Fact}_A, \text{Fact}_B) \iff (\text{Entity}_A = \text{Entity}_B) \land (\text{Attribute}_A = \text{Attribute}_B) \land (\text{Scope}_A = \text{Scope}_B) \land (\text{Val}_A \neq \text{Val}_B)$$
+```text
+Conflict(Fact_A, Fact_B) <=> (Entity_A == Entity_B) and (Attribute_A == Attribute_B) and (Scope_A == Scope_B) and (Val_A != Val_B)
+```
 
 ### False Positive Prevention (What NOT to Compare):
-- **Distinct Pricing Tiers:** A \$10/mo "Starter Tier" and \$50/mo "Enterprise Tier" share the attribute `price` but have different `entity` scopes. Comparing them as a contradiction is an automatic evaluation failure.
-- **Volume & Billing Cycles:** Annual pricing (\$8/mo billed annually) vs Monthly pricing (\$10/mo billed monthly) represent distinct billing scopes.
-- **Regional Currencies:** \$100 USD vs €95 EUR represent distinct currency scopes.
+- **Distinct Pricing Tiers:** A $10/mo "Starter Tier" and $50/mo "Enterprise Tier" share the attribute `price` but have different `entity` scopes. Comparing them as a contradiction is an automatic evaluation failure.
+- **Volume & Billing Cycles:** Annual pricing ($8/mo billed annually) vs Monthly pricing ($10/mo billed monthly) represent distinct billing scopes.
+- **Regional Currencies:** $100 USD vs €95 EUR represent distinct currency scopes.
 
 ---
 
@@ -236,5 +238,5 @@ To compare prices across disparate formats (US, UK, Indian, European), values mu
 
 ## 3. Contact & Phone Normalization
 
-- **Phone Numbers:** Strip non-digits (`+1 (800) 555-0199` $\to$ `18005550199`). Compare only within the same contact department scope (e.g. Sales Phone vs Support Phone).
+- **Phone Numbers:** Strip non-digits (`+1 (800) 555-0199` $->$ `18005550199`). Compare only within the same contact department scope (e.g. Sales Phone vs Support Phone).
 - **Email Addresses:** Lowercase and strip whitespace. Scoped by department mailbox (`support@brand.com` vs `sales@brand.com`).
