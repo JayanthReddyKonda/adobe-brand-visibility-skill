@@ -36,7 +36,7 @@ class SitemapParser:
 
     # XML namespace cleanup pattern
     _NS_REGEX = re.compile(r"\{[^\}]+\}")
-    _URL_LOC_REGEX = re.compile(r"<loc>\s*(https?://[^<\s]+)\s*</loc>", re.IGNORECASE)
+    _URL_LOC_REGEX = re.compile(r"<loc>\s*(https?://[^\s<]+)", re.IGNORECASE)
 
     @classmethod
     def parse_sitemap(cls, content: str) -> Tuple[List[SitemapUrl], List[str]]:

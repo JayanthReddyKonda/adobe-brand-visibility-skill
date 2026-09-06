@@ -86,7 +86,7 @@ class SecurityPolicy:
                 if ip_obj in cgnat:
                     return False, f"Carrier-grade NAT address (RFC 6598) rejected: {ip_str}"
 
-        return True, "IP address is permissible"
+        return True, "Public IP verified / permissible"
 
     def resolve_and_verify_host(self, host: str, port: int = 443) -> Tuple[bool, str, Optional[str]]:
         """Pre-resolve hostname via DNS and check all returned IPs for safety."""
@@ -169,3 +169,13 @@ class SecurityPolicy:
             return False, f"Redirect target rejected: {reason}", resolved_new_url, None
 
         return True, "Redirect target is safe", resolved_new_url, ip
+
+    def validate_url_and_resolve(self, url: str) -> Tuple[str, str, int]:
+        """Validate target URL and resolve IP address, raising SecurityValidationError on failure."""
+        parsed = urlparse(url)
+        scheme = parsed.scheme.lower()
+        port = parsed.port or (443 if scheme == "https" else 80)
+        safe, reason, ip = self.validate_url(url)
+        if not safe or not ip:
+            raise SecurityValidationError(reason)
+        return scheme, ip, port

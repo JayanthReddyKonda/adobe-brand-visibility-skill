@@ -1,27 +1,16 @@
+"""Legacy test forwarder for Security Policy tests."""
+
 import os
 import sys
 import unittest
 
-script_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../src/skills/audit-orchestrator/scripts"))
-sys.path.insert(0, script_dir)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
-import safe_fetch
+from tests.unit.test_security_policy import TestSecurityPolicy
 
-
-class TestSafeFetchSecurity(unittest.TestCase):
-    def test_block_ipv4_mapped_ipv6(self):
-        status, _, _, err = safe_fetch.safe_fetch("http://[::ffff:127.0.0.1]/")
-        self.assertIsNone(status)
-        self.assertIn("blocked network", err)
-
-        status, _, _, err = safe_fetch.safe_fetch("http://[::ffff:10.0.0.1]/")
-        self.assertIsNone(status)
-        self.assertIn("blocked network", err)
-
-        status, _, _, err = safe_fetch.safe_fetch("http://127.0.0.1/")
-        self.assertIsNone(status)
-        self.assertIn("blocked network", err)
-
+__all__ = ["TestSecurityPolicy"]
 
 if __name__ == "__main__":
     unittest.main()

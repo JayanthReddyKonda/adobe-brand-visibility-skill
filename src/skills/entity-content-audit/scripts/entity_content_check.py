@@ -19,7 +19,7 @@ import os
 import re
 import sys
 from html.parser import HTMLParser
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -392,35 +392,33 @@ def audit(base, domain, inv=None, state_file=None):
     )
 
     if not org_entity:
-        if not og_site_name and not dom.title:
-            findings.append(
-                {
-                    "category": "entity-identity",
-                    "title": "Missing machine-explicit Organization entity",
-                    "severity": "medium",
-                    "confidence": "high",
-                    "root_cause": "The brand publishes no Schema.org Organization markup, OpenGraph site_name, or descriptive title.",
-                    "cause_family": "ENTITY.IDENTITY",
-                    "id": "MATERIAL_ENTITY_AMBIGUITY",
-                    "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
-                    "impact": "AI models cannot resolve the brand entity with high confidence, leading to entity collisions and ungrounded answers.",
-                    "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
-                    "suggested_action": {
-                        "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
-                        "priority": "medium",
-                        "verification": "Inspect homepage JSON-LD and confirm Organization schema parses validly.",
-                    },
-                }
-            )
-        else:
-            recommendations.append(
-                {
-                    "title": "Add Organization JSON-LD schema",
-                    "category": "entity-identity",
-                    "rationale": f"Brand '{brand_name}' is stated in human-readable text but lacks machine-explicit JSON-LD Organization markup.",
-                    "suggested_action": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles.",
-                }
-            )
+        findings.append(
+            {
+                "category": "entity-identity",
+                "title": "Missing machine-explicit Organization entity",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "The brand publishes no Schema.org Organization markup, leading to machine ambiguity.",
+                "cause_family": "ENTITY.IDENTITY",
+                "id": "MATERIAL_ENTITY_AMBIGUITY",
+                "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+                "impact": "AI models cannot resolve the brand entity with high confidence, leading to entity collisions and ungrounded answers.",
+                "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
+                "suggested_action": {
+                    "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
+                    "priority": "medium",
+                    "verification": "Inspect homepage JSON-LD and confirm Organization schema parses validly.",
+                },
+            }
+        )
+        recommendations.append(
+            {
+                "title": "Add Organization JSON-LD schema",
+                "category": "entity-identity",
+                "rationale": f"Brand '{brand_name}' lacks machine-explicit JSON-LD Organization markup.",
+                "suggested_action": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles.",
+            }
+        )
 
     # 3. Answerability Evaluation Across Sampled HTML Pages (Excluding Homepage)
     answerability_evaluations = []
@@ -461,11 +459,11 @@ def audit(base, domain, inv=None, state_file=None):
                                             "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res.get('score', 0.0)}/1.0.",
                                             "suggested_action": {
                                                 "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
-                                    "priority": "medium",
-                                    "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
-                                },
-                            }
-                        )
+                                                "priority": "medium",
+                                                "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
+                                            },
+                                        }
+                                    )
 
             # 3.1 Google Deprecated Schema Check (from schema_ecommerce_validate.py)
             deprecated_types = {

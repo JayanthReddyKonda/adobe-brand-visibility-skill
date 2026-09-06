@@ -11,6 +11,7 @@
     "src/skills/fact-consistency-audit/scripts",
     "src/skills/corroboration-authority-audit/scripts",
     "src/skills/geo-content-audit/scripts",
-    "src/skills/engagement-context-audit/scripts"
+    "src/skills/engagement-context-audit/scripts",
+    "."
   ]
 }

@@ -1235,6 +1235,12 @@ def main():
     parser.add_argument("--state", help="Path to global state JSON")
     parser.add_argument("--format", required=False, help="Output format (json)")
     args = parser.parse_args()
+    s = args.site.strip()
+    if not s.startswith("http"):
+        s = "https://" + s
+    p = urlparse(s)
+    base = f"{p.scheme}://{p.netloc}"
+    domain = p.netloc
 
     if args.inventory and os.path.exists(args.inventory):
         try:
@@ -1243,18 +1249,18 @@ def main():
         except Exception:
             inv = None
     else:
-        status, html, _, _ = safe_fetch(args.site)
+        status, html, _, _ = safe_fetch(base)
         if status == 200 and html:
             inv = {
-                "site": args.site,
+                "site": domain,
                 "pages": [
-                    {"url": args.site, "status": 200, "content_type": "text/html", "page_type": "article", "html": html}
+                    {"url": base, "status": 200, "content_type": "text/html", "page_type": "article", "html": html}
                 ],
             }
         else:
-            inv = {"site": args.site, "pages": []}
+            inv = {"site": domain, "pages": []}
 
-    res = audit(args.site, urlparse(args.site).netloc, inv)
+    res = audit(base, domain, inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 
 

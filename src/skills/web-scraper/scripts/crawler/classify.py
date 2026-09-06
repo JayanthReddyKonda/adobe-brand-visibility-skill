@@ -83,3 +83,12 @@ class PageClassifier:
             return {"value": "homepage", "confidence": 0.99}
 
         return {"value": "general", "confidence": 0.50}
+
+    @classmethod
+    def classify_route(cls, url: str) -> str:
+        """Classify a URL path into a simplified route category string."""
+        res = cls.classify(url)
+        val = res.get("value", "general")
+        if val == "product_detail":
+            return "product"
+        return val

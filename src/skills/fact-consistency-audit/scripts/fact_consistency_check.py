@@ -597,7 +597,7 @@ def compare_ai_observations(fact_ledger, responses_file):
     findings = []
     notes = []
 
-    if not responses_file or not os.path.exists(responses_file):
+    if not responses_file or not isinstance(responses_file, (str, bytes, os.PathLike)) or not os.path.exists(responses_file):
         return findings, notes
 
     try:
@@ -664,6 +664,10 @@ def compare_ai_observations(fact_ledger, responses_file):
 
 
 def audit(base, domain, responses_file=None, inv=None, state_file=None):
+    if isinstance(responses_file, dict) and inv is None:
+        inv = responses_file
+        responses_file = None
+
     findings = []
     recommendations = []
     page_fact_list = []

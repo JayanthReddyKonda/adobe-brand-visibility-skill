@@ -32,7 +32,7 @@ if [ -f "$VENV_BIN/ruff" ] && [ -f "$VENV_BIN/flake8" ] && [ -f "$VENV_BIN/mypy"
     echo "=== 4. JSON Integrity & Draft-07 Schema Gate ==="
     python3 -c "
 import glob, json
-for jf in sorted(glob.glob('src/**/*.json', recursive=True) + glob.glob('src/*.json')):
+for jf in sorted(set(glob.glob('src/**/*.json', recursive=True) + glob.glob('src/*.json') + glob.glob('.agents/**/*.json', recursive=True) + glob.glob('.agents/*.json'))):
     with open(jf, 'r', encoding='utf-8') as fp:
         json.load(fp)
 print('  [OK] All JSON manifests, evals, and schema files valid.')
@@ -70,7 +70,7 @@ else
     echo "=== 1. Python Syntax & AST Compilation ==="
     python3 -c "
 import glob, py_compile, ast
-for f in sorted(glob.glob('src/**/*.py', recursive=True) + glob.glob('tests/*.py')):
+for f in sorted(glob.glob('src/**/*.py', recursive=True) + glob.glob('tests/**/*.py', recursive=True) + glob.glob('tests/*.py')):
     py_compile.compile(f, doraise=True)
     with open(f, 'r', encoding='utf-8') as fp:
         ast.parse(fp.read(), filename=f)
@@ -81,7 +81,7 @@ print('  [OK] All Python files compiled and AST validated cleanly.')
     echo "=== 2. Strict Code Quality & Style Gate ==="
     python3 -c "
 import glob, ast, sys
-all_files = sorted(glob.glob('src/**/*.py', recursive=True) + glob.glob('tests/*.py'))
+all_files = sorted(set(glob.glob('src/**/*.py', recursive=True) + glob.glob('tests/**/*.py', recursive=True) + glob.glob('tests/*.py')))
 issues = []
 for filepath in all_files:
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -106,7 +106,7 @@ print('  [OK] 0 code quality / style violations detected.')
     echo "=== 3. JSON Integrity & Draft-07 Schema Check ==="
     python3 -c "
 import glob, json
-for jf in sorted(glob.glob('src/**/*.json', recursive=True) + glob.glob('src/*.json')):
+for jf in sorted(set(glob.glob('src/**/*.json', recursive=True) + glob.glob('src/*.json') + glob.glob('.agents/**/*.json', recursive=True) + glob.glob('.agents/*.json'))):
     with open(jf, 'r', encoding='utf-8') as fp:
         json.load(fp)
 print('  [OK] All JSON manifests, evals, and schema files valid.')
@@ -114,7 +114,9 @@ print('  [OK] All JSON manifests, evals, and schema files valid.')
 
     echo ""
     echo "=== 4. Unit Test Suite (Python unittest) ==="
-    python3 -m unittest discover -s tests
+    python3 -m unittest discover -s tests/unit
+    python3 -m unittest discover -s tests/integration
+    python3 -m unittest discover -s tests/system
 fi
 
 echo ""

@@ -135,7 +135,7 @@ class RobotsAuditor:
                 if value and value not in self.sitemaps:
                     self.sitemaps.append(value)
 
-    def is_allowed(self, user_agent: str, url_or_path: str) -> bool:
+    def is_allowed(self, user_agent: str, url_or_path: str = "") -> bool:
         """Determines whether a given user agent is allowed to access the path.
 
         Follows RFC 9309 rule precedence:
@@ -144,6 +144,9 @@ class RobotsAuditor:
         3. If same length, Allow takes precedence over Disallow.
         4. Default is Allow if no rules match or on 404.
         """
+        # Support both (user_agent, url_or_path) and (url_or_path, user_agent)
+        if user_agent.startswith(("http://", "https://", "/")) and not url_or_path.startswith(("http://", "https://", "/")):
+            user_agent, url_or_path = url_or_path, user_agent
         # If robots.txt returned 5xx, fail-closed per RFC 9309 section 2.3.1.2
         if self.outcome == RobotsOutcome.SERVER_ERROR or self.status_code >= 500:
             return False

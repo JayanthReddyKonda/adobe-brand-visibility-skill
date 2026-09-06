@@ -1,143 +1,159 @@
-# AGENTS.md — Developer & AI Agent Instruction Manual
+# AGENTS.md — Developer & AI Agent Operating Specification
 
-## 1. Project Mission & Overview
-
-The **Brand AI-Readiness & Visibility Marketplace** is an autonomous multi-skill suite engineered for the Adobe University Hackathon 2026 (Round 3). Its mission is to automatically audit any brand website, diagnose why the brand is invisible, misrepresented, or experiencing high visitor bounce across generative AI search assistants (ChatGPT Search, Claude, Perplexity Pro, Google AI Overviews), and emit an evidence-backed, Draft-07 schema-validated audit report with dual-track remediation.
-
-The marketplace conforms strictly to the **`agentskills.io`** standard and comprises **8 focused skills**:
-- **`audit-orchestrator`** *(Marketplace Entrypoint)*: Master AI runbook coordinator; directs single-pass inventory acquisition, orchestrates specialist sensor execution, applies cognitive reasoning over multi-signal evidence, and enforces the Draft-07 JSON Schema gate.
-- **`web-scraper`**: Autonomous, zero-dependency, SSRF-hardened web crawler and content extractor. Crawls websites, evaluates RFC 9309 robots.txt matrices across 16 AI retrieval & training bots, traverses XML sitemaps, flattens Schema.org JSON-LD graphs, extracts Trafilatura-grade clean Markdown with SNR scoring, scores commercial routes, and emits canonical site inventories (`inv.json`).
-- **`discoverability-audit`**: Evaluates search retrieval access, crawler disallow rules, meta `noindex` directives, canonical consistency, and blank CSR/SPA shells.
-- **`entity-content-audit`**: Extracts explicit Schema.org JSON-LD entities (`Organization`, `Product`, `@graph`) and scores commercial Answerability attribute completeness.
-- **`fact-consistency-audit`**: Scopes first-party facts across multi-page inventories with global multi-currency normalization to isolate contradictory pricing, contacts, or lifecycle terms.
-- **`corroboration-authority-audit`**: Validates external identity corroboration by probing declared `sameAs` authority links (Wikidata, LinkedIn, Wikipedia) with zero-trust SSRF sandboxing.
-- **`geo-content-audit`**: Audits text based on empirical Generative Engine Optimization (Princeton KDD 2024 / CMU AutoGEO) research across all 9 citability vectors.
-- **`engagement-context-audit`**: Evaluates post-citation visitor orientation and intent-handoff continuity with OpenGraph metadata fallbacks.
+Autonomous multi-skill diagnostic engine engineered for the Adobe University Hackathon 2026 (Round 3). Audits brand websites for Generative Engine Optimization (GEO), Answer Engine Optimization (AEO), and LLM citation readiness (ChatGPT Search, Claude, Perplexity Pro, Google AI Overviews), emitting Draft-07 schema-validated reports with dual-track remediation.
 
 ---
 
-## 2. Strict Architectural Constraints & Invariants
+## 1. Directory Topology & Mutation Boundaries
 
-Every agent or contributor working in this repository MUST preserve these non-negotiable rules:
+Strict directory roles must be respected. Violating these boundaries causes build drift, test contamination, and package corruption.
 
-1. **Zero Runtime Third-Party Dependencies:**
-   - All runtime scripts under `src/skills/` MUST use pure Python 3.9+ standard library modules only (`urllib.parse`, `urllib.request`, `socket`, `html.parser`, `xml.etree.ElementTree`, `json`, `heapq`, `gzip`, `zlib`, `ast`, `re`, `argparse`).
-   - Pip packages (Ruff, Flake8, MyPy, Pytest) are developer tooling ONLY and must NEVER be imported in production skill scripts.
-2. **No Headless Browser Runtimes:**
-   - Absolutely NO Playwright, Puppeteer, Selenium, or Chromium binaries. Everything must run lightweight, fast, and sandboxed.
-3. **Zero-Trust SSRF Defense:**
-   - Every outbound network request must resolve IP addresses before connecting and reject RFC 1918 private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopbacks (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`), cloud metadata (`169.254.169.254`), and IPv4-mapped IPv6 ranges.
-4. **Twin Directory Invariant:**
-   - `src/skills/` is the canonical source.
-   - `.agents/skills/` must be 100% identical to `src/skills/`.
-   - Always run `bash scripts/sync.sh` after modifying any skill.
-5. **Clean Marketplace Root Packaging:**
-   - Per `round3_PS.pdf`, the submission archive (`brand-ai-readiness-audit.zip`) must unpack to the single directory `brand-ai-readiness-audit/` containing ONLY:
+| Path | Purpose | Mutation Rules | Prohibited Actions |
+| :--- | :--- | :--- | :--- |
+| **`src/skills/`** | **Canonical Source of Truth** | All runtime code, manifests, and references MUST be authored here. | Never write external dependencies or developer tooling imports here. |
+| **`tests/`** | **Test Suite & Fixtures** | Tiered tests (`unit/`, `integration/`, `system/`), fixtures, helpers. | Do not put runtime skill logic in test helpers. |
+| **`.agents/skills/`** | **Runtime Agent Mirror** | **READ-ONLY / GENERATED**. Synced from `src/skills/` via `scripts/sync.sh`. | **NEVER edit directly.** Direct edits are overwritten on sync. |
+| **`resources/`** | **External Vendor References** | **FROZEN / READ-ONLY**. Contains research papers and reference repos. | **NEVER run formatters (`ruff`), linters, or edits here.** |
+| **`build/`** | **Packaging Staging** | **GENERATED**. Managed by `scripts/build.sh`. | Never commit manual files to `build/`. |
+
+### Repository Synchronization
+Always mirror `src/` to `.agents/` after any edit:
+```bash
+./scripts/sync.sh
+```
+
+---
+
+## 2. Non-Negotiable Architectural Invariants
+
+1. **Zero Runtime Dependencies:**
+   - All runtime scripts in `src/skills/` MUST use Python 3.9+ standard library ONLY (`urllib`, `socket`, `html.parser`, `xml.etree.ElementTree`, `json`, `heapq`, `gzip`, `zlib`, `re`, `argparse`).
+   - Pip tools (`pytest`, `ruff`, `flake8`, `mypy`) are developer tooling only. No third-party packages in production execution.
+2. **No Headless Browsers:**
+   - Absolutely NO Playwright, Puppeteer, Selenium, or Chromium binaries. Execution must remain sub-second, lightweight, and deterministic.
+3. **Zero-Trust SSRF Protection:**
+   - All outbound requests must resolve target IPs before socket creation and immediately abort on RFC 1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopbacks (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`), carrier-grade NAT (`100.64.0.0/10`), AWS/GCP metadata (`169.254.169.254`), and IPv4-mapped IPv6 ranges.
+4. **Single-Pass Acquisition (Zero Redundant Crawls):**
+   - Web crawling is strictly performed once by `web-scraper` (or `acquire_inventory.py`) emitting `inv.json`. All downstream diagnostic sensors run offline against `inv.json`.
+5. **Clean Marketplace Distribution:**
+   - `brand-ai-readiness-audit.zip` unpacks into a single root folder `brand-ai-readiness-audit/` containing ONLY:
      - `marketplace.json`
      - `README.md`
      - `LICENSE`
      - `skills/` (the 8 skill folders)
-   - Archive size MUST be $\le 50\text{ MB}$ (current build is ~274 KB).
-6. **Audit Execution Runtime Ceiling:**
-   - The entire audit for a typical site MUST finish in $< 5\text{ minutes}$.
+   - Final archive size MUST be $\le 50\text{ MB}$ (current artifact is ~274 KB).
+6. **Execution Ceiling:**
+   - Complete multi-skill audit for any standard domain must finish in $< 5\text{ minutes}$.
 
 ---
 
-## 3. Tooling & Environment Setup
+## 3. Specialist Skills Catalog
 
-The repository uses standard Linux shell scripts and a local virtual environment for QA tooling:
+| Skill Name | Role | Primary Sensor Output |
+| :--- | :--- | :--- |
+| **`audit-orchestrator`** | Entrypoint & Coordinator | Master runbook, single-pass crawl dispatch, cross-signal synthesis, Draft-07 schema gate. |
+| **`web-scraper`** | Crawler & Extractor | SSRF-safe crawler, RFC 9309 (16 AI bots), Trafilatura markdown, JSON-LD extraction, `inv.json`. |
+| **`discoverability-audit`** | Search Engine Retrieval | Crawler rules, meta `noindex`, canonical mismatch, blank SPA/CSR shell detection. |
+| **`entity-content-audit`** | Entity Identity & Schema.org | Machine-explicit `Organization`, `Product`, `@graph` completeness, commercial Answerability. |
+| **`fact-consistency-audit`** | Factual Ledger & Drift | Multi-page contradiction detection, cross-currency pricing divergence, stale contact terms. |
+| **`corroboration-authority-audit`** | Identity Corroboration | Probes declared `sameAs` authority links (Wikidata, Wikipedia, LinkedIn) under SSRF guard. |
+| **`geo-content-audit`** | Citation Probability | Princeton KDD 2024 / CMU AutoGEO citability metrics across all 9 empirical vectors. |
+| **`engagement-context-audit`** | Post-Citation Continuity | Visitor orientation, Entity-to-H1 alignment, CTA proximity, and intent-handoff friction. |
+
+---
+
+## 4. Common Defect Prevention & Anti-Pattern Matrix
+
+This matrix governs recurring implementation and automation errors. Follow these exact patterns:
+
+| Defect Class | Root Cause | Mandatory Guardrail / Resolution |
+| :--- | :--- | :--- |
+| **Dirty git diff in `resources/`** | Running formatters across repository root (`ruff check --fix .`). | **Target strictly `src/` and `tests/`**. `resources/` contains immutable third-party repos. If touched, revert immediately: `git checkout -- resources/`. |
+| **Manual drift in `.agents/`** | Editing files directly under `.agents/skills/`. | **Edit `src/skills/` exclusively**. Run `./scripts/sync.sh` to mirror changes. |
+| **`TypeError: stat: path should be string...`** | Sensor `audit(base, domain, inv)` called with dict in legacy `responses_file` positional slot. | Guard sensor signatures: if `isinstance(responses_file, dict)`, assign `inv = responses_file; responses_file = None`. Use `isinstance(arg, (str, bytes, os.PathLike))` before `os.path.exists()`. |
+| **Schema validation error on `proactive_actions`** | Missing required fields in action dictionary or test fixtures. | Every action item MUST provide all 4 fields: `"id"`, `"title"`, `"summary"`, and `"priority"`. |
+| **Schema validation error on root status** | Emitting `"ok"` or `"inconclusive"` at report root. | Root status must strictly be one of: `"complete"`, `"partial"`, or `"failed"`. |
+| **False-negative finding suppression** | Suppressing entity schema defects when HTML `<title>` or OpenGraph tags exist. | Machine search engines require explicit Schema.org JSON-LD. Never suppress `MATERIAL_ENTITY_AMBIGUITY` just because HTML title tags are present. |
+| **Sensor crash on empty crawl** | Target site unreachable or empty inventory passed. | Sensors must gracefully return `{"status": "inconclusive", "findings": [], "recommendations": []}`. Tests must accept `["ok", "inconclusive"]`. |
+| **Terminal / subagent hanging** | Shell blocked on interactive process or background command. | Avoid persistent interactive shells. Run standalone commands with timeout or use direct file inspection. |
+
+---
+
+## 5. Specialist Sensor Interface Contract
+
+Every sensor script (`*_check.py`):
+```bash
+python3 <skill_script>.py --site <url> [--inventory <inv.json>] [--state <state.json>] [--format json]
+```
+
+### Python API Signature
+```python
+def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_file: Optional[str] = None) -> Dict[str, Any]:
+    """Execute diagnostic sensor against inventory.
+    
+    Returns:
+        Dict matching {"status": "ok"|"inconclusive", "findings": [...], "recommendations": [...]}
+    """
+```
+
+### Finding Object Structure
+Every finding in `findings` must strictly provide:
+- `id` *(string)*: Unique defect identifier (e.g., `AI_RETRIEVAL_BLOCKED`, `MATERIAL_ENTITY_AMBIGUITY`).
+- `cause_id` *(string)*: Root cause key matching `audit-orchestrator-knowledge-base.md`.
+- `category` *(string)*: Functional audit domain.
+- `severity` *(enum)*: Strictly `"critical" | "high" | "medium" | "low"`.
+- `confidence` *(enum)*: Strictly `"high" | "medium" | "low"`.
+- `evidence` *(string | object)*: Concise diagnostic proof (`summary`, `scope`, `sources`).
+- `suggested_action` *(object)*: Actionable mitigation with required `"summary"` and `"priority"`, plus `"technical_fix"`, `"creative_fix"`, and `"verification"`.
+
+---
+
+## 6. Draft-07 Report Schema Gate Invariants
+
+All reports processed by `validate_report.py` must satisfy `report-schema.json`:
+
+1. **Root Status:** Must be one of `["complete", "partial", "failed"]`.
+2. **Proactive Actions:** Array elements must have `id`, `title`, `summary`, and `priority` (`"critical" | "high" | "medium" | "low"`).
+3. **Summary Counts:** Non-negative integers for `total_findings`, `critical`, `high`, `medium`, and `low`.
+4. **No Disallowed Additional Properties:** Strict validation is enforced on root and summary blocks. Do not introduce unauthorized top-level keys.
+
+---
+
+## 7. QA Pipeline & Verification Commands
+
+All changes must pass the full QA verification suite prior to commit:
 
 ```bash
-# 1. Environment Activation (via .venv or uv)
-source .venv/bin/activate
-# or use uv directly:
-# uv sync
-
-# 2. Production QA Pipeline (MANDATORY BEFORE ANY COMMIT)
+# 1. Run Complete Quality Assurance Suite
 ./scripts/qa_check.sh
-# Runs:
-# - Ruff Linter & Formatter (0 errors)
-# - Flake8 Strict Style Checker (--max-line-length=140, 0 errors)
-# - MyPy Static Type Checker across all 8 skills (0 errors)
-# - JSON Schema & Draft-07 Manifest Integrity Check (0 errors)
-# - Pytest Unit & Integration Test Suite (130+ tests, 100% green)
 
-# 3. Synchronize Skills to .agents/skills/
+# 2. Individual Scoped Checks (DO NOT run on repo root)
+ruff check src/ tests/
+flake8 src/ tests/ --max-line-length=140 --ignore=E402,E501,W503
+mypy src/
+pytest tests/ -q
+
+# 3. Synchronize Runtime Mirror
 ./scripts/sync.sh
 
-# 4. Build Marketplace Submission Zip
+# 4. Build Marketplace Distribution Zip
 ./scripts/build.sh
 ```
 
 ---
 
-## 4. End-to-End Audit Execution Workflow
+## 8. Agent Behavioral Rules
 
-When an AI Agent is tasked with auditing a website (`--site <url>`), follow this 4-phase sequence:
+### Mandatory:
+- Author code strictly under `src/skills/` and tests under `tests/`.
+- Run `./scripts/sync.sh` immediately after altering skill logic or manifests.
+- Keep `SKILL.md` documents concise and below 500 lines; place extended tables in `references/`.
+- Validate that helper functions accommodate argument inversion (e.g., `is_allowed(bot, url)` and `is_allowed(url, bot)`).
+- Provide dual-track remediation (both `technical_fix` and `creative_fix`) for every diagnostic finding.
 
-### Phase 1: Pre-Flight & Normalization
-Normalize URL to canonical domain (e.g., `https://example.com/`) and verify DNS reachability under SSRF policy.
-
-### Phase 2: Unified Single-Pass Acquisition (NO 6x Redundant Crawling)
-Run `web-scraper` once to acquire the target domain's full inventory into `inv.json`:
-```bash
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com \
-  --output inv.json \
-  --format json \
-  --max-pages 15 \
-  --timeout 30
-```
-*(Alternatively: `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json`)*
-
-### Phase 3: Specialist Sensor Execution (Offline against `inv.json`)
-Fan out `inv.json` across all 6 diagnostic tools sequentially or in parallel. Zero duplicate network requests:
-```bash
-# 1. Discoverability
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
-
-# 2. Entity Content & Schema.org
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
-
-# 3. Fact Consistency & Conflicts
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
-
-# 4. Authority & Corroboration
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
-
-# 5. Generative Engine Optimization (GEO)
-python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
-
-# 6. Engagement & Context Continuity
-python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
-```
-
-### Phase 4: Cognitive Synthesis & Schema Validation Gate
-1. Apply reasoning rules from `audit-orchestrator/references/audit-orchestrator-knowledge-base.md` to correlate cross-domain signals (e.g., low word count + missing schema + missing H1 = SPA rendering failure).
-2. For each finding, generate **dual-track remediation**:
-   - `technical_fix`: Exact code/markup snippet for developers.
-   - `creative_fix`: Copy/UX guidelines for marketers and editors.
-   - `verification`: Concrete verification test.
-3. Validate the final output report against the Draft-07 schema gate:
-```bash
-python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
-```
-
----
-
-## 5. Dos and Don'ts for Agents
-
-### DO:
-- **DO** keep `SKILL.md` files concise and under 500 lines, pushing detailed checklists to `references/` and code to `scripts/`.
-- **DO** ensure all Markdown references have clear Tables of Contents when exceeding 250 lines.
-- **DO** run `./scripts/qa_check.sh` after modifying any code to ensure 0 lint, type, or test regressions.
-- **DO** run `./scripts/sync.sh` whenever any skill file is modified.
-- **DO** verify that `evidence` in audit findings can be safely parsed whether emitted as a string or a structured object.
-- **DO** handle network timeouts and HTTP 4xx/5xx gracefully (fail-closed for 5xx robots.txt, fail-open for 404).
-
-### DO NOT:
-- **DO NOT** add any `pip` package dependency to any script in `src/skills/`.
-- **DO NOT** create loose packages or scratch files at the marketplace root (`src/` or `build/brand-ai-readiness-audit/`).
-- **DO NOT** execute crawling multiple times across specialist skills when `inv.json` is available.
-- **DO NOT** modify live websites (the entire marketplace is strictly read-only and diagnostic).
-- **DO NOT** check in `__pycache__` directories or `.pyc` files.
+### Strictly Forbidden:
+- **DO NOT** edit files inside `.agents/` or `build/` directly.
+- **DO NOT** modify, format, or lint files in `resources/`.
+- **DO NOT** import runtime `pip` packages in `src/skills/`.
+- **DO NOT** execute redundant network crawls across sensors when `inv.json` exists.
+- **DO NOT** commit cache files (`__pycache__`, `*.pyc`).

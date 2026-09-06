@@ -15,7 +15,7 @@ import time
 import urllib.robotparser
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List
 from urllib.parse import urljoin, urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
