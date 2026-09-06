@@ -924,7 +924,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "category": "engagement",
                 "summary": (
                     f"Lead paragraph on {url} has an elevated reading complexity score (ARI: {readability_data['ari_score']}, avg sentence: {readability_data['avg_sentence_length']} words). "
-                    "Arriving AI referral visitors skim for immediate answers; high sentence complexity increases abandonment.",
+                    "Arriving AI referral visitors skim for immediate answers; high sentence complexity increases abandonment."
                 ),
                 "priority": "low",
                 "technical_fix": "Break long compound sentences (exceeding 25 words) into concise declarative statements.",

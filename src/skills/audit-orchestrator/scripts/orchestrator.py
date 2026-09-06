@@ -10,6 +10,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -46,7 +47,7 @@ except ImportError:
     validate_type = None  # type: ignore
 
 
-def parse_target_domain(site: str):
+def parse_target_domain(site: str) -> tuple:
     """Normalize site string into base URL and domain."""
     if not site.startswith(("http://", "https://")):
         site = "https://" + site
@@ -66,6 +67,22 @@ def load_schema() -> Optional[Dict[str, Any]]:
         except Exception:
             return None
     return None
+
+
+def clean_text_string(val: Any) -> str:
+    """Normalize string for clean JSON report output, eliminating literal newlines and redundant whitespace."""
+    if val is None:
+        return ""
+    if isinstance(val, (tuple, list)):
+        return " ; ".join(clean_text_string(x) for x in val if x)
+    text = str(val)
+    # If text has newlines between sentences (ends with punctuation), replace with space
+    text = re.sub(r"([.!?])\s*[\r\n]+\s*", r"\1 ", text)
+    # If text has code/config lines (like robots.txt or markdown lists), join with ' ; '
+    text = re.sub(r"\s*[\r\n]+\s*", " ; ", text)
+    # Collapse excessive spaces
+    text = re.sub(r"[ \t]+", " ", text).strip()
+    return text
 
 
 def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, Any], extra_arg=None) -> Dict[str, Any]:
@@ -194,35 +211,67 @@ def synthesize_audit_report(
         finding_id = f"F-{finding_counter:03d}"
         finding_counter += 1
 
-        sev = f.get("severity", "medium").lower()
+        raw_sev = f.get("severity", "medium")
+        sev = str(raw_sev).lower() if raw_sev is not None else "medium"
         if sev not in ("critical", "high", "medium", "low"):
             sev = "medium"
 
         action = f.get("suggested_action") or {}
-        action_summary = action.get("summary") or f.get("title") or "Remediate detected defect."
-        action_priority = action.get("priority") or sev
+        raw_act_sum = action.get("summary") or f.get("title") or "Remediate detected defect."
+        action_summary = clean_text_string(raw_act_sum)
+
+        raw_act_prio = action.get("priority") or sev
+        action_priority = str(raw_act_prio).lower() if raw_act_prio is not None else sev
         if action_priority not in ("critical", "high", "medium", "low"):
             action_priority = sev
 
-        clean_finding = {
+        raw_ftitle = f.get("title", "Detected Brand Visibility Defect")
+        f_title = clean_text_string(raw_ftitle)
+
+        raw_froot = f.get("root_cause") or f_title
+        f_root = clean_text_string(raw_froot)
+
+        raw_ev = f.get("evidence", "Observed during multi-sensor site analysis.")
+        if isinstance(raw_ev, str):
+            evidence_val: Any = clean_text_string(raw_ev)
+        elif isinstance(raw_ev, dict):
+            evidence_val = {
+                k: clean_text_string(v) if isinstance(v, str) else v
+                for k, v in raw_ev.items()
+            }
+        else:
+            evidence_val = clean_text_string(raw_ev)
+
+        suggested_action: Dict[str, Any] = {
+            "summary": action_summary,
+            "priority": action_priority,
+        }
+        if action.get("technical_fix"):
+            t_fix = clean_text_string(action["technical_fix"])
+            if t_fix:
+                suggested_action["technical_fix"] = t_fix
+        if action.get("creative_fix"):
+            c_fix = clean_text_string(action["creative_fix"])
+            if c_fix:
+                suggested_action["creative_fix"] = c_fix
+        if action.get("verification"):
+            v_fix = clean_text_string(action["verification"])
+            if v_fix:
+                suggested_action["verification"] = v_fix
+
+        clean_finding: Dict[str, Any] = {
             "id": finding_id,
-            "title": f.get("title", "Detected Brand Visibility Defect"),
+            "title": f_title,
             "severity": sev,
-            "category": f.get("category", "discoverability"),
-            "root_cause": f.get("root_cause") or f.get("title", ""),
+            "category": str(f.get("category", "discoverability")),
+            "root_cause": f_root,
             "confidence": f.get("confidence", "high") if f.get("confidence") in ("high", "medium", "low") else "high",
-            "evidence": f.get("evidence", "Observed during multi-sensor site analysis."),
-            "suggested_action": {
-                "summary": action_summary,
-                "priority": action_priority,
-                "technical_fix": action.get("technical_fix"),
-                "creative_fix": action.get("creative_fix"),
-                "verification": action.get("verification"),
-            },
+            "evidence": evidence_val,
+            "suggested_action": suggested_action,
         }
 
         if f.get("impact"):
-            clean_finding["impact"] = f.get("impact")
+            clean_finding["impact"] = clean_text_string(f.get("impact"))
 
         deduped_findings.append(clean_finding)
 
@@ -233,7 +282,12 @@ def synthesize_audit_report(
     proactive_counter = 1
 
     for r in all_raw_recommendations:
-        rtitle = r.get("title") or r.get("summary") or ""
+        raw_title = r.get("title") or r.get("summary") or ""
+        if isinstance(raw_title, (tuple, list)):
+            rtitle = " ".join(str(x) for x in raw_title)
+        else:
+            rtitle = str(raw_title)
+
         norm_key = rtitle.lower()[:30]
         if norm_key in proactive_seen:
             continue
@@ -241,22 +295,45 @@ def synthesize_audit_report(
 
         p_id = f"PROACTIVE-{proactive_counter:03d}"
         proactive_counter += 1
-        p_sev = r.get("priority", "low").lower()
+        p_sev = str(r.get("priority", "low")).lower()
         if p_sev not in ("critical", "high", "medium", "low"):
             p_sev = "low"
 
-        proactive_actions.append({
+        raw_summary = r.get("summary", "Improve brand entity and search engine visibility.")
+        if isinstance(raw_summary, (tuple, list)):
+            r_summary = " ".join(str(x) for x in raw_summary)
+        else:
+            r_summary = str(raw_summary)
+
+        raw_t = r.get("title", "Proactive Discoverability Enhancement")
+        if isinstance(raw_t, (tuple, list)):
+            r_t = " ".join(str(x) for x in raw_t)
+        else:
+            r_t = str(raw_t)
+
+        p_act: Dict[str, Any] = {
             "id": p_id,
-            "title": r.get("title", "Proactive Discoverability Enhancement"),
-            "summary": r.get("summary", "Improve brand entity and search engine visibility."),
+            "title": clean_text_string(r_t),
+            "summary": clean_text_string(r_summary),
             "priority": p_sev,
-            "technical_fix": r.get("technical_fix"),
-            "creative_fix": r.get("creative_fix"),
-            "verification": r.get("verification"),
-        })
+        }
+        if r.get("technical_fix"):
+            t_fix = clean_text_string(r["technical_fix"])
+            if t_fix:
+                p_act["technical_fix"] = t_fix
+        if r.get("creative_fix"):
+            c_fix = clean_text_string(r["creative_fix"])
+            if c_fix:
+                p_act["creative_fix"] = c_fix
+        if r.get("verification"):
+            v_fix = clean_text_string(r["verification"])
+            if v_fix:
+                p_act["verification"] = v_fix
+
+        proactive_actions.append(p_act)
 
     # Archetype-Tailored Strategic Recommendations
-    if archetype == "ecommerce" and not any("product & offer" in p["title"].lower() for p in proactive_actions):
+    if archetype == "ecommerce" and not any("product & offer" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": "Deploy Machine-Readable Product & Offer Answer Graph (@graph)",
@@ -268,7 +345,7 @@ def synthesize_audit_report(
         })
         proactive_counter += 1
 
-    elif archetype == "saas" and not any("pricing.md" in p["title"].lower() for p in proactive_actions):
+    elif archetype == "saas" and not any("pricing.md" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": "Deploy Autonomous AI Buying Agent Pricing Manifest (/pricing.md)",
@@ -280,7 +357,7 @@ def synthesize_audit_report(
         })
         proactive_counter += 1
 
-    elif archetype == "publisher" and not any("e-e-a-t" in p["title"].lower() for p in proactive_actions):
+    elif archetype == "publisher" and not any("e-e-a-t" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": "Structure E-E-A-T Author Credentials & Fact Attributions",
@@ -293,7 +370,7 @@ def synthesize_audit_report(
         proactive_counter += 1
 
     # Ensure baseline universal proactive actions per Adobe Hackathon Round 3 Rubric
-    if not any("llms.txt" in p["summary"].lower() or "llms.txt" in p["title"].lower() for p in proactive_actions):
+    if not any("llms.txt" in str(p.get("summary", "")).lower() or "llms.txt" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": "Deploy Machine-Readable llms.txt Manifest",
@@ -305,7 +382,7 @@ def synthesize_audit_report(
         })
         proactive_counter += 1
 
-    if not any("organization" in p["summary"].lower() or "sameas" in p["summary"].lower() for p in proactive_actions):
+    if not any("organization" in str(p.get("summary", "")).lower() or "sameas" in str(p.get("summary", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": "Strengthen Knowledge Graph Authority Nodes",
@@ -317,7 +394,7 @@ def synthesize_audit_report(
         })
         proactive_counter += 1
 
-    if not any("citability architecture" in p["title"].lower() or "passage chunking" in p["summary"].lower() for p in proactive_actions):
+    if not any("citability architecture" in str(p.get("title", "")).lower() or "passage chunking" in str(p.get("summary", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": "Implement Princeton KDD 2024 Citability Architecture",
@@ -433,7 +510,14 @@ def synthesize_audit_report(
         },
     }
 
-    # 6. Assemble Final Draft-07 Compliant Report
+    # Sort proactive actions by priority and limit to top 5 highest-leverage actions
+    prio_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    proactive_actions.sort(key=lambda a: prio_order.get(a.get("priority", "low"), 4))
+    proactive_actions = proactive_actions[:5]
+    for idx, act in enumerate(proactive_actions, start=1):
+        act["id"] = f"PROACTIVE-{idx:03d}"
+
+    # 6. Assemble Final Draft-07 Compliant Report (Strictly Signal, Zero Fluff)
     report: Dict[str, Any] = {
         "site": site,
         "audited_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -445,30 +529,10 @@ def synthesize_audit_report(
             "medium": med_count,
             "low": low_count,
         },
+        "geo_citability_summary": geo_summary,
         "findings": deduped_findings,
         "proactive_actions": proactive_actions,
-        "geo_citability_summary": geo_summary,
     }
-
-    # Ingest specialist extensions conforming to report-schema.json
-    geo_plans = geo_res.get("page_improvement_plans")
-    if geo_plans:
-        report["page_improvement_plans"] = geo_plans
-
-    eng_res = specialist_results.get("engagement-context-audit", {})
-    eng_summary = eng_res.get("engagement_continuity_summary")
-    if eng_summary:
-        report["engagement_continuity_summary"] = eng_summary
-
-    corrob_evidence = corrob_res.get("evidence_classes")
-    if corrob_evidence:
-        report["evidence_classes"] = corrob_evidence
-
-    if inv and "stats" in inv:
-        report["ai_agent_scrapeability_summary"] = inv["stats"]
-
-    if eng_res.get("analytics_summary"):
-        report["analytics_summary"] = eng_res["analytics_summary"]
 
     return report
 
