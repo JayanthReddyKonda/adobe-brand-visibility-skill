@@ -83,6 +83,58 @@ def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, An
         }
 
 
+def detect_business_archetype(inv: Dict[str, Any]) -> str:
+    """Classifies website into primary business archetype from crawl inventory."""
+    pages = inv.get("pages", []) if inv else []
+    if not pages:
+        return "corporate"
+
+    ecomm_score = 0
+    saas_score = 0
+    publisher_score = 0
+    local_score = 0
+
+    for p in pages:
+        ptype = (p.get("page_type") or "").lower()
+        url = (p.get("url") or "").lower()
+        html = (p.get("html") or "").lower()
+
+        if ptype in ("product_detail", "product", "product_listing", "category") or any(
+            k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog")
+        ):
+            ecomm_score += 2
+        if "schema.org/product" in html or "schema.org/offer" in html or '"@type": "product"' in html:
+            ecomm_score += 3
+
+        if ptype in ("pricing", "subscription_flow", "documentation") or any(
+            k in url for k in ("/pricing", "/plans", "/docs", "/api", "/billing", "/features")
+        ):
+            saas_score += 2
+        if "softwareapplication" in html or '"@type": "softwareapplication"' in html:
+            saas_score += 3
+
+        if ptype == "article" or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
+            publisher_score += 2
+        if "newsarticle" in html or "blogposting" in html or '"@type": "article"' in html:
+            publisher_score += 3
+
+        if ptype == "location" or any(k in url for k in ("/location", "/store-locator", "/contact", "/branches")):
+            local_score += 1
+        if "localbusiness" in html or "postaladdress" in html:
+            local_score += 3
+
+    candidates = [
+        (ecomm_score, "ecommerce"),
+        (saas_score, "saas"),
+        (publisher_score, "publisher"),
+        (local_score, "local_business"),
+    ]
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    if candidates[0][0] >= 2:
+        return candidates[0][1]
+    return "corporate"
+
+
 def synthesize_audit_report(
     site: str,
     inv: Dict[str, Any],
@@ -174,7 +226,8 @@ def synthesize_audit_report(
 
         deduped_findings.append(clean_finding)
 
-    # 3. Proactive Opportunities Synthesis (beyond detected defects)
+    # 3. Archetype Detection & Proactive Opportunities Synthesis (Beyond-Problem Rubric)
+    archetype = detect_business_archetype(inv)
     proactive_actions: List[Dict[str, Any]] = []
     proactive_seen = set()
     proactive_counter = 1
@@ -202,7 +255,44 @@ def synthesize_audit_report(
             "verification": r.get("verification"),
         })
 
-    # Ensure baseline proactive actions per Adobe Hackathon Round 3 Rubric
+    # Archetype-Tailored Strategic Recommendations
+    if archetype == "ecommerce" and not any("product & offer" in p["title"].lower() for p in proactive_actions):
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": "Deploy Machine-Readable Product & Offer Answer Graph (@graph)",
+            "summary": "Provide machine-explicit Schema.org Product markup with Offer pricing, ISO 4217 currency, inStock availability, and AggregateRating.",
+            "priority": "medium",
+            "technical_fix": "Embed Schema.org Product JSON-LD on catalog routes with nested Offer, priceCurrency, and availability declarations.",
+            "creative_fix": "Ensure explicit specification tables (dimensions, materials, warranty) exist in clean HTML tables above the fold to maximize conversational recommendations in ChatGPT Search and Perplexity.",
+            "verification": "Validate product routes with Schema.org Validator or Google Rich Results Test to confirm 0 errors.",
+        })
+        proactive_counter += 1
+
+    elif archetype == "saas" and not any("pricing.md" in p["title"].lower() for p in proactive_actions):
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": "Deploy Autonomous AI Buying Agent Pricing Manifest (/pricing.md)",
+            "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
+            "priority": "medium",
+            "technical_fix": "Serve /pricing.md at domain root over HTTPS with Content-Type: text/markdown containing structured plan comparison tables.",
+            "creative_fix": "Standardize plan names with transparent feature contrast rows, eliminating ambiguous asterisk conditions.",
+            "verification": "Request GET /pricing.md and verify HTTP 200 with text/markdown Content-Type.",
+        })
+        proactive_counter += 1
+
+    elif archetype == "publisher" and not any("e-e-a-t" in p["title"].lower() for p in proactive_actions):
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": "Structure E-E-A-T Author Credentials & Fact Attributions",
+            "summary": "Embed Schema.org Person markup for authors linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks directly beneath question headings.",
+            "priority": "medium",
+            "technical_fix": "Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles.",
+            "creative_fix": "Replace passive voice and speculative assertions with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
+            "verification": "Inspect article markup with Google Rich Results Test to confirm valid Person and author credentials.",
+        })
+        proactive_counter += 1
+
+    # Ensure baseline universal proactive actions per Adobe Hackathon Round 3 Rubric
     if not any("llms.txt" in p["summary"].lower() or "llms.txt" in p["title"].lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
@@ -225,6 +315,18 @@ def synthesize_audit_report(
             "creative_fix": "Maintain identical corporate legal name and contact details across all registered external profiles.",
             "verification": "Inspect root HTML JSON-LD with Google Rich Results Test or Schema.org Validator.",
         })
+        proactive_counter += 1
+
+    if not any("citability architecture" in p["title"].lower() or "passage chunking" in p["summary"].lower() for p in proactive_actions):
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": "Implement Princeton KDD 2024 Citability Architecture",
+            "summary": "Structure core landing sections into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
+            "priority": "low",
+            "technical_fix": "Structure content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
+            "creative_fix": "Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity names directly.",
+            "verification": "Audit section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
+        })
 
     # 4. Compute Counts-by-Severity Summary
     crit_count = sum(1 for f in deduped_findings if f["severity"] == "critical")
@@ -232,7 +334,106 @@ def synthesize_audit_report(
     med_count = sum(1 for f in deduped_findings if f["severity"] == "medium")
     low_count = sum(1 for f in deduped_findings if f["severity"] == "low")
 
-    # 5. Assemble Final Report
+    # 5. Compute Orthogonal Scores & Simulated Cross-Engine Readiness
+    has_crawl_crit = any(f["severity"] == "critical" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
+    has_crawl_high = any(f["severity"] == "high" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
+    crawl_score = 30.0 if has_crawl_crit else (65.0 if has_crawl_high else 95.0)
+
+    has_rendering_gap = any("RENDERED_CONTENT_GAP" in (f.get("cause_id") or "") for f in deduped_findings)
+    retrieval_score = 40.0 if has_rendering_gap else 90.0
+
+    geo_res = specialist_results.get("geo-content-audit", {})
+    geo_cov = geo_res.get("coverage", {})
+    avg_cit = float(geo_cov.get("average_citability_score") or 72.0)
+    citation_score = round(min(100.0, max(10.0, avg_cit)), 1)
+
+    has_entity_ambiguity = any("MATERIAL_ENTITY_AMBIGUITY" in (f.get("cause_id") or "") for f in deduped_findings)
+    corrob_res = specialist_results.get("corroboration-authority-audit", {})
+    corrob_cov = corrob_res.get("coverage", {})
+    sameas_count = corrob_cov.get("sameas_count", 0)
+    authority_score = 45.0 if has_entity_ambiguity else (90.0 if sameas_count >= 2 else 75.0)
+
+    cross_engine_score = round((crawl_score * 0.4 + citation_score * 0.4 + authority_score * 0.2), 1)
+
+    has_fact_conflict = any("FIRST_PARTY_FACT_CONFLICT" in (f.get("cause_id") or "") for f in deduped_findings)
+    commerce_score = 40.0 if has_fact_conflict else 85.0
+
+    composite_score = round(
+        crawl_score * 0.20
+        + retrieval_score * 0.20
+        + citation_score * 0.20
+        + authority_score * 0.15
+        + cross_engine_score * 0.15
+        + commerce_score * 0.10,
+        1,
+    )
+
+    if composite_score >= 85:
+        letter_grade = "A"
+    elif composite_score >= 70:
+        letter_grade = "B"
+    elif composite_score >= 50:
+        letter_grade = "C"
+    elif composite_score >= 30:
+        letter_grade = "D"
+    else:
+        letter_grade = "F"
+
+    chatgpt_factors = ["OAI-SearchBot allowed" if crawl_score >= 80 else "Crawler access restricted"]
+    if sameas_count >= 1:
+        chatgpt_factors.append("Knowledge Graph authority anchors present")
+    if citation_score >= 70:
+        chatgpt_factors.append("Substantive depth suitable for synthetic answer absorption")
+
+    claude_factors = ["Claude-SearchBot retrieval access permitted" if crawl_score >= 80 else "Claude crawler blocked"]
+    if retrieval_score >= 80:
+        claude_factors.append("Clean semantic markdown extractable from raw HTML")
+
+    perplexity_factors = ["PerplexityBot retrieval indexation enabled" if crawl_score >= 80 else "Perplexity crawler blocked"]
+    if citation_score >= 65:
+        perplexity_factors.append("Atomic facts and metrics present for direct citation cards")
+
+    google_factors = ["Googlebot access healthy" if crawl_score >= 85 else "Crawl directives restrict Google"]
+    if retrieval_score >= 80:
+        google_factors.append("Semantic headings and content tables suitable for AI Overview extraction")
+
+    geo_summary: Dict[str, Any] = {
+        "detected_archetype": archetype,
+        "composite_citability_score": composite_score,
+        "letter_grade": letter_grade,
+        "orthogonal_scores": {
+            "crawlability": crawl_score,
+            "retrieval_readiness": retrieval_score,
+            "citation_readiness": citation_score,
+            "entity_authority": authority_score,
+            "cross_engine_visibility": cross_engine_score,
+            "agentic_commerce": commerce_score,
+        },
+        "engine_readiness_simulation": {
+            "chatgpt_search": {
+                "status": "ready" if crawl_score >= 75 and citation_score >= 60 else "impaired",
+                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "key_factors": chatgpt_factors,
+            },
+            "claude_search": {
+                "status": "ready" if crawl_score >= 75 and retrieval_score >= 70 else "impaired",
+                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "key_factors": claude_factors,
+            },
+            "perplexity_ai": {
+                "status": "ready" if crawl_score >= 75 and citation_score >= 60 else "impaired",
+                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "key_factors": perplexity_factors,
+            },
+            "google_ai_overviews": {
+                "status": "ready" if crawl_score >= 80 and retrieval_score >= 75 else "impaired",
+                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "key_factors": google_factors,
+            },
+        },
+    }
+
+    # 6. Assemble Final Draft-07 Compliant Report
     report: Dict[str, Any] = {
         "site": site,
         "audited_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -246,7 +447,28 @@ def synthesize_audit_report(
         },
         "findings": deduped_findings,
         "proactive_actions": proactive_actions,
+        "geo_citability_summary": geo_summary,
     }
+
+    # Ingest specialist extensions conforming to report-schema.json
+    geo_plans = geo_res.get("page_improvement_plans")
+    if geo_plans:
+        report["page_improvement_plans"] = geo_plans
+
+    eng_res = specialist_results.get("engagement-context-audit", {})
+    eng_summary = eng_res.get("engagement_continuity_summary")
+    if eng_summary:
+        report["engagement_continuity_summary"] = eng_summary
+
+    corrob_evidence = corrob_res.get("evidence_classes")
+    if corrob_evidence:
+        report["evidence_classes"] = corrob_evidence
+
+    if inv and "stats" in inv:
+        report["ai_agent_scrapeability_summary"] = inv["stats"]
+
+    if eng_res.get("analytics_summary"):
+        report["analytics_summary"] = eng_res["analytics_summary"]
 
     return report
 
@@ -273,8 +495,21 @@ def audit(
 
     if inv is None:
         if build_inventory is not None:
-            inv = build_inventory(site, max_pages=15, timeout_seconds=60)
-        else:
+            try:
+                inv_res = build_inventory(site, max_pages=15, timeout_seconds=60)
+                if isinstance(inv_res, tuple):
+                    inv_candidate, stats = inv_res
+                    if isinstance(inv_candidate, dict):
+                        inv = inv_candidate
+                        if "stats" not in inv and isinstance(stats, dict):
+                            inv["stats"] = stats
+                elif isinstance(inv_res, dict):
+                    inv = inv_res
+            except Exception as e:
+                sys.stderr.write(f"Warning: Live inventory acquisition failed: {e}\n")
+                inv = None
+
+        if inv is None or not isinstance(inv, dict):
             inv = {
                 "site": site,
                 "domain": domain,

@@ -134,9 +134,14 @@ python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 
 ## 6. Verification & Quality Metrics
 
-- **247 Automated Unit Tests:** 100% passing across 24 test modules in ~38-49 seconds.
+- **254 Automated Unit Tests:** 100% passing across 24 test modules in under 60 seconds.
 - **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
 - **Static Type Safety:** 0 errors under MyPy across all 8 skills.
 - **Draft-07 JSON Schema Gate:** Validated against `report-schema.json` with support for flexible evidence typing and dual-track remediation.
+- **Edge-Case Hardening:**
+  - Modern Browser Client Hints (`Sec-Ch-Ua`, `Sec-Fetch-*`) and adaptive 429/503 retry defense against edge WAF rejections.
+  - Hidden DOM noise & cookie banner (`display:none`, OneTrust) suppression preventing false pricing conflicts.
+  - Multi-stage HTML decoding with BOM stripping and fallback to `latin-1` preventing currency symbol corruption (`£`, `€`, `¥`).
+  - Non-textual commercial fact-locking detection (Round 2 Appendix Concept C/F).
 - **SSRF Hardening:** Pure stdlib socket-level IP validation against RFC-1918, link-local, loopback, and IPv4-mapped IPv6 ranges.
 

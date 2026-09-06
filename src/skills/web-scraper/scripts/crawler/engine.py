@@ -9,6 +9,7 @@ Pure Python standard library (concurrent.futures, urllib.parse, datetime).
 from __future__ import annotations
 
 import concurrent.futures
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
@@ -241,7 +242,37 @@ class WebAuditEngine:
         if "text/html" not in res.content_type.lower() and not res.url.endswith(".html"):
             return None
 
-        html_text = res.body_bytes.decode("utf-8", errors="replace")
+        # Multi-stage resilient HTML decoding with BOM stripping
+        raw_bytes = res.body_bytes
+        if raw_bytes.startswith(b"\xef\xbb\xbf"):
+            raw_bytes = raw_bytes[3:]
+        elif raw_bytes.startswith(b"\xff\xfe") or raw_bytes.startswith(b"\xfe\xff"):
+            raw_bytes = raw_bytes[2:]
+
+        charset = None
+        ct = res.headers.get("content-type", "")
+        if "charset=" in ct:
+            charset = ct.split("charset=")[-1].split(";")[0].strip().strip("\"'")
+        if not charset:
+            meta_m = re.search(rb'<meta[^>]+charset=["\']?([a-zA-Z0-9_-]+)', raw_bytes[:1024], re.IGNORECASE)
+            if meta_m:
+                try:
+                    charset = meta_m.group(1).decode("ascii")
+                except Exception:
+                    pass
+
+        html_text = ""
+        if charset:
+            try:
+                html_text = raw_bytes.decode(charset, errors="replace")
+            except Exception:
+                pass
+        if not html_text:
+            try:
+                html_text = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                html_text = raw_bytes.decode("latin-1")
+        html_text = html_text.replace("\ufeff", "")
 
         # Step 1: Streaming HTML Parse
         from .parser import StreamingHTMLParser
@@ -312,6 +343,7 @@ class WebAuditEngine:
             semantic_landmarks=parser.semantic_landmarks,
             tables=parser.tables,
             code_blocks=parser.code_blocks,
+            images=parser.images,
             observations=page_observations,
             facts=all_page_facts,
             claims=claims,

@@ -582,32 +582,59 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
-    # Rule HF-05: Restrictive Snippet Controls on Core Content (nosnippet)
+    # Rule HF-05: Restrictive Snippet Controls on Core Content (nosnippet / max-snippet:0 / data-nosnippet)
     all_pages = inv.get("pages", []) if inv else [{"url": base + "/", "html": html}]
     for page in all_pages:
         p_html = page.get("html", "")
         p_url = page.get("url", base)
         if p_html:
-            has_nosnippet = bool(re.search(r"<meta[^>]+content=[^>]*nosnippet", p_html, re.IGNORECASE))
-            if has_nosnippet:
+            has_nosnippet = bool(re.search(r"<meta[^>]+content=[^>]*\bnosnippet\b", p_html, re.IGNORECASE))
+            has_zero_snippet = bool(re.search(r"<meta[^>]+content=[^>]*max-snippet\s*:\s*0\b", p_html, re.IGNORECASE))
+            data_nosnippet_matches = len(re.findall(r"\bdata-nosnippet\b", p_html, re.IGNORECASE))
+
+            if has_nosnippet or has_zero_snippet:
+                directive = "nosnippet" if has_nosnippet else "max-snippet:0"
                 findings.append(
                     {
                         "category": "crawlability",
-                        "title": "nosnippet directive active on page (HF-05)",
+                        "title": f"Snippet suppression directive active on core page ({directive}) (HF-05)",
                         "severity": "high",
                         "confidence": "high",
-                        "root_cause": f"Page {p_url} declares nosnippet directive. Under Google Search Central and AEO guidance, nosnippet suppresses textual extraction for AI Overviews and answer engine synthesis.",
+                        "root_cause": f"Page {p_url} declares '{directive}' directive. Under Google AI Overviews, SearchGPT, and Perplexity indexing rules, snippet suppression prevents models from displaying quotes, definitions, or verified facts in synthesized answers.",
                         "cause_family": "CRAWLER.ACCESS_DENIED",
                         "id": "NOSNIPPET_ON_CORE_CONTENT",
                         "cause_id": "NOSNIPPET_ON_CORE_CONTENT",
-                        "evidence": f"Found nosnippet directive in HTML head metadata on {p_url}.",
+                        "evidence": f"Found '{directive}' directive in HTML metadata on {p_url}.",
                         "impact": "Generative search engines cannot display or quote textual snippets from this page in synthesized answers.",
                         "suggested_action": {
-                            "summary": "Remove nosnippet directive from indexable informational pages.",
-                            "technical_fix": "Replace nosnippet with fine-grained max-snippet:-1 to allow full generative synthesis.",
-                            "creative_fix": "Use targeted data-nosnippet only on sensitive UI components, not main article copy.",
+                            "summary": f"Remove {directive} directive from indexable informational pages.",
+                            "technical_fix": "Replace nosnippet or max-snippet:0 with fine-grained max-snippet:-1 to allow full generative synthesis.",
+                            "creative_fix": "Use targeted data-nosnippet only on sensitive or proprietary UI components, not main article or commercial copy.",
                             "priority": "high",
-                            "verification": "Confirm nosnippet meta tag is removed from document head.",
+                            "verification": "Confirm nosnippet / max-snippet:0 meta tag is removed from document head.",
+                        },
+                    }
+                )
+                break
+            elif data_nosnippet_matches >= 3:
+                findings.append(
+                    {
+                        "category": "crawlability",
+                        "title": f"Excessive data-nosnippet attributes masking body copy ({data_nosnippet_matches} elements)",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": f"Page {p_url} wraps {data_nosnippet_matches} DOM elements in data-nosnippet attributes, hiding substantive paragraphs from AI search indexers.",
+                        "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
+                        "id": "DATA_NOSNIPPET_OVERUSE",
+                        "cause_id": "NOSNIPPET_ON_CORE_CONTENT",
+                        "evidence": f"Detected {data_nosnippet_matches} data-nosnippet attributes on content elements within {p_url}.",
+                        "impact": "AI crawlers treat content inside data-nosnippet as non-quotable, reducing citation probability in generative answers.",
+                        "suggested_action": {
+                            "summary": "Audit and remove data-nosnippet from product specifications and informational copy.",
+                            "technical_fix": "Remove data-nosnippet attribute from semantic <div>, <section>, and <span> tags carrying public product facts.",
+                            "creative_fix": "Ensure all core brand claims and feature descriptions remain visible to retrieval parsers.",
+                            "priority": "medium",
+                            "verification": "Inspect HTML source to confirm data-nosnippet is only applied to internal administrative notes or legal disclaimers.",
                         },
                     }
                 )

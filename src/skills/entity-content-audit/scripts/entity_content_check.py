@@ -637,6 +637,70 @@ def audit(base, domain, inv=None, state_file=None):
                                 }
                             )
 
+            # 3.3 Non-Text Fact Locking Check (Round 3 PS Page 3 & Round 2 Appendix Concept C/F)
+            # Detects critical commercial/pricing/specification charts locked inside unparsed raster images
+            locked_images = []
+            img_candidates = list(p.get("images", []))
+            if not img_candidates and phtml:
+                for im in re.finditer(r'<img\s+([^>]+)>', phtml, re.IGNORECASE):
+                    attrs_str = im.group(1)
+                    src_m = re.search(r'src=["\']([^"\']+)["\']', attrs_str, re.IGNORECASE)
+                    alt_m = re.search(r'alt=["\']([^"\']*)["\']', attrs_str, re.IGNORECASE)
+                    cls_m = re.search(r'class=["\']([^"\']+)["\']', attrs_str, re.IGNORECASE)
+                    id_m = re.search(r'id=["\']([^"\']+)["\']', attrs_str, re.IGNORECASE)
+                    img_candidates.append({
+                        "src": src_m.group(1) if src_m else "",
+                        "alt": alt_m.group(1) if alt_m else "",
+                        "class": cls_m.group(1) if cls_m else "",
+                        "id": id_m.group(1) if id_m else "",
+                    })
+
+            for im_obj in img_candidates:
+                src_val = (im_obj.get("src") or "").lower()
+                alt_val = (im_obj.get("alt") or "").strip().lower()
+                cls_id_val = f"{im_obj.get('class', '')} {im_obj.get('id', '')}".lower()
+                combined_img_str = f"{src_val} {cls_id_val}"
+
+                is_commercial_img = bool(
+                    re.search(
+                        r"\b(pricing|price|tier|plan|comparison|spec|specification|features|menu|chart|infographic|rates|dimensions)\b",
+                        combined_img_str,
+                    )
+                )
+                is_unannotated_alt = not alt_val or len(alt_val) < 15 or alt_val in (
+                    "pricing", "image", "chart", "table", "menu", "features", "infographic"
+                )
+                if is_commercial_img and is_unannotated_alt:
+                    img_filename = src_val.split("/")[-1].split("?")[0] or "raster_graphic"
+                    locked_images.append((img_filename, alt_val or "empty"))
+
+            has_prod_schema = any(matches_schema_type(o, ("product", "individualproduct", "offer")) for o in typed_objects)
+            has_html_table = bool(re.search(r"<table\b[^>]*>", phtml or "", re.IGNORECASE))
+
+            if locked_images and not has_prod_schema and not has_html_table:
+                sample_img, sample_alt = locked_images[0]
+                findings.append(
+                    {
+                        "category": "entity-answerability",
+                        "title": f"Key commercial facts locked in non-textual images without machine-readable schema on {purl}",
+                        "severity": "high",
+                        "confidence": "high",
+                        "root_cause": f"MISSING_MATERIAL_FACT: Graphic charts ('{sample_img}') lock essential pricing and specification facts inside raster images without machine-readable Schema.org JSON-LD or semantic HTML table markup.",
+                        "cause_family": "ENTITY.ANSWERABILITY",
+                        "id": "MISSING_MATERIAL_FACT",
+                        "cause_id": "MISSING_MATERIAL_FACT",
+                        "impact": "Generative search engines (ChatGPT Search, Claude, Perplexity) cannot perform OCR during search indexing, resulting in total omission of commercial specifications in AI comparison cards.",
+                        "evidence": f"Detected commercial graphic ('{sample_img}') with uninformative alt text ('{sample_alt}') on {purl}, with 0 Product/Offer JSON-LD schemas and 0 semantic HTML data tables present.",
+                        "suggested_action": {
+                            "summary": f"Extract pricing and specifications from '{sample_img}' into Schema.org Product/Offer JSON-LD and semantic HTML tables.",
+                            "priority": "high",
+                            "technical_fix": f"Deploy standard Schema.org Product/Offer JSON-LD representing the tiers and specifications shown in '{sample_img}', paired with an HTML5 <table>.",
+                            "creative_fix": "Retain visual marketing infographics for human visitors while providing an identical machine-readable structured data layer for AI crawlers.",
+                            "verification": "Confirm that search engine crawlers extract complete numeric prices and attributes without raster image processing.",
+                        },
+                    }
+                )
+
     if state_file:
         if "entities" not in state:
             state["entities"] = {}

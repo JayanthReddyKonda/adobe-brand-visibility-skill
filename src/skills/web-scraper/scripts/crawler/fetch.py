@@ -83,12 +83,20 @@ class SafeFetcher:
         if effective_timeout <= 0.0:
             raise BudgetExhaustedError("Audit deadline has already expired before fetching.")
 
-        # Prepare request headers
+        # Prepare request headers with modern Client Hints to avoid false WAF rejections
         req_headers = {
             "User-Agent": self.user_agent,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Encoding": "gzip, deflate",
             "Accept-Language": "en-US,en;q=0.9",
+            "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Linux"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
         }
         if headers:
             req_headers.update(headers)
@@ -154,6 +162,21 @@ class SafeFetcher:
                 )
 
         except urllib.error.HTTPError as e:
+            # Handle transient 429 / 503 with short Retry-After if budget allows
+            if e.code in (429, 503) and self.budget.remaining_time() > 10.0:
+                retry_header = e.headers.get("retry-after", "") if e.headers else ""
+                sleep_sec = 0.0
+                if retry_header.isdigit():
+                    sleep_sec = min(float(retry_header), 2.0)
+                elif retry_header:
+                    sleep_sec = 1.0
+                if 0.0 < sleep_sec <= 2.0:
+                    time.sleep(sleep_sec)
+                    try:
+                        return self.fetch(url, timeout=timeout, headers=headers)
+                    except Exception:
+                        pass
+
             latency_ms = (time.monotonic() - start_time) * 1000.0
             error_body = b""
             try:

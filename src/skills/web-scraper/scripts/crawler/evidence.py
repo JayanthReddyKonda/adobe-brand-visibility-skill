@@ -53,7 +53,7 @@ class EvidenceExtractor:
 
     @classmethod
     def strip_boilerplate(cls, raw_html: str) -> str:
-        """Strips layout chrome (scripts, styles, nav, headers, footers, aside, svgs)."""
+        """Strips layout chrome (scripts, styles, nav, headers, footers, aside, svgs, hidden elements, and cookie banners)."""
         if not raw_html:
             return ""
 
@@ -61,6 +61,11 @@ class EvidenceExtractor:
         # Remove non-content tags and their inner content
         for tag in ["script", "style", "noscript", "svg", "header", "nav", "footer", "aside", "template"]:
             text = re.sub(rf"<{tag}[^>]*>.*?</{tag}>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+
+        # Remove hidden containers, aria-hidden nodes, and cookie/consent banners
+        text = re.sub(r"<([a-zA-Z0-9]+)[^>]*?\b(?:hidden|aria-hidden=['\"]true['\"])[^>]*>.*?</\1>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<([a-zA-Z0-9]+)[^>]*?style=['\"][^'\"]*?display:\s*none[^'\"]*?['\"][^>]*>.*?</\1>", " ", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"<([a-zA-Z0-9]+)[^>]*?(?:class|id)=['\"][^'\"]*?(?:cookie|consent|onetrust)[^'\"]*?['\"][^>]*>.*?</\1>", " ", text, flags=re.IGNORECASE | re.DOTALL)
 
         # Remove HTML comments
         text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
