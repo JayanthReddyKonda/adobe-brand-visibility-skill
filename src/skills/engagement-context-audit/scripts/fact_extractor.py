@@ -34,8 +34,9 @@ DISCONTINUED_PATTERN = re.compile(
 
 
 def extract_currency(raw_str):
-    s = (raw_str or "").upper()
-    if "₹" in raw_str or "INR" in s or "RS" in s:
+    raw = raw_str or ""
+    s = raw.upper()
+    if "₹" in raw or "INR" in s or "RS" in s:
         return "INR"
     if "R$" in s or "BRL" in s:
         return "BRL"
@@ -43,13 +44,13 @@ def extract_currency(raw_str):
         return "CAD"
     if "A$" in s or "AUD" in s:
         return "AUD"
-    if "$" in raw_str or "USD" in s:
+    if "$" in raw or "USD" in s:
         return "USD"
-    if "€" in raw_str or "EUR" in s:
+    if "€" in raw or "EUR" in s:
         return "EUR"
-    if "£" in raw_str or "GBP" in s:
+    if "£" in raw or "GBP" in s:
         return "GBP"
-    if "¥" in raw_str or "JPY" in s or "CNY" in s or "RMB" in s:
+    if "¥" in raw or "JPY" in s or "CNY" in s or "RMB" in s:
         return "JPY"
     if "AED" in s or "DHS" in s:
         return "AED"

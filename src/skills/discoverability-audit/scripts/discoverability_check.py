@@ -327,7 +327,7 @@ def robots_access(groups, ua, path="/"):
             continue
         if _pattern_matches(v, path):
             specificity = len(v)
-            if k == "allow" and specificity == best[2] or specificity > best[2]:
+            if (k == "allow" and specificity == best[2]) or specificity > best[2]:
                 best = (k, v, specificity)
     return best[0], best[1]
 

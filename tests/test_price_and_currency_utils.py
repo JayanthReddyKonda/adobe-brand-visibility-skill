@@ -15,6 +15,8 @@ class TestPriceAndCurrencyUtils(unittest.TestCase):
             ("USD 99", "USD"),
             ("EUR 45", "EUR"),
             ("INR 500", "INR"),
+            (None, "UNKNOWN"),
+            ("", "UNKNOWN"),
         ]
         for raw, expected in test_cases:
             self.assertEqual(fact_consistency_check.extract_currency(raw), expected, f"Failed on {raw}")

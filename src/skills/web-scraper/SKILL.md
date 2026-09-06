@@ -16,8 +16,8 @@ metadata:
   version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
-  - bash
-  - python3
+  - run_command
+  - view_file
 ---
 
 # Web Scraper Skill (Autonomous AI Retrieval Acquisition)

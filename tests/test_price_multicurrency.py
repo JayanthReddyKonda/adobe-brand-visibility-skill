@@ -25,6 +25,8 @@ class TestMultiCurrencyAndIntervals(unittest.TestCase):
         self.assertEqual(extract_currency("AED 350"), "AED")
         self.assertEqual(extract_currency("CAD 89.00"), "CAD")
         self.assertEqual(extract_currency("AUD 120.00"), "AUD")
+        self.assertEqual(extract_currency(None), "UNKNOWN")
+        self.assertEqual(extract_currency(""), "UNKNOWN")
 
     def test_interval_extraction(self):
         self.assertEqual(extract_interval("Starting at $49/mo"), "month")
