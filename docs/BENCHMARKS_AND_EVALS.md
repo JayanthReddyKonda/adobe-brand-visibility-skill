@@ -42,7 +42,7 @@ Adapted from `zilisrikle/geo-audit-skill`:
 | Code | Dimension | Points | Core Criteria |
 | :--- | :--- | :---: | :--- |
 | **DA** | Direct Answer | 0–5 | Standalone 40–60 word answer lead directly resolving search intent. |
-| **DD** | Data Density | 0–5 | Quantitative statistics, benchmarks, FTR $\ge 0.080$. |
+| **DD** | Data Density | 0–5 | Quantitative statistics, benchmarks, FTR >= 0.080. |
 | **AS** | Authority Signals | 0–5 | Named experts, external DOIs, verified `sameAs` identity links. |
 | **SQ** | Structure Quality | 0–5 | Strict heading hierarchy, comparison tables, code blocks. |
 | **FR** | Freshness | 0–5 | `dateModified` within last 60 days, recent temporal anchors. |

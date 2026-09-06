@@ -49,14 +49,18 @@ The AI Agent acts as the cognitive engine:
 
 Modern generative engines operate as multi-stage, partially observable probabilistic retrieval pipelines. The audit models generative visibility as a multiplicative chain:
 
-$$\boxed{ \text{AI Visibility} \approx \text{Crawl Eligibility} \times \text{Retrieval Eligibility} \times \text{Content Citability} \times \text{Entity/Source Authority} \times \text{Citation Fidelity} }$$
+```text
+AI Visibility = Crawl Eligibility * Retrieval Eligibility * Content Citability * Entity Authority * Citation Fidelity
+```
 
 with an adjacent **Agentic Commerce Readiness** layer for transactional products and services.
 
 ### Methodological Rule: Prominence vs. Presence
 In the canonical GEO paper (Aggarwal et al., KDD 2024), the documented "+40% visibility improvement" refers to a change in **Position-Adjusted Word Count (PAWC)** *among an already retrieved set of sources*. It is NOT a flat 40% increase in retrieval probability.
 
-$$\text{PAWC}(r) = \frac{\sum_{s_i \in S_c} wc(s_i) e^{-pos(s_i)}}{\sum_j wc(s_j)}$$
+```text
+PAWC(r) = sum(wc(s_i) * exp(-pos(s_i))) / sum(wc(s_j))
+```
 
 The audit measures citation prominence, citation position, and answer share rather than binary citation presence.
 
@@ -70,19 +74,19 @@ To avoid collapsing distinct technical vectors into a single misleading score, t
    - Deterministic HTTP 200 responses, RFC 9309 compliance (500 KiB cap, 5xx fail-closed).
    - Unrestricted permissions for AI search indexers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`).
 2. **Retrieval Readiness (Weight: 20%):**
-   - Main content extractability, Signal-to-Noise Ratio ($\text{SNR} \ge 0.12$).
-   - Content Availability Gap ($\text{CAG} < 0.15$), server-side rendering completeness.
+   - Main content extractability, Signal-to-Noise Ratio (SNR >= 0.12).
+   - Content Availability Gap (CAG < 0.15), server-side rendering completeness.
 3. **Citation Readiness (Weight: 20%):**
-   - Atomic Fact-to-Token Ratio ($\text{FTR} \ge 0.080$).
+   - Atomic Fact-to-Token Ratio (FTR >= 0.080).
    - Evidence genre density (code, stats, definitions, comparisons).
-   - Low hedge density ($\le 1.2\%$) and BLUF top-30% placement.
+   - Low hedge density (<= 1.2%) and BLUF top-30% placement.
 4. **Entity / Authority Score (Weight: 15%):**
    - Machine-explicit Schema.org `@graph` Organization and Product nodes.
-   - Authoritative `sameAs` density ($\ge 2$ external authority links).
+   - Authoritative `sameAs` density (>= 2 external authority links).
    - Cross-page first-party fact ledger consistency.
 5. **Cross-Engine Visibility Score (Weight: 15%):**
-   - Cross-Engine Citation Coverage ($\text{CECO}$ across the Big 5 engines).
-   - Statistical uncertainty bound by **Wilson 95% Confidence Intervals** ($z=1.96, n \ge 10$).
+   - Cross-Engine Citation Coverage (CECO across the Big 5 engines).
+   - Statistical uncertainty bound by **Wilson 95% Confidence Intervals** (z = 1.96, n >= 10).
 6. **Agentic Commerce Score (Weight: 10%):**
    - Clean float pricing, ISO 4217 currency validation.
    - Zero contradictions between HTML text and JSON-LD (`ProductConsistency = 1.0`).
@@ -111,8 +115,8 @@ Findings must be classified into the canonical defect taxonomy:
 - `W-04`: Brand entity discordance across Organization schema and external nodes.
 - `W-05`: Excessive discovery depth (authoritative evidence requires > 3 hops).
 - `W-06`: `llms.txt` manifest contains broken or non-canonical links.
-- `W-07`: Low atomic fact density ($\text{FTR} < 0.040$).
-- `W-08`: Cross-engine citation divergence ($\text{CECO} < 0.50$).
+- `W-07`: Low atomic fact density (FTR < 0.040).
+- `W-08`: Cross-engine citation divergence (CECO < 0.50).
 
 ---
 
@@ -148,8 +152,8 @@ The audit segregates identity and backlink evidence into two non-overlapping cla
 The audit separates static UX proxies from observed engagement outcomes:
 - **Static UX Proxies:** Heuristic signals evaluated from raw HTML (H1 alignment, word count, CTA reachability in first 3 interactive elements, internal navigation scent).
 - **Observed Engagement Outcomes:** Optional empirical ingestion via `--analytics <file.csv|file.json|inline>` containing `{route, ai_referral_sessions, bounce_rate, avg_dwell_time_seconds, primary_referrer}`.
-- **Empirical Corroboration:** When analytics show bounce rate $\ge 60\%$ and dwell time $< 30$s, static warnings are corroborated and elevated to `AI_REFERRAL_DISCONTINUITY` defects.
-- **Heuristic Mitigation:** When analytics confirm healthy visitor retention (bounce $\le 35\%$, dwell $\ge 60$s), static heuristic defects are downgraded or suppressed with notes that empirical performance is satisfactory.
+- **Empirical Corroboration:** When analytics show bounce rate >= 60% and dwell time < 30s, static warnings are corroborated and elevated to `AI_REFERRAL_DISCONTINUITY` defects.
+- **Heuristic Mitigation:** When analytics confirm healthy visitor retention (bounce <= 35%, dwell >= 60s), static heuristic defects are downgraded or suppressed with notes that empirical performance is satisfactory.
 - **Heuristic-Only Limitation:** In the absence of analytics, reports explicitly declare findings as *unverified static UX proxies* that have not been calibrated against real user telemetry.
 
 ### 6.4 Deterministic Page-Level GEO Content Improvement Plans
@@ -173,7 +177,9 @@ Research across 21,143 empirical citations demonstrates that citation absorption
 Evaluates the arrival experience of high-intent citation traffic:
 - **Viewport Answer Anchoring:** The cited proposition must be visible within the top 600px viewport (first 150 words / 2 paragraphs) to prevent orientation shock and immediate bounce (`VIEWPORT_ANSWER_ABSENCE`).
 - **CTA Reachability Index:** Quantifies transactional continuation accessibility:
-  $$\text{Reachability Index} = \frac{1}{1 + \text{Preceding Interactive Elements}}$$
-  If the primary commercial action is delayed behind $>3$ auxiliary header/nav links, the sensor flags `CTA_REACHABILITY_FRICTION`.
+  ```text
+Reachability Index = 1 / (1 + Preceding Interactive Elements)
+```
+  If the primary commercial action is delayed behind > 3 auxiliary header/nav links, the sensor flags `CTA_REACHABILITY_FRICTION`.
 
 

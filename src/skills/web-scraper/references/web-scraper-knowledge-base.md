@@ -62,7 +62,7 @@ SNR = (Length of Extracted Clean Text characters) / (Length of Raw HTML Source c
 
 ### Sparse SPA Shell Detection
 A page is classified as a **Sparse SPA Shell** when:
-1. Total initial HTML word count is $< 25$ words.
+1. Total initial HTML word count is < 25 words.
 2. The DOM consists primarily of empty mounting containers (`<div id="root"></div>`, `<div id="app"></div>`, `<div id="__next"></div>`).
 3. Heavy script bundles are present without server-side rendered text.
 

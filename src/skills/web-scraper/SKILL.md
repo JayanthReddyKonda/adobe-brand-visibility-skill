@@ -147,6 +147,6 @@ python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --o
 # 2. Fast Snapshot: 5 pages with 10-second timeout
 python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 5 --timeout 10.0 --output inv.json
 
-# 3. Terminal Markdown Summary:
-python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 3 --format markdown
+# 3. Deep Traversal: 20 pages with link depth 2
+python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 20 --max-depth 2 --output inv.json
 ```

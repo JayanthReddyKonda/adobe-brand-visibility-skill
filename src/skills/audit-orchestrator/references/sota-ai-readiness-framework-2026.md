@@ -48,7 +48,7 @@ The audit architecture strictly demarcates:
   - Keyword Stuffing: **17.7 (-8.3% penalty)**
 - **Mathematical Formulation:**
   PAWC(r) = sum(wc(s_i) * exp(-pos(s_i))) / sum(wc(s_j))
-  Where $wc(s_i)$ is word count and $pos(s_i)$ is the position of the cited source within the generated answer. Prominence, not merely presence, drives authority.
+  Where `wc(s_i)` is word count and `pos(s_i)` is the position of the cited source within the generated answer. Prominence, not merely presence, drives authority.
 
 ### 1.2 Multi-Stage Pipeline & Cross-Platform Nuance
 - **Citation:** "Optimizing Visibility in Generative Engines: A Critical Survey of GEO (2023–2026)" (arXiv:2607.14035).
@@ -103,7 +103,7 @@ The audit architecture strictly demarcates:
   Across ChatGPT, Perplexity, Claude, Gemini, and Google AI Overviews.
 - **Wilson 95% Confidence Interval for Empirical Sampling:**
   CI_95% = (p_hat + z^2 / (2n) +/- z * sqrt(p_hat * (1 - p_hat) / n + z^2 / (4n^2))) / (1 + z^2 / n)
-  With $z = 1.96$ and $n >= 10$ runs per engine (5 runs minimum floor).
+  With z = 1.96 and n >= 10 runs per engine (5 runs minimum floor).
 
 ---
 
@@ -115,7 +115,7 @@ The audit architecture strictly demarcates:
 - **`HF-03`**: Search retrieval crawler (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) blocked in `robots.txt`.
 - **`HF-04`**: `noindex` directive active on citation-critical route.
 - **`HF-05`**: `nosnippet` or restrictive `max-snippet` active on core informational content.
-- **`HF-06`**: Primary commercial product data absent or contradictory (HTML $<->$ JSON-LD price mismatch).
+- **`HF-06`**: Primary commercial product data absent or contradictory (HTML <-> JSON-LD price mismatch).
 - **`HF-07`**: Critical factual claims exist solely in images/PDF/JS without equivalent HTML text.
 - **`HF-08`**: Structured data directly contradicts visible page content.
 
@@ -138,11 +138,11 @@ Rather than a single arbitrary score, the audit evaluates six orthogonal dimensi
 1. **Crawlability Score (Weight: 20%):**
    Deterministic access: HTTP 200, RFC 9309 compliance, crawler permissions (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), sitemaps.
 2. **Retrieval Readiness (Weight: 20%):**
-   Text extractability, Signal-to-Noise Ratio ($SNR >= 0.12$), Content Availability Gap (`CAG < 0.15`), heading semantics, content freshness.
+   Text extractability, Signal-to-Noise Ratio (SNR >= 0.12), Content Availability Gap (`CAG < 0.15`), heading semantics, content freshness.
 3. **Citation Readiness (Weight: 20%):**
-   Atomic fact density ($FTR >= 0.080$), Princeton GEO evidence density ($>= 1$ stat + quote / 150 words), low hedge rate (`HedgeRate <= 1.2%`), BLUF top-30% placement.
+   Atomic fact density (FTR >= 0.080), Princeton GEO evidence density (>= 1 stat + quote / 150 words), low hedge rate (`HedgeRate <= 1.2%`), BLUF top-30% placement.
 4. **Entity / Authority Score (Weight: 15%):**
-   Machine-explicit schema graph, bidirectional `sameAs` linkage ($>= 2$ nodes), cross-page fact ledger consistency, external Knowledge Graph footprint.
+   Machine-explicit schema graph, bidirectional `sameAs` linkage (>= 2 nodes), cross-page fact ledger consistency, external Knowledge Graph footprint.
 5. **Cross-Engine Visibility Score (Weight: 15%):**
    Empirical mention rate, citation rate, and `CECO` across the Big 5 engines, bound by Wilson 95% confidence intervals.
 6. **Agentic Commerce Score (Weight: 10%):**

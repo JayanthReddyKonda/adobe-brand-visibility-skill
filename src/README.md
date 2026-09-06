@@ -113,7 +113,13 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Production 
 python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
 ```
 
-### Option B: Step-by-Step Specialist Invocations (Agentic Runbook)
+### Option B: Automated Knowledge Bundling
+```bash
+# Compile tailored site context and archetype-specific playbooks in a single pass
+python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com
+```
+
+### Option C: Step-by-Step Specialist Invocations (Agentic Runbook)
 ```bash
 # 1. Acquire site inventory via single-pass web scraper
 python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json

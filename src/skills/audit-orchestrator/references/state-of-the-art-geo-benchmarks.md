@@ -20,7 +20,7 @@ This document establishes the empirical, algorithmic, and architectural benchmar
     - **Keyword Stuffing:** Caused a **-10% to negative effect**, actively harming attribution.
 - **Mathematical Formulation:**
   PAWC(S, R) = sum(WordCount(c) / log2(Rank(c) + 1))
-  Where $C_S$ is the set of citations to source $S$ in response $R$, $WordCount(c)$ is the token volume attributed to the citation, and $Rank(c)$ is the 1-indexed position of the citation within the synthesized response.
+  Where `C_S` is the set of citations to source `S` in response `R`, `WordCount(c)` is the token volume attributed to the citation, and `Rank(c)` is the 1-indexed position of the citation within the synthesized response.
 - **Audit Rule (`TX06` / `Rule_GEO_EvidenceDensity`):**
   Every 150–200 words of substantive copy must contain at least one verifiable quantitative statistic (`\d+(\.\d+)?%?|\$[\d,]+`) and at least one cited entity reference or quotation.
 

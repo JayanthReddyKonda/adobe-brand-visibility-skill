@@ -645,7 +645,7 @@ def main():
     parser.add_argument("--candidate-backlinks", help="Path to candidate backlinks JSON (optional)")
     parser.add_argument("--analytics", help="Path to first-party analytics JSON (optional)")
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
 
     args = parser.parse_args()
 

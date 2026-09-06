@@ -29,7 +29,9 @@
 - **arXiv:** [2604.25707](https://arxiv.org/abs/2604.25707) · Dataset: `geo-citation-lab`
 - **Scope:** 602 prompts, 21,143 citations, 72 extracted features across ChatGPT Search, Perplexity AI, and Google AI Overviews.
 - **The Mathematical `Influence_i` Model:**
-  $$\text{Influence}_i = 0.20 \cdot \min\left(\frac{\text{ref\_count}_i}{3}, 1\right) + 0.15 \cdot (1 - \text{first\_position\_ratio}_i) + 0.20 \cdot \text{paragraph\_coverage\_ratio}_i + 0.25 \cdot \text{tfidf\_cosine}_i + 0.20 \cdot \frac{\text{bigram\_overlap}_i + \text{trigram\_overlap}_i}{2}$$
+  ```text
+Influence_i = 0.20 * min(ref_count_i / 3, 1) + 0.15 * (1 - first_position_ratio_i) + 0.20 * paragraph_coverage_ratio_i + 0.25 * tfidf_cosine_i + 0.20 * ((bigram_overlap_i + trigram_overlap_i) / 2)
+```
 - **Evidence-Genre Relative Lift:**
   - Code Snippets / Blocks: **+76.9% lift** (highest influence).
   - Numbers / Statistics: **+61.6% lift**.
@@ -48,8 +50,8 @@
   1. **Retrieval Failure:** Crawler block (`robots.txt`), 4xx/5xx errors, `noindex`, unrendered SPA shell.
   2. **Relevance Failure:** Title/H1 query-intent mismatch or semantic drift.
   3. **Redundancy Failure:** Generic prose losing context allocation to authoritative domain summaries.
-  4. **Trust Failure:** Low fact density ($\text{FTR} < 0.040$), excessive hedging ($>2.5\%$), missing `sameAs`.
-  5. **Extraction Failure:** `nosnippet`, low text Signal-to-Noise Ratio ($<0.12$), DOM fragmentation.
+  4. **Trust Failure:** Low fact density (FTR < 0.040), excessive hedging (> 2.5%), missing `sameAs`.
+  5. **Extraction Failure:** `nosnippet`, low text Signal-to-Noise Ratio (< 0.12), DOM fragmentation.
 
 ---
 
@@ -86,25 +88,31 @@
 
 ### 3. Multi-Platform Divergence
 - Only **11% of domains** are cited by both ChatGPT and Perplexity for identical queries.
-- **ChatGPT Search:** Encyclopedic bias (Wikipedia $7.8\% - 47.9\%$), high per-citation influence ($0.271$).
-- **Perplexity AI:** Community discussion bias (Reddit $46.7\%$), recency bias ($76.4\%$ citations $<30$ days old).
-- **Google AI Overviews:** Multimodal bias (YouTube $23.3\%$).
+- **ChatGPT Search:** Encyclopedic bias (Wikipedia 7.8% - 47.9%), high per-citation influence (0.271).
+- **Perplexity AI:** Community discussion bias (Reddit 46.7%), recency bias (76.4% citations < 30 days old).
+- **Google AI Overviews:** Multimodal bias (YouTube 23.3%).
 
 ---
 
 ## 3. Mathematical Formulations for Evaluation
 
 ### 1. Lakoff & Hyland Linguistic Hedging Rate
-$$\text{HedgeRate} = \left( \frac{\sum w_{\text{hedge}}}{N_{\text{total\_words}}} \right) \times 100$$
-- Authoritative / Highly Cited: $\le 1.2\%$
-- Neutral Informational: $1.2\% - 2.2\%$
-- Speculative / Low Trust: $> 2.5\%$
+```text
+HedgeRate = (sum(w_hedge) / N_total_words) * 100
+```
+- Authoritative / Highly Cited: <= 1.2%
+- Neutral Informational: 1.2% - 2.2%
+- Speculative / Low Trust: > 2.5%
 
 ### 2. Atomic Fact-to-Token Ratio (FTR / FActScore)
-$$\text{FTR} = \frac{N_{\text{atomic\_facts}}}{N_{\text{tokens}}}$$
-- Citable AI-Engineered: $\ge 0.080$
-- Thin / Marketing Fluff: $< 0.040$
+```text
+FTR = N_atomic_facts / N_tokens
+```
+- Citable AI-Engineered: >= 0.080
+- Thin / Marketing Fluff: < 0.040
 
 ### 3. Wilson 95% Score Confidence Interval
-$$\text{CI}_{95\%} = \frac{\hat p + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat p(1-\hat p)}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}$$
-Where $z = 1.96$, $\hat p$ is observed citation rate, and $n \ge 10$ runs per engine.
+```text
+CI_95% = (p_hat + z^2 / (2n) +/- z * sqrt(p_hat * (1 - p_hat) / n + z^2 / (4n^2))) / (1 + z^2 / n)
+```
+Where z = 1.96, p_hat is observed citation rate, and n >= 10 runs per engine.

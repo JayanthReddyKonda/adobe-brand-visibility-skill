@@ -54,7 +54,7 @@ Content genres exhibit vastly divergent influence on generative engine answer ge
 - **Three Structural Tiers:**
   1. **Macro Architecture:** Strict heading hierarchy (`<h1>` -> `<h2>` -> `<h3>`), table of contents, and executive takeaways.
   2. **Meso Chunking:** Standalone section self-containment (134–167 words per section) that can be extracted independently without antecedent loss.
-  3. **Micro Visual Emphasis:** Semantic bullet lists (density >=0.40$), comparison tables, and bold key takeaway leads.
+  3. **Micro Visual Emphasis:** Semantic bullet lists (density >= 0.40), comparison tables, and bold key takeaway leads.
 
 ---
 
@@ -99,10 +99,10 @@ The 0–30 CITE Citability Score Rubric defines the objective criteria for evalu
 | Code | Dimension | Points | Evaluation Metric |
 | :--- | :--- | :---: | :--- |
 | **DA** | Direct Answer | 0–5 | Section openers provide standalone, extractable 40–60 word answer leads. |
-| **DD** | Data Density | 0–5 | Specific numbers, percentages, durations, benchmark statistics (FTR >=0.080$). |
+| **DD** | Data Density | 0–5 | Specific numbers, percentages, durations, benchmark statistics (FTR >= 0.080). |
 | **AS** | Authority Signals | 0–5 | Named researchers, DOIs, authoritative outbound citations, verified `sameAs` nodes. |
-| **SQ** | Structure Quality | 0–5 | Heading hierarchy, comparison tables, list density >=0.40$, code blocks. |
-| **FR** | Freshness | 0–5 | Visible dateModified $< 60$ days, recent temporal grounding. |
+| **SQ** | Structure Quality | 0–5 | Heading hierarchy, comparison tables, list density >= 0.40, code blocks. |
+| **FR** | Freshness | 0–5 | Visible dateModified < 60 days, recent temporal grounding. |
 | **UQ** | Uniqueness | 0–5 | Proprietary case data, original frameworks, zero generic boilerplate. |
 
 **Total Score Bands:** A (27–30) / B (22–26) / C (17–21) / D (12–16) / F (<12).

@@ -120,7 +120,7 @@ AI retrieval systems weight first-party brand statements based on temporal signa
 |---|---|---|---|
 | **Multi-Year Copyright Drift** | Copyright year on one active page is >= 2 years older than the homepage (e.g. 2022 on `/terms` vs 2026 on `/`). | **Low** (`LEGACY_FACT_PROPAGATION`) | Update legacy page templates to dynamically inherit current copyright year. |
 | **Outdated Tagline Drift** | An old slogan is stated in footer markup while an active repositioning campaign exists on the homepage. | **Low** (`LEGACY_FACT_PROPAGATION`) | Harmonize brand tagline strings across all active layouts. |
-| **Current Copyright Year** | Copyright year matches current calendar year or current year $+/- 1$. | **Pass** | No action required. |
+| **Current Copyright Year** | Copyright year matches current calendar year or current year +/- 1. | **Pass** | No action required. |
 
 ---
 
@@ -238,5 +238,5 @@ To compare prices across disparate formats (US, UK, Indian, European), values mu
 
 ## 3. Contact & Phone Normalization
 
-- **Phone Numbers:** Strip non-digits (`+1 (800) 555-0199` $->$ `18005550199`). Compare only within the same contact department scope (e.g. Sales Phone vs Support Phone).
+- **Phone Numbers:** Strip non-digits (`+1 (800) 555-0199` -> `18005550199`). Compare only within the same contact department scope (e.g. Sales Phone vs Support Phone).
 - **Email Addresses:** Lowercase and strip whitespace. Scoped by department mailbox (`support@brand.com` vs `sales@brand.com`).

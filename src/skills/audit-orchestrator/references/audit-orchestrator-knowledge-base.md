@@ -675,7 +675,7 @@ Rules:
 Heuristics (like counting `<table>` tags or measuring keyword density) may be used to build a classifier profile, but **cannot alone trigger a finding**. Findings must require semantic corroboration or explicit logic breakdown (e.g., missing `<title>` tag).
 
 ## 5. Output Delivery Mandate (Output Standard)
-The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json``` code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
 
 ## 6. Query-Intent Scenario Modeling
 When authoring `root_cause` and `impact` for findings, articulate the specific query mode failure in conversational AI search engines:
@@ -905,7 +905,7 @@ The AI calibrates finding confidence using an objective Bayesian evidence framew
   Derived from single-page text metrics, word count heuristics, or isolated stylistic observations. **Action Rule:** Automatically demoted by the Eligibility Gate to `proactive_actions[]`; never emitted as a critical or high defect.
 
 ### Sample Size Discounting Rule:
-- When total crawled page count $n < 5$, sitewide extrapolations are strictly prohibited.
+- When total crawled page count n < 5, sitewide extrapolations are strictly prohibited.
 - Finding evidence scope must be annotated as `"sample-restricted"` rather than `"sitewide"`.
 - High-severity heuristic findings must be downgraded to `medium` severity until confirmed across a larger catalog crawl.
 

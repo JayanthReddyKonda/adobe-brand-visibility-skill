@@ -296,7 +296,7 @@ Content optimization cannot rely on generic, one-size-fits-all recommendations. 
 2. **Gap Analysis:** Identifies precise deficiencies against empirical thresholds:
    - Deficient depth score (< 3).
    - High hedge word density (> 0.5%).
-   - Sub-threshold atomic fact ratio ($< 0.080$).
+   - Sub-threshold atomic fact ratio (< 0.080).
    - Absence of semantic comparison tables or definition lists.
    - Exophoric pronouns in passage leads breaking context.
 3. **Deterministic Action Tracks:**

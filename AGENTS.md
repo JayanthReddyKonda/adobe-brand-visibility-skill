@@ -41,9 +41,9 @@ Always mirror `src/` to `.agents/` after any edit:
      - `README.md`
      - `LICENSE`
      - `skills/` (the 8 skill folders)
-   - Final archive size MUST be $\le 50\text{ MB}$ (current artifact is ~274 KB).
+   - Final archive size MUST be <= 50 MB (current artifact is ~274 KB).
 6. **Execution Ceiling:**
-   - Complete multi-skill audit for any standard domain must finish in $< 5\text{ minutes}$.
+   - Complete multi-skill audit for any standard domain must finish in < 5 minutes.
 
 ---
 

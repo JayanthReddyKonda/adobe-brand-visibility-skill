@@ -70,70 +70,17 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 
 ## Procedure
 
-> [!CAUTION]
-> **MANDATORY READING GATE:** You MUST read your own reference files AND all 7 specialist SKILL.mds BEFORE running any scripts. This loads the domain knowledge and decision rules that your synthesis reasoning depends on. Do not skip this. Do not execute scripts first.
+### Stage 1 — Context Ingestion & Signal Profiling
 
-### Phase 1 — Knowledge Loading
-
-**Step 1: Load Orchestrator References and Schemas**
-
-Read these 3 core files before anything else:
+**Step 1: Ingest Core Synthesis Digest & Output Contract**
+Load the master synthesis digest and schema output contract in a single operation:
 ```bash
-cat skills/audit-orchestrator/references/audit-orchestrator-knowledge-base.md
+cat skills/audit-orchestrator/references/core-synthesis-digest.md
 cat skills/audit-orchestrator/references/report-schema.json
-cat skills/audit-orchestrator/references/seo-foundations.md
 ```
 
-**Step 2: Load All 7 Specialist SKILL.md Runbooks**
-
-Read each specialist's SKILL.md to understand execution commands and output contracts:
-```bash
-cat skills/web-scraper/SKILL.md
-cat skills/discoverability-audit/SKILL.md
-cat skills/entity-content-audit/SKILL.md
-cat skills/fact-consistency-audit/SKILL.md
-cat skills/corroboration-authority-audit/SKILL.md
-cat skills/geo-content-audit/SKILL.md
-cat skills/engagement-context-audit/SKILL.md
-```
-
-**Step 3: Load All Specialist Knowledge Bases and Domain Reference Schemas**
-
-Read all 13 domain knowledge bases, specialized guides, and JSON reference schemas across specialists:
-```bash
-# Web Scraper Architecture & Crawler Matrix
-cat skills/web-scraper/references/web-scraper-knowledge-base.md
-
-# Discoverability Knowledge Base & International SEO Guide
-cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
-cat skills/discoverability-audit/references/international-seo.md
-
-# Entity Content Knowledge Base & Master Schema Templates (JSON-LD)
-cat skills/entity-content-audit/references/entity-content-audit-knowledge-base.md
-cat skills/entity-content-audit/references/organization.json
-cat skills/entity-content-audit/references/product.json
-
-# Fact Consistency Knowledge Base & Multi-Currency Ledger Rules
-cat skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md
-
-# Corroboration & Authority Verification Knowledge Base
-cat skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md
-
-# GEO Content Citability Knowledge Base & AI Writing Analysis Guide
-cat skills/geo-content-audit/references/geo-content-audit-knowledge-base.md
-cat skills/geo-content-audit/references/ai-writing-detection.md
-
-# Engagement Context Knowledge Base & Intent Handoff Reference Templates
-cat skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md
-cat skills/engagement-context-audit/references/pricing-comparison.json
-cat skills/engagement-context-audit/references/product-purchase.json
-```
-
-### Phase 2 — Site Inventory Acquisition
-
-**Step 4: Unified Web Acquisition via `web-scraper`**
-
-Execute the single-pass web scraper to build the shared canonical site inventory (`inv.json`). This ensures the target domain is crawled **exactly once**, completely eliminating redundant scraping across the 6 downstream specialist skills:
+**Step 2: Unified Single-Pass Acquisition via `web-scraper`**
+Execute the single-pass web scraper to construct the canonical site inventory (`inv.json`). Crawling is performed **strictly once**, eliminating redundant network calls across downstream specialist skills:
 ```bash
 # Option A: Directly invoke web-scraper skill
 python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
@@ -141,143 +88,96 @@ python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --o
 # Option B: Run orchestrator acquisition wrapper
 python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 ```
+*Emitted Artifact:* `inv.json` containing `site`, `pages[]` (`url`, `status`, `content_type`, `snr_ratio`, `word_count`, `jsonld`, `clean_markdown`, `html`), `robots` (RFC 9309 16-bot matrix), and `sitemaps[]`.
 
-The inventory JSON contains: `site`, `pages[]` (each with `url`, `status`, `content_type`, `page_type`, `snr_ratio`, `word_count`, `jsonld`, `clean_markdown`, `html`), `robots` (RFC 9309 16 AI crawler matrix), `sitemaps[]`, and `infrastructure`.
+**Step 3: Conditional Reference Routing Matrix**
+Inspect `inv.json` signals to consult deep specialist references strictly on demand:
+
+| Trigger Signal in Site Crawl | Specialist Reference to Load | Diagnostic Focus |
+|---|---|---|
+| Non-English routes (`/es/`, `/fr/`, `hreflang`) | `skills/discoverability-audit/references/international-seo.md` | Hreflang reciprocity, region codes, canonical links |
+| Archetype == `ecommerce` | `skills/entity-content-audit/references/product.json`<br>`skills/engagement-context-audit/references/product-purchase.json` | Price float formatting, ISO currency, hero checkout CTAs |
+| Archetype == `saas` | `skills/engagement-context-audit/references/pricing-comparison.json` | Tier feature contrast, seat limits, `/pricing.md` format |
+| Missing/ambiguous brand identity | `skills/entity-content-audit/references/organization.json` | Schema.org `@graph` Organization & WebSite hierarchy |
+| Explanatory Depth < 3 / high fluff | `skills/geo-content-audit/references/ai-writing-detection.md` | Statistical burstiness, AI writing patterns, causal conjunctions |
+| Zero declared `sameAs` | `skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md` | 57% off-site citation rule, Wikidata, LinkedIn, YouTube |
+
+*(Automated Alternative: Run `python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com --inventory inv.json` to stream all triggered rules in a single pass).*
 
 ---
 
-### Phase 3 — Specialist Diagnostic Execution
+### Stage 2 — Causal Gated Specialist Execution
 
-Run each specialist script sequentially. Each returns a JSON payload with `status`, `findings[]`, `recommendations[]`. Collect all outputs — you will synthesize them in Phase 4.
+Execute specialist diagnostic sensors against `inv.json` following the strictly ordered 6-layer dependency DAG:
 
-**Step 5: Discoverability & Retrieval Audit**
+**Step 4: Gate 0 — Discoverability & Retrieval Audit (Layer 0)**
 ```bash
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 ```
+- *Diagnostic Target:* RFC 9309 crawler matrices (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), HTTP status, canonical tags, and raw SPA shell parity.
+- *Short-Circuit & Gating Rule:* If the target domain or entrypoint returns HTTP 403 or disallows search retrieval crawlers (`AI_RETRIEVAL_BLOCKED`), register as an upstream Keystone Defect and suppress downstream text/schema omission findings on blocked routes.
 
-**Step 6: Entity Identity & Answerability Audit**
+**Step 5: Gate 1 — Entity Identity & Schema Graph Audit (Layer 1)**
 ```bash
 python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 ```
+- *Diagnostic Target:* Machine-explicit Schema.org `@graph` extraction (`Organization`, `WebSite`, `Product`, `Offer`).
+- *Gating Rule:* Flag `MATERIAL_ENTITY_AMBIGUITY` if explicit Schema.org JSON-LD is missing; HTML `<title>` or OpenGraph tags do NOT substitute for machine-explicit linked data.
 
-**Step 6: Fact Consistency & Lifecycle Audit**
+**Step 6: Gate 2 — Multi-Source Fact Consistency Audit (Layer 2)**
 ```bash
 python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
 ```
+- *Diagnostic Target:* Multi-page factual contradictions, cross-currency pricing discrepancies, and stale contact info.
+- *Gating Rule:* Compare only facts with identical entity scope. Do not flag distinct subscription tiers (e.g. Starter $10 vs Pro $50) as contradictions.
 
-**Step 7: Authority & SameAs Corroboration Audit**
+**Step 7: Gate 3 — Authority & Identity Corroboration Audit (Layer 3)**
 ```bash
 python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
 ```
+- *Diagnostic Target:* Probes declared `sameAs` authority nodes (Wikidata, Wikipedia, LinkedIn) under zero-trust SSRF sandboxing to confirm 57% off-site grounding.
 
-**Step 8: Generative Engine Optimization (GEO) Audit**
+**Step 8: Gate 4 — Generative Citability & AutoGEO Audit (Layer 4)**
 ```bash
 python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 ```
+- *Diagnostic Target:* Princeton KDD 2024 / CMU AutoGEO citability vectors: causal conjunction density, quantitative statistics, pull quotes, and BLUF attention primacy.
 
-**Step 9: Engagement & Context Continuity Audit**
+**Step 9: Gate 5 — Intent-Handoff & Engagement Continuity Audit (Layer 5)**
 ```bash
 python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --analytics analytics.json --format json
 ```
+- *Diagnostic Target:* AI referral landing orientation, above-the-fold answer presence, H1 semantic scent, and CTA reachability.
 
 ---
 
-### Phase 4 — Cognitive Synthesis (YOUR REASONING)
+### Stage 3 — Cross-Domain Cognitive Synthesis & Keystone Deduplication
 
-**Step 10: Multi-Signal Evidence Reconciliation**
+**Step 10: Multi-Signal Evidence Triangulation & Scoring**
+Apply the cognitive reasoning rules from `audit-orchestrator-knowledge-base.md`:
 
-Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over all 6 outputs:
-
-1. **Causal DAG & Keystone Defect Deduplication (Knowledge Base Section 12):** Apply the 6-layer Causal DAG (Layer 0 Ingestion -> Layer 1 Extraction -> Layer 2 Entity -> Layer 3 Fact Ledger -> Layer 4 Citability -> Layer 5 Engine Selection). If an upstream Layer 0 or Layer 1 defect is active, consolidate downstream omissions as supporting evidence under the single Keystone Defect to prevent finding inflation.
-2. **Epistemic Falsification Protocol (Knowledge Base Section 13):** Run mandatory counter-hypothesis gates before asserting defects. Rule out price tiering, nested `@graph` schema declarations, edge WAF challenges, and training-bot vs retrieval-bot distinctions.
-3. **The 5-Step Cognitive Synthesis Protocol (Knowledge Base Section 14):** Execute Step A (Triangulation) -> Step B (Causal Root-Tracing) -> Step C (Counterfactual Falsification) -> Step D (Multi-Engine Simulation) -> Step E (Dual-Track Prescription).
-4. **Bayesian Confidence Calibration & Sample Size Discounting (Knowledge Base Section 16):** Calibrate confidence objectively (L1 deterministic = high, L2 corroborated multi-page = high/medium, L3 single-sample = low demoted to proactive actions). Annotate sample-restricted scope if crawled pages n < 5.
-5. **Dual-Track Remediation (Domain-Aware):** For every finding, write a `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers) AND a `verification` step. Tailor fixes to the detected website archetype (Media/Streaming, SaaS/Software, E-Commerce, or Publishing) using Knowledge Base Section 7.
-6. **Query-Intent Scenario Modeling:** In each finding's `impact`, clearly contrast how the defect impairs both:
-   - **Navigational Brand Queries** (e.g., *"What is [Brand]?"* — entity resolution failure, hallucination, lack of knowledge graph anchor).
-   - **Categorical / Discovery Queries** (e.g., *"Where can I buy/stream/find [Topic]?"* — competitor selection due to superior schema attributes, licensing provenance, or causal depth).
-7. **Effort-vs-Impact Executive Prioritization (Knowledge Base Section 17):** Classify recommendations across the 2x2 executive decision matrix (P1 Quick Wins, P2 Architectural Priorities, P3 Optimization Polish, P4 Backlog).
-8. **The 17-Rule Consolidated Matrix (`CR01`–`TX06`):**
-   Audit reasoning must evaluate the target domain against the complete consolidated benchmark suite defined in `references/state-of-the-art-geo-benchmarks.md`:
-   - **Crawler Access (`CR01`–`CR05`):** RFC 9309 compliance, 500 KiB file cap, HTTP 5xx fail-closed state, and explicit permissions for `OAI-SearchBot`, `Claude-SearchBot`, and `PerplexityBot`.
-   - **Machine-Readable Manifests (`LL01`–`LL02`):** Root `/llms.txt` availability with H1 title and blockquote, plus first-100-word executive summaries.
-   - **Rendering & Delivery (`RD01`–`RD02`):** Content Availability Gap (CAG < 0.15) and text-to-HTML Signal-to-Noise Ratio (SNR > 0.12).
-   - **Structured Data (`SC01`–`SC03`):** Organization >= 2 authoritative `sameAs` nodes, clean float Offer prices with ISO 4217 currencies, and 60-day freshness.
-   - **Text & Citability (`TX01`–`TX06`):** BLUF top-30% placement, Hyland hedge density <= 1.2%, Atomic Fact-to-Token Ratio FTR >= 0.080, Exophoric Pronoun Ratio 0%, Shannon Token Entropy 6.8 - 7.6 bits, and Princeton GEO evidence density (>= 1 stat + 1 quote / 150 words).
-
-9. **The 6 Orthogonal Scores Model & Wilson Confidence Intervals:**
-   Audit synthesis must evaluate the target brand across the 6 orthogonal dimensions defined in `references/sota-ai-readiness-framework-2026.md`:
-   - **Crawlability Score (20%):** Deterministic HTTP, RFC 9309, crawler access.
-   - **Retrieval Readiness (20%):** Text extraction, SNR, Content Availability Gap.
-   - **Citation Readiness (20%):** Atomic Fact-to-Token Ratio (FTR), hedge rate, BLUF top-30%.
-   - **Entity Authority (15%):** Schema graph, sameAs nodes, fact ledger consistency.
-   - **Cross-Engine Visibility (15%):** CECO and Wilson 95% confidence intervals.
-   - **Agentic Commerce Readiness (10%):** Product consistency, UCP, AP2, and A2A interoperability.
-
-10. **The Canonical 16-Defect Classification (HF-01 to HF-08 and W-01 to W-08):**
-   Every finding must be mapped to its corresponding Hard Failure (`HF`) or High-Value Warning (`W`) code from the defect catalog.
-
-11. **The Citation Failure Modes Decision Tree (Tian et al. 2026):**
-   Structure root cause analysis using the 5-stage failure taxonomy:
-   - **Retrieval Failure:** robots.txt disallow, HTTP 4xx/5xx, noindex, or empty SSR application shell.
-   - **Relevance Failure:** Title/H1 query-intent mismatch or semantic drift.
-   - **Redundancy Failure:** Generic, commoditized content losing context attention to higher-authority domains.
-   - **Trust Failure:** FTR < 0.040, excessive hedge language (>2.5%), or uncorroborated entity claims.
-   - **Extraction Failure:** nosnippet directives, low text Signal-to-Noise Ratio (<0.12), or DOM fragmentation.
-
-12. **The 57% Off-Site Authority Rule & CITE Rubric:**
-   Reasoning must acknowledge that 57% of branded AI citations derive from third-party reviews and authority nodes (Reddit, Wikipedia, YouTube, LinkedIn), and evaluate pages against the 0–30 CITE rubric.
-
-13. **Platform-Specific Citation Breakdown & PAWC Scoring (Knowledge Base Section 15):**
-   In your reasoning and executive summary, contrast visibility across the Big 3 Generative Engines using the Position-Adjusted Word Count (PAWC) framework:
-   - **Google AI Overviews (Gemini):** Traditional SEO gateway (top 10 correlation), table extractability, direct 40–60 word answer leads, and query fan-out topical clusters.
-   - **ChatGPT Search (Bing):** Wikipedia/Wikidata entity grounding (47.9% share), comprehensive 2000+ word deep guides, and autonomous buying agent manifests (`/pricing.md`).
-   - **Perplexity AI:** Community consensus validation (Reddit 46.7%), recency (<3 months 3x boost), and multi-source corroboration.
-
-14. **Two Explicit Authority Evidence Classes (`evidence_classes`):**
-    Distinguish `declared_identity_nodes` (outbound `sameAs` entity declarations) from `verified_candidate_backlinks` (inbound third-party links verified via bounded SSRF-safe prober). Explicitly acknowledge that web-wide backlink discovery cannot be performed truthfully from URL-only indexes (such as Common Crawl CDX).
-
-15. **First-Party Analytics Ingestion & Dual-Track Evaluation (`analytics_summary`):**
-    When first-party analytics are provided, cross-correlate static UX proxies with observed visitor retention. Escalate empirically corroborated defects, mitigate false alarms when observed engagement is healthy, and detect `AI_REFERRAL_DISCONTINUITY`. If omitted, maintain heuristic-only mode with clear limitations.
-
-16. **Deterministic Page-Level Content Improvement Plans (`page_improvement_plans`):**
-    Synthesize deterministic, page-level improvement plans derived from the 9 Princeton & AutoGEO citability dimensions and Zhang et al. 2026 Citation Absorption findings. Each plan explicitly audits the 5 high-influence evidence genres (Code +76.9%, Stats +61.6%, Definitions +57.3%, Tables +55.3%, Steps +41.2%), flags Standalone FAQ Deficits (-5.7% citation penalty), detects unnatural keyword stuffing (-8.3% to -10% neural perplexity penalty), enforces BLUF Top-30% attention primacy, and mandates attributed expert quotes (+40.9% Princeton KDD lift).
-
-17. **Post-Citation Viewport Anchoring & Intent Continuity (`engagement_continuity_summary`):**
-    Evaluate arriving AI referral traffic orientation. Flag `VIEWPORT_ANSWER_ABSENCE` if cited claims are pushed below the top 600px / first 150 words by decorative banners. Flag `CTA_REACHABILITY_FRICTION` if the primary commercial conversion action is delayed behind more than 3 auxiliary interactive elements. Mitigate heuristic warnings when first-party analytics reflect healthy visitor retention, and prioritize value-driven outcome copy over generic action verbs.
-
-**Step 11: Calculate Summary Metrics & Scoring Model**
-
-1. Calculate and populate the exact integer counts for `summary`:
-   - `total_findings`, `critical`, `high`, `medium`, and `low` strictly conforming to `references/report-schema.json`.
-2. Compute the **Scoring Model Composite GEO Score** (0–100) using Knowledge Base Section 8:
-   - Technical Accessibility (20%), Content Citability (35%), Structured Data (20%), and Brand Signals (25%).
-   - Apply Business Type Multipliers (SaaS, E-Commerce, Publisher, Local, Agency).
-   - Assign the Letter Grade: **A** (85–100), **B** (70–84), **C** (50–69), **D** (30–49), **F** (0–29).
-3. Serialize the machine-readable `<!-- GEO-AUDIT-META ... -->` block in your report's executive summary to support automated monitoring and delta comparison.
+1. **Causal DAG & Keystone Deduplication:** If an upstream Layer 0 or Layer 1 defect is active, consolidate downstream symptoms as supporting evidence under the Keystone Defect to prevent finding inflation.
+2. **Epistemic Falsification Protocol:** Test counter-hypotheses before asserting defects (e.g. verify pricing tiering, nested `@graph` structures, edge WAF challenges, and training vs retrieval bot distinctions).
+3. **Dual-Track Remediation:** Provide BOTH a concrete `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers), plus an empirical `verification` check.
+4. **Query-Intent Scenario Modeling:** Contrast how each defect impairs both **Navigational Brand Queries** (*"What is [Brand]?"*) and **Categorical Discovery Queries** (*"Where can I buy [Category]?"*).
+5. **Orthogonal Scoring Model:** Compute the 6 orthogonal scores (0–100): Crawlability (20%), Retrieval Readiness (15%), Citation Readiness (25%), Entity Authority (20%), Cross-Engine Visibility (10%), Agentic Commerce (10%). Assign Letter Grade (A: 85–100, B: 70–84, C: 50–69, D: 30–49, F: 0–29).
+6. **Curated Strategic Proactive Actions:** Select up to 5 beyond-problem growth opportunities, prioritized from critical to low.
 
 ---
 
-### Phase 5 — Report Generation & Validation
+### Stage 4 — Report Generation & Schema Gate Validation
 
-**Step 12: Construct the Final JSON Report**
+**Step 11: Construct Final Draft-07 JSON Report**
+Construct the final schema-compliant JSON report object conforming strictly to `references/report-schema.json`. Every required key (`site`, `audited_at`, `audit_status`, `summary`, `findings[]`, `proactive_actions[]`) must be fully populated. Ensure zero newline escape sequences (`\n`), zero unpopulated null values, and zero unneeded debug blocks.
 
-Construct the final Draft-07 schema-compliant JSON report object. Use the exact schema from `references/report-schema.json` — every required field (`site`, `audited_at`, `summary`, `findings[]`, `proactive_actions[]`) must be present with valid types and allowed severities.
-
-**Step 13: Validate via Schema Gate**
+**Step 12: Validate via Schema Gate**
 ```bash
 python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json
 ```
-Ensure the validator exits with status code `0` and reports 0 schema errors. If validation fails, immediately correct the JSON structure to comply with `report-schema.json`.
+Validation MUST pass with exit code 0. If any schema violations occur, correct the payload before final emission.
 
-**Step 14: Output Delivery (MANDATORY)**
-
-The entrypoint skill's primary deliverable is the **complete, unabridged audit report JSON object emitted directly in your response**:
-
-- **CRITICAL REQUIREMENT:** Output the entire, fully-populated JSON report directly inside a `json` code block in your response.
-- **DO NOT** merely write a file to disk and summarize it. The client application and users consume the output emitted by the agent directly.
-- **DO NOT** truncate, summarize, or omit any findings or recommendations from the JSON payload.
-- You may include a concise Executive Summary preceding the JSON block, but the complete, schema-valid JSON object MUST be present in full.
+**Step 13: Direct Output Delivery (MANDATORY)**
+Emit the complete, unabridged Draft-07 JSON report directly inside a `json` code block in your response. Never substitute with a placeholder or point to disk.
 
 ---
 

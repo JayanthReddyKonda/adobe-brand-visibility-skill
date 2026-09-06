@@ -48,7 +48,9 @@ Sites that fail to expose machine-readable commerce protocols are invisible to a
 Autonomous buying agents drop product trust when machine-readable schema contradicts visible HTML copy.
 
 ### The Product Consistency Formula
-$$\text{ProductConsistency} = 1 - \frac{\#\text{conflicting fields}}{\#\text{checked fields}}$$
+```text
+ProductConsistency = 1 - (conflicting fields / checked fields)
+```
 
 ### Required Machine-Readable Properties
 - `price`: Clean numeric string without currency symbols (`49.00`, not `"$49.00"`).
