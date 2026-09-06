@@ -35,6 +35,16 @@
   - [2.1 Finding Contract](#21-finding-contract)
 - [3. Internal Shared State Contract](#3-internal-shared-state-contract)
 - [4. No Heuristic Defects Rule](#4-no-heuristic-defects-rule)
+- [8. Scoring Model v2 & Composite GEO Score](#8-scoring-model-v2--composite-geo-score)
+- [9. Machine-Readable `GEO-AUDIT-META` Specification](#9-machine-readable-geo-audit-meta-specification)
+- [10. The Canonical 16-Defect Matrix (HF-01 to HF-08 and W-01 to W-08)](#10-the-canonical-16-defect-matrix-hf-01-to-hf-08-and-w-01-to-w-08)
+- [11. The 6 Orthogonal Scoring Dimensions & Statistical Formulation](#11-the-6-orthogonal-scoring-dimensions--statistical-formulation)
+- [12. Causal Dependency Graph (DAG) & The Keystone Defect Rule](#12-causal-dependency-graph-dag--the-keystone-defect-rule)
+- [13. Epistemic Falsification & Disambiguation Protocol](#13-epistemic-falsification--disambiguation-protocol-anti-hallucination-gates)
+- [14. The 5-Step Cognitive Synthesis Protocol](#14-the-5-step-cognitive-synthesis-protocol-from-sensors-to-diagnostic-judgment)
+- [15. Multi-Engine Retrieval Simulation Matrix](#15-multi-engine-retrieval-simulation-matrix)
+- [16. Bayesian Evidence Triangulation & Sample Size Discounting](#16-bayesian-evidence-triangulation--sample-size-discounting)
+- [17. Effort-vs-Impact Executive Prioritization Matrix](#17-effort-vs-impact-executive-prioritization-matrix)
 
 ---
 
@@ -694,7 +704,7 @@ Tailor `suggested_action.technical_fix` and `creative_fix` to the detected websi
 To produce a single, holistic benchmark of AI search readiness while retaining empirical rigor, the orchestrator computes the Composite GEO Score (0–100):
 
 ### Mathematical Formulation:
-$$\\text{GEO Score} = (\\text{Technical} \\times 0.20) + (\\text{Citability} \\times 0.35) + (\\text{Schema} \\times 0.20) + (\\text{Brand} \\times 0.25)$$
+GEO Score = (Technical * 0.20) + (Citability * 0.35) + (Schema * 0.20) + (Brand * 0.25)
 
 1. **Technical Accessibility (Weight: 20%):**
    - 11-Crawler matrix access (retrieval bots weighted 2x training bots).
@@ -782,13 +792,131 @@ To eliminate subjective ambiguity, audit findings must map directly to the canon
 
 To avoid conflating crawlability with empirical visibility, the audit synthesizes six distinct, orthogonal scores:
 
-$$\text{Crawlability (20\%)} + \text{Retrieval (20\%)} + \text{Citation Readiness (20\%)} + \text{Entity Authority (15\%)} + \text{Cross-Engine Visibility (15\%)} + \text{Agentic Commerce (10\%)}$$
+Score Formulation = Crawlability (20%) + Retrieval (20%) + Citation Readiness (20%) + Entity Authority (15%) + Cross-Engine Visibility (15%) + Agentic Commerce (10%)
 
 ### Mathematical Formulations:
 1. **Cross-Engine Citation Coverage (CECO):**
-   $$\text{CECO} = \frac{\#\text{engines citing brand/domain}}{\#\text{engines tested}}$$
+   CECO = (number of engines citing brand or domain) / (total engines tested)
 2. **Wilson 95% Score Confidence Interval:**
-   $$\text{CI}_{95\%} = \frac{\hat p + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat p(1-\hat p)}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}$$
-   Where $\hat p$ is the observed sample citation rate, $n$ is total query runs (minimum $n \ge 10$), and $z = 1.96$.
+   CI_95% = (p_hat + z^2 / (2n) +/- z * sqrt(p_hat * (1 - p_hat) / n + z^2 / (4n^2))) / (1 + z^2 / n)
+   Where p_hat is the observed sample citation rate, n is total query runs (minimum n >= 10), and z = 1.96.
 3. **Product Consistency Index:**
-   $$\text{ProductConsistency} = 1 - \frac{\#\text{conflicting fields}}{\#\text{checked fields}}$$
+   ProductConsistency = 1 - (number of conflicting fields / total checked fields)
+
+---
+
+## 12. Causal Dependency Graph (DAG) & The Keystone Defect Rule
+
+To prevent the AI from confusing downstream symptoms with upstream root causes, the orchestrator evaluates findings along an explicit 6-layer Causal Directed Acyclic Graph (DAG):
+
+```text
+CAUSAL DEPENDENCY GRAPH (DAG)
+=============================
+Layer 0: INGESTION & ACCESS
+  [AI_RETRIEVAL_BLOCKED, NOINDEX_EXCLUSION, ROBOTS_5XX_FAIL_CLOSED, ROBOTS_TXT_OVERSIZED]
+       |
+       v (Blocks engine access to raw response)
+Layer 1: CONTENT EXTRACTION & DELIVERY
+  [RENDERED_CONTENT_GAP, NOSNIPPET_ON_CORE_CONTENT, WAF_BOT_CHALLENGE, CANONICAL_FRAGMENTATION]
+       |
+       v (Prevents ingestion of DOM nodes and schema)
+Layer 2: ENTITY & SEMANTIC RESOLUTION
+  [MATERIAL_ENTITY_AMBIGUITY, BROKEN_AUTHORITY_ANCHOR, CIRCULAR_SAMEAS_SELF_REFERENCE, WEAK_IDENTITY_SIGNALS]
+       |
+       v (Deprives knowledge graph of grounded entity identity)
+Layer 3: FACTUAL KNOWLEDGE LEDGER
+  [FIRST_PARTY_FACT_CONFLICT, COMMERCIAL_PRODUCT_DATA_CONTRADICTION, INCOMPLETE_OFFER_ATTRIBUTES, STALE_AUTHORITATIVE_FACT]
+       |
+       v (Causes hallucinations and conflicting price quotes)
+Layer 4: GENERATIVE CITABILITY & SCENT
+  [MISSING_IN_DEPTH_MECHANISMS, STANDALONE_FAQ_DEFICIT, LOW_FACT_TO_TOKEN_RATIO, EXCESSIVE_KEYWORD_DENSITY, CONTEXT_PLACEMENT_DEGRADATION, LOW_INFORMATION_SCENT]
+       |
+       v (Degrades neural passage attention during RAG synthesis)
+Layer 5: ENGINE SELECTION & CONVERSION
+  [AI_CITATION_GAP, AI_FACT_CONFLICT, AI_REFERRAL_DISCONTINUITY, INTENT_TO_LANDING_MISMATCH]
+```
+
+### The Keystone Defect Rule (Anti-Inflation Gate):
+1. **Upstream Preemption**: If a Layer 0 defect (e.g. `AI_RETRIEVAL_BLOCKED` or `ROBOTS_5XX_FAIL_CLOSED`) or a Layer 1 defect (e.g. `RENDERED_CONTENT_GAP` or `WAF_BOT_CHALLENGE`) is present, downstream omissions at Layers 2–4 are **consequential symptoms**, not independent defects.
+2. **Consolidation Mandate**: The orchestrator MUST attribute the root failure to the single upstream "Keystone Defect". Downstream observations (such as missing JSON-LD or zero body text extracted) must be recorded as supporting evidence under that Keystone Defect, rather than inflating the report with 5 separate critical findings.
+3. **Severity Decoupling**: Downstream findings cannot carry higher severity than their enabling upstream root cause.
+
+---
+
+## 13. Epistemic Falsification & Disambiguation Protocol (Anti-Hallucination Gates)
+
+Before committing an observation as an authoritative finding, the AI must execute mandatory falsification tests to rule out common benign architectures and edge cases:
+
+| Target Observation | Sensor Trigger | Mandatory Falsification Test | Disambiguation Outcome |
+| :--- | :--- | :--- | :--- |
+| **Price Mismatch Across Pages** | Price on `/product` != price on `/pricing` | Check currency code, billing interval (monthly vs annual upfront), variant IDs, and promotional tier labels. | • If prices correspond to different billing terms or editions -> REJECT `FIRST_PARTY_FACT_CONFLICT`. Emit `COMMERCIAL_TERMS_TRANSPARENCY` recommendation.<br>• If prices claim to represent the identical scope/term -> CONFIRM `FIRST_PARTY_FACT_CONFLICT`. |
+| **Missing Root `Organization` Schema** | No standalone `Organization` block in homepage JSON-LD | Inspect nested `@graph` arrays, `WebSite.publisher` references, microdata `itemtype`, and OpenGraph `og:site_name`. | • If organization is declared within `@graph` or inherited from root -> REJECT `MATERIAL_ENTITY_AMBIGUITY`.<br>• If machine-explicit entity identity is entirely absent across all syntaxes -> CONFIRM `MATERIAL_ENTITY_AMBIGUITY`. |
+| **Low Text Word Count (<50 words)** | Scraped HTML body has minimal text | Inspect HTTP headers (`Server`, `cf-ray`, `x-akamai`), HTML `<title>` ("Attention Required", "Just a moment..."), and status codes (403/429/503). | • If an edge firewall challenge is detected -> Trigger `WAF_BOT_CHALLENGE`.<br>• If HTTP 200 with an unhydrated `<div id="root"></div>` -> CONFIRM `RENDERED_CONTENT_GAP` (SPA dependency). |
+| **Crawler Disallow in `robots.txt`** | `Disallow: /` for an AI-prefixed bot | Check exact User-Agent name against RFC 9309 crawler taxonomy. | • If bot is an offline model training harvester (`GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`) -> REJECT `AI_RETRIEVAL_BLOCKED`. Log as informational training opt-out.<br>• If bot is an AI search retrieval bot (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) -> CONFIRM `AI_RETRIEVAL_BLOCKED`. |
+| **Stale Copyright Year** | Hardcoded footer says "© 2023" or "© 2024" | Inspect HTTP `Last-Modified` header, JSON-LD `dateModified`, article publication dates, and recent changelog updates. | • If substantive articles/products are updated within 90 days -> REJECT `STALE_AUTHORITATIVE_FACT`. Footer string is an aesthetic defect.<br>• If substantive copy and prices have had zero updates for >365 days -> CONFIRM `CONTENT_RECENCY_DEFICIT`. |
+
+---
+
+## 14. The 5-Step Cognitive Synthesis Protocol (From Sensors to Diagnostic Judgment)
+
+The AI orchestrator executes this five-step cognitive loop to transform raw sensor outputs into an executive-grade diagnostic report:
+
+```text
+[Step A: Triangulation] -> [Step B: Causal Root-Tracing] -> [Step C: Falsification] -> [Step D: Engine Simulation] -> [Step E: Dual-Track Prescription]
+```
+
+1. **Step A — Multi-Sensor Triangulation & Route Indexing:**
+   - Group raw sensor findings by URL path and entity identifier. Cross-correlate discoverability, entity schema, fact consistency, and engagement metrics into a unified route ledger.
+2. **Step B — Causal Root-Tracing (The 5-Whys Analysis):**
+   - Traverse the Causal DAG backwards from each symptom to identify the deepest upstream enabling failure. Identify the single Keystone Defect responsible for clustered symptoms.
+3. **Step C — Counterfactual Falsification Gate:**
+   - Evaluate: *"If engineering fixes this proposed defect, does the AI search barrier immediately dissolve, or does an unaddressed upstream gate remain?"* If an upstream gate remains, re-center priority on the upstream blocker.
+4. **Step D — Platform-Specific Retrieval Simulation:**
+   - Model how the defect specifically penalizes Google AI Overviews, ChatGPT Search, and Perplexity Pro using the differential retrieval mechanics defined in Section 15.
+5. **Step E — Dual-Track Remediation Prescription:**
+   - Author domain-tailored technical specifications (for software engineers and DevOps) and creative copy/architecture guidance (for content strategists and brand marketers), complete with a deterministic verification procedure.
+
+---
+
+## 15. Multi-Engine Retrieval Simulation Matrix
+
+Generative search engines do not share a monolithic retrieval architecture. The AI orchestrator models defects against the three dominant engine paradigms:
+
+| Architectural Dimension | Google AI Overviews (Gemini) | ChatGPT Search (OpenAI / Bing) | Perplexity Pro |
+| :--- | :--- | :--- | :--- |
+| **Primary Indexing Pipeline** | Google Search Web Index (Top-10 organic ranking strongly correlated with citation). | Bing Web Index + Dedicated `OAI-SearchBot` real-time crawl. | Custom Perplexity Web Crawler + Live Search API Aggregation Pipeline. |
+| **Entity Grounding Anchor** | Google Knowledge Graph + Verified Google Business Profile nodes. | Wikidata Q-Identifiers + Wikipedia entities (47.9% anchor share) + Schema `@id`. | Third-Party Consensus (Reddit, forums, authoritative news, multi-domain agreement). |
+| **Optimal Content Geometry** | Semantic HTML `<table>` elements + concise 40–60 word Direct Answer leads. | Deep, comprehensive guides (2,000+ words) with rich technical mechanisms. | Fast server response + recency (<90 days, 3x citation boost) + explicit data attribution. |
+| **Machine-Readable Manifests** | XML Sitemaps + Clean Server-Side Rendered HTML. | Root `/llms.txt` + `/pricing.md` API-ready manifests. | Clean markdown headers + structured citations. |
+| **Dominant Failure Mode** | Ranking below Page 1 in traditional organic search; unrendered client JS. | Entity confusion with similarly named brands; hallucinated facts due to missing schema. | Total omission if recent third-party discussion or reviews are absent. |
+
+---
+
+## 16. Bayesian Evidence Triangulation & Sample Size Discounting
+
+The AI calibrates finding confidence using an objective Bayesian evidence framework:
+
+### Evidence Tiers:
+- **L1 — Deterministic Direct Ground Truth (Confidence: `high`, 1.0):**
+  Derived from exact HTTP status codes, RFC 9309 parsed robots rules, or syntax-validated schema parse exceptions. Eligible for all severity levels (`critical`, `high`, `medium`, `low`).
+- **L2 — Corroborated Multi-Page Heuristic (Confidence: `high` if n >= 5, `medium` if n < 5):**
+  Derived from verified contradictions across 2 or more distinct pages (e.g. cross-route price mismatch or multi-page text availability ratio).
+- **L3 — Single-Sample Uncorroborated Heuristic (Confidence: `low`):**
+  Derived from single-page text metrics, word count heuristics, or isolated stylistic observations. **Action Rule:** Automatically demoted by the Eligibility Gate to `proactive_actions[]`; never emitted as a critical or high defect.
+
+### Sample Size Discounting Rule:
+- When total crawled page count $n < 5$, sitewide extrapolations are strictly prohibited.
+- Finding evidence scope must be annotated as `"sample-restricted"` rather than `"sitewide"`.
+- High-severity heuristic findings must be downgraded to `medium` severity until confirmed across a larger catalog crawl.
+
+---
+
+## 17. Effort-vs-Impact Executive Prioritization Matrix
+
+To provide clear strategic roadmaps rather than unprioritized laundry lists, the AI orchestrator classifies all proactive actions and suggested remediations into a 2x2 executive decision matrix:
+
+| Impact \ Technical Effort | Low Effort (Hours / Days) | High Effort (Weeks / Sprints) |
+| :--- | :--- | :--- |
+| **High Citability Impact** | **P1: Quick Wins**<br>• Unblock `OAI-SearchBot` and `PerplexityBot` in `robots.txt`.<br>• Add Schema.org `Organization` with Wikidata `sameAs`.<br>• Fix broken authority profile anchors.<br>• Synchronize contradictory visible prices. | **P2: Architectural Priorities**<br>• Migrate client-rendered SPA shells to Server-Side Rendering (SSR).<br>• Implement machine-readable `/llms.txt` and `/llms-full.txt`.<br>• Build automated catalog-to-schema synchronization pipeline.<br>• Re-architect core landing pages for BLUF 30% answer leads. |
+| **Moderate / Incremental Impact** | **P3: Optimization Polish**<br>• Invert generic H1 headings ("Home") to descriptive value propositions.<br>• Reduce epistemic hedge language density below 1.2%.<br>• Add explicit `dateModified` timestamps to substantive content.<br>• Enrich Product schema with optional SKU and review fields. | **P4: Deprioritized / Backlog**<br>• Re-writing non-commercial informational footer pages.<br>• Micro-optimizing text readability on low-traffic utility routes.<br>• Sitewide taxonomy restructuring without search engine impact. |
+
