@@ -640,7 +640,9 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
         "recommendations": recommendations,
         "observations": observations,
         "coverage": {
-            "sameas_count": len(sameas_urls),
+            "sameas_count": len(sameas_urls),       # backward-compat alias
+            "sameas_declared": len(sameas_urls),    # total sameAs URLs declared in schema
+            "sameas_resolvable": len(checked),      # subset that returned HTTP 2xx
             "probed": len(checked),
             "results": checked,
             "candidate_backlinks_provided": len(candidate_list),

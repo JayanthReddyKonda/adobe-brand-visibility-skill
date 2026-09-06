@@ -742,6 +742,16 @@ def audit(base, domain, inv=None, state_file=None):
             "html_pages_evaluated": len(html_pages),
             "answerability_evaluations": answerability_evaluations,
             "json_ld_count": len(json_ld_entities),
+            # Ratios for continuous orchestrator scoring (structured data completeness)
+            "org_schema_pages": 1 if org_entity else 0,
+            "product_schema_pages": sum(
+                1 for p in html_pages
+                if any(
+                    "product" in str(e.get("@type", "")).lower()
+                    for e in parse_json_ld(p.get("json_ld_contents", []), p.get("html", ""))
+                )
+            ) if len(html_pages) > 1 else (1 if any("product" in str(e.get("@type", "")).lower() for e in json_ld_entities) else 0),
+            "total_pages": len(html_pages),
         },
         "limitations": [
             "Entity and answerability analysis was performed on sampled first-party HTML; authenticated portals were not evaluated."

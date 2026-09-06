@@ -751,6 +751,21 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
                 for pf in page_fact_list
             ),
             "source": "shared-inventory" if inv is not None else "homepage-only",
+            # Continuous scoring: conflict ratio = fact_conflicts / facts_checked
+            "fact_conflicts": sum(
+                1 for f in findings
+                if f.get("cause_id") in (
+                    "FIRST_PARTY_FACT_CONFLICT", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+                    "DISCONTINUED_VS_CURRENT_CONFLICT", "CONFLICTING_COMMERCIAL_TERMS",
+                )
+            ),
+            "facts_checked": sum(
+                len(pf.get("scoped_prices", []))
+                + len(pf.get("contact_emails", []))
+                + len(pf.get("contact_phones", []))
+                + len(pf.get("copyright_years", []))
+                for pf in page_fact_list
+            ) or 1,  # guard against zero division in orchestrator
         },
         "limitations": ["Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"],
     }

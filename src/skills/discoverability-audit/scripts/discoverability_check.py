@@ -884,6 +884,19 @@ def audit(base, domain, inv=None, state_file=None):
             "robots_txt_status": r_status,
             "canonical_declared": dom.canonical,
             "meta_robots_declared": dom.meta_robots,
+            # Counts for continuous orchestrator scoring
+            "retrieval_bots_allowed": search_bots_allowed,
+            "retrieval_bots_total": search_bots_total,
+            "noindex_pages": sum(
+                1 for p in all_pages
+                if "noindex" in str(p.get("html", "")).lower()[:2000]
+                and "<meta" in str(p.get("html", "")).lower()[:2000]
+            ),
+            "canonical_mismatch_pages": sum(
+                1 for p in all_pages
+                if p.get("canonical") and domain not in str(p.get("canonical", ""))
+            ),
+            "total_pages_checked": len(all_pages),
         },
         "limitations": [
             "Raw HTML extractability was evaluated directly; JavaScript headless rendering was not executed."

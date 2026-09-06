@@ -77,6 +77,10 @@
             "type": "string",
             "description": "Unique finding identifier (e.g. F-001, finding-1)"
           },
+          "cause_id": {
+            "type": "string",
+            "description": "Root cause key matching audit-orchestrator-knowledge-base.md"
+          },
           "title": {
             "type": "string",
             "description": "Clear descriptive title of the defect"

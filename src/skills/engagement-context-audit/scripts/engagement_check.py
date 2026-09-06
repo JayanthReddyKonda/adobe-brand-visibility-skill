@@ -1172,6 +1172,16 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                 1 for pm in page_metrics if pm.get("navigation_links_found", pm.get("anchor_links_found", 0)) > 0
             ),
             "pages_with_analytics": pages_with_analytics,
+            # Continuous scoring: orientation & intent-handoff ratios
+            "h1_aligned_pages": sum(
+                1 for pm in page_metrics
+                if pm["h1"] and pm.get("information_scent_score", 0.0) >= 0.4
+            ),
+            "cta_above_fold_pages": sum(
+                1 for pm in page_metrics
+                if pm.get("cta_reachability_score", 0.0) > 0.0
+            ),
+            "total_pages": len(page_metrics),
         },
         "limitations": limitations,
     }

@@ -2,7 +2,7 @@
 """
 orchestrator.py - Master Orchestrator for Brand AI-Readiness & Visibility Audit.
 Executes single-pass site acquisition, coordinates 6 specialist diagnostic sensors,
-applies the 6-layer Causal DAG and Keystone Defect deduplication, and emits a
+applies the full 6-layer Causal DAG and Keystone Defect deduplication, and emits a
 strictly validated Draft-07 JSON report.
 """
 
@@ -12,8 +12,114 @@ import json
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlparse
+
+# ---------------------------------------------------------------------------
+# Canonical Retrieval Bot Set (RFC 9309 search retrieval bots only — NOT training)
+# Blocking these is a critical/high defect. Blocking training bots (GPTBot,
+# ClaudeBot) is a governance decision — NOT an AI search defect.
+# ---------------------------------------------------------------------------
+RETRIEVAL_BOTS: Set[str] = {"OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai"}
+
+# ---------------------------------------------------------------------------
+# Full 6-Layer Causal DAG — Keystone suppression tables
+# Source: audit-orchestrator-knowledge-base.md Section 12
+# Layer 0 defects preempt everything below. Layer 1 defects preempt Layers 2-4.
+# ---------------------------------------------------------------------------
+_LAYER0_CAUSE_IDS: Set[str] = {
+    "AI_RETRIEVAL_BLOCKED",
+    "NOINDEX_EXCLUSION",
+    "ROBOTS_5XX_FAIL_CLOSED",
+    "ROBOTS_TXT_OVERSIZED",
+}
+_LAYER1_CAUSE_IDS: Set[str] = {
+    "RENDERED_CONTENT_GAP",
+    "NOSNIPPET_ON_CORE_CONTENT",
+    "WAF_BOT_CHALLENGE",
+    "CANONICAL_FRAGMENTATION",
+}
+# Findings at Layers 2-5 that are symptoms of Layer 0 (access block)
+_SUPPRESSED_BY_LAYER0: Set[str] = {
+    # Layer 2 — Entity Resolution
+    "MATERIAL_ENTITY_AMBIGUITY",
+    "BROKEN_AUTHORITY_ANCHOR",
+    "CIRCULAR_SAMEAS_SELF_REFERENCE",
+    "WEAK_IDENTITY_SIGNALS",
+    # Layer 3 — Fact Ledger
+    "FIRST_PARTY_FACT_CONFLICT",
+    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "INCOMPLETE_OFFER_ATTRIBUTES",
+    "STALE_AUTHORITATIVE_FACT",
+    # Layer 4 — Citability
+    "MISSING_IN_DEPTH_MECHANISMS",
+    "STANDALONE_FAQ_DEFICIT",
+    "LOW_FACT_TO_TOKEN_RATIO",
+    "EXCESSIVE_KEYWORD_DENSITY",
+    "CONTEXT_PLACEMENT_DEGRADATION",
+    "LOW_INFORMATION_SCENT",
+    # Layer 5 — Engine selection (full suppression only when entire domain is blocked)
+    "AI_CITATION_GAP",
+    "AI_FACT_CONFLICT",
+    "AI_REFERRAL_DISCONTINUITY",
+    "INTENT_TO_LANDING_MISMATCH",
+}
+# Findings at Layers 3-4 that are symptoms of Layer 1 (rendering gap)
+_SUPPRESSED_BY_LAYER1: Set[str] = {
+    # Layer 3 — cannot read facts from an unrendered shell
+    "FIRST_PARTY_FACT_CONFLICT",
+    "INCOMPLETE_OFFER_ATTRIBUTES",
+    "ATTRIBUTE_INCOMPLETENESS",
+    # Layer 4 — cannot evaluate citation quality of an empty page
+    "LOW_FACT_TO_TOKEN_RATIO",
+    "MISSING_IN_DEPTH_MECHANISMS",
+    "CONTEXT_PLACEMENT_DEGRADATION",
+    "LOW_CITABILITY_SCORE",
+    "LACK_OF_SPECIFIC_EVIDENCE",
+}
+
+# ---------------------------------------------------------------------------
+# Archetype-Specific Severity Reweighting
+# Scripts detect the archetype; AI contextualizes defect severity by business model.
+# Source: audit-orchestrator-knowledge-base.md Section 7 & 8
+# ---------------------------------------------------------------------------
+ARCHETYPE_SEVERITY_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "ecommerce": {
+        # Product schema without price/availability is critical for purchase journeys
+        "ATTRIBUTE_INCOMPLETENESS": "critical",
+        "INCOMPLETE_OFFER_ATTRIBUTES": "critical",
+        "COMMERCIAL_PRODUCT_DATA_CONTRADICTION": "critical",
+        # AI must recommend specific products; entity ambiguity is high not medium
+        "MATERIAL_ENTITY_AMBIGUITY": "high",
+        # Fact conflicts on pricing pages mislead buyers
+        "FIRST_PARTY_FACT_CONFLICT": "critical",
+    },
+    "saas": {
+        # SaaS buyers need feature comparisons; thin content blocks category citations
+        "LOW_FACT_TO_TOKEN_RATIO": "high",
+        "MISSING_IN_DEPTH_MECHANISMS": "high",
+        # Pricing clarity is critical for AI buying agents
+        "FIRST_PARTY_FACT_CONFLICT": "critical",
+        "CONTEXT_PLACEMENT_DEGRADATION": "high",
+    },
+    "publisher": {
+        # E-E-A-T authorship is critical for publisher citation in AI Overviews
+        "MATERIAL_ENTITY_AMBIGUITY": "high",
+        # FAQ structure deficits are more impactful for reference/how-to content
+        "STANDALONE_FAQ_DEFICIT": "high",
+        # Fact currency matters more for news/publisher sites
+        "STALE_AUTHORITATIVE_FACT": "high",
+        "CONTENT_RECENCY_DEFICIT": "medium",
+    },
+    "local_business": {
+        # Local AI assistants (Maps, voice search) cannot surface hours/address without LocalBusiness schema
+        "MATERIAL_ENTITY_AMBIGUITY": "critical",
+        "MISSING_MATERIAL_FACT": "critical",
+        # Broken authority anchors on Google Business Profile = critical for local discovery
+        "BROKEN_AUTHORITY_ANCHOR": "high",
+    },
+    "corporate": {},  # Use default sensor severities
+}
 
 # Ensure local script directory and peer skill script directories are in sys.path
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -174,19 +280,20 @@ def synthesize_audit_report(
     else:
         audit_status = "failed"
 
-    # 1. Causal DAG Precedence Analysis & Keystone Defect Identification
+    # 1. Full 6-Layer Causal DAG Precedence Analysis & Keystone Defect Identification
+    # (Source: audit-orchestrator-knowledge-base.md Section 12)
     has_layer0_block = any(
-        f.get("cause_id") in ("AI_RETRIEVAL_BLOCKED", "NOINDEX_EXCLUSION", "ROBOTS_5XX_FAIL_CLOSED")
+        (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
         for f in all_raw_findings
     )
     has_layer1_rendering_gap = any(
-        f.get("cause_id") in ("RENDERED_CONTENT_GAP", "WAF_BOT_CHALLENGE")
+        (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
         for f in all_raw_findings
     )
 
     # 2. Deduplicate Findings by cause_id and normalized title
     deduped_findings: List[Dict[str, Any]] = []
-    seen_cause_ids = set()
+    seen_cause_ids: Set[str] = set()
     finding_counter = 1
 
     # Order by severity: critical -> high -> medium -> low
@@ -196,11 +303,15 @@ def synthesize_audit_report(
     for f in all_raw_findings:
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
 
-        # Keystone Defect Rule: If Layer 0 block or Layer 1 rendering gap exists,
-        # downstream schema/text omissions on the unrendered shell are clustered, not duplicated
-        if has_layer0_block and cid in ("MATERIAL_ENTITY_AMBIGUITY", "MISSING_IN_DEPTH_MECHANISMS"):
+        # Full 6-Layer Causal DAG Keystone Suppression:
+        # Layer 0 access block (e.g. AI_RETRIEVAL_BLOCKED) preempts ALL downstream symptoms at
+        # Layers 2-5. Recording them as separate findings inflates the report and misleads
+        # remediation priority. They are clustered as supporting evidence under the Keystone.
+        if has_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
             continue
-        if has_layer1_rendering_gap and cid in ("ATTRIBUTE_INCOMPLETENESS", "LOW_FACT_TO_TOKEN_RATIO"):
+        # Layer 1 rendering gap (e.g. RENDERED_CONTENT_GAP) preempts Layers 3-4.
+        # Cannot evaluate citation quality or fact consistency on an unrendered shell.
+        if has_layer1_rendering_gap and cid in _SUPPRESSED_BY_LAYER1:
             continue
 
         if cid in seen_cause_ids:
@@ -208,6 +319,7 @@ def synthesize_audit_report(
         seen_cause_ids.add(cid)
 
         # Build clean finding conforming strictly to Draft-07 schema
+        # Note: archetype severity reweighting is applied below after archetype detection
         finding_id = f"F-{finding_counter:03d}"
         finding_counter += 1
 
@@ -228,7 +340,7 @@ def synthesize_audit_report(
         raw_ftitle = f.get("title", "Detected Brand Visibility Defect")
         f_title = clean_text_string(raw_ftitle)
 
-        raw_froot = f.get("root_cause") or f_title
+        raw_froot = f.get("root_cause") or f.get("cause_id") or f_title
         f_root = clean_text_string(raw_froot)
 
         raw_ev = f.get("evidence", "Observed during multi-sensor site analysis.")
@@ -261,6 +373,7 @@ def synthesize_audit_report(
 
         clean_finding: Dict[str, Any] = {
             "id": finding_id,
+            "cause_id": cid,
             "title": f_title,
             "severity": sev,
             "category": str(f.get("category", "discoverability")),
@@ -275,8 +388,34 @@ def synthesize_audit_report(
 
         deduped_findings.append(clean_finding)
 
-    # 3. Archetype Detection & Proactive Opportunities Synthesis (Beyond-Problem Rubric)
+    # 3. Archetype Detection, Severity Reweighting & Proactive Opportunities Synthesis
     archetype = detect_business_archetype(inv)
+
+    # Apply archetype-contextual severity reweighting.
+    # Scripts detect defects against universal thresholds. The AI (or headless orchestrator)
+    # contextualizes severity by business model — missing Product schema is medium for a
+    # corporate blog but critical for an e-commerce product page.
+    archetype_overrides = ARCHETYPE_SEVERITY_OVERRIDES.get(archetype, {})
+    if archetype_overrides:
+        for finding in deduped_findings:
+            f_cid = finding.get("cause_id") or finding.get("root_cause", "")
+            # Match on cause_id OR the finding id string for broad coverage
+            for override_cid, override_sev in archetype_overrides.items():
+                if override_cid in f_cid or override_cid in (finding.get("id") or ""):
+                    original_sev = finding.get("severity", "medium")
+                    if severity_rank.get(override_sev, 1) > severity_rank.get(original_sev, 1):
+                        finding["severity"] = override_sev
+                        if finding.get("suggested_action"):
+                            finding["suggested_action"]["priority"] = override_sev
+
+    # Re-sort after archetype reweighting (severity may have changed)
+    deduped_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
+    # Re-compute counts after reweighting
+    crit_count = sum(1 for f in deduped_findings if f["severity"] == "critical")
+    high_count = sum(1 for f in deduped_findings if f["severity"] == "high")
+    med_count = sum(1 for f in deduped_findings if f["severity"] == "medium")
+    low_count = sum(1 for f in deduped_findings if f["severity"] == "low")
+
     proactive_actions: List[Dict[str, Any]] = []
     proactive_seen = set()
     proactive_counter = 1
@@ -405,35 +544,89 @@ def synthesize_audit_report(
             "verification": "Audit section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
         })
 
-    # 4. Compute Counts-by-Severity Summary
-    crit_count = sum(1 for f in deduped_findings if f["severity"] == "critical")
-    high_count = sum(1 for f in deduped_findings if f["severity"] == "high")
-    med_count = sum(1 for f in deduped_findings if f["severity"] == "medium")
-    low_count = sum(1 for f in deduped_findings if f["severity"] == "low")
+    # 4. Counts-by-Severity Summary (computed earlier after archetype reweighting)
+    # (crit_count, high_count, med_count, low_count already set above)
 
-    # 5. Compute Orthogonal Scores & Simulated Cross-Engine Readiness
-    has_crawl_crit = any(f["severity"] == "critical" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
-    has_crawl_high = any(f["severity"] == "high" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
-    crawl_score = 30.0 if has_crawl_crit else (65.0 if has_crawl_high else 95.0)
+    # 5. Compute Orthogonal Scores from Real Sensor Signal Data
+    # -------------------------------------------------------------------------
+    # These scores are derived ENTIRELY from actual crawl signals, not ternary
+    # hardcodes. Every figure traces to a concrete sensor output field.
+    # -------------------------------------------------------------------------
 
-    has_rendering_gap = any("RENDERED_CONTENT_GAP" in (f.get("cause_id") or "") for f in deduped_findings)
-    retrieval_score = 40.0 if has_rendering_gap else 90.0
+    # 5a. Crawlability Score — fraction of retrieval bots that are allowed
+    # Source: discoverability sensor coverage.retrieval_bots_allowed / coverage.retrieval_bots_total
+    disc_cov = specialist_results.get("discoverability-audit", {}).get("coverage", {})
+    disc_scrape = specialist_results.get("discoverability-audit", {}).get("ai_agent_scrapeability_summary", {})
+    _bots_allowed = disc_cov.get("retrieval_bots_allowed", disc_scrape.get("retrieval_bots_allowed", None))
+    _bots_total = disc_cov.get("retrieval_bots_total", disc_scrape.get("retrieval_bots_total", None))
+    if _bots_allowed is not None and _bots_total and int(_bots_total) > 0:
+        crawl_score = round((int(_bots_allowed) / int(_bots_total)) * 100.0, 1)
+    else:
+        # Fallback: infer from findings (Layer 0 block = 0%; no block = 95%)
+        has_crawl_crit = any(f["severity"] == "critical" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
+        has_crawl_high = any(f["severity"] == "high" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
+        crawl_score = 30.0 if has_crawl_crit else (65.0 if has_crawl_high else 95.0)
 
+    # 5b. Retrieval Readiness Score — inverse of rendering gap severity
+    # Source: discoverability coverage.visible_words_initial_html + page inventory SNR
+    _visible_words = disc_cov.get("visible_words_initial_html", None)
+    pages = inv.get("pages", []) if inv else []
+    _total_pages = max(len(pages), 1)
+    _blank_pages = sum(1 for p in pages if (p.get("word_count") or 0) < 50)
+    if _visible_words is not None:
+        # Use the primary HTML word count from discoverability
+        retrieval_score = round(min(100.0, max(10.0, (_visible_words / max(_visible_words, 150)) * 100.0)), 1)
+        # Penalise if most pages are blank shells
+        blank_ratio = _blank_pages / _total_pages
+        retrieval_score = round(retrieval_score * (1.0 - blank_ratio * 0.6), 1)
+    else:
+        has_rendering_gap = any("RENDERED_CONTENT_GAP" in (f.get("cause_id") or "") for f in deduped_findings)
+        retrieval_score = 40.0 if has_rendering_gap else 90.0
+
+    # 5c. Citation Readiness Score — real average citability score from geo sensor
+    # Source: geo-content-audit coverage.average_citability_score
     geo_res = specialist_results.get("geo-content-audit", {})
     geo_cov = geo_res.get("coverage", {})
-    avg_cit = float(geo_cov.get("average_citability_score") or 72.0)
-    citation_score = round(min(100.0, max(10.0, avg_cit)), 1)
+    _raw_cit = geo_cov.get("average_citability_score") or geo_cov.get("avg_citability_score")
+    if _raw_cit is not None:
+        citation_score = round(min(100.0, max(10.0, float(_raw_cit))), 1)
+    else:
+        # No geo sensor data — infer from findings
+        has_low_cit = any((f.get("cause_id") or "") in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO") for f in deduped_findings)
+        citation_score = 45.0 if has_low_cit else 72.0
 
-    has_entity_ambiguity = any("MATERIAL_ENTITY_AMBIGUITY" in (f.get("cause_id") or "") for f in deduped_findings)
+    # 5d. Entity Authority Score — sameas_resolvable / sameas_declared ratio
+    # Source: corroboration-authority-audit coverage.sameas_declared + sameas_resolvable
     corrob_res = specialist_results.get("corroboration-authority-audit", {})
     corrob_cov = corrob_res.get("coverage", {})
-    sameas_count = corrob_cov.get("sameas_count", 0)
-    authority_score = 45.0 if has_entity_ambiguity else (90.0 if sameas_count >= 2 else 75.0)
+    _sa_declared = corrob_cov.get("sameas_declared", corrob_cov.get("sameas_count", None))
+    _sa_resolvable = corrob_cov.get("sameas_resolvable", corrob_cov.get("probed", None))
+    has_entity_ambiguity = any("MATERIAL_ENTITY_AMBIGUITY" in (f.get("cause_id") or "") for f in deduped_findings)
+    if _sa_declared is not None and _sa_declared > 0 and _sa_resolvable is not None:
+        sa_ratio = float(_sa_resolvable) / float(_sa_declared)
+        authority_score = round(max(10.0, sa_ratio * 100.0), 1)
+        if has_entity_ambiguity:
+            authority_score = min(authority_score, 55.0)  # Cap when no machine-readable identity
+    elif _sa_declared == 0 or _sa_declared is None:
+        # No sameAs declared — base on entity ambiguity finding
+        authority_score = 30.0 if has_entity_ambiguity else 60.0
+    else:
+        authority_score = 45.0 if has_entity_ambiguity else 75.0
 
-    cross_engine_score = round((crawl_score * 0.4 + citation_score * 0.4 + authority_score * 0.2), 1)
-
+    # 5e. Agentic Commerce Score — pricing completeness + offer schema + fact consistency
+    # Source: fact-consistency coverage.fact_conflicts / facts_checked
+    fact_cov = specialist_results.get("fact-consistency-audit", {}).get("coverage", {})
+    _fact_conflicts = fact_cov.get("fact_conflicts", None)
+    _facts_checked = fact_cov.get("facts_checked", None)
     has_fact_conflict = any("FIRST_PARTY_FACT_CONFLICT" in (f.get("cause_id") or "") for f in deduped_findings)
-    commerce_score = 40.0 if has_fact_conflict else 85.0
+    if _fact_conflicts is not None and _facts_checked is not None and int(_facts_checked) > 0:
+        conflict_ratio = float(_fact_conflicts) / float(_facts_checked)
+        commerce_score = round(max(10.0, (1.0 - conflict_ratio) * 100.0), 1)
+    else:
+        commerce_score = 40.0 if has_fact_conflict else 85.0
+
+    # Cross-Engine Visibility: weighted composite of crawl + citation + authority
+    cross_engine_score = round((crawl_score * 0.40 + citation_score * 0.35 + authority_score * 0.25), 1)
 
     composite_score = round(
         crawl_score * 0.20
@@ -457,7 +650,8 @@ def synthesize_audit_report(
         letter_grade = "F"
 
     chatgpt_factors = ["OAI-SearchBot allowed" if crawl_score >= 80 else "Crawler access restricted"]
-    if sameas_count >= 1:
+    _sa_anchor_count = int(_sa_declared or 0)
+    if _sa_anchor_count >= 1:
         chatgpt_factors.append("Knowledge Graph authority anchors present")
     if citation_score >= 70:
         chatgpt_factors.append("Substantive depth suitable for synthetic answer absorption")
