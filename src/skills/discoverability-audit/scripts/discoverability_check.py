@@ -26,6 +26,7 @@ from safe_fetch import safe_fetch
 AI_BOTS = [
     "OAI-SearchBot",
     "Claude-SearchBot",
+    "anthropic-ai",
     "PerplexityBot",
     "Claude-User",
     "Perplexity-User",
@@ -33,6 +34,7 @@ AI_BOTS = [
     "GPTBot",
     "ClaudeBot",
     "Applebot-Extended",
+    "Google-Extended",
     "CCBot",
 ]
 
@@ -46,6 +48,11 @@ CRAWLER_SEMANTICS = {
         "role": "retrieval",
         "platform": "Anthropic / Claude",
         "impact_desc": "Live web search and real-time grounding in Claude.",
+    },
+    "anthropic-ai": {
+        "role": "retrieval",
+        "platform": "Anthropic / Claude",
+        "impact_desc": "Anthropic live retrieval and user-directed web access.",
     },
     "PerplexityBot": {
         "role": "retrieval",
@@ -108,6 +115,16 @@ THIRD_PARTY_SCRIPT_PATTERNS = re.compile(
     r"cookiebot\.com|onetrust\.com|trustarc\.com|hubspot\.com|hs-scripts\.com|datadoghq)",
     re.IGNORECASE,
 )
+
+
+def is_valid_hreflang(code):
+    """Validate the language-region subset supported by HTML hreflang links."""
+    normalized = str(code or "").strip().lower()
+    if normalized == "x-default":
+        return True
+    if "_" in normalized or not re.fullmatch(r"[a-z]{2}(?:-[a-z]{2}|-\d{3})?", normalized):
+        return False
+    return not normalized.endswith("-uk")
 
 
 class Dom(HTMLParser):
@@ -420,11 +437,8 @@ def audit(base, domain, inv=None, state_file=None):
         invalid_langs = []
         for hl in dom.hreflangs:
             code = str(hl.get("lang", "")).lower().strip()
-            if code and code != "x-default":
-                parts = code.split("-")
-                lang = parts[0]
-                if lang in ("eng", "jp") or len(parts) > 1 and parts[1].upper() == "UK":
-                    invalid_langs.append(code)
+            if code and not is_valid_hreflang(code):
+                invalid_langs.append(code)
 
         if invalid_langs:
             findings.append(

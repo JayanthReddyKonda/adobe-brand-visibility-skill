@@ -9,6 +9,13 @@ import engagement_check
 
 
 class TestEngagement(unittest.TestCase):
+    def test_pricing_fact_matcher_handles_boundaries(self):
+        engine = engagement_check.SemanticIntentEngine(
+            os.path.join(script_dir, "../references")
+        )
+        required = ["tier_names", "billing_interval", "tier_prices", "signup_or_trial_cta"]
+        self.assertEqual(engine.check_facts_in_text("Pro plan: $49/mo. Start today", required), [])
+
     def test_no_h1(self):
         html = "<html><body><p>No H1 here</p></body></html>"
         findings, recs, _metrics = engagement_check.audit_page_engagement(html, "http://example.com/", "other")

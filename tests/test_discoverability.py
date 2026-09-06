@@ -1,11 +1,20 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, "src/skills/discoverability-audit/scripts")
+import discoverability_check
+
 
 class TestDiscoverabilityAudit(unittest.TestCase):
+    def test_invalid_hreflang_formats_are_flagged(self):
+        self.assertFalse(discoverability_check.is_valid_hreflang("en_US"))
+        self.assertFalse(discoverability_check.is_valid_hreflang("en-uk"))
+        self.assertTrue(discoverability_check.is_valid_hreflang("en-GB"))
+
     def setUp(self):
         self.script_path = "src/skills/discoverability-audit/scripts/discoverability_check.py"
         self.test_inv = os.path.join(tempfile.gettempdir(), "test_disc_inv.json")

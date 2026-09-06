@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import sys
 
 
@@ -49,6 +50,9 @@ def validate_type(instance, schema, path="root"):
     if "minLength" in schema and isinstance(instance, str) and len(instance) < schema["minLength"]:
         return f"{path}: String too short, expected at least {schema['minLength']} chars"
 
+    if "pattern" in schema and isinstance(instance, str) and not re.search(schema["pattern"], instance):
+        return f"{path}: String does not match required pattern"
+
     if isinstance(instance, dict):
         if "required" in schema:
             for req in schema["required"]:
@@ -64,6 +68,16 @@ def validate_type(instance, schema, path="root"):
                 return f"{path}: Additional property '{k}' not allowed"
 
     elif isinstance(instance, list):
+        if "minItems" in schema and len(instance) < schema["minItems"]:
+            return f"{path}: Too few items, expected at least {schema['minItems']}"
+        if "maxItems" in schema and len(instance) > schema["maxItems"]:
+            return f"{path}: Too many items, expected at most {schema['maxItems']}"
+        if schema.get("uniqueItems"):
+            try:
+                if len({json.dumps(item, sort_keys=True) for item in instance}) != len(instance):
+                    return f"{path}: Items must be unique"
+            except (TypeError, ValueError):
+                return f"{path}: Items cannot be checked for uniqueness"
         if "items" in schema:
             for i, item in enumerate(instance):
                 err = validate_type(item, schema["items"], path=f"{path}[{i}]")

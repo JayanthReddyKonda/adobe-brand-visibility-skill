@@ -171,33 +171,17 @@ class SemanticIntentEngine:
         text_lower = text.lower()
         missing = []
         for fact in required_facts:
-            # Heuristic mapping for facts
-            if fact == "tier_names":
-                if not re.search(
-                    r"(starter|pro|enterprise|basic|premium|free|standard|advanced|tier|plan)", text_lower
-                ):
-                    missing.append(fact)
-            elif fact == "billing_interval":
-                if not re.search(r" (month|year|annual|mo|yr|monthly|annually) ", text_lower):
-                    missing.append(fact)
-            elif fact == "tier_prices":
-                if not re.search(r"(\$|€|£|¥|\d+\.\d{2})", text_lower):
-                    missing.append(fact)
-            elif (
-                fact == "feature_matrix"
-                and not re.search(r" (feature|compare|include|matrix|custom) ", text_lower)
-                or fact == "signup_or_trial_cta"
-                and not re.search(r" (sign up|try|trial|get started|start|subscribe) ", text_lower)
-            ):
-                missing.append(fact)
-            elif fact == "product_name":
-                pass  # Already extracted via schema usually
-            elif (
-                fact == "availability"
-                and not re.search(r" (stock|sold out|available|backorder) ", text_lower)
-                or fact == "add_to_cart_or_buy_cta"
-                and not re.search(r" (add to cart|buy|purchase|checkout) ", text_lower)
-            ):
+            patterns = {
+                "tier_names": r"\b(starter|pro|enterprise|basic|premium|free|standard|advanced|tier|plan)\b",
+                "billing_interval": r"\b(month|year|annual|mo|yr|monthly|annually)\b",
+                "tier_prices": r"(?:\$|€|£|¥|\d+\.\d{2})",
+                "feature_matrix": r"\b(feature|compare|include|matrix|custom)\b",
+                "signup_or_trial_cta": r"\b(sign up|try|trial|get started|start|subscribe)\b",
+                "availability": r"\b(stock|sold out|available|backorder)\b",
+                "add_to_cart_or_buy_cta": r"\b(add to cart|buy|purchase|checkout)\b",
+            }
+            pattern = patterns.get(fact)
+            if pattern and not re.search(pattern, text_lower):
                 missing.append(fact)
         return missing
 

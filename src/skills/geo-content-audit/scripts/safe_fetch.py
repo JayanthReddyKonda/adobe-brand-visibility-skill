@@ -153,6 +153,10 @@ def safe_fetch(url, timeout=10, max_bytes=5 * 1024 * 1024, user_agent=None, meth
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return None, "", {}, f"Disallowed scheme: {parsed.scheme}"
+    if not parsed.hostname or parsed.username is not None or parsed.password is not None:
+        return None, "", {}, "Malformed URL: credentials and missing host are disallowed"
+    if max_bytes < 0:
+        return None, "", {}, "Invalid max_bytes: must be non-negative"
 
     opener = urllib.request.build_opener(SafeHTTPHandler(), SafeHTTPSHandler(), SafeRedirectHandler(max_redirects=5))
 
@@ -185,7 +189,7 @@ def safe_fetch(url, timeout=10, max_bytes=5 * 1024 * 1024, user_agent=None, meth
 
             return status, html, resp_headers, ""
     except urllib.error.HTTPError as e:
-        return e.code, "", {}, str(e)
+        return e.code, "", {k.lower(): v for k, v in e.headers.items()}, str(e)
     except Exception as e:
         return None, "", {}, str(e)
 
