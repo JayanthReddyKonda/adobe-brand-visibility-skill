@@ -14,6 +14,7 @@ import sys
 import time
 import urllib.robotparser
 import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -157,6 +158,89 @@ def classify_page(url, title=""):
     return "other", "low", logical_path, locale
 
 
+class CleanContentParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.skip_tags = {"script", "style", "noscript", "svg", "canvas", "nav", "header", "footer", "aside", "form"}
+        self.skip_depth = 0
+        self.lines = []
+        self.current_tag = None
+        self.has_main = False
+        self.has_article = False
+        self.has_header = False
+        self.has_nav = False
+        self.has_footer = False
+
+    def handle_starttag(self, tag, attrs):
+        t = tag.lower()
+        self.current_tag = t
+        if t in self.skip_tags:
+            self.skip_depth += 1
+        if t == "main":
+            self.has_main = True
+        elif t == "article":
+            self.has_article = True
+        elif t == "header":
+            self.has_header = True
+        elif t == "nav":
+            self.has_nav = True
+        elif t == "footer":
+            self.has_footer = True
+        elif t in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            self.lines.append("\n")
+
+    def handle_endtag(self, tag):
+        t = tag.lower()
+        if t in self.skip_tags and self.skip_depth > 0:
+            self.skip_depth -= 1
+        elif t in ("p", "div", "section", "article", "tr", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
+            self.lines.append("\n")
+        self.current_tag = None
+
+    def handle_data(self, data):
+        if self.skip_depth == 0:
+            txt = data.strip()
+            if txt:
+                self.lines.append(txt + " ")
+
+
+def extract_clean_content(html):
+    """Extract clean substantive text, calculate signal-to-noise ratio, and detect semantic tags for AI scrapers."""
+    if not html:
+        return {
+            "clean_text": "",
+            "clean_word_count": 0,
+            "snr": 0.0,
+            "has_main": False,
+            "has_article": False,
+            "has_header": False,
+            "has_nav": False,
+            "has_footer": False,
+        }
+    parser = CleanContentParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        pass
+    raw_text = "".join(parser.lines)
+    clean_text = re.sub(r"[ \t]+", " ", raw_text)
+    clean_text = re.sub(r"\n\s*\n+", "\n\n", clean_text).strip()
+    words = clean_text.split()
+    raw_len = len(html)
+    text_len = len(clean_text)
+    snr = round(text_len / max(raw_len, 1), 4)
+    return {
+        "clean_text": clean_text,
+        "clean_word_count": len(words),
+        "snr": snr,
+        "has_main": parser.has_main,
+        "has_article": parser.has_article,
+        "has_header": parser.has_header,
+        "has_nav": parser.has_nav,
+        "has_footer": parser.has_footer,
+    }
+
+
 def _visible_words(html):
     text = re.sub(r"<(script|style|noscript)\b[^>]*>.*?</\1>", " ", html or "", flags=re.DOTALL | re.IGNORECASE)
     text = re.sub(r"<[^>]+>", " ", text)
@@ -245,6 +329,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         }
 
     ptype, pconf, ptmpl, ploc = classify_page(base_url + "/", _extract_title(html))
+    clean_info = extract_clean_content(html)
     inv["pages"].append(
         {
             "url": base_url + "/",
@@ -256,7 +341,16 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             "logical_template": ptmpl,
             "locale": ploc,
             "title": _extract_title(html),
-            "word_count": _visible_words(html),
+            "word_count": clean_info["clean_word_count"] or _visible_words(html),
+            "clean_text": clean_info["clean_text"],
+            "snr": clean_info["snr"],
+            "semantic_landmarks": {
+                "has_main": clean_info["has_main"],
+                "has_article": clean_info["has_article"],
+                "has_header": clean_info["has_header"],
+                "has_nav": clean_info["has_nav"],
+                "has_footer": clean_info["has_footer"],
+            },
             "html": html,
             "headers": headers,
         }
@@ -284,7 +378,15 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         "snippet": (llms_txt[:400] if ll_status == 200 and llms_txt else None),
     }
 
-    # 2.2 Machine-Readable Pricing Manifest Discovery (/pricing.md)
+    # 2.2 llms-full.txt Discovery
+    llf_status, llms_full_txt, _, _ = safe_fetch(base_url + "/llms-full.txt", timeout=5, max_bytes=1024 * 1024)
+    inv["infrastructure"]["llms_full_txt"] = {
+        "status": llf_status,
+        "present": (llf_status == 200 and bool(llms_full_txt)),
+        "snippet": (llms_full_txt[:400] if llf_status == 200 and llms_full_txt else None),
+    }
+
+    # 2.3 Machine-Readable Pricing Manifest Discovery (/pricing.md)
     pm_status, pricing_md, _, _ = safe_fetch(base_url + "/pricing.md", timeout=5, max_bytes=512 * 1024)
     if pm_status != 200 or not pricing_md:
         pt_status, pt_txt, _, _ = safe_fetch(base_url + "/pricing.txt", timeout=5, max_bytes=512 * 1024)
@@ -400,6 +502,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         p_status, p_html, p_headers, _ = safe_fetch(u, timeout=8, max_bytes=2 * 1024 * 1024, deadline=deadline)
         if p_html and is_html_response(p_headers, p_html):
             pt, pconf, ptmpl, ploc = classify_page(u, _extract_title(p_html))
+            c_info = extract_clean_content(p_html)
             return {
                 "url": u,
                 "status": p_status,
@@ -410,7 +513,16 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
                 "logical_template": ptmpl,
                 "locale": ploc,
                 "title": _extract_title(p_html),
-                "word_count": _visible_words(p_html),
+                "word_count": c_info["clean_word_count"] or _visible_words(p_html),
+                "clean_text": c_info["clean_text"],
+                "snr": c_info["snr"],
+                "semantic_landmarks": {
+                    "has_main": c_info["has_main"],
+                    "has_article": c_info["has_article"],
+                    "has_header": c_info["has_header"],
+                    "has_nav": c_info["has_nav"],
+                    "has_footer": c_info["has_footer"],
+                },
                 "html": p_html,
                 "headers": p_headers,
             }

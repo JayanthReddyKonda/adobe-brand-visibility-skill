@@ -231,7 +231,7 @@ AI content visibility is measured across seven fine-grained dimensions (0–5 sc
 
 ---
 
-## 5. The Hedge Language Dictionary & Density Metric (from `geoskills/geo-fix-content`)
+## 5. The Hedge Language Dictionary & Density Metric
 
 ### Why Hedge Language Destroys AI Citations:
 - Hedged language ranks **3x lower** than confident assertions in AI citation selection.
@@ -270,7 +270,7 @@ $$\text{Hedge Density} = \frac{\text{Total Hedge Words}}{\text{Total Words}} \ti
 
 ---
 
-## 7. Multi-Platform Citation Dynamics & Query Fan-Out (from `claude-seo` & `geo-seo-claude`)
+## 7. Multi-Platform Citation Dynamics & Query Fan-Out
 
 ### 1. Cross-Platform Source Selection Divergence:
 Only **11% of domains** are cited by BOTH ChatGPT and Google AI Overviews for the same query. Each AI search engine employs different retrieval pipelines:

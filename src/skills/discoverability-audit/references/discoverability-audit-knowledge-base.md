@@ -277,7 +277,7 @@ Sitemap: https://example.com/sitemap.xml
 
 ---
 
-## 4. User-Triggered Fetchers vs. Autonomous Crawlers (from `claude-seo/seo-geo`)
+## 4. User-Triggered Fetchers vs. Autonomous Crawlers
 
 Understanding crawler behavior is critical for accurate audit diagnosis:
 

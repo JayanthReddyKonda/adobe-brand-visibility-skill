@@ -350,6 +350,10 @@ class GEODOMParser(HTMLParser):
         self.published_date = None
         self.modified_date = None
 
+    @property
+    def extracted_text(self):
+        return " ".join(self.text_blocks)
+
     def handle_starttag(self, tag, attrs):
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
         t = tag.lower()
@@ -557,7 +561,14 @@ def audit(base, domain, inv=None, state_file=None):
     if not html_pages:
         return {"status": "inconclusive", "findings": [], "recommendations": []}
 
-    target_pages = [p for p in html_pages if p.get("page_type") in ("product_detail", "article", "pricing", "about")]
+    target_pages = [
+        p
+        for p in html_pages
+        if p.get("page_type")
+        in ("product_detail", "product", "article", "pricing", "about", "documentation", "guide", "faq")
+    ]
+    if not target_pages:
+        target_pages = html_pages
     page_citability_map = {}
     page_improvement_plans: list[dict] = []
 

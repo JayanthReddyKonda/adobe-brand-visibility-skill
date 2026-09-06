@@ -28,11 +28,15 @@ AI_BOTS = [
     "Claude-SearchBot",
     "anthropic-ai",
     "PerplexityBot",
+    "Amazonbot",
+    "cohere-ai",
+    "Meta-ExternalAgent",
     "Claude-User",
     "Perplexity-User",
     "ChatGPT-User",
     "GPTBot",
     "ClaudeBot",
+    "Bytespider",
     "Applebot-Extended",
     "Google-Extended",
     "CCBot",
@@ -59,6 +63,21 @@ CRAWLER_SEMANTICS = {
         "platform": "Perplexity AI",
         "impact_desc": "Direct citation and source index for Perplexity AI answers.",
     },
+    "Amazonbot": {
+        "role": "retrieval",
+        "platform": "Amazon / Rufus",
+        "impact_desc": "E-commerce conversational search and product recommendation in Amazon Rufus.",
+    },
+    "cohere-ai": {
+        "role": "retrieval",
+        "platform": "Cohere / Coral",
+        "impact_desc": "Enterprise conversational search and RAG retrieval in Cohere.",
+    },
+    "Meta-ExternalAgent": {
+        "role": "retrieval",
+        "platform": "Meta AI",
+        "impact_desc": "Live web retrieval for Meta AI assistant and Llama models.",
+    },
     "Claude-User": {
         "role": "user_fetch",
         "platform": "Anthropic / Claude",
@@ -83,6 +102,11 @@ CRAWLER_SEMANTICS = {
         "role": "training",
         "platform": "Anthropic",
         "impact_desc": "Model training dataset collection for Claude foundation models.",
+    },
+    "Bytespider": {
+        "role": "training",
+        "platform": "ByteDance",
+        "impact_desc": "Model pre-training and offline dataset collection.",
     },
     "Google-Extended": {
         "role": "training",
@@ -144,6 +168,12 @@ class Dom(HTMLParser):
         self.paragraphs_count = 0
         self.in_body = False
         self.current_tag = None
+        self.has_main = False
+        self.has_article = False
+        self.has_header = False
+        self.has_nav = False
+        self.has_footer = False
+        self.has_aside = False
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -151,6 +181,18 @@ class Dom(HTMLParser):
         self.current_tag = t
         if t == "body":
             self.in_body = True
+        if t == "main":
+            self.has_main = True
+        elif t == "article":
+            self.has_article = True
+        elif t == "header":
+            self.has_header = True
+        elif t == "nav":
+            self.has_nav = True
+        elif t == "footer":
+            self.has_footer = True
+        elif t == "aside":
+            self.has_aside = True
         if self.in_body and t not in ("script", "style", "noscript", "link", "meta", "head"):
             self.body_content_elements += 1
         if t == "script":
@@ -621,6 +663,9 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
+    search_bots_total = len([b for b in AI_BOTS if CRAWLER_SEMANTICS.get(b, {}).get("role") == "retrieval"])
+    search_bots_allowed = 0 if (r_status is not None and 500 <= r_status <= 599) else search_bots_total
+
     if r_status == 200 and robots_txt:
         groups, _sitemaps = parse_robots(robots_txt)
         blocked_retrieval = []
@@ -694,7 +739,7 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
-    # 4. Proactive /llms.txt content manifest discovery
+    # 4. Proactive /llms.txt and /llms-full.txt content manifest discovery
     llms_info = inv.get("infrastructure", {}).get("llms_txt") if inv else None
     llms_present = False
     if llms_info:
@@ -702,6 +747,14 @@ def audit(base, domain, inv=None, state_file=None):
     else:
         status, l_body, _, _ = safe_fetch(f"{base}/llms.txt", timeout=5, max_bytes=512 * 1024)
         llms_present = status == 200 and bool(l_body)
+
+    llms_full_info = inv.get("infrastructure", {}).get("llms_full_txt") if inv else None
+    llms_full_present = False
+    if llms_full_info:
+        llms_full_present = llms_full_info.get("present", False)
+    else:
+        f_status, f_body, _, _ = safe_fetch(f"{base}/llms-full.txt", timeout=5, max_bytes=1024 * 1024)
+        llms_full_present = f_status == 200 and bool(f_body)
 
     if llms_present:
         observations.append(
@@ -711,19 +764,79 @@ def audit(base, domain, inv=None, state_file=None):
                 "role": "discovery",
             }
         )
+        if not llms_full_present:
+            recommendations.append(
+                {
+                    "id": "PROACTIVE.DISCOVERY.LLMS_FULL_TXT.001",
+                    "title": "Publish an /llms-full.txt comprehensive document for AI agents",
+                    "category": "discoverability",
+                    "summary": "The site publishes /llms.txt but lacks an /llms-full.txt comprehensive file. Under the llmstxt.org standard, /llms-full.txt concatenates complete documentation and product context into a single file, enabling zero-roundtrip agent ingestion without traversing individual links.",
+                    "priority": "low",
+                    "technical_fix": "Generate and serve /llms-full.txt compiling full markdown documentation for core features and commercial offerings.",
+                    "creative_fix": "Include executive summaries and full specifications for each major section in /llms-full.txt.",
+                    "verification": f"Verify {base}/llms-full.txt returns HTTP 200 with complete markdown text.",
+                }
+            )
     else:
         recommendations.append(
             {
                 "id": "PROACTIVE.DISCOVERY.LLMS_TXT.001",
-                "title": "Publish an /llms.txt markdown index for AI agents",
+                "title": "Publish an /llms.txt and /llms-full.txt markdown index for AI agents",
                 "category": "discoverability",
                 "summary": "The website does not publish an /llms.txt file. Modern generative search systems (ChatGPT, Perplexity, Claude) and agentic web workers prioritize /llms.txt to ingest clean, hierarchical markdown summaries without HTML parsing overhead.",
                 "priority": "low",
-                "technical_fix": "Publish an /llms.txt file at the root of the domain linking to key markdown documentation and product pages.",
+                "technical_fix": "Publish an /llms.txt file at the root of the domain linking to key markdown documentation and product pages, accompanied by /llms-full.txt.",
                 "creative_fix": "Write clear 1-line descriptions for each section in /llms.txt explaining the primary problem it solves.",
                 "verification": f"Verify {base}/llms.txt returns HTTP 200 with text/plain or text/markdown content.",
             }
         )
+
+    # 5. Semantic Landmarks Audit for AI Agent Scrapers
+    has_semantic_landmarks = dom.has_main or dom.has_article
+    if not has_semantic_landmarks and visible_words > 100:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.DISCOVERY.SEMANTIC_LANDMARKS.001",
+                "title": "Adopt semantic HTML tags (<main>, <article>) for AI scraper clarity",
+                "category": "discoverability",
+                "summary": "The page structure relies on generic <div> containers without semantic <main> or <article> landmark elements. AI scrapers (Readability, Trafilatura, Crawl4AI) rely on HTML5 semantic landmarks to cleanly isolate primary content from navigation chrome, headers, and footers.",
+                "priority": "low",
+                "technical_fix": "Wrap primary content inside a semantic <main> element and distinct articles or blog posts inside <article> tags.",
+                "creative_fix": "Structure page content with clear <header>, <main>, and <aside> regions.",
+                "verification": "Inspect DOM to confirm <main> and <article> tags enclose substantive content.",
+            }
+        )
+
+    # Compute AI Agent Scrapeability Score (0-100)
+    raw_html_len = len(html) if html else 0
+    clean_text_len = len(" ".join(dom.text))
+    snr = round(clean_text_len / max(raw_html_len, 1), 4)
+
+    # Component weights:
+    # 1. Retrieval bots allowed: 30 pts
+    retrieval_pts = 30.0 * (search_bots_allowed / max(search_bots_total, 1))
+    # 2. Raw HTML content available (not empty SPA shell): 25 pts
+    raw_content_pts = 25.0 if (visible_words >= 60 and not (dom.spa_root and visible_words < 50)) else 5.0
+    # 3. LLM manifests (llms.txt: 12 pts, llms-full.txt: 8 pts): 20 pts
+    manifest_pts = (12.0 if llms_present else 0.0) + (8.0 if llms_full_present else 0.0)
+    # 4. Semantic landmarks (<main>/<article>): 15 pts
+    landmark_pts = 15.0 if has_semantic_landmarks else 5.0
+    # 5. SNR token efficiency (SNR >= 0.10: 10 pts, >= 0.05: 5 pts): 10 pts
+    snr_pts = 10.0 if snr >= 0.10 else (5.0 if snr >= 0.05 else 2.0)
+
+    ai_agent_scrapeability_score = round(retrieval_pts + raw_content_pts + manifest_pts + landmark_pts + snr_pts, 1)
+
+    ai_agent_scrapeability_summary = {
+        "overall_scrapeability_score": ai_agent_scrapeability_score,
+        "llms_txt_present": llms_present,
+        "llms_full_txt_present": llms_full_present,
+        "retrieval_bots_allowed": search_bots_allowed,
+        "retrieval_bots_total": search_bots_total,
+        "retrieval_bots_allowed_ratio": round(search_bots_allowed / max(search_bots_total, 1), 3),
+        "raw_html_content_available": bool(visible_words >= 60),
+        "semantic_landmarks_present": has_semantic_landmarks,
+        "signal_to_noise_ratio": snr,
+    }
 
     if state_file:
         import tempfile as _tf
@@ -738,6 +851,7 @@ def audit(base, domain, inv=None, state_file=None):
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,
+        "ai_agent_scrapeability_summary": ai_agent_scrapeability_summary,
         "coverage": {
             "visible_words_initial_html": visible_words,
             "robots_txt_status": r_status,

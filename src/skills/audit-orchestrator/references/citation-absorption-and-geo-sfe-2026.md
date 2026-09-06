@@ -92,7 +92,7 @@ Content genres exhibit vastly divergent influence on generative engine answer ge
 ---
 
 ## 5. The 0–30 CITE Citability Score Rubric
-Adapted from `zilisrikle/geo-audit-skill`:
+The 0–30 CITE Citability Score Rubric defines the objective criteria for evaluating content readiness:
 
 | Code | Dimension | Points | Evaluation Metric |
 | :--- | :--- | :---: | :--- |

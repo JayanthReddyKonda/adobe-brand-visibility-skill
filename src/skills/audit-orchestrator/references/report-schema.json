@@ -375,6 +375,9 @@
     },
     "engagement_continuity_summary": {
       "type": "object"
+    },
+    "ai_agent_scrapeability_summary": {
+      "type": "object"
     }
   },
   "additionalProperties": false

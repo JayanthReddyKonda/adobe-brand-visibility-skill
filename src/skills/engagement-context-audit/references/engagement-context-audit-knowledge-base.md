@@ -208,7 +208,7 @@ Derived from `agent-friendly-pages` and web.dev criteria:
 
 ---
 
-## 6. Search Experience Optimization (SXO) & Value-Driven CTAs (from `claude-seo/seo-sxo` & `marketingskills/cro`)
+## 6. Search Experience Optimization (SXO) & Value-Driven CTAs
 
 ### SXO Core Principle:
 A page can achieve a 95/100 technical SEO score and still fail completely in AI search and visitor retention if there is a **page-type intent mismatch**:
