@@ -263,6 +263,51 @@ class TestGeoContentAudit(unittest.TestCase):
         rec_ids = [r.get("id") for r in data.get("recommendations", [])]
         self.assertIn("PROACTIVE.GEO.BEYOND_FAQ_FORMAT.001", rec_ids)
 
+    def test_page_improvement_plans_structure_and_epistemic_boundaries(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/overview",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "article",
+                    "html": "<html><body><h1>Overview</h1><p>Our software delivers excellent results for modern development workflows and scalable platforms.</p></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script_path, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        self.assertIn("page_improvement_plans", data)
+        plans = data["page_improvement_plans"]
+        self.assertGreaterEqual(len(plans), 1)
+
+        plan = plans[0]
+        self.assertEqual(plan["url"], "https://testbrand.com/overview")
+        self.assertIn("citability_score", plan)
+        self.assertIn("gap_analysis", plan)
+        self.assertIn("prescribed_actions", plan)
+        actions = plan["prescribed_actions"]
+        self.assertIn("immediate_structural_actions", actions)
+        self.assertIn("textual_modifications", actions)
+        self.assertIn("passage_chunking_plan", actions)
+
+        # Verify epistemic boundaries
+        self.assertIn("epistemic_qualification", plan)
+        qual = plan["epistemic_qualification"]
+        self.assertIn("heuristic", qual.lower())
+        self.assertTrue(
+            "not live search engine citation logs" in qual or "not live engine citation logs" in qual or "guarantee" in qual.lower()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

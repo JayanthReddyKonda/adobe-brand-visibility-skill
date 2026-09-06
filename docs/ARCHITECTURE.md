@@ -124,3 +124,39 @@ The audit suite adheres to a zero-trust model when fetching external domains:
 - **IPv4-Mapped IPv6 Protection:** Disallows `::ffff:127.0.0.1` and encoded hexadecimal loopbacks.
 - **Payload Limits:** Maximum fetch size capped at 2 MiB to prevent memory exhaustion / decompression bombs.
 - **Timeout Bounds:** Bounded socket timeouts (5–10s) prevent hang conditions.
+
+---
+
+## 6. Grounded Verification & Epistemic Boundaries
+
+To prevent misleading claims and preserve scientific integrity, the audit implements strict boundaries between static heuristics, declared metadata, and empirical evidence:
+
+### 6.1 Explicit Evidence Classes (Authority & Corroboration)
+The audit segregates identity and backlink evidence into two non-overlapping classes:
+1. `declared_identity_nodes`: Outbound identity assertions declared by the site itself via Schema.org `sameAs` (e.g., Wikidata, Wikipedia, LinkedIn, X, Crunchbase). Verifies that these identity endpoints are live (HTTP 200) and resolve to authoritative third-party knowledge graphs.
+2. `verified_candidate_backlinks`: Inbound citations from external third-party referring pages to the audited domain, verified via bounded, SSRF-safe HTTP probing.
+
+> **Common Crawl CDX Technical Reality**: The Common Crawl CDX API indexes *crawled URLs*, timestamps, byte offsets, and MIME types. It does **not** index an inverted link graph (which URL links to which target). Truthful backlink discovery from Common Crawl requires petabytes of WARC graph extraction. The audit enforces an honest **bounded candidate backlink verification contract** (`--candidate-backlinks`) rather than feigning instant web-wide discovery.
+
+### 6.2 Bounded Candidate Backlink Verification Contract
+- **Input Contract:** Takes candidate referring URLs via `--candidate-backlinks "url1,url2"` or newline-delimited file.
+- **SSRF Safe:** Strict IP resolution check against RFC 1918, loopbacks, link-local metadata addresses (`169.254.169.254`), and IPv6 private blocks prior to socket connection.
+- **Resource Bounds:** Capped at 10 candidate URLs per audit, 5.0-second socket timeout, and 512 KiB streaming limit per response body.
+- **Classification:** Categorizes referring domains by type (`academic_edu`, `government_gov`, `industry_news`, `standard_web`).
+
+### 6.3 Dual-Track Engagement Auditing (Analytics Ingestion)
+The audit separates static UX proxies from observed engagement outcomes:
+- **Static UX Proxies:** Heuristic signals evaluated from raw HTML (H1 alignment, word count, CTA reachability in first 3 interactive elements, internal navigation scent).
+- **Observed Engagement Outcomes:** Optional empirical ingestion via `--analytics <file.csv|file.json|inline>` containing `{route, ai_referral_sessions, bounce_rate, avg_dwell_time_seconds, primary_referrer}`.
+- **Empirical Corroboration:** When analytics show bounce rate $\ge 60\%$ and dwell time $< 30$s, static warnings are corroborated and elevated to `AI_REFERRAL_DISCONTINUITY` defects.
+- **Heuristic Mitigation:** When analytics confirm healthy visitor retention (bounce $\le 35\%$, dwell $\ge 60$s), static heuristic defects are downgraded or suppressed with notes that empirical performance is satisfactory.
+- **Heuristic-Only Limitation:** In the absence of analytics, reports explicitly declare findings as *unverified static UX proxies* that have not been calibrated against real user telemetry.
+
+### 6.4 Deterministic Page-Level GEO Content Improvement Plans
+Derived algorithmically from the 9 Princeton KDD 2024 / AutoGEO citability dimensions in `geo_content_check.py`:
+- **Gap Analysis:** Identifies specific deficits on each audited page across causal mechanisms, statistical evidence, passage chunking, semantic tables, BLUF placement, hedge density, and quotation authority.
+- **Structural Actions:** Actionable blueprints for adding responsive comparison tables, step-by-step ordered lists, and Q&A blocks with FAQPage JSON-LD.
+- **Textual Modifications:** Prescriptive guidance to inject causal conjunctions (`because`, `therefore`, `enables`) and convert vague assertions into quantified metrics.
+- **120–180 Word Passage Chunking Plan:** Reorganizes body content into standalone, self-contained semantic passages optimized for RAG chunk extraction.
+- **Epistemic Qualification:** Every plan explicitly states that recommendations are static heuristic optimizations grounded in empirical GEO research, **not** live citation log measurements or guarantees of search engine ranking.
+

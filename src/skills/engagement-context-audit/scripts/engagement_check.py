@@ -404,6 +404,107 @@ def infer_site_type(html_pages):
     return best_match, destinations.get(best_match, ["products", "services", "pricing", "about", "contact"])
 
 
+def parse_analytics_data(arg_val, inv=None):
+    """
+    Parse optional first-party analytics ingestion.
+    Supports file path (JSON or CSV), raw JSON string, or dict/list inside inventory.
+    Returns: dict mapping normalized path/url -> metrics dict.
+    """
+    raw_data = None
+    if arg_val:
+        if isinstance(arg_val, (dict, list)):
+            raw_data = arg_val
+        elif os.path.exists(str(arg_val)):
+            try:
+                with open(str(arg_val), "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                try:
+                    raw_data = json.loads(content)
+                except json.JSONDecodeError:
+                    import csv
+                    import io
+
+                    reader = csv.DictReader(io.StringIO(content))
+                    raw_data = list(reader)
+            except Exception:
+                raw_data = None
+        else:
+            try:
+                raw_data = json.loads(arg_val)
+            except Exception:
+                raw_data = None
+    elif inv and isinstance(inv, dict):
+        raw_data = inv.get("analytics")
+
+    if not raw_data:
+        return None
+
+    page_metrics_map = {}
+    records = []
+    if isinstance(raw_data, dict):
+        if "pages" in raw_data and isinstance(raw_data["pages"], list):
+            records = raw_data["pages"]
+        else:
+            for k, v in raw_data.items():
+                if isinstance(v, dict):
+                    v["url"] = v.get("url", k)
+                    records.append(v)
+    elif isinstance(raw_data, list):
+        records = raw_data
+
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        raw_url = rec.get("url", rec.get("path", rec.get("route", "")))
+        if not raw_url:
+            continue
+        parsed = urlparse(raw_url)
+        norm_key = parsed.path.rstrip("/").lower() or "/"
+
+        def _to_float(val, is_pct=False):
+            if val is None or val == "":
+                return None
+            if isinstance(val, (int, float)):
+                f = float(val)
+                return f / 100.0 if (is_pct and f > 1.0) else f
+            s = str(val).strip().rstrip("%")
+            try:
+                f = float(s)
+                return f / 100.0 if (is_pct and f > 1.0) else f
+            except ValueError:
+                return None
+
+        bounce_rate = _to_float(rec.get("bounce_rate", rec.get("bounce")), is_pct=True)
+        avg_dwell = _to_float(
+            rec.get(
+                "avg_time_on_page_seconds",
+                rec.get("avg_dwell_time_seconds", rec.get("dwell_time_seconds", rec.get("time_on_page"))),
+            )
+        )
+        scroll_depth = _to_float(rec.get("scroll_depth_pct", rec.get("scroll_depth")), is_pct=False)
+        conversion_rate = _to_float(rec.get("conversion_rate", rec.get("cvr")), is_pct=True)
+        ai_bounce = _to_float(rec.get("ai_referral_bounce_rate", rec.get("ai_bounce_rate")), is_pct=True)
+        organic_bounce = _to_float(
+            rec.get("organic_bounce_rate", rec.get("organic_search_bounce_rate")), is_pct=True
+        )
+        sessions = int(rec.get("sessions", rec.get("pageviews", 0)) or 0)
+
+        entry = {
+            "url": raw_url,
+            "bounce_rate": bounce_rate,
+            "avg_dwell_seconds": avg_dwell,
+            "scroll_depth_pct": scroll_depth,
+            "conversion_rate": conversion_rate,
+            "ai_referral_bounce_rate": ai_bounce,
+            "organic_bounce_rate": organic_bounce,
+            "sessions": sessions,
+        }
+        page_metrics_map[norm_key] = entry
+        page_metrics_map[raw_url.lower()] = entry
+
+    return page_metrics_map
+
+
 def audit_page_engagement(html_content, url, page_type="other", state=None):
     state = state or {}
     findings = []
@@ -563,7 +664,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     )
 
 
-def audit(base, domain, inv=None, state_file=None):
+def audit(base, domain, inv=None, state_file=None, analytics=None):
     if state_file and os.path.exists(state_file):
         try:
             with open(state_file, "r") as f:
@@ -574,6 +675,8 @@ def audit(base, domain, inv=None, state_file=None):
     recommendations = []
     observations = []
     page_metrics = []
+
+    analytics_map = parse_analytics_data(analytics, inv=inv)
 
     html_pages = []
     if inv is not None:
@@ -596,21 +699,103 @@ def audit(base, domain, inv=None, state_file=None):
             html_pages.append({"url": base + "/", "html": html, "page_type": "homepage"})
 
     site_type = infer_site_type(html_pages)[0]
+
+    corroborated_findings_count = 0
+    mitigated_findings_count = 0
+    pages_with_analytics = 0
+    observed_bounces: list[float] = []
+    observed_dwells: list[float] = []
+
     for p in html_pages:
         p_findings, p_recs, p_data = audit_page_engagement(
             p["html"],
             p["url"],
             page_type=p.get("page_type", "other"),
         )
+
+        p_url = p.get("url", "")
+        path_key = urlparse(p_url).path.rstrip("/").lower() or "/"
+        p_analytics = None
+        if analytics_map:
+            p_analytics = analytics_map.get(p_url.lower()) or analytics_map.get(path_key)
+
+        if p_analytics:
+            pages_with_analytics += 1
+            b_rate = p_analytics.get("bounce_rate")
+            d_time = p_analytics.get("avg_dwell_seconds")
+            ai_bounce = p_analytics.get("ai_referral_bounce_rate")
+            org_bounce = p_analytics.get("organic_bounce_rate")
+
+            if b_rate is not None:
+                observed_bounces.append(b_rate)
+            if d_time is not None:
+                observed_dwells.append(d_time)
+
+            # 1. Empirical Corroboration of Static Findings
+            if b_rate is not None and (b_rate >= 0.60 or (d_time is not None and d_time <= 20)):
+                for f in p_findings:
+                    if f.get("category") == "engagement":
+                        f["confidence"] = "high"
+                        f["severity"] = "high"
+                        f["evidence"] = (
+                            f"{f.get('evidence', '')} [Empirically Corroborated: First-party analytics records "
+                            f"{b_rate * 100:.1f}% bounce rate and {d_time or 'N/A'}s dwell time, proving layout friction causes visitor bounce.]"
+                        )
+                        corroborated_findings_count += 1
+
+            # 2. Heuristic Mitigation (Observed Retention is Healthy)
+            elif b_rate is not None and b_rate <= 0.35 and (d_time is not None and d_time >= 60):
+                for f in p_findings:
+                    if f.get("category") == "engagement":
+                        f["severity"] = "low"
+                        f["evidence"] = (
+                            f"{f.get('evidence', '')} [Mitigated by Analytics: Observed visitor retention is healthy "
+                            f"({b_rate * 100:.1f}% bounce, {d_time}s dwell); static heuristic warning is lowered in priority.]"
+                        )
+                        mitigated_findings_count += 1
+
+            # 3. AI Referral Discontinuity (Citation expectation mismatch)
+            if ai_bounce is not None:
+                baseline_bounce = org_bounce if org_bounce is not None else 0.40
+                if ai_bounce - baseline_bounce >= 0.25:
+                    p_findings.append(
+                        {
+                            "title": f"AI search referral bounce rate severely diverges from organic baseline ({p_url})",
+                            "severity": "high",
+                            "category": "engagement",
+                            "cause_family": "EXPERIENCE.CONTINUITY",
+                            "id": "AI_REFERRAL_DISCONTINUITY",
+                            "cause_id": "AI_REFERRAL_DISCONTINUITY",
+                            "confidence": "high",
+                            "root_cause": (
+                                f"Observed AI referral traffic exhibits a {ai_bounce * 100:.1f}% bounce rate compared to a "
+                                f"{baseline_bounce * 100:.1f}% organic search baseline. Visitors referred from generative AI answers "
+                                f"experience post-citation orientation shock because cited answers are not instantly anchored in the viewport."
+                            ),
+                            "evidence": (
+                                f"First-party analytics for {p_url} reveals AI referral bounce rate of {ai_bounce * 100:.1f}% "
+                                f"versus {baseline_bounce * 100:.1f}% organic baseline (+{(ai_bounce - baseline_bounce) * 100:.1f}% gap)."
+                            ),
+                            "suggested_action": {
+                                "summary": "Anchor cited AI query propositions in hero section and place prominent continuation CTA above the fold.",
+                                "priority": "high",
+                                "technical_fix": "Add an above-the-fold callout box verifying the specific product/service claims cited by AI assistants.",
+                                "creative_fix": "Align hero H1 and introductory sentence directly with the citation query intent.",
+                                "verification": "Monitor AI referral cohort bounce rate over 14 days post-remediation.",
+                            },
+                        }
+                    )
+
         findings.extend(p_findings)
         recommendations.extend(p_recs)
         page_metrics.append(p_data)
 
     # 6. AI Buying Agent Readiness: Machine-Readable Pricing Manifest (/pricing.md)
-    pricing_info = inv.get("infrastructure", {}).get("pricing_manifest") if inv else None
     pricing_present = False
-    if pricing_info:
-        pricing_present = pricing_info.get("present", False)
+    if inv is not None:
+        pricing_info = inv.get("infrastructure", {}).get("pricing_manifest")
+        if pricing_info and isinstance(pricing_info, dict):
+            pricing_present = pricing_info.get("present", False)
     else:
         status_pm, p_body, _, _ = safe_fetch(f"{base}/pricing.md", timeout=5, max_bytes=512 * 1024)
         if status_pm == 200 and bool(p_body):
@@ -649,8 +834,32 @@ def audit(base, domain, inv=None, state_file=None):
             "error": f"could not retrieve HTML content from {base}",
         }
 
+    mode = "analytics_augmented" if analytics_map else "heuristic_only"
+    avg_bounce = round(sum(observed_bounces) / len(observed_bounces), 3) if observed_bounces else None
+    avg_dwell = round(sum(observed_dwells) / len(observed_dwells), 1) if observed_dwells else None
+
+    analytics_summary = {
+        "mode": mode,
+        "first_party_analytics_provided": bool(analytics_map),
+        "pages_with_analytics": pages_with_analytics,
+        "average_observed_bounce_rate": avg_bounce,
+        "average_observed_dwell_seconds": avg_dwell,
+        "corroborated_findings_count": corroborated_findings_count,
+        "mitigated_findings_count": mitigated_findings_count,
+    }
+
+    limitations = [
+        "Engagement and orientation analysis is based on static HTML layout semantics; dynamic client-rendered overlays were not evaluated."
+    ]
+    if mode == "heuristic_only":
+        limitations.append(
+            "Engagement evaluation operated in heuristic-only mode based on static HTML layout proxies (heading hierarchy, CTA placement, information scent). First-party behavioral analytics (bounce rates, dwell times, scroll depths, AI-referral cohort drop-offs) were not provided. Static proxies indicate structural risks, not observed visitor drop-off."
+        )
+
     return {
         "status": "ok",
+        "engagement_mode": mode,
+        "analytics_summary": analytics_summary,
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,
@@ -664,10 +873,9 @@ def audit(base, domain, inv=None, state_file=None):
             "pages_with_navigation": sum(
                 1 for pm in page_metrics if pm.get("navigation_links_found", pm.get("anchor_links_found", 0)) > 0
             ),
+            "pages_with_analytics": pages_with_analytics,
         },
-        "limitations": [
-            "Engagement and orientation analysis is based on static HTML layout semantics; dynamic client-rendered overlays were not evaluated."
-        ],
+        "limitations": limitations,
     }
 
 
@@ -678,6 +886,10 @@ def main():
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
     parser.add_argument("--state", help="Path to global state JSON")
+    parser.add_argument(
+        "--analytics",
+        help="Path to first-party analytics JSON/CSV file or JSON string",
+    )
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -692,7 +904,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, inv=inv, state_file=args.state)
+    res = audit(base, p.netloc, inv=inv, state_file=args.state, analytics=args.analytics)
     print(json.dumps(res, indent=2))
 
 

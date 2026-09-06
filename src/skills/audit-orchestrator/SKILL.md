@@ -164,10 +164,10 @@ python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py \
 **Step 7: Authority & SameAs Corroboration Audit**
 ```bash
 python3 skills/corroboration-authority-audit/scripts/corroboration_check.py \
-  --site https://example.com --inventory inv.json --format json
+  --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
 ```
 
-**Step 9: Generative Engine Optimization (GEO) Audit**
+**Step 8: Generative Engine Optimization (GEO) Audit**
 ```bash
 python3 skills/geo-content-audit/scripts/geo_content_check.py \
   --site https://example.com --inventory inv.json --format json
@@ -176,7 +176,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py \
 **Step 9: Engagement & Context Continuity Audit**
 ```bash
 python3 skills/engagement-context-audit/scripts/engagement_check.py \
-  --site https://example.com --inventory inv.json --format json
+  --site https://example.com --inventory inv.json --analytics analytics.json --format json
 ```
 
 ---
@@ -231,6 +231,15 @@ Now apply the rules from `audit-orchestrator-knowledge-base.md` to reason over a
    - **Google AI Overviews (Gemini):** Traditional SEO gateway (top 10 correlation), table extractability, direct 40–60 word answer leads, and query fan-out topical clusters.
    - **ChatGPT Search (Bing):** Wikipedia/Wikidata entity grounding (47.9% share), comprehensive 2000+ word deep guides, and autonomous buying agent manifests (`/pricing.md`).
    - **Perplexity AI:** Community consensus validation (Reddit 46.7%), recency (<3 months 3x boost), and multi-source corroboration.
+
+13. **Two Explicit Authority Evidence Classes (`evidence_classes`):**
+    Distinguish `declared_identity_nodes` (outbound `sameAs` entity declarations) from `verified_candidate_backlinks` (inbound third-party links verified via bounded SSRF-safe prober). Explicitly acknowledge that web-wide backlink discovery cannot be performed truthfully from URL-only indexes (such as Common Crawl CDX).
+
+14. **First-Party Analytics Ingestion & Dual-Track Evaluation (`analytics_summary`):**
+    When first-party analytics are provided, cross-correlate static UX proxies with observed visitor retention. Escalate empirically corroborated defects, mitigate false alarms when observed engagement is healthy, and detect `AI_REFERRAL_DISCONTINUITY`. If omitted, maintain heuristic-only mode with clear limitations.
+
+15. **Deterministic Page-Level Content Improvement Plans (`page_improvement_plans`):**
+    Synthesize deterministic, page-level improvement plans derived from the 9 Princeton & AutoGEO citability dimensions, complete with gap analysis, prioritized structural/textual actions, and the mandatory epistemic qualification.
 
 **Step 11: Calculate Summary Metrics & Scoring Model**
 

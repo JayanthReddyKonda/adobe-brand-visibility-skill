@@ -82,7 +82,115 @@ def extract_sameas_links(html):
     return sorted(links)
 
 
-def audit(base, domain, inv=None, state_file=None):
+class InboundLinkExtractor(HTMLParser):
+    """Extract inbound hyperlinks pointing to target domain, along with anchor text and rel attributes."""
+
+    def __init__(self, target_domain: str):
+        super().__init__()
+        self.target_domain = target_domain.lower().replace("www.", "")
+        self.found_links: list[dict] = []
+        self._current_tag: str | None = None
+        self._current_href: str | None = None
+        self._current_rel: str = ""
+        self._current_text: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "a":
+            attr_dict = {k.lower(): (v or "") for k, v in attrs}
+            href = attr_dict.get("href", "").strip()
+            if href:
+                self._current_tag = "a"
+                self._current_href = href
+                self._current_rel = attr_dict.get("rel", "").lower()
+                self._current_text = []
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "a" and self._current_tag == "a":
+            anchor_text = " ".join("".join(self._current_text).split())
+            href = self._current_href or ""
+            parsed_href = urlparse(href)
+            href_netloc = parsed_href.netloc.lower().replace("www.", "")
+            if href_netloc == self.target_domain or href_netloc.endswith("." + self.target_domain):
+                is_dofollow = not any(r in self._current_rel for r in ["nofollow", "ugc", "sponsored"])
+                self.found_links.append(
+                    {
+                        "href": href,
+                        "anchor_text": anchor_text,
+                        "rel": self._current_rel,
+                        "is_dofollow": is_dofollow,
+                    }
+                )
+            self._current_tag = None
+            self._current_href = None
+            self._current_rel = ""
+            self._current_text = []
+
+    def handle_data(self, data):
+        if self._current_tag == "a":
+            self._current_text.append(data)
+
+
+def classify_referring_domain(url: str) -> str:
+    """Classify the referring source archetype for candidate backlinks."""
+    netloc = urlparse(url).netloc.lower()
+    if any(d in netloc for d in ["wikipedia.org", "wikidata.org"]):
+        return "knowledge_graph"
+    if any(d in netloc for d in ["nytimes.com", "techcrunch.com", "forbes.com", "wsj.com", "wired.com", "theverge.com", "bloomberg.com"]):
+        return "editorial_news"
+    if any(d in netloc for d in ["reddit.com", "news.ycombinator.com", "quora.com", "stackoverflow.com"]):
+        return "community_forum"
+    if any(d in netloc for d in ["github.com", "linkedin.com", "twitter.com", "x.com", "youtube.com"]):
+        return "social_platform"
+    if any(d in netloc for d in ["g2.com", "trustpilot.com", "capterra.com", "crunchbase.com"]):
+        return "review_directory"
+    return "general_web"
+
+
+def parse_candidate_backlinks(arg_val, inv=None):
+    """Parse candidate backlinks from CLI argument (file/JSON/CSV) or inventory."""
+    candidates = []
+    if arg_val:
+        if isinstance(arg_val, list):
+            candidates = arg_val
+        elif os.path.exists(str(arg_val)):
+            try:
+                with open(str(arg_val), "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                try:
+                    data = json.loads(content)
+                    if isinstance(data, list):
+                        candidates = data
+                    elif isinstance(data, dict):
+                        candidates = data.get("candidate_backlinks", data.get("backlinks", []))
+                except json.JSONDecodeError:
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            candidates.append(line)
+            except Exception:
+                candidates = []
+        else:
+            try:
+                data = json.loads(arg_val)
+                if isinstance(data, list):
+                    candidates = data
+                elif isinstance(data, dict):
+                    candidates = data.get("candidate_backlinks", data.get("backlinks", []))
+            except Exception:
+                candidates = [u.strip() for u in str(arg_val).split(",") if u.strip().startswith("http")]
+    elif inv and isinstance(inv, dict):
+        candidates = inv.get("candidate_backlinks", inv.get("backlinks", []))
+
+    clean_candidates = []
+    for c in candidates:
+        if isinstance(c, str) and c.strip().startswith("http"):
+            clean_candidates.append({"source_url": c.strip()})
+        elif isinstance(c, dict) and c.get("source_url"):
+            clean_candidates.append(c)
+    return clean_candidates
+
+
+def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
     findings = []
     recommendations = []
     observations = []
@@ -133,7 +241,7 @@ def audit(base, domain, inv=None, state_file=None):
     if title_match:
         brand_name = title_match.group(1).split("|")[0].replace(" - ", "|").replace(" | ", "|").split("|")[0].strip()
 
-    # 3. Check declared authority links and perform Bounded Claim Corroboration
+    # 3. Check declared identity nodes (sameAs)
     if not sameas_urls:
         recommendations.append(
             {
@@ -143,7 +251,6 @@ def audit(base, domain, inv=None, state_file=None):
                 "suggested_action": "Add sameAs URLs to Organization JSON-LD.",
             }
         )
-        return {"status": "ok", "findings": findings, "recommendations": recommendations, "observations": observations}
 
     # 3.1 Classify sameAs URLs: Separate internal mirror domain clusters from genuine external authorities
     target_sld = extract_sld(domain)
@@ -338,14 +445,176 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
+    # 4. Bounded Candidate Backlinks Verification
+    candidate_list = parse_candidate_backlinks(candidate_backlinks, inv=inv)
+    backlink_results = []
+    broken_backlinks = []
+    missing_backlinks = []
+    intact_backlinks = []
+
+    if candidate_list:
+        # Bounded execution: max 10 candidates to respect latency budget
+        for item in candidate_list[:10]:
+            source_url = item.get("source_url") if isinstance(item, dict) else str(item)
+            if not source_url or not source_url.startswith("http"):
+                continue
+
+            expected_target = item.get("expected_target") if isinstance(item, dict) else None
+            domain_archetype = classify_referring_domain(source_url)
+
+            # SSRF-safe probe with 5s timeout and 512 KiB limit
+            s_status, s_html, _, s_err = safe_fetch(source_url, timeout=5, max_bytes=512 * 1024, method="GET")
+
+            if s_status != 200 or not s_html:
+                backlink_results.append(
+                    {
+                        "source_url": source_url,
+                        "domain_archetype": domain_archetype,
+                        "status": "source_unreachable",
+                        "http_status": s_status,
+                        "error": s_err or f"HTTP {s_status}",
+                        "inbound_links_found": 0,
+                        "is_dofollow": False,
+                    }
+                )
+                broken_backlinks.append(f"{source_url} ({s_err or f'HTTP {s_status}'})")
+                continue
+
+            link_parser = InboundLinkExtractor(domain)
+            try:
+                link_parser.feed(s_html)
+            except Exception:
+                pass
+
+            matching_links = link_parser.found_links
+            if matching_links:
+                # If specific target was expected, verify path match
+                target_matched = True
+                if expected_target:
+                    exp_parsed = urlparse(expected_target)
+                    target_matched = any(
+                        urlparse(ml["href"]).path.rstrip("/") == exp_parsed.path.rstrip("/")
+                        for ml in matching_links
+                    )
+
+                status_code = "verified_intact" if target_matched else "target_mismatch"
+                primary_link = matching_links[0]
+                backlink_results.append(
+                    {
+                        "source_url": source_url,
+                        "domain_archetype": domain_archetype,
+                        "status": status_code,
+                        "http_status": 200,
+                        "inbound_links_found": len(matching_links),
+                        "target_url": primary_link["href"],
+                        "anchor_text": primary_link["anchor_text"],
+                        "rel": primary_link["rel"],
+                        "is_dofollow": primary_link["is_dofollow"],
+                    }
+                )
+                if target_matched:
+                    intact_backlinks.append(source_url)
+                else:
+                    missing_backlinks.append(source_url)
+            else:
+                backlink_results.append(
+                    {
+                        "source_url": source_url,
+                        "domain_archetype": domain_archetype,
+                        "status": "link_missing",
+                        "http_status": 200,
+                        "inbound_links_found": 0,
+                        "is_dofollow": False,
+                    }
+                )
+                missing_backlinks.append(source_url)
+
+        if intact_backlinks:
+            observations.append(
+                {
+                    "observation": f"Verified {len(intact_backlinks)} intact candidate backlink(s) pointing to {domain}."
+                }
+            )
+        if broken_backlinks:
+            findings.append(
+                {
+                    "category": "corroboration",
+                    "title": f"Candidate backlink referring source unreachable ({len(broken_backlinks)} link(s))",
+                    "severity": "low",
+                    "confidence": "high",
+                    "root_cause": "Referring candidate backlink source URL returns HTTP 4xx/5xx or is unreachable.",
+                    "cause_family": "AUTHORITY.CLAIM_CORROBORATION",
+                    "id": "CANDIDATE_BACKLINK_UNREACHABLE",
+                    "cause_id": "CANDIDATE_BACKLINK_UNREACHABLE",
+                    "evidence": f"Candidate backlink sources failed with errors: {'; '.join(broken_backlinks[:3])}.",
+                    "suggested_action": {
+                        "summary": "Verify and update dead candidate backlink URLs in external PR or referral tracking ledgers.",
+                        "priority": "low",
+                    },
+                }
+            )
+    else:
+        recommendations.append(
+            {
+                "id": "PROACTIVE.AUTHORITY.BACKLINK_LEDGER_INGESTION.001",
+                "title": "Ingest verified third-party backlink candidate ledger for bounded citation verification",
+                "category": "corroboration",
+                "summary": "No candidate backlinks were provided for bounded verification. Web-wide backlink discovery cannot be performed truthfully without an external backlink ledger or indexed link graph API; arbitrary linking pages cannot be discovered from Common Crawl URL-only indexes (CDX). Supply candidate referring URLs via --candidate-backlinks to audit inbound citation anchors.",
+                "priority": "low",
+                "technical_fix": "Provide candidate backlink URLs in inv.json or via --candidate-backlinks to audit inbound citation anchors.",
+                "creative_fix": "Acquire high-authority editorial citations and industry publication references pointing to canonical product pages.",
+                "verification": "Run corroboration_check.py --candidate-backlinks <ledger.json> to verify intact inbound hyperlinks.",
+            }
+        )
+
+    tier1_list = [
+        u for u in sameas_urls
+        if any(td in u.lower() for td in ["wikidata.org", "wikipedia.org", "crunchbase.com"])
+    ]
+    evidence_classes = {
+        "declared_identity_nodes": {
+            "count": len(sameas_urls),
+            "declared_urls": sameas_urls,
+            "tier1_anchors": tier1_list,
+            "verified_external_nodes": checked,
+            "broken_anchors": broken,
+            "internal_mirror_domains": mirror_domains,
+        },
+        "verified_candidate_backlinks": {
+            "contract_active": bool(candidate_list),
+            "total_candidates_provided": len(candidate_list),
+            "candidates_probed": len(backlink_results),
+            "verified_intact_count": len(intact_backlinks),
+            "link_missing_count": len(missing_backlinks),
+            "source_unreachable_count": len(broken_backlinks),
+            "dofollow_count": sum(1 for r in backlink_results if r.get("is_dofollow")),
+            "results": backlink_results,
+            "limitations": [
+                "Backlink verification is strictly bounded to supplied candidate URLs; arbitrary linking pages cannot be discovered from Common Crawl URL-only index (CDX)."
+            ]
+            if candidate_list
+            else [
+                "No candidate backlink dataset provided. Web-wide backlink discovery cannot be performed truthfully without an external backlink ledger or indexed link graph API; arbitrary linking pages cannot be discovered from Common Crawl URL-only indexes (CDX). Retaining bounded verification contract for user-supplied candidate backlinks."
+            ],
+        },
+    }
+
     return {
         "status": "ok",
+        "evidence_classes": evidence_classes,
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,
-        "coverage": {"sameas_count": len(sameas_urls), "probed": len(checked), "results": checked},
+        "coverage": {
+            "sameas_count": len(sameas_urls),
+            "probed": len(checked),
+            "results": checked,
+            "candidate_backlinks_provided": len(candidate_list),
+            "candidate_backlinks_verified": len(intact_backlinks),
+        },
         "limitations": [
-            "Probed declared sameAs authority URLs; full web-wide claim corroboration was bounded to declared links."
+            "Probed declared sameAs authority URLs; full web-wide claim corroboration was bounded to declared links.",
+            "Web-wide backlink discovery cannot be performed truthfully from URL-only indexes (such as Common Crawl CDX, which indexes page URLs rather than an inverted link graph). Backlink verification is bounded to user-supplied candidate backlinks.",
         ],
     }
 
@@ -355,6 +624,11 @@ def main():
     parser.add_argument("--site", required=True)
     parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
     parser.add_argument("--state", help="Path to global state JSON")
+    parser.add_argument(
+        "--candidate-backlinks",
+        dest="candidate_backlinks",
+        help="Path to candidate backlinks JSON/CSV or raw JSON string",
+    )
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -369,7 +643,7 @@ def main():
                 inv = json.load(f)
         except Exception:
             inv = None
-    res = audit(base, p.netloc, inv=inv, state_file=args.state)
+    res = audit(base, p.netloc, inv=inv, state_file=args.state, candidate_backlinks=args.candidate_backlinks)
     print(json.dumps(res, indent=2))
 
 

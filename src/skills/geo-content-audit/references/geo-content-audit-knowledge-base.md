@@ -289,3 +289,34 @@ Only **11% of domains** are cited by BOTH ChatGPT and Google AI Overviews for th
 - Pages updated within the last **3 months are 3x more likely to be cited** in generative AI search results.
 - Pages left un-refreshed for **6+ months lose citation eligibility** across time-sensitive queries.
 - A scheduled quarterly refresh program updating statistics, publication dates (`article:modified_time`), and case studies is high-leverage GEO.
+
+---
+
+## 8. Deterministic Page-Level Content Improvement Plans & Epistemic Boundaries
+
+Content optimization cannot rely on generic, one-size-fits-all recommendations. For every evaluated substantive page (`article`, `product_detail`, `pricing`, `about`), the audit derives a deterministic, actionable **Page Content Improvement Plan**:
+
+### 1. Plan Derivation Pipeline:
+1. **Dimension Scoring (0–100):** Each page is scored against the 9 empirical citability dimensions:
+   - Answer Block Quality (30 pts): Direct definition lead in first 40–60 words, question headings.
+   - Self-Containment (25 pts): 120–180 word passage chunks, standalone entity attribution.
+   - Mechanistic Depth (15 pts): Causal conjunction density (`how`, `why`, `because`, `therefore`, `enables`).
+   - Statistical Density (15 pts): Verifiable numbers, benchmark metrics, percentages.
+   - Information Density & FTR (15 pts): Atomic Fact-to-Token Ratio $\ge 0.080$, low hedge rate $\le 0.5\%$.
+2. **Gap Analysis:** Identifies precise deficiencies against empirical thresholds:
+   - Deficient depth score ($< 3$).
+   - High hedge word density ($> 0.5\%$).
+   - Sub-threshold atomic fact ratio ($< 0.080$).
+   - Absence of semantic comparison tables or definition lists.
+   - Exophoric pronouns in passage leads breaking context.
+3. **Deterministic Action Tracks:**
+   - **Immediate Structural Actions:** H2 question heading restructuring, BLUF 40–60 word answer leads beneath H1, conversion of flat lists to semantic `<table>` elements, author byline/Person schema markup.
+   - **Textual Modifications:** Elimination of detected hedge words, addition of verified benchmark statistics, replacement of opening pronouns with canonical entity names, causal conjunction enrichment.
+   - **Passage Chunking Plan:** Modular division of long copy into 120–180 word standalone sections.
+
+### 2. Mandatory Epistemic Qualification:
+Every generated plan must include this explicit qualification:
+> *"This content improvement plan is deterministically synthesized from empirical static text citability heuristics (Princeton KDD 2024, AutoGEO, C-SEO Bench). It measures structural, linguistic, and informational citability readiness, not live search engine citation logs or dynamic LLM inference results."*
+
+Engineers and copywriters can execute these concrete, deterministic recommendations directly to optimize pages for generative engine retrieval.
+

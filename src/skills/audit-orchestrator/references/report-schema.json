@@ -236,6 +236,121 @@
         },
         "additionalProperties": false
       }
+    },
+    "evidence_classes": {
+      "type": "object",
+      "properties": {
+        "declared_identity_nodes": {
+          "type": "object"
+        },
+        "verified_candidate_backlinks": {
+          "type": "object"
+        }
+      }
+    },
+    "analytics_summary": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "first_party_analytics_provided": {
+          "type": "boolean"
+        },
+        "pages_with_analytics": {
+          "type": "integer"
+        },
+        "average_observed_bounce_rate": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "average_observed_dwell_seconds": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "corroborated_findings_count": {
+          "type": "integer"
+        },
+        "mitigated_findings_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "page_improvement_plans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "page_url",
+          "page_type",
+          "current_citability_score",
+          "gap_analysis",
+          "prescribed_actions",
+          "epistemic_qualification"
+        ],
+        "properties": {
+          "page_url": {
+            "type": "string"
+          },
+          "page_type": {
+            "type": "string"
+          },
+          "word_count": {
+            "type": "integer"
+          },
+          "current_citability_score": {
+            "type": "number"
+          },
+          "target_citability_score": {
+            "type": "number"
+          },
+          "dimension_scores": {
+            "type": "object"
+          },
+          "gap_analysis": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prescribed_actions": {
+            "type": "object",
+            "properties": {
+              "immediate_structural_actions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "textual_modifications": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "passage_chunking_plan": {
+                "type": "string"
+              }
+            }
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "epistemic_qualification": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "additionalProperties": false

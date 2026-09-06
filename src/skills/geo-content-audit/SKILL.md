@@ -101,20 +101,28 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
    - For product pages: flags absence of semantic `<table>` and `<ul>`/`<ol>` elements as an advisory extractability recommendation.
    - For informational/article pages: flags absence of question-oriented headings (`<h2>What is...</h2>`, `<h2>How does...</h2>`) as a recommendation to adopt FAQ/direct answer formatting.
 
+4. **Deterministic Page-Level Content Improvement Plans (`page_improvement_plans`):**
+   - For each substantive evaluated page, derives a deterministic, actionable remediation plan:
+     * Current dimension scores across Answer Block Quality, Self-Containment, Mechanistic Depth, Statistical Density, Table/List Formatting, Hedge Control, and FTR.
+     * Concrete gap analysis benchmarking against empirical thresholds (e.g., FTR $\ge 0.080$, hedge density $\le 0.5\%$, depth score $\ge 3$).
+     * Prioritized action tracks: `immediate_structural_actions`, `textual_modifications`, and `passage_chunking_plan` (120–180 word modular sections).
+     * Mandatory epistemic qualification on every plan.
+
 ---
 
 ## Gotchas & False-Positive Boundaries
 
-- Do NOT flag transactional pages (login, cart, checkout, account settings) for lack of explanatory mechanisms or statistics.
-- Do NOT flag short contact pages with standard headers as shallow content.
-- Do NOT emit heuristic tag absence (e.g. missing `<table>`) as a defect finding; tag absence is strictly a proactive recommendation.
+- **Static Heuristics vs Live Citations:** Citability scores and improvement plans are derived deterministically from empirical static text heuristics (Princeton KDD 2024, AutoGEO, C-SEO Bench). They evaluate linguistic and informational citability readiness, not live search engine citation logs or dynamic LLM inference results.
+- **Do NOT flag transactional pages** (login, cart, checkout, account settings) for lack of explanatory mechanisms or statistics.
+- **Do NOT flag short contact pages** with standard headers as shallow content.
+- **Do NOT emit heuristic tag absence** (e.g. missing `<table>`) as a defect finding; tag absence is strictly a proactive recommendation.
 
 ---
 
 ## Output Format & Strict Mandate
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
-`{status, findings[], recommendations[], observations[]}`.
+`{status, findings[], recommendations[], observations[], page_improvement_plans[], coverage{}, limitations[]}`.
 
 ---
 

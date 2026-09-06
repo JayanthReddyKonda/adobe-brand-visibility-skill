@@ -229,3 +229,30 @@ Autonomous AI agents (OpenAI Operator, Google Project Mariner) increasingly eval
 - **Standard Machine-Readable Manifests:**
   - `/pricing.md` or `/pricing.txt`: A structured markdown summary of tiers, monthly/annual rates, usage limits, and core features.
   - Trivially ingestible by LLMs with zero HTML parsing or browser rendering overhead.
+
+---
+
+## 8. First-Party Analytics Ingestion & Dual-Track Evaluation (Static Proxies vs. Observed Outcomes)
+
+To prevent false alarms and provide ground-truth business impact, the engagement audit implements a dual-track evaluation architecture that distinguishes **static UX proxies** from **observed user behavioral outcomes**:
+
+### 1. Dual-Track Architecture:
+- **Track 1: Static UX Proxies (DOM-derived):** Evaluates structural HTML layout, heading hierarchy, first-3 interactive CTA placement, and information scent similarity.
+- **Track 2: Observed Engagement Outcomes (Analytics-derived):** Ingests first-party analytics data (bounce rate, dwell time, scroll depth, conversion rate, and AI search referral cohort retention).
+
+### 2. Analytics Ingestion Schema:
+Supported page-level metrics via `--analytics <file.json|file.csv>` or `inventory["analytics"]`:
+- `url` or `path`: Normalized route string (e.g., `/pricing` or `https://brand.com/pricing`).
+- `bounce_rate`: Float (0.0–1.0) or percentage string (e.g. `0.65` or `"65%"`).
+- `avg_time_on_page_seconds` / `dwell_time_seconds`: Mean visitor duration on page.
+- `scroll_depth_pct`: Median vertical scroll depth percentage.
+- `conversion_rate`: Primary macro/micro conversion percentage.
+- `ai_referral_bounce_rate`: Bounce rate specifically for traffic arriving from AI assistant citation links (ChatGPT, Perplexity, Claude).
+- `organic_bounce_rate`: Baseline bounce rate from traditional search engines.
+
+### 3. Cross-Correlation & Severity Adjustment Rules:
+1. **Empirical Corroboration:** When a static UX defect (e.g. `INTENT_TO_LANDING_MISMATCH` or `LOW_INFORMATION_SCENT`) coincides with high observed bounce rate ($\ge 60\%$) or low dwell time ($\le 20\text{s}$), the finding severity and confidence are elevated to `high`, citing empirical confirmation of visitor abandonment.
+2. **Heuristic Mitigation:** When a static heuristic flags an issue (e.g. absent H1 tag or low word count), but first-party analytics prove healthy visitor retention (bounce rate $\le 35\%$, dwell time $\ge 60\text{s}$), the finding is downgraded to `low` or informational, noting that real-world users are not abandoning the page.
+3. **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds the organic baseline by $\ge 25\%$, the skill emits an `AI_REFERRAL_DISCONTINUITY` finding, diagnosing that post-citation visitors suffer orientation disconnect because cited claims are not immediately anchored in the viewport.
+4. **Heuristic-Only Operation (Clear Limitations):** When no analytics dataset is provided, the skill operates in heuristic-only mode with explicit disclaimers: static proxies highlight potential UX friction, but do not represent observed user drop-off in production.
+

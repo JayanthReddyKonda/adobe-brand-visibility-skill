@@ -264,6 +264,104 @@ class TestCorroborationDeep(unittest.TestCase):
         rec_ids = [r.get("id") for r in data.get("recommendations", [])]
         self.assertIn("PROACTIVE.AUTHORITY.OFFSITE_FOOTPRINT_GAP.001", rec_ids)
 
+    def test_evidence_classes_segregation(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": """<!DOCTYPE html><html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "TestBrand", "sameAs": ["https://twitter.com/testbrand"]}</script></head><body><h1>TestBrand</h1></body></html>""",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        with open(self.test_state, "w") as f:
+            json.dump({"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}, f)
+
+        res = subprocess.run(
+            ["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv, "--state", self.test_state],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        self.assertIn("evidence_classes", data)
+        ev = data["evidence_classes"]
+        self.assertIn("declared_identity_nodes", ev)
+        self.assertIn("verified_candidate_backlinks", ev)
+        self.assertEqual(ev["declared_identity_nodes"]["count"], 1)
+
+    def test_candidate_backlink_ssrf_rejection(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": "<html><body><h1>TestBrand</h1></body></html>",
+                }
+            ],
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--candidate-backlinks",
+                "http://127.0.0.1/private-link,http://169.254.169.254/meta",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        self.assertIn("evidence_classes", data)
+        backlinks = data["evidence_classes"]["verified_candidate_backlinks"]
+        self.assertEqual(backlinks["total_candidates_provided"], 2)
+        self.assertEqual(backlinks["source_unreachable_count"], 2)
+        for r in backlinks["results"]:
+            self.assertIn("SSRF blocked", r["error"])
+
+    def test_inbound_link_extractor_unit(self):
+        import sys
+        sys.path.insert(0, os.path.dirname(self.script))
+        from corroboration_check import InboundLinkExtractor, classify_referring_domain
+
+        extractor = InboundLinkExtractor("targetbrand.com")
+        sample_html = """
+        <html>
+            <body>
+                <a href="https://targetbrand.com/products">Target Product</a>
+                <a href="https://otherdomain.org/about">Other</a>
+                <a href="/relative-link">Relative</a>
+            </body>
+        </html>
+        """
+        extractor.feed(sample_html)
+        self.assertTrue(len(extractor.found_links) > 0)
+        self.assertEqual(extractor.found_links[0]["href"], "https://targetbrand.com/products")
+        self.assertTrue(extractor.found_links[0]["is_dofollow"])
+
+        # Test domain classifier
+        self.assertEqual(classify_referring_domain("https://en.wikipedia.org/wiki/Entity"), "knowledge_graph")
+        self.assertEqual(classify_referring_domain("https://techcrunch.com/article"), "editorial_news")
+        self.assertEqual(classify_referring_domain("https://reddit.com/r/technology"), "community_forum")
+        self.assertEqual(classify_referring_domain("https://randomsite.xyz/page"), "general_web")
+
 
 if __name__ == "__main__":
     unittest.main()

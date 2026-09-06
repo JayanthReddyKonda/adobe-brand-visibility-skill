@@ -337,6 +337,7 @@ def audit(base, domain, inv=None, state_file=None):
 
     target_pages = [p for p in html_pages if p.get("page_type") in ("product_detail", "article", "pricing", "about")]
     page_citability_map = {}
+    page_improvement_plans: list[dict] = []
 
     for p in target_pages:
         url = p.get("url")
@@ -351,6 +352,8 @@ def audit(base, domain, inv=None, state_file=None):
 
         full_text = " ".join(parser.text_blocks)
         total_words = _word_count(full_text)
+        has_auth_citation = False
+        has_credentials = False
 
         # 1. Princeton Vector: In-Depth Mechanisms ('how', 'why', 'because', 'therefore') - +40.3% boost
         mechanism_words = [
@@ -732,6 +735,118 @@ def audit(base, domain, inv=None, state_file=None):
                     }
                 )
 
+        # Construct deterministic page-level content improvement plan
+        gaps = []
+        immediate_actions = []
+        text_actions = []
+
+        if depth_score < 3:
+            gaps.append(f"Deficient mechanistic depth: only {depth_score} causal connector(s) detected (target: >= 3).")
+            text_actions.append(
+                "Inject causal explanatory conjunctions ('because', 'therefore', 'enables', 'results in') to explain the technical mechanisms behind stated benefits."
+            )
+
+        if len(stat_matches) == 0:
+            gaps.append("Zero quantifiable statistics or benchmark metrics detected in body text.")
+            text_actions.append(
+                "Substantiate product/service claims with at least 2 quantifiable statistics (e.g. benchmark figures, percentages, verified metrics)."
+            )
+
+        if hedge_density > 0.5:
+            gaps.append(
+                f"Excessive epistemic hedge density: {hedge_density:.1f}% (target: <= 0.5%). Found {len(hedge_matches)} hedge expression(s)."
+            )
+            text_actions.append(
+                f"Eliminate {len(hedge_matches)} detected hedge qualifiers ({', '.join(set(m.lower() for m in hedge_matches[:4]))}) and replace with affirmative, verified propositions."
+            )
+
+        if ftr < 0.080 and total_words >= 100:
+            gaps.append(
+                f"Low atomic fact-to-token ratio: {ftr:.3f} (target: >= 0.080). Contains {atomic_facts} atomic proposition(s) across {total_words} words."
+            )
+            text_actions.append(
+                "Increase factual proposition density by pairing every qualitative adjective with a specific date, number, or benchmark."
+            )
+
+        if not has_lead_definition and total_words >= 150:
+            gaps.append("Missing Bottom Line Up Front (BLUF) direct definition in the first 250 words.")
+            immediate_actions.append(
+                "Insert a 40-60 word definitive BLUF answer paragraph immediately below the primary H1."
+            )
+
+        if parser.tables == 0 and parser.lists == 0:
+            gaps.append("Zero semantic comparison tables or structured specification lists found.")
+            immediate_actions.append(
+                "Convert feature lists and product specifications into a semantic <table> or <dl> definition list."
+            )
+
+        if not has_questions:
+            gaps.append("Zero question-oriented headings (What/Why/How) detected.")
+            immediate_actions.append(
+                "Restructure H2 headings into conversational user query questions ('What is...', 'How does... work?')."
+            )
+
+        if exophoric_leads:
+            gaps.append(
+                f"Ambiguous exophoric opening pronouns ({len(exophoric_leads)} detected) break standalone passage attribution."
+            )
+            text_actions.append(
+                "Replace leading pronouns ('It provides', 'They allow') in section leads with explicit canonical entity names."
+            )
+
+        if ptype == "article" and not has_auth_citation and total_words > 200:
+            gaps.append("Missing outbound citations to primary authoritative sources (.edu, .gov, wikipedia.org, doi.org).")
+            immediate_actions.append(
+                "Add outbound hyperlinks to at least 2 primary research or regulatory sources to anchor claims."
+            )
+
+        if ptype == "article" and not has_credentials and total_words > 150:
+            gaps.append("Missing named author credentials and E-E-A-T byline markup.")
+            immediate_actions.append(
+                "Embed an author byline box with verified professional credentials (MD, PhD, title) and Schema.org Person markup."
+            )
+
+        chunking_plan = (
+            "Divide body copy into modular 120-180 word passage chunks under question headings, each opening with a direct declarative claim."
+            if total_words > 250
+            else "Expand passage length to at least 150 words to provide sufficient semantic context for neural passage retrieval."
+        )
+
+        plan_priority = "high" if citability["total"] < 50 else ("medium" if citability["total"] < 75 else "low")
+
+        page_plan = {
+            "url": url,
+            "page_url": url,
+            "page_type": ptype,
+            "word_count": total_words,
+            "citability_score": citability["total"],
+            "current_citability_score": citability["total"],
+            "target_citability_score": 80,
+            "dimension_scores": {
+                "answer_block_quality": citability["answer_block_quality"],
+                "self_containment": citability["self_containment"],
+                "structural_readability": citability["structural_readability"],
+                "statistical_density": citability["statistical_density"],
+                "uniqueness_signals": citability["uniqueness_signals"],
+                "mechanistic_depth_score": depth_score,
+                "atomic_fact_ratio": ftr,
+                "hedge_density_pct": round(hedge_density, 2),
+            },
+            "gap_analysis": gaps if gaps else ["Content meets or exceeds baseline citability thresholds across evaluated dimensions."],
+            "prescribed_actions": {
+                "immediate_structural_actions": immediate_actions if immediate_actions else ["Maintain current structural heading and table layout."],
+                "textual_modifications": text_actions if text_actions else ["Continue maintaining high factual density and assertive phrasing."],
+                "passage_chunking_plan": chunking_plan,
+            },
+            "priority": plan_priority,
+            "epistemic_qualification": (
+                "This content improvement plan is deterministically synthesized from empirical static text citability heuristics "
+                "(Princeton KDD 2024, AutoGEO, C-SEO Bench). It measures structural, linguistic, and informational citability readiness, "
+                "not live search engine citation logs or dynamic LLM inference results."
+            ),
+        }
+        page_improvement_plans.append(page_plan)
+
     avg_cit = (
         round(sum(c["total"] for c in page_citability_map.values()) / max(len(page_citability_map), 1), 1)
         if page_citability_map
@@ -742,10 +857,17 @@ def audit(base, domain, inv=None, state_file=None):
         "findings": findings,
         "recommendations": recommendations,
         "observations": observations,
+        "page_improvement_plans": page_improvement_plans,
         "coverage": {
             "target_pages_evaluated": len(target_pages),
             "average_citability_score": avg_cit,
+            "improvement_plans_generated": len(page_improvement_plans),
         },
+        "limitations": [
+            "Content improvement plans are derived deterministically from static text citability heuristics "
+            "(Princeton KDD 2024, AutoGEO, C-SEO Bench). These heuristics evaluate passage structure, factual density, "
+            "and linguistic assertiveness; they do not measure live search engine citation logs or dynamic LLM inference results."
+        ],
     }
 
 

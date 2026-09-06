@@ -32,7 +32,29 @@ Identity link verification tests whether external authority anchors declared by 
 
 ---
 
-## 2. External Claim Corroboration (Out-of-Scope Boundary)
+## 2. Declared Identity Nodes vs. Verified Candidate Backlinks (Two Explicit Evidence Classes)
+
+A critical architectural principle of this skill is the strict separation between two evidence classes:
+
+1. **Declared Identity Nodes (`declared_identity_nodes`):**
+   - **Definition:** Outbound entity declarations provided by the brand within its first-party JSON-LD `sameAs` array (Wikidata, Wikipedia, LinkedIn, YouTube, X, GitHub, Crunchbase).
+   - **Purpose:** Disambiguates *who the brand is* across global knowledge graphs and social footprints.
+   - **Verification:** Probed via SSRF-safe HTTP HEAD/GET to ensure resolution with HTTP 200 and explicit brand name corroboration in title or OpenGraph metadata.
+   - **Defect:** 4xx/5xx responses indicate broken identity anchors (`BROKEN_AUTHORITY_ANCHOR`).
+
+2. **Verified Candidate Backlinks (`verified_candidate_backlinks`):**
+   - **Definition:** Inbound hyperlinks from third-party websites pointing *to* the brand's canonical domain or deep links (`<a href="https://brand.com/...">`).
+   - **Purpose:** Validates external editorial citations, press mentions, reviews, and community references that AI search engines retrieve during query fan-out.
+   - **Verification Input Contract:** Ingests user-supplied candidate backlink URLs via `--candidate-backlinks` or `inventory.json`. Probes each candidate page (capped at 10, 5s timeout, 512 KiB limit, SSRF-safe) to verify the actual presence of the inbound hyperlink, anchor text, and `rel` attributes (`nofollow`, `ugc`, `sponsored`, `dofollow`).
+
+### The Common Crawl CDX Limitation (Why Web-Wide Discovery Cannot Be Claimed):
+- **The Myth:** Some tools claim to perform "instant web-wide backlink discovery" using the public Common Crawl CDX API.
+- **The Technical Reality:** The Common Crawl CDX index is an index of **crawled URLs**, capturing page URLs, timestamps, MIME types, and WARC offsets. It is **NOT** an inverted index of web links/hyperlinks pointing to arbitrary target domains. To discover all pages linking to a brand from Common Crawl, one would need to download and parse petabytes of WARC/WAT files across billions of pages.
+- **Engineering Boundary:** The skill operates honestly: it does NOT claim web-wide backlink discovery from URL-only indexes. Instead, it provides a bounded, SSRF-safe verification engine for user-supplied candidate backlink ledgers.
+
+---
+
+## 3. External Claim Corroboration (Out-of-Scope Boundary)
 
 External claim corroboration refers to searching the open web to independently verify factual claims made by the brand (e.g. "Founded in 2018", "#1 Coffee Roaster in California").
 

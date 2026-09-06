@@ -9,8 +9,10 @@
 - [3. `MATERIAL_ENTITY_AMBIGUITY`](#3-material-entity-ambiguity)
 - [4. `FIRST_PARTY_FACT_CONFLICT`](#4-first-party-fact-conflict)
 - [5. `BROKEN_AUTHORITY_ANCHOR`](#5-broken-authority-anchor)
+- [5b. `CANDIDATE_BACKLINK_UNREACHABLE`](#5b-candidate-backlink-unreachable)
 - [6. `INTENT_TO_LANDING_MISMATCH`](#6-intent-to-landing-mismatch)
 - [7. `LOW_INFORMATION_SCENT`](#7-low-information-scent)
+- [7b. `AI_REFERRAL_DISCONTINUITY`](#7b-ai-referral-discontinuity)
 - [8. `AI_FACT_CONFLICT`](#8-ai-fact-conflict)
 - [9. `MISSING_IN_DEPTH_MECHANISMS`](#9-missing-in-depth-mechanisms)
 - [Top-Level Fields](#top-level-fields)
@@ -91,7 +93,8 @@ AUDIT TAXONOMY
 ├── AUTHORITY
 │   ├── IDENTITY_CORROBORATION
 │   │   ├── BROKEN_AUTHORITY_ANCHOR         (Declared sameAs profile URL returns 4xx/5xx HTTP error)
-│   │   └── CIRCULAR_SAMEAS_SELF_REFERENCE  (sameAs points to alternate mirror domains rather than 3rd-party knowledge graph)
+│   │   ├── CIRCULAR_SAMEAS_SELF_REFERENCE  (sameAs points to alternate mirror domains rather than 3rd-party knowledge graph)
+│   │   └── CANDIDATE_BACKLINK_UNREACHABLE  (Candidate backlink from referring domain returns 4xx/5xx or is unreachable)
 │   ├── CLAIM_CORROBORATION
 │   │   └── CLAIM_CORROBORATION_GAP         (Material factual assertions lack external verification)
 │   └── PROVENANCE_AND_RIGHTS
@@ -101,7 +104,8 @@ AUDIT TAXONOMY
 │   └── CONTINUITY
 │       ├── INTENT_TO_LANDING_MISMATCH      (Landing page fails to retain referral query intent)
 │       ├── LOW_INFORMATION_SCENT           (Headline / hero uses vague filler lacking descriptive nouns)
-│       └── DESTINATION_NAVIGATION_FRICTION (Absence of semantic navigation to key brand destinations)
+│       ├── DESTINATION_NAVIGATION_FRICTION (Absence of semantic navigation to key brand destinations)
+│       └── AI_REFERRAL_DISCONTINUITY       (First-party analytics confirm excessive bounce on AI search traffic)
 │
 └── REPRESENTATION
     └── ACCURACY
@@ -127,8 +131,10 @@ AUDIT TAXONOMY
 | `FACT.FRESHNESS` | `LEGACY_FACT_PROPAGATION` | Outdated slogans, legacy pricing, or stale copyright years persist across pages. | `medium` |
 | `FACT.LIFECYCLE` | `DISCONTINUED_VS_CURRENT_CONFLICT` | Discontinued product marketed as active or in-stock on secondary pages. | `high` |
 | `AUTHORITY.IDENTITY_CORROBORATION` | `BROKEN_AUTHORITY_ANCHOR` | Declared sameAs profile URL returns 4xx/5xx HTTP error. | `medium` |
+| `AUTHORITY.IDENTITY_CORROBORATION` | `CANDIDATE_BACKLINK_UNREACHABLE` | Candidate backlink from referring domain returns 4xx/5xx or is unreachable. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `INTENT_TO_LANDING_MISMATCH` | Landing page omits answers to referral query intent above the fold. | `medium` |
 | `EXPERIENCE.CONTINUITY` | `LOW_INFORMATION_SCENT` | Primary H1 uses generic filler words ("Welcome", "Home") lacking information scent. | `low` |
+| `EXPERIENCE.CONTINUITY` | `AI_REFERRAL_DISCONTINUITY` | First-party analytics confirm excessive bounce (>= 60%) and low dwell (< 30s) on AI search traffic. | `high` |
 | `EXPERIENCE.CONTINUITY` | `DESTINATION_NAVIGATION_FRICTION` | Landing page lacks navigation links to core brand destinations. | `medium` |
 | `CONTENT.SHALLOW_COVERAGE` | `MISSING_IN_DEPTH_MECHANISMS` | Content lacks explanatory mechanisms ('how' and 'why') prioritized by generative search. | `medium` |
 | `CONTENT.RETRIEVAL_OPTIMIZATION` | `LACK_OF_SPECIFIC_EVIDENCE` | Content lacks concrete statistics, numbers, or verifiable metrics. | `low` |
@@ -162,41 +168,41 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 ## 2. `RENDERED_CONTENT_GAP`
 - **Skill:** `discoverability-audit`
 - **Family:** `DISCOVERY.REPRESENTATION_AVAILABILITY`
-- **Purpose:** Detect when initial unrendered HTML payload carries insufficient text.
-- **Input:** Raw HTTP response body word count.
-- **Decision:** Finding triggered IF visible word count < 25 words AND empty SPA root marker (`<div id="root">`, `<div id="app">`) is present.
-- **Exclusion:** Do NOT report if visible words ≥ 30 words or if the page is an API endpoint.
+- **Purpose:** Detect heavy client-side rendering where bots see empty shells.
+- **Input:** Raw HTTP response body vs rendered DOM snapshot.
+- **Decision:** Finding triggered IF text delta > 70% or raw word count < 50 while rendered > 250 words.
+- **Exclusion:** Single-page applications with prerendered meta tags and server-side hydration.
 - **Severity:** `high`.
-- **Confidence:** `medium` (risk indicator; modern search engines may execute JS).
-- **Remediation:** Implement server-side rendering (SSR), static generation (SSG), or dynamic pre-rendering for core text.
-- **Verification:** Fetch raw HTML response and confirm main heading and copy are present without JS execution.
+- **Confidence:** `high`.
+- **Remediation:** Implement server-side rendering (SSR) or dynamic prerendering for bots.
+- **Verification:** Verify raw HTML response contains visible body copy.
 
 ---
 
 ## 3. `MATERIAL_ENTITY_AMBIGUITY`
 - **Skill:** `entity-content-audit`
 - **Family:** `ENTITY.IDENTITY`
-- **Purpose:** Ensure brand entity identity is machine-explicit.
-- **Input:** Landing page JSON-LD, OpenGraph, `<title>`.
-- **Decision:** Finding triggered IF no Organization/Brand schema, no `og:site_name`, and no title identity exists.
-- **Exclusion:** Do NOT report if identity is clearly stated in OpenGraph or title.
+- **Purpose:** Ensure machines can unambiguously identify the publishing organization.
+- **Input:** JSON-LD scripts extracted from homepage / root.
+- **Decision:** Finding triggered IF no `Organization` or `Brand` schema is found, or if `name` / `url` is missing.
+- **Exclusion:** Sub-pages inheriting root Organization schema via reverse linkage.
 - **Severity:** `medium`.
 - **Confidence:** `high`.
-- **Remediation:** Publish Organization JSON-LD markup declaring name, logo, url, and sameAs links.
-- **Verification:** Re-fetch landing page and verify Organization JSON-LD parses cleanly.
+- **Remediation:** Add canonical `Organization` JSON-LD schema with `name`, `url`, `logo`, and `sameAs`.
+- **Verification:** Validate JSON-LD with Schema.org validator.
 
 ---
 
 ## 4. `FIRST_PARTY_FACT_CONFLICT`
 - **Skill:** `fact-consistency-audit`
 - **Family:** `FACT.CONSISTENCY`
-- **Purpose:** Detect conflicting first-party representations of a product/tier price or specification.
-- **Input:** Scoped fact ledger across first-party pages.
-- **Decision:** Finding triggered IF the same product/plan name has distinct price values across 2+ pages.
-- **Exclusion:** Do NOT report when distinct prices belong to different named tiers (Starter vs Pro) or billing intervals.
+- **Purpose:** Prevent hallucinations caused by contradictory facts published across different pages.
+- **Input:** Fact ledger compiled from crawled page bodies and structured data.
+- **Decision:** Finding triggered IF identical entity attribute (e.g. price) has conflicting values across 2+ pages.
+- **Exclusion:** Explicitly marked tier differences or historical changelogs.
 - **Severity:** `high`.
 - **Confidence:** `high`.
-- **Remediation:** Establish a single canonical price for the entity and synchronize across all product listings.
+- **Remediation:** Align factual claims across all site pages or mark historical data with deprecation notices.
 - **Verification:** Re-crawl affected URLs and confirm identical pricing.
 
 ---
@@ -212,6 +218,20 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 - **Confidence:** `high`.
 - **Remediation:** Update dead sameAs URLs to active canonical profile URLs.
 - **Verification:** Send HEAD request to all sameAs URLs and confirm HTTP 200.
+
+---
+
+## 5b. `CANDIDATE_BACKLINK_UNREACHABLE`
+- **Skill:** `corroboration-authority-audit`
+- **Family:** `AUTHORITY.IDENTITY_CORROBORATION`
+- **Purpose:** Verify external candidate backlink sources citing the brand domain are live and reachable.
+- **Input:** Provided candidate backlink URLs via `--candidate-backlinks`.
+- **Decision:** Finding triggered IF candidate backlink probe returns HTTP 4xx or 5xx error, or fails to fetch.
+- **Exclusion:** URLs blocked by SSRF protections are marked rejected, not broken.
+- **Severity:** `medium`.
+- **Confidence:** `high`.
+- **Remediation:** Update or remove unreachable referring source URLs from backlink rosters.
+- **Verification:** Re-probe referring URLs under SSRF-safe HTTP streaming.
 
 ---
 
@@ -240,6 +260,20 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 - **Confidence:** `high`.
 - **Remediation:** Revise H1 to clearly state the product name or core value proposition.
 - **Verification:** Confirm updated H1 contains descriptive nouns and value verbs.
+
+---
+
+## 7b. `AI_REFERRAL_DISCONTINUITY`
+- **Skill:** `engagement-context-audit`
+- **Family:** `EXPERIENCE.CONTINUITY`
+- **Purpose:** Detect severe post-citation drop-off where AI search referrals bounce immediately due to orientation failure.
+- **Input:** First-party analytics records ingested via `--analytics`.
+- **Decision:** Finding triggered IF an AI referral source on a route exhibits bounce rate >= 60% and dwell time < 30 seconds.
+- **Exclusion:** Do NOT trigger if total route sessions < 5 (insufficient sample size).
+- **Severity:** `high`.
+- **Confidence:** `high`.
+- **Remediation:** Align page H1, value proposition, and primary CTAs directly with the answering AI engine's query intent.
+- **Verification:** Re-check analytics telemetry after 7 days of deployment to confirm bounce reduction below 50%.
 
 ---
 
@@ -290,6 +324,9 @@ This document specifies the structure, validation constraints, and field semanti
 | `summary` | Object | Yes | Aggregate counts of findings categorized by severity (`critical`, `high`, `medium`, `low`) |
 | `findings` | Array | Yes | Ordered list of verified defects with supporting evidence and suggested actions |
 | `proactive_actions` | Array | No | Deduplicated proactive opportunities (e.g. sitemap creation, llms.txt, JSON-LD) |
+| `evidence_classes` | Object | No | Explicit segregation: `declared_identity_nodes` (Schema sameAs) vs `verified_candidate_backlinks` (verified via bounded probe) |
+| `analytics_summary` | Object | No | Quantitative metrics from first-party analytics (total referrals, bounce rates, dwell) and heuristic fallback caveats |
+| `page_improvement_plans` | Array | No | Deterministic page-level content improvement plans with gap analysis, structural and textual actions, and epistemic boundaries |
 
 ---
 

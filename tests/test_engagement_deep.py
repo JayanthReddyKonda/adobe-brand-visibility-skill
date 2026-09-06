@@ -258,6 +258,147 @@ class TestEngagementDeep(unittest.TestCase):
         obs = [o.get("observation", "") for o in out.get("observations", [])]
         self.assertTrue(any("Found machine-readable /pricing.md manifest" in o for o in obs))
 
+    def test_heuristic_only_limitation_present_without_analytics(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "homepage",
+                    "html": "<html><body><h1>TestBrand</h1><p>Welcome to our cloud solutions.</p><a href='/contact'>Contact Us</a></body></html>",
+                }
+            ],
+            "infrastructure": {"pricing_manifest": {"present": True}},
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+        res = subprocess.run(
+            ["python3", self.script, "--site", "https://testbrand.com", "--inventory", self.test_inv],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        self.assertIn("analytics_summary", out)
+        summary = out["analytics_summary"]
+        self.assertFalse(summary["first_party_analytics_provided"])
+        self.assertIn("limitations", out)
+        self.assertTrue(any("static HTML layout proxies" in lim for lim in out["limitations"]))
+
+    def test_analytics_ingestion_and_corroboration(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/pricing",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "pricing",
+                    "html": "<html><body><h1>Pricing</h1><p>Vague text lacking prices.</p><a href='/demo'>Demo</a></body></html>",
+                }
+            ],
+            "infrastructure": {"pricing_manifest": {"present": True}},
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        analytics_file = os.path.join(tempfile.gettempdir(), "test_analytics_high_bounce.json")
+        analytics_data = [
+            {
+                "route": "/pricing",
+                "sessions": 120,
+                "ai_referral_bounce_rate": 0.78,
+                "organic_bounce_rate": 0.40,
+                "bounce_rate": 0.78,
+                "avg_dwell_time_seconds": 14,
+                "primary_referrer": "chatgpt.com",
+            }
+        ]
+        with open(analytics_file, "w") as f:
+            json.dump(analytics_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--analytics",
+                analytics_file,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        self.assertIn("analytics_summary", out)
+        self.assertTrue(out["analytics_summary"]["first_party_analytics_provided"])
+        self.assertEqual(out["analytics_summary"]["pages_with_analytics"], 1)
+
+        # Must trigger AI_REFERRAL_DISCONTINUITY
+        cause_ids = [f.get("cause_id") for f in out.get("findings", [])]
+        self.assertIn("AI_REFERRAL_DISCONTINUITY", cause_ids)
+
+    def test_analytics_healthy_retention_mitigation(self):
+        inv_data = {
+            "site": "https://testbrand.com",
+            "pages": [
+                {
+                    "url": "https://testbrand.com/pricing",
+                    "status": 200,
+                    "content_type": "text/html",
+                    "page_type": "pricing",
+                    "html": "<html><body><h1>Pricing</h1><div onclick='a()'>Btn 1</div><div onclick='b()'>Btn 2</div><div onclick='c()'>Btn 3</div></body></html>",
+                }
+            ],
+            "infrastructure": {"pricing_manifest": {"present": True}},
+        }
+        with open(self.test_inv, "w") as f:
+            json.dump(inv_data, f)
+
+        analytics_file = os.path.join(tempfile.gettempdir(), "test_analytics_healthy.json")
+        analytics_data = [
+            {
+                "route": "/pricing",
+                "sessions": 250,
+                "bounce_rate": 0.18,
+                "avg_dwell_time_seconds": 115,
+                "primary_referrer": "perplexity.ai",
+            }
+        ]
+        with open(analytics_file, "w") as f:
+            json.dump(analytics_data, f)
+
+        res = subprocess.run(
+            [
+                "python3",
+                self.script,
+                "--site",
+                "https://testbrand.com",
+                "--inventory",
+                self.test_inv,
+                "--analytics",
+                analytics_file,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0)
+        out = json.loads(res.stdout)
+        self.assertIn("analytics_summary", out)
+        self.assertTrue(out["analytics_summary"]["first_party_analytics_provided"])
+        self.assertGreaterEqual(out["analytics_summary"]["mitigated_findings_count"], 1)
+        # Verify evidence mentions mitigation
+        evidences = [f.get("evidence", "") for f in out.get("findings", [])]
+        self.assertTrue(any("Mitigated by Analytics" in e for e in evidences))
+
 
 if __name__ == "__main__":
     unittest.main()
