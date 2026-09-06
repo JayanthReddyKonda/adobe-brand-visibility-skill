@@ -20,13 +20,9 @@
 
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: engagement-rubric.md ===
-========================================================================
-
-# On-Site Orientation & Engagement Heuristics Rubric
+## On-Site Orientation & Engagement Heuristics Rubric
 
 This rubric evaluates how well a website retains visitors who arrive from AI search referrals, and how easily machines and humans comprehend the core offering within the first 5 seconds.
 
@@ -58,13 +54,9 @@ This rubric evaluates how well a website retains visitors who arrive from AI sea
 - **Context Retention**: When users click from a specific AI citation link (e.g. deep link to a feature), does the destination page retain context or dump them into a generic homepage redirect?
 - **Frictionless CTAs**: Clear, accessible buttons with unambiguous labels ("Start Free Trial", "Book Demo", "Read Documentation").
 
+---
 
-
-========================================================================
-=== SOURCE FILE: ai-snippet-guidelines.md ===
-========================================================================
-
-# AI Snippet & Information Scent Guidelines
+## AI Snippet & Information Scent Guidelines
 
 How to structure on-page content so AI search assistants and human visitors can immediately extract answers and orient without bouncing.
 
@@ -99,12 +91,9 @@ Headings provide structural boundaries for passage indexing and AI chunking:
 | `max-snippet` | `<meta name="robots" content="max-snippet:160">` | Restricts snippet quotes to the specified character length. |
 | `data-nosnippet` | `<div data-nosnippet>...</div>` | Excludes specific proprietary text or pricing footnotes from AI quotes while keeping the rest indexable. |
 
+---
 
-========================================================================
-=== SOURCE FILE: engagement-contracts.md ===
-========================================================================
-
-# Engagement & Context Continuity Audit — Check Contracts
+## Engagement & Context Continuity Audit — Check Contracts
 
 Formal check contracts, decision thresholds, and evidence criteria for engagement and visitor orientation.
 
@@ -129,12 +118,9 @@ Formal check contracts, decision thresholds, and evidence criteria for engagemen
 - **Defect:** A pricing-designated landing URL containing zero visible numerical price figures, plan tiers, or commercial terms (`INTENT_TO_LANDING_MISMATCH`, Severity: `medium`).
 - **Not a defect:** Enterprise "Contact Sales" quotes where custom pricing is explicitly indicated.
 
+---
 
-========================================================================
-=== SOURCE FILE: 5-second-orientation.md ===
-========================================================================
-
-# 5-Second Orientation & Information Scent Framework
+## 5-Second Orientation & Information Scent Framework
 
 This reference outlines the empirical methodology for evaluating first-visit user orientation, heading information scent, and intent-handoff continuity for visitors referred from AI search engines (ChatGPT Search, Claude, Perplexity AI, Google AI Overviews).
 
@@ -204,7 +190,6 @@ Derived from `agent-friendly-pages` and web.dev criteria:
 - **`PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001` (Low Priority):**
   Triggered when content pages lack HTML5 semantic landmarks (`<main>`, `<nav>`, `<article>`).
   *Remediation:* Wrap primary article/product content in `<main>` and primary navigation in `<nav>`.
-
 
 ---
 

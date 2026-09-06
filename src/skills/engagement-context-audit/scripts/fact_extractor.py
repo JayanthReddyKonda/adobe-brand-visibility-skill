@@ -22,7 +22,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_fetch
+from safe_fetch import safe_fetch  # type: ignore
 
 CURRENT_YEAR = datetime.now(timezone.utc).year
 PRICE_PATTERN = re.compile(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", re.IGNORECASE)

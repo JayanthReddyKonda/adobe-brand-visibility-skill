@@ -1,0 +1,35 @@
+{
+  "skill_name": "web-scraper",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run zero-dependency SSRF-hardened crawl against http://127.0.0.1:8080 to test loopback defense.",
+      "expected_output": "Crawl is aborted immediately with zero-trust SSRF prohibition error.",
+      "expectations": [
+        "SSRF policy rejects 127.0.0.1 and private IP ranges",
+        "Zero network connections are established to loopback",
+        "Engine exits cleanly without unhandled socket exceptions"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Evaluate RFC 9309 robots.txt permissions across 16 AI retrieval and training bots on https://example.com.",
+      "expected_output": "Deterministic access matrix evaluating OAI-SearchBot, PerplexityBot, Claude-SearchBot, GPTBot, and other bots.",
+      "expectations": [
+        "Matrix distinguishes search retrieval bots from training bots",
+        "Fail-closed 5xx and fail-open 404 semantics are respected",
+        "Sitemap links declared in robots.txt are extracted"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Acquire single-pass site inventory for https://example.com within a 30s deadline budget.",
+      "expected_output": "Structured inv.json containing pages, clean Markdown, JSON-LD graphs, SNR ratios, and response stats.",
+      "expectations": [
+        "Inventory conforms to canonical schema with pages, robots, sitemaps, stats",
+        "Signal-to-Noise Ratio (SNR) and word counts are computed for each page",
+        "Schema.org @graph JSON-LD is extracted and normalized"
+      ]
+    }
+  ]
+}

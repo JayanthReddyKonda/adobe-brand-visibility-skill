@@ -7,16 +7,19 @@
 
 ---
 
-## 1. Why Every Skill Ships Its Own `safe_fetch.py`
+## 1. Hermetic SSRF Defense Across All 8 Skills
 
-Each of the 7 skills in this marketplace ships an identical copy of `safe_fetch.py` in its `scripts/` directory. This is a deliberate, principled design decision:
+Every skill in this marketplace that touches the network enforces strict zero-trust SSRF protection:
+- The 7 diagnostic and orchestrator skills (`audit-orchestrator`, `discoverability-audit`, `entity-content-audit`, `fact-consistency-audit`, `corroboration-authority-audit`, `engagement-context-audit`, `geo-content-audit`) ship an identical, hermetic `safe_fetch.py` in their `scripts/` directory.
+- The dedicated `web-scraper` skill implements the identical zero-trust boundary within its `crawler/fetch.py` and `crawler/policy.py` modules.
 
+This architecture enforces key guarantees:
 - **Independent Deployability:** Any skill can be installed and run standalone — an agent or client application can invoke a single specialist without any other skill being present.
 - **No Cross-Skill Import Paths:** A skill must never reach into a sibling skill's directory to import shared code. This prevents accidental coupling and deployment failures.
 - **Isolated Security Boundary:** Each skill's SSRF protection governs only that skill's network egress. If one skill's fetch boundary were ever compromised, it cannot affect another skill's boundary.
-- **Agentskills.io Portability:** The `agentskills.io` standard requires each skill to be self-contained. Bundling `safe_fetch.py` per skill satisfies this requirement without requiring a runtime package manager.
+- **Agentskills.io Portability:** The `agentskills.io` standard requires each skill to be self-contained. Bundling network security per skill satisfies this requirement without requiring a runtime package manager.
 
-The copies are byte-for-byte identical. Architectural drift between copies is detected by `tests/test_fetch_security.py`.
+Architectural drift and SSRF defenses are verified by `tests/test_fetch_security.py` and `tests/test_crawler_core.py`.
 
 ---
 

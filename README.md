@@ -18,11 +18,12 @@ Operating entirely within a read-only sandbox using the pure Python 3.9+ standar
 
 ## 2. The Skills in the Marketplace
 
-The marketplace is decomposed into **6 specialized domain skills** composed under **1 central entrypoint skill**, adhering strictly to the Principle of Least Privilege and genuine separation of concerns:
+The marketplace is decomposed into **7 specialized domain skills** composed under **1 central entrypoint skill** (8 skills total), adhering strictly to the Principle of Least Privilege and genuine separation of concerns:
 
 | Skill ID | Domain Responsibility | Key Failure Modes & Signals Detected |
 |---|---|---|
-| **`audit-orchestrator`** *(Entrypoint)* | Master AI runbook coordinator. Directs the acquisition of site inventory, runs specialists in causal order, synthesizes cross-domain telemetry, and validates the final report against the Draft-07 schema gate. | Cross-domain multi-signal root causes, priority conflicts, schema non-compliance. |
+| **`audit-orchestrator`** *(Entrypoint)* | Master AI runbook coordinator. Directs the single-pass acquisition of site inventory, runs specialists in causal order, synthesizes cross-domain telemetry, and validates the final report against the Draft-07 schema gate. | Cross-domain multi-signal root causes, priority conflicts, schema non-compliance. |
+| **`web-scraper`** | Autonomous, zero-dependency, SSRF-hardened web crawler and AI content extractor. Crawls websites within strict monotonic budgets, parses RFC 9309 robots.txt permissions across 16 AI retrieval & training bots, traverses XML sitemaps, flattens Schema.org JSON-LD graphs, extracts Trafilatura-grade clean Markdown with SNR scoring, scores commercial routes, and emits canonical site inventories (`inv.json`). | Crawl budget exhaustion, robots disallow matrices, missing XML sitemaps, low SNR text density, sparse SPA shells. |
 | **`discoverability-audit`** | Evaluates retrieval access and indexation barriers across search engines and AI retrieval bots (OAI-SearchBot, PerplexityBot, Claude-SearchBot). | Robots.txt crawler blocks (`AI_RETRIEVAL_BLOCKED`), meta `noindex` exclusions, canonical fragmentation, blank CSR shells. |
 | **`entity-content-audit`** | Extracts explicit Schema.org JSON-LD entities (`Organization`, `Product`, `@graph`) and scores Answerability attribute completeness. | Missing entity definitions (`MATERIAL_ENTITY_AMBIGUITY`), incomplete pricing/availability attributes (`ATTRIBUTE_INCOMPLETENESS`). |
 | **`fact-consistency-audit`** | Scopes first-party facts across multi-page inventories with global multi-currency normalization to detect contradictory pricing, contacts, or lifecycle terms. | Cross-page pricing conflicts (`FIRST_PARTY_FACT_CONFLICT`), conflicting support emails, stale marketing terms. |
@@ -34,13 +35,13 @@ The marketplace is decomposed into **6 specialized domain skills** composed unde
 
 ## 3. How the Entrypoint Composes the Skills
 
-The entrypoint skill (`audit-orchestrator`) coordinates the audit through a **True Agentic Multi-Signal Reasoning Architecture**:
+The entrypoint skill (`audit-orchestrator`) coordinates the audit through a **True Agentic Multi-Signal Reasoning Architecture** with a single-pass data acquisition model:
 
 ```mermaid
 graph TD
     A["Target URL / Website"] --> B["audit-orchestrator (Entrypoint Skill)"]
-    B --> C["1. Inventory Crawler (acquire_inventory.py)"]
-    C --> D["inv.json (Shared HTML/Robots Snapshot)"]
+    B --> C["1. Web Scraper Skill (web-scraper/run_scraper.py)"]
+    C --> D["inv.json (Canonical Shared Site Inventory)"]
     D --> E1["discoverability_check.py"]
     D --> E2["entity_content_check.py"]
     D --> E3["fact_consistency_check.py"]
@@ -53,8 +54,8 @@ graph TD
     H --> I["Final Validated JSON Report"]
 ```
 
-1. **Deterministic Inventory Acquisition:** The orchestrator runs `acquire_inventory.py` to acquire page representations, robots.txt, and sitemaps into `inv.json`.
-2. **Independent Specialist Sensor Probing:** The AI Agent runs each of the 6 specialist tools via CLI against `inv.json`, collecting raw structured telemetry.
+1. **Deterministic Single-Pass Acquisition:** The orchestrator invokes `web-scraper` to crawl the site once within budget, extracting HTML representations, RFC 9309 robots matrices, clean Markdown, and JSON-LD graphs into `inv.json`. Crawling is **never repeated** across specialists.
+2. **Independent Specialist Sensor Probing:** The AI Agent runs each of the 6 specialist audit tools via CLI against `inv.json`, collecting raw structured telemetry with zero additional network overhead.
 3. **Multi-Signal Cognitive Synthesis:** The AI Agent correlates findings across domains (e.g. connecting low word counts from discoverability, missing schema from entity-content, and missing H1 from engagement into a single SPA root cause).
 4. **Dual-Track Remediation Synthesis:** Every detected finding is synthesized with both a **`technical_fix`** (code/markup for developers) and a **`creative_fix`** (content/UX for copywriters).
 5. **Strict Schema Validation Gate:** The final JSON report is piped through `validate_report.py`, guaranteeing 100% compliance with Draft-07 JSON Schema before completion.
@@ -110,9 +111,12 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Production 
 # 1. Run the production QA pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
 ./scripts/qa_check.sh
 
-# 2. Acquire site inventory
-python3 skills/audit-orchestrator/scripts/acquire_inventory.py \
+# 2. Acquire site inventory via single-pass web scraper
+python3 skills/web-scraper/scripts/run_scraper.py \
   --site https://example.com --output inv.json --format json
+
+# (Or run orchestrator acquisition wrapper)
+# python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 
 # 3. Execute specialist sensors
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
@@ -130,7 +134,8 @@ python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 
 ## 6. Verification & Quality Metrics
 
-- **65 Automated Unit Tests:** 100% passing across 18 test modules in ~1.6 seconds.
+- **131 Automated Unit Tests:** 100% passing across 24 test modules in ~20 seconds.
 - **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
-- **Static Type Safety:** 0 errors under MyPy across all 7 skills.
+- **Static Type Safety:** 0 errors under MyPy across all 8 skills.
+- **Draft-07 JSON Schema Gate:** Validated against `report-schema.json` with support for flexible evidence typing and dual-track remediation.
 - **SSRF Hardening:** Pure stdlib socket-level IP validation against RFC-1918, link-local, loopback, and IPv4-mapped IPv6 ranges.

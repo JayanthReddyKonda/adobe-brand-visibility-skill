@@ -89,6 +89,39 @@ class TestSchemaValidationGate(unittest.TestCase):
         )
         self.assertNotEqual(res.returncode, 0)
 
+    def test_string_evidence_passes(self):
+        # Conformance with sample report in round3_PS.pdf page 2
+        report_with_string_evidence = {
+            "site": "example.com",
+            "audited_at": "2026-09-20T14:32:00Z",
+            "summary": {
+                "total_findings": 1,
+                "critical": 0,
+                "high": 1,
+                "medium": 0,
+            },
+            "findings": [
+                {
+                    "id": "F-001",
+                    "title": "No JSON-LD structured data on product pages",
+                    "severity": "high",
+                    "evidence": "Crawled 12 product pages; 0/12 contain schema.org markup.",
+                    "suggested_action": {
+                        "summary": "Add Product/Offer JSON-LD to every product page.",
+                        "priority": "high",
+                    },
+                }
+            ],
+        }
+        res = subprocess.run(
+            ["python3", self.val_script, "-"],
+            input=json.dumps(report_with_string_evidence),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"Failed validation: {res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

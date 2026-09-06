@@ -5,7 +5,7 @@ description: >
   and AI Search Visibility audit on any website. Use this skill whenever the user asks to
   "audit a website", "check AI readiness", "evaluate LLM search visibility", "optimize for
   ChatGPT/Claude/Perplexity citations", "find brand SEO/AEO defects", or wants an end-to-end brand
-  visibility assessment. Coordinates 6 specialist skills, executes diagnostic sensors directly,
+  visibility assessment. Coordinates 7 specialist skills (including web-scraper), executes diagnostic sensors directly,
   applies cognitive reasoning over multi-signal evidence, and emits a Draft-07 schema-validated
   JSON report with dual-track remediation.
 license: MIT
@@ -23,7 +23,8 @@ allowed-tools:
 
 | Tool | Command | Output |
 |---|---|---|
-| **Site Inventory Crawler** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Typed HTML page inventory (JSON) |
+| **Web Scraper (Unified Acquisition)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical Site Inventory JSON |
+| **Site Inventory Wrapper** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Typed HTML page inventory (JSON) |
 | **Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json` | Exit Code 0 (pass) or 1 (fail) |
 
 > **True Agentic Principle:** YOU are the orchestrator. There is no master Python runner. YOU read each skill, YOU run each script, YOU synthesize the findings using your reasoning. Scripts are deterministic sensors — they extract raw facts. You decide what they mean.
@@ -125,17 +126,24 @@ cat skills/engagement-context-audit/references/product-purchase.json
 
 ### Phase 2 — Site Inventory Acquisition
 
-**Step 4: Crawl the Target Site**
+**Step 4: Unified Web Acquisition via `web-scraper`**
 
-Build the shared typed HTML inventory (homepage + robots.txt + sitemaps → sampled HTML pages):
+Execute the single-pass web scraper to build the shared canonical site inventory (`inv.json`). This ensures the target domain is crawled **exactly once**, completely eliminating redundant scraping across the 6 downstream specialist skills:
 ```bash
+# Option A: Directly invoke web-scraper skill
+python3 skills/web-scraper/scripts/run_scraper.py \
+  --site https://example.com \
+  --output inv.json \
+  --format json
+
+# Option B: Run orchestrator acquisition wrapper
 python3 skills/audit-orchestrator/scripts/acquire_inventory.py \
   --site https://example.com \
   --output inv.json \
   --format json
 ```
 
-The inventory JSON contains: `site`, `pages[]` (each with `url`, `status`, `content_type`, `page_type`, `html`), `robots_txt`, and `sitemaps[]`.
+The inventory JSON contains: `site`, `pages[]` (each with `url`, `status`, `content_type`, `page_type`, `snr_ratio`, `word_count`, `jsonld`, `clean_markdown`, `html`), `robots` (RFC 9309 16 AI crawler matrix), `sitemaps[]`, and `infrastructure`.
 
 ---
 

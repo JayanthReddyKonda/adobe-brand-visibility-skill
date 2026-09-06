@@ -71,7 +71,8 @@ class SafeHTTPConnection(http.client.HTTPConnection):
         is_safe, err, safe_ips = _is_safe_host(self.host)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked: {err}")
-        self.sock = socket.create_connection((safe_ips[0][4][0], self.port), self.timeout, self.source_address)
+        source_addr = getattr(self, "source_address", None)
+        self.sock = socket.create_connection((safe_ips[0][4][0], self.port), self.timeout, source_addr)
 
 
 class SafeHTTPSConnection(http.client.HTTPSConnection):
@@ -79,11 +80,14 @@ class SafeHTTPSConnection(http.client.HTTPSConnection):
         is_safe, err, safe_ips = _is_safe_host(self.host)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked: {err}")
-        self.sock = socket.create_connection((safe_ips[0][4][0], self.port), self.timeout, self.source_address)
-        if self._tunnel_host:
-            self.sock = self.sock
-            self._tunnel()
-        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.host)
+        source_addr = getattr(self, "source_address", None)
+        self.sock = socket.create_connection((safe_ips[0][4][0], self.port), self.timeout, source_addr)
+        if getattr(self, "_tunnel_host", None):
+            tunnel_fn = getattr(self, "_tunnel", None)
+            if callable(tunnel_fn):
+                tunnel_fn()
+        context = getattr(self, "_context", None) or ssl.create_default_context()
+        self.sock = context.wrap_socket(self.sock, server_hostname=self.host)
 
 
 class SafeHTTPHandler(urllib.request.HTTPHandler):

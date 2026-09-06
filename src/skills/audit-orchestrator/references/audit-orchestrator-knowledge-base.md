@@ -40,13 +40,9 @@
 
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: root-causes.md ===
-========================================================================
-
-# Unified Causal Failure Taxonomy for AI Brand Visibility
+## Unified Causal Failure Taxonomy for AI Brand Visibility
 
 This document establishes the canonical root-cause classification across all skills in the Brand AI-Readiness Audit Marketplace.
 Findings represent authentic **causal failure modes**, not superficial HTML checklist violations.
@@ -157,12 +153,9 @@ AUDIT TAXONOMY
 | `CONTENT.CONTEXT_PLACEMENT_DEGRADATION` | `CONTEXT_PLACEMENT_DEGRADATION` | Primary answer delayed beyond top 30% / first 250 words (Stanford 'Lost in the Middle'). | `medium` |
 | `FACT.CONSISTENCY` | `AI_FACT_CONFLICT` | Observed AI assistant quotes pricing or facts contradicting on-site reality. | `high` |
 
+---
 
-========================================================================
-=== SOURCE FILE: contracts-catalog.md ===
-========================================================================
-
-# Audit Check Contracts Catalog
+## Audit Check Contracts Catalog
 
 Formal contracts defining inputs, evidence criteria, decision boundaries, and remediation rules across all marketplace skills.
 
@@ -320,12 +313,9 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 - **Remediation:** Refactor key text to explain underlying mechanisms, operational workflows, and causal benefits.
 - **Verification:** Confirm presence of explanatory conjunctions and depth markers in visible text.
 
+---
 
-========================================================================
-=== SOURCE FILE: report-schema.md ===
-========================================================================
-
-# Brand AI-Readiness Audit Report Schema
+## Brand AI-Readiness Audit Report Schema
 
 This document specifies the structure, validation constraints, and field semantics for the audit report emitted by `audit-orchestrator`.
 
@@ -486,13 +476,9 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
 }
 ```
 
+---
 
-
-========================================================================
-=== SOURCE FILE: severity-model.md ===
-========================================================================
-
-# Severity & Confidence Calibration Model
+## Severity & Confidence Calibration Model
 
 This document specifies the rules for assigning severity and confidence scores to audit findings.
 
@@ -521,13 +507,9 @@ Confidence reflects the strength and verifiability of the supporting evidence.
 | `medium` | **Corroborated Heuristic (L2 Evidence)**: Derived from cross-page comparison, text word counts, or multi-probe behavioral analysis. | Eligible for `medium` or `low` severity; `high` severity requires explicit corroborating evidence. |
 | `low` | **Weak / Inconclusive Signal (L3 Evidence)**: Speculative or single-sample heuristic lacking secondary corroboration. | **Demoted by the Eligibility Gate** to a proactive recommendation (`proactive_actions[]`); never asserted as a critical/high defect. |
 
+---
 
-
-========================================================================
-=== SOURCE FILE: composition-guidelines.md ===
-========================================================================
-
-# Composition, Evidence & Severity Guidelines
+## Composition, Evidence & Severity Guidelines
 
 How `audit-orchestrator` acquires evidence, composes specialist outputs, gates
 findings, enforces global deadlines, and reports root causes. This document describes the *implemented*
@@ -613,7 +595,9 @@ Synthetic point deduction scores are avoided. The orchestrator emits objective m
 - `critical_blockers`: Total count of critical access/indexing blockers.
 - `confidence_distribution`: High, medium, and low confidence evidence counts.
 - `answerability_index`: Average material attribute coverage across sampled pages.
-# Architectural Contracts
+---
+
+## Architectural Contracts
 
 This document defines the frozen schemas and logic boundaries for the Brand AI Readiness Audit.
 
@@ -690,7 +674,6 @@ Tailor `suggested_action.technical_fix` and `creative_fix` to the detected websi
   - *Technical Fix:* Embed named author `Person` markup with credentials (`jobTitle`, `alumniOf`) and primary source citation links (DOI, academic institutions, standards bodies).
   - *Creative Fix:* Adopt the "Direct Answer Inversion" pattern: an H2 question heading followed immediately by a concise 40-60 word answer lead, followed by 100 words of mechanistic explanation.
 
-
 ## 8. Scoring Model v2 & Composite GEO Score
 
 To produce a single, holistic benchmark of AI search readiness while retaining empirical rigor, the orchestrator computes the Composite GEO Score (0–100):
@@ -749,7 +732,6 @@ For programmatic integration, CI/CD gates, and automated trend monitoring, the o
 }
 -->
 ```
-
 
 ## 10. The Canonical 16-Defect Matrix (HF-01 to HF-08 and W-01 to W-08)
 

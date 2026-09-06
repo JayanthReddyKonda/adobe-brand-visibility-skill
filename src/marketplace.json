@@ -8,6 +8,10 @@
       "entrypoint": true
     },
     {
+      "id": "web-scraper",
+      "path": "skills/web-scraper"
+    },
+    {
       "id": "discoverability-audit",
       "path": "skills/discoverability-audit"
     },

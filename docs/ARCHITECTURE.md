@@ -21,8 +21,8 @@ The AI Agent acts as the cognitive engine:
 │                           AI AGENT (Reasoner)                           │
 │                                                                         │
 │  1. Reads SKILL.md files & Knowledge Bases                             │
-│  2. Executes acquire_inventory.py → Builds typed page inventory         │
-│  3. Executes 6 Specialist Diagnostic Scripts → Collects pure telemetry   │
+│  2. Executes web-scraper (run_scraper.py) → Canonical inv.json snapshot │
+│  3. Executes Specialist Diagnostic Scripts → Collects pure telemetry   │
 │  4. Applies Multi-Signal Reasoning → Root-causes defects (HF-01 to W-08)│
 │  5. Computes 6 Orthogonal Scores & Wilson 95% Confidence Intervals      │
 │  6. Generates Final JSON Report → Validates with validate_report.py     │
@@ -30,10 +30,10 @@ The AI Agent acts as the cognitive engine:
                                      │
            ┌─────────────────────────┼────────────────────────┐
            ▼                         ▼                        ▼
-     Orchestration Tools      6 Specialist Skills       Validation Gate
-     acquire_inventory.py     discoverability-audit     validate_report.py
-     safe_fetch.py            entity-content-audit      report-schema.json
-                              fact-consistency-audit
+     Acquisition Engine       Diagnostic Skills         Validation Gate
+     web-scraper              discoverability-audit     validate_report.py
+     acquire_inventory.py     entity-content-audit      report-schema.json
+     safe_fetch.py            fact-consistency-audit
                               corroboration-authority
                               geo-content-audit
                               engagement-context

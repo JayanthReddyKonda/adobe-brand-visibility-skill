@@ -15,12 +15,18 @@ import time
 import urllib.robotparser
 import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urljoin, urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
-from safe_fetch import DEFAULT_USER_AGENT, safe_fetch
+# Discover peer web-scraper skill if present in marketplace
+WEB_SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
+if os.path.exists(WEB_SCRAPER_DIR) and WEB_SCRAPER_DIR not in sys.path:
+    sys.path.insert(0, WEB_SCRAPER_DIR)
+
+from safe_fetch import DEFAULT_USER_AGENT, safe_fetch  # type: ignore
 
 NON_HTML_EXTENSIONS = (
     ".xml",
@@ -95,7 +101,6 @@ def extract_locale_and_template(url):
 
 def classify_page(url, title=""):
     """Classify an HTML page with confidence, granular page types, and template identification."""
-    urlparse(url)
     locale, logical_path = extract_locale_and_template(url)
     segments = [s for s in logical_path.strip("/").split("/") if s]
     t_lower = (title or "").lower()
@@ -303,17 +308,73 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     domain, base_url = normalize_target(site)
     target_netloc = urlparse(base_url).netloc.lower()
 
-    inv = {
+    # Intelligent Agent Scraper Integration (delegating to web-scraper skill)
+    WebAuditEngine = None
+    try:
+        from crawler.engine import WebAuditEngine
+    except ImportError:
+        try:
+            from .crawler.engine import WebAuditEngine
+        except ImportError:
+            try:
+                import importlib.util
+                candidate_paths = [
+                    os.path.join(WEB_SCRAPER_DIR, "crawler", "engine.py"),
+                    os.path.join(SCRIPT_DIR, "crawler", "engine.py"),
+                ]
+                for crawler_engine_path in candidate_paths:
+                    if os.path.exists(crawler_engine_path):
+                        spec = importlib.util.spec_from_file_location("crawler.engine", crawler_engine_path)
+                        if spec and spec.loader:
+                            mod = importlib.util.module_from_spec(spec)
+                            sys.modules["crawler.engine"] = mod
+                            spec.loader.exec_module(mod)
+                            WebAuditEngine = getattr(mod, "WebAuditEngine", None)
+                            if WebAuditEngine is not None:
+                                break
+            except Exception:
+                WebAuditEngine = None
+
+    if WebAuditEngine is not None:
+        effective_timeout = max(5.0, (deadline - time.monotonic()) if deadline else timeout_seconds)
+        engine = WebAuditEngine(time_limit_sec=effective_timeout, max_pages=max_pages)
+        try:
+            engine.crawl(base_url)
+            if engine.pages:
+                inv_dict = engine.to_inventory_dict()
+                inv_dict["site"] = domain
+                inv_dict["base_url"] = base_url
+                stats = {
+                    "homepage_reachable": inv_dict["infrastructure"]["homepage_reachable"],
+                    "html_pages_sampled": len(inv_dict["pages"]),
+                    "sitemaps_found": len(inv_dict["infrastructure"]["sitemaps_discovered"]),
+                    "sitemaps_processed": inv_dict["infrastructure"]["sitemaps_processed"],
+                    "urls_discovered": inv_dict["infrastructure"]["urls_extracted"],
+                    "same_origin_urls": inv_dict["infrastructure"]["same_origin_urls"],
+                    "elapsed_seconds": inv_dict.get("elapsed_seconds", round(time.monotonic() - start_mono, 1)),
+                    "page_types": {
+                        t: sum(1 for p in inv_dict["pages"] if p.get("page_type") == t)
+                        for t in {p.get("page_type") for p in inv_dict["pages"] if p.get("page_type")}
+                    },
+                }
+                return inv_dict, stats
+        except Exception:
+            pass
+
+    infra: Dict[str, Any] = {
+        "sitemaps_discovered": [],
+        "sitemaps_processed": 0,
+        "urls_extracted": 0,
+        "same_origin_urls": 0,
+    }
+    pages_list: List[Dict[str, Any]] = []
+    limitations_list: List[str] = []
+    inv: Dict[str, Any] = {
         "site": domain,
         "base_url": base_url,
-        "pages": [],
-        "infrastructure": {
-            "sitemaps_discovered": [],
-            "sitemaps_processed": 0,
-            "urls_extracted": 0,
-            "same_origin_urls": 0,
-        },
-        "limitations": [],
+        "pages": pages_list,
+        "infrastructure": infra,
+        "limitations": limitations_list,
     }
 
     # 1. Homepage Acquisition

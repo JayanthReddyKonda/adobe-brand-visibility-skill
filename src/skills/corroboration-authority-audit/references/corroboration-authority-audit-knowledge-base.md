@@ -2,13 +2,9 @@
 
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: identity-vs-claim.md ===
-========================================================================
-
-# Identity Link Verification vs Claim Corroboration Reference
+## Identity Link Verification vs Claim Corroboration Reference
 
 This reference defines the strict boundary between identity link verification (`sameAs` resolution) and external claim corroboration.
 
@@ -63,12 +59,9 @@ External claim corroboration refers to searching the open web to independently v
 - **First-Party Grounding:** The audit evaluates first-party machine-explicitness, structured schema integrity, and declared anchor validity.
 - **Inconclusive Handling:** If a third-party registry times out, rate-limits (HTTP 429), or requires Cloudflare bot verification, the probe is recorded as `inconclusive` and NEVER reported as a broken link defect.
 
+---
 
-========================================================================
-=== SOURCE FILE: corroboration-contracts.md ===
-========================================================================
-
-# Corroboration & Authority — Check Contracts
+## Corroboration & Authority — Check Contracts
 
 Every check in this skill follows this contract. Findings are only emitted
 when the DEFECT conditions are met with direct evidence; everything else is
@@ -101,12 +94,9 @@ either INCONCLUSIVE or a proactive recommendation.
 Findings here rely on Levels 1–3 (direct HTTP/DOM, structured data, cross-page
 first-party). Level 6 (heuristic inference) never produces high severity.
 
+---
 
-========================================================================
-=== SOURCE FILE: authority-correlation-guide.md ===
-========================================================================
-
-# External Authority Channels & AI Citation Weight Matrix
+## External Authority Channels & AI Citation Weight Matrix
 
 AI search engines (Perplexity, ChatGPT Search, Claude Search) do not rely solely on internal HTML markup; they cross-validate entity claims against authoritative external web nodes.
 

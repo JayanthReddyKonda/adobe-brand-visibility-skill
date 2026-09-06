@@ -26,7 +26,7 @@ if [ -f "$VENV_BIN/ruff" ] && [ -f "$VENV_BIN/flake8" ] && [ -f "$VENV_BIN/mypy"
             "$VENV_BIN/mypy" "$skill" --ignore-missing-imports --no-error-summary >/dev/null 2>&1 || "$VENV_BIN/mypy" "$skill" --ignore-missing-imports
         fi
     done
-    echo "  [OK] MyPy passed across all 7 skills."
+    echo "  [OK] MyPy passed across all 8 skills."
 
     echo ""
     echo "=== 4. JSON Integrity & Draft-07 Schema Gate ==="

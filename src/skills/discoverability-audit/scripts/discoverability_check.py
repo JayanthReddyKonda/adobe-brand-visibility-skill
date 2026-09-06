@@ -21,7 +21,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_fetch
+from safe_fetch import safe_fetch  # type: ignore
 
 AI_BOTS = [
     "OAI-SearchBot",
@@ -833,7 +833,7 @@ def audit(base, domain, inv=None, state_file=None):
         "retrieval_bots_allowed": search_bots_allowed,
         "retrieval_bots_total": search_bots_total,
         "retrieval_bots_allowed_ratio": round(search_bots_allowed / max(search_bots_total, 1), 3),
-        "raw_html_content_available": bool(visible_words >= 60),
+        "raw_html_content_available": visible_words >= 60,
         "semantic_landmarks_present": has_semantic_landmarks,
         "signal_to_noise_ratio": snr,
     }

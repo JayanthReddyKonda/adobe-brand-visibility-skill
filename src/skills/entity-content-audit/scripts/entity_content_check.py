@@ -19,6 +19,7 @@ import os
 import re
 import sys
 from html.parser import HTMLParser
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +27,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_fetch
+from safe_fetch import safe_fetch  # type: ignore
 
 # Weighted Answerability Schema by Page Type (Structured & Measurable Material Attributes)
 MATERIAL_ATTRIBUTE_WEIGHTS = {
@@ -319,7 +320,7 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
 
 
 def audit(base, domain, inv=None, state_file=None):
-    state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
+    state: Dict[str, Any] = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
     if state_file and os.path.exists(state_file):
         try:
             with open(state_file, "r") as f:
@@ -436,25 +437,30 @@ def audit(base, domain, inv=None, state_file=None):
                 pass
             typed_objects = parse_json_ld(pdom.json_ld_contents, phtml)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
-            if ans and ans.get("status") == "present":
-                for res in ans.get("results", []):
-                    answerability_evaluations.append(res)
-                    missing = [k for k, v in res["facts"].items() if not v]
-                    if missing:
-                        findings.append(
-                            {
-                                "category": "product-answerability",
-                                "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
-                                "severity": "medium",
-                                "confidence": "high",
-                                "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
-                                "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
-                                "id": "ATTRIBUTE_INCOMPLETENESS",
-                                "cause_id": "ATTRIBUTE_INCOMPLETENESS",
-                                "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
-                                "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res['score']}/1.0.",
-                                "suggested_action": {
-                                    "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
+            if isinstance(ans, dict) and ans.get("status") == "present":
+                results_list = ans.get("results")
+                if isinstance(results_list, list):
+                    for res in results_list:
+                        if isinstance(res, dict):
+                            answerability_evaluations.append(res)
+                            res_facts = res.get("facts")
+                            if isinstance(res_facts, dict):
+                                missing = [k for k, v in res_facts.items() if not v]
+                                if missing:
+                                    findings.append(
+                                        {
+                                            "category": "product-answerability",
+                                            "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
+                                            "severity": "medium",
+                                            "confidence": "high",
+                                            "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
+                                            "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
+                                            "id": "ATTRIBUTE_INCOMPLETENESS",
+                                            "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                                            "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
+                                            "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res.get('score', 0.0)}/1.0.",
+                                            "suggested_action": {
+                                                "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
                                     "priority": "medium",
                                     "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
                                 },

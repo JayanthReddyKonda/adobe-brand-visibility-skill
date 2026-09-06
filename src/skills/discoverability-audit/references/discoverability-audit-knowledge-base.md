@@ -29,13 +29,9 @@
 
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: discoverability-contracts.md ===
-========================================================================
-
-# Discoverability Audit — Check Contracts
+## Discoverability Audit — Check Contracts
 
 Every check in this skill states what it measures, what evidence is required,
 what does **not** constitute a defect, and how severity is assigned. Checks
@@ -92,12 +88,9 @@ If the homepage cannot be fetched, the script returns
 `status: "inconclusive"` with zero findings. The orchestrator surfaces this
 status; it is never interpreted as "clean".
 
+---
 
-========================================================================
-=== SOURCE FILE: crawler-matrix-reference.md ===
-========================================================================
-
-# Canonical AI Crawler Matrix & Platform Semantics Reference
+## Canonical AI Crawler Matrix & Platform Semantics Reference
 
 Understanding the distinct purposes and operational impacts of AI web crawlers is essential for avoiding false-positive audit findings.
 
@@ -128,13 +121,9 @@ Understanding the distinct purposes and operational impacts of AI web crawlers i
 2. **Google AI Overviews (AIO):**
    - Uses standard `Googlebot` crawling and indexing pipelines. `Google-Extended` disallows do NOT prevent Google Search or AI Overviews from citing a page.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: seo-foundations.md ===
-========================================================================
-
-# Technical SEO Foundations for AI Retrieval
+## Technical SEO Foundations for AI Retrieval
 
 This reference synthesizes essential technical SEO mechanisms and their causal impact on AI discovery, indexing, and retrieval.
 
@@ -150,13 +139,19 @@ robots.txt governs **crawling access**, not indexing.
 
 ### Path Syntax Rules
 ```txt
-# Blocks /admin, /admin/, /admin123
+---
+
+## Blocks /admin, /admin/, /admin123
 Disallow: /admin
 
-# Blocks ONLY paths under /admin/
+---
+
+## Blocks ONLY paths under /admin/
 Disallow: /admin/
 
-# Wildcards
+---
+
+## Wildcards
 Disallow: /*.pdf$    # Blocks all PDF files
 Disallow: /*/temp/   # Blocks temp directory at any depth
 ```
@@ -222,19 +217,22 @@ Fine-grained controls to govern how search engines and AI assistants quote conte
 ```
 *(Note: `data-nosnippet` is only supported on `span`, `div`, and `section` tags).*
 
+---
 
-========================================================================
-=== SOURCE FILE: robots-txt-recipe.md ===
-========================================================================
-
-# Production-Ready robots.txt Recipe (Copy-Paste Remediation)
+## Production-Ready robots.txt Recipe (Copy-Paste Remediation)
 
 This standard `robots.txt` configuration allows real-time AI search retrieval crawlers (ChatGPT Search, Claude, Perplexity) while cleanly opting out of foundation model training datasets (if desired by brand governance):
 
 ```text
-# ==============================================================================
-# AI Search Retrieval Crawlers (ALLOWED: Required for Citations & AI Overviews)
-# ==============================================================================
+---
+
+## ==============================================================================
+---
+
+## AI Search Retrieval Crawlers (ALLOWED: Required for Citations & AI Overviews)
+---
+
+## ==============================================================================
 User-agent: OAI-SearchBot
 Allow: /
 
@@ -244,10 +242,18 @@ Allow: /
 User-agent: PerplexityBot
 Allow: /
 
-# ==============================================================================
-# Foundation Model Training Tokens (OPTIONAL: Disallow to Opt Out of Training)
-# Note: Blocking training tokens does NOT affect live AI search retrieval citations.
-# ==============================================================================
+---
+
+## ==============================================================================
+---
+
+## Foundation Model Training Tokens (OPTIONAL: Disallow to Opt Out of Training)
+---
+
+## Note: Blocking training tokens does NOT affect live AI search retrieval citations.
+---
+
+## ==============================================================================
 User-agent: GPTBot
 Disallow: /
 
@@ -263,9 +269,15 @@ Disallow: /
 User-agent: CCBot
 Disallow: /
 
-# ==============================================================================
-# General Web Indexers & Sitemaps
-# ==============================================================================
+---
+
+## ==============================================================================
+---
+
+## General Web Indexers & Sitemaps
+---
+
+## ==============================================================================
 User-agent: *
 Allow: /
 Disallow: /admin/
@@ -273,7 +285,6 @@ Disallow: /checkout/
 Disallow: /api/
 
 Sitemap: https://example.com/sitemap.xml
-
 
 ---
 

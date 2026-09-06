@@ -19,7 +19,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_fetch
+from safe_fetch import safe_fetch  # type: ignore
 
 
 class SameAsExtractor(HTMLParser):
@@ -182,7 +182,7 @@ def parse_candidate_backlinks(arg_val, inv=None):
         candidates = inv.get("candidate_backlinks", inv.get("backlinks", []))
 
     clean_candidates = []
-    for c in candidates:
+    for c in (candidates or []):
         if isinstance(c, str) and c.strip().startswith("http"):
             clean_candidates.append({"source_url": c.strip()})
         elif isinstance(c, dict) and c.get("source_url"):

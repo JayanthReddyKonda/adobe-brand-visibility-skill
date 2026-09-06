@@ -38,3 +38,17 @@ ignore = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = [
+    "src/skills/audit-orchestrator/scripts",
+    "src/skills/web-scraper/scripts",
+    "src/skills/discoverability-audit/scripts",
+    "src/skills/entity-content-audit/scripts",
+    "src/skills/fact-consistency-audit/scripts",
+    "src/skills/corroboration-authority-audit/scripts",
+    "src/skills/geo-content-audit/scripts",
+    "src/skills/engagement-context-audit/scripts"
+]
+

@@ -2,7 +2,7 @@
 
 **Author:** Jayanth Reddy Konda  
 **Version:** 3.0.0  
-**Status:** 83 Automated Tests Passing · 100% Green QA Pipeline  
+**Status:** 131 Automated Tests Passing · 100% Green QA Pipeline  
 
 ---
 
@@ -58,9 +58,9 @@ Every build and commit must cleanly pass all five automated stages:
 
 1. **Ruff Linter & Formatter:** Strict syntax, formatting, and PEP 8 enforcement (`0 errors`).
 2. **Flake8 Style Checker:** Zero unused imports, clean indentation (`0 errors`).
-3. **MyPy Static Typing:** Strict type-checking across all 7 skills (`0 errors`).
+3. **MyPy Static Typing:** Strict type-checking across all 8 skills (`0 errors`).
 4. **JSON Schema Gate:** Draft-07 JSON Schema gate validating `report-schema.json` and all sample manifests (`0 errors`).
-5. **Pytest Unit Test Suite:** **83 automated unit tests** across 21 test modules running in ~2.3 seconds (`100% passing`).
+5. **Pytest Unit Test Suite:** **131 automated unit tests** across 24 test modules running in ~20 seconds (`100% passing`).
 
 ---
 

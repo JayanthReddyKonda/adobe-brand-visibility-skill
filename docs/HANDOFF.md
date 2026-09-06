@@ -4,7 +4,7 @@
 **Version:** 3.0.0 (Production SOTA Release)  
 **Project:** Brand AI-Readiness & Generative Engine Optimization (GEO/AEO) Audit Suite  
 **Target Audience:** Incoming Autonomous AI Agent taking over project stewardship  
-**Status:** 100% OPERATIONAL — 83/83 TESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
+**Status:** 100% OPERATIONAL — 131/131 TESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
 
 ---
 
@@ -20,12 +20,12 @@ This codebase delivers an end-to-end audit skill that evaluates any brand's webs
 ### The Non-Negotiable Evaluator Constraints (`round3_PS.pdf`)
 To maintain a 100/100 evaluation score, you MUST preserve these strict rules:
 1. **Zero External Dependencies:** 100% pure Python standard library (`urllib.request`, `html.parser`, `re`, `json`, `math`, `datetime`, `subprocess`, `ssl`, `socket`). No `pip` packages (`requests`, `beautifulsoup4`, `playwright`, `pydantic`).
-2. **Single Entrypoint Architecture:** Exactly 1 entrypoint orchestrator (`audit-orchestrator`) coordinating 6 specialist skills defined in `marketplace.json` conforming to the `agentskills.io` standard.
-3. **Draft-07 JSON Schema Gate:** Final audit report MUST strictly validate against `report-schema.json` with `additionalProperties: false`. Every finding MUST contain `id`, `title`, `severity`, `category`, `root_cause`, `evidence`, and `suggested_action`.
+2. **Single Entrypoint Architecture:** Exactly 1 entrypoint orchestrator (`audit-orchestrator`) coordinating 7 specialist skills (including dedicated `web-scraper`) defined in `marketplace.json` conforming to the `agentskills.io` standard (8 skills total).
+3. **Draft-07 JSON Schema Gate:** Final audit report MUST strictly validate against `report-schema.json` with support for both string and structured evidence objects, dual-track remediation (`technical_fix`, `creative_fix`, `verification`), and proactive actions.
 4. **Recommend-Only Mandate:** Never execute mutating operations on the target domain; recommend fixes with `technical_fix` and `creative_fix`.
 5. **Zero Emojis Policy:** Absolute zero emojis in any markdown documentation across all skills and docs.
-6. **Package Ceiling:** Zip size must stay <= 50 MB (current build is ~198 KB).
-7. **Time Ceiling:** Audit execution must complete in < 5 minutes (current test suite runs in 2.3s).
+6. **Package Ceiling:** Zip size must stay <= 50 MB (current build is ~274 KB).
+7. **Time Ceiling:** Audit execution must complete in < 5 minutes (test suite runs in ~20s, live audits finish in < 3s).
 
 ---
 
@@ -34,27 +34,32 @@ To maintain a 100/100 evaluation score, you MUST preserve these strict rules:
 The codebase exists in two synchronized representations:
 - `src/skills/`: The primary source codebase.
 - `.agents/skills/`: The runtime agent marketplace environment.
-- **Rule:** Any change made in `src/skills/` MUST be mirrored to `.agents/skills/` (`cp -a src/skills/* .agents/skills/`).
+- **Rule:** Any change made in `src/skills/` MUST be mirrored to `.agents/skills/` (`./scripts/sync.sh`).
 
 ```
 adobe-brand-visibility-skill/
-├── marketplace.json                 # Standard marketplace manifest (1 entrypoint + 6 specialists)
-├── src/skills/                      # Source skills directory
+├── marketplace.json                 # Standard marketplace manifest (1 entrypoint + 7 specialists)
+├── src/skills/                      # Source skills directory (8 skills total)
 │   ├── audit-orchestrator/          # Entrypoint coordinator & report synthesis
 │   │   ├── SKILL.md                 # Orchestrator runbook & synthesis guidelines
 │   │   ├── scripts/                 # acquire_inventory.py, validate_report.py, safe_fetch.py
 │   │   └── references/              # report-schema.json, knowledge base, SOTA benchmark docs
+│   ├── web-scraper/                 # Autonomous crawler, RFC 9309 matrices, markdown & JSON-LD
+│   │   ├── SKILL.md                 # Scraper runbook & CLI guidelines
+│   │   ├── scripts/run_scraper.py   # CLI entrypoint with JSON & MD table outputs
+│   │   └── scripts/crawler/         # 17 pure-Python modules (policy, fetch, robots, sitemap, etc.)
 │   ├── discoverability-audit/       # RFC 9309, AI bots, SNR, nosnippet (HF-03, HF-04, HF-05)
 │   ├── entity-content-audit/        # Schema.org @graph, sameAs, ISO 4217, product consistency (HF-06)
 │   ├── fact-consistency-audit/      # Cross-page contradiction ledger, price drift (W-03)
 │   ├── corroboration-authority-audit/# Zero-trust linkbacks, 57% off-site footprint (W-04)
 │   ├── geo-content-audit/           # Evidence genres, hedge lexicon, FTR, BLUF, Wilson CIs (TX01-TX06)
 │   └── engagement-context-audit/    # Post-citation intent handoff, value CTAs, /pricing.md
-├── tests/                           # 83 automated unit tests across 21 test suites
+├── tests/                           # 131 automated unit tests across 24 test suites
 ├── docs/                            # High-level knowledge base and architectural docs
 ├── resources/                       # Unabridged research papers, PDFs, cloned repos, and specs
 └── scripts/
     ├── qa_check.sh                  # Full production pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
+    ├── sync.sh                      # Synchronizes src/skills/ to .agents/skills/
     └── build.sh                     # Cleans, strips pycache, packages brand-ai-readiness-audit.zip
 ```
 
@@ -70,23 +75,29 @@ adobe-brand-visibility-skill/
   - `safe_fetch.py`: Enterprise-grade SSRF protection blocking private RFC-1918, link-local, and loopback IP addresses.
 - **Cognitive Responsibility:** The agent synthesizes specialist telemetry, deduplicates overlapping findings, calculates the 6 Orthogonal Scores, maps root causes to the 16-Defect Matrix, and outputs the final report.
 
-### 2. `discoverability-audit` (Crawl & Index Eligibility)
+### 2. `web-scraper` (Single-Pass Crawler & Content Extractor)
+- **Role:** Autonomous, zero-dependency web crawler and AI content extractor.
+- **Key Tools:**
+  - `run_scraper.py`: Production CLI with JSON output (`inv.json`) and clean terminal Markdown tables.
+  - `crawler/`: 17 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval & training bots, recursive sitemap parsing, Trafilatura-grade clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, and zero-trust SSRF defense.
+
+### 3. `discoverability-audit` (Crawl & Index Eligibility)
 - **Evaluates:** RFC 9309 rules (500 KiB cap `CR04`, 5xx fail-closed `CR05`), AI search indexers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) vs. training bots (`GPTBot`, `ClaudeBot`), Signal-to-Noise Ratio (`RD02`, `SNR >= 0.12`), and nosnippet restrictions (`HF-05`).
 
-### 3. `entity-content-audit` (Machine-Explicit Identity & Commerce)
+### 4. `entity-content-audit` (Machine-Explicit Identity & Commerce)
 - **Evaluates:** Schema.org JSON-LD `@graph` structures (`Organization`, `Product`, `Offer`), authoritative `sameAs` density (>= 2 nodes `SC01`), clean float pricing without currency symbols, 3-letter ISO 4217 currencies (`SC02`), 60-day freshness (`SC03`), HTML vs. JSON-LD product consistency (`HF-06`), and Universal Commerce Protocol (UCP) readiness.
 
-### 4. `fact-consistency-audit` (Truth & Grounding Ledger)
+### 5. `fact-consistency-audit` (Truth & Grounding Ledger)
 - **Evaluates:** Multi-page numerical and factual drift. Scrapes pricing, phone numbers, addresses, and copyright dates across all routes to detect self-contradictory claims (`W-03`) that trigger LLM hallucination and mistrust.
 
-### 5. `corroboration-authority-audit` (External Identity & Third-Party Footprint)
+### 6. `corroboration-authority-audit` (External Identity & Third-Party Footprint)
 - **Evaluates:** Zero-trust HTTP linkback verification. Confirms that external `sameAs` targets (Wikidata, Wikipedia, LinkedIn, GitHub) actually point back to the brand.
 - **57% Off-Site Footprint Sensor:** Probes for brand footprint across the top third-party citation hubs (Reddit, Wikipedia, YouTube, LinkedIn, Trustpilot, G2), acknowledging that 57% of branded AI search citations derive from third-party sources.
 
-### 6. `geo-content-audit` (Generative Citability & Absorption)
+### 7. `geo-content-audit` (Generative Citability & Absorption)
 - **Evaluates:** Evidence genre detection (Code +76.9%, Stats +61.6%, Definitions +57.3%, Comparisons +55.3%), Hyland hedge lexicon density (<= 1.2%), Atomic Fact-to-Token Ratio (FTR >= 0.080), BLUF top-30% positioning, Exophoric pronoun RAG grounding, Q&A alone penalty warning (-5.7%), and Wilson 95% Confidence Intervals.
 
-### 7. `engagement-context-audit` (Intent Handoff & Autonomous Buying)
+### 8. `engagement-context-audit` (Intent Handoff & Autonomous Buying)
 - **Evaluates:** Post-citation user orientation, first-3-elements CTA reachability, value-driven CTA text analysis (`[Action] + [Specific Value]`), and machine-readable pricing manifests (`/pricing.md` or `/pricing.txt`) for autonomous purchasing agents.
 
 ---

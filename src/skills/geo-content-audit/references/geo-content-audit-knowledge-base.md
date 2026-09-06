@@ -19,11 +19,9 @@
 
 This document contains all mandatory rules, schemas, taxonomies, and research citations for the `geo-content-audit` skill.
 
-========================================================================
-=== SOURCE FILE: geo-contracts.md ===
-========================================================================
+---
 
-# Generative Engine Optimization (GEO) Check Contracts
+## Generative Engine Optimization (GEO) Check Contracts
 
 This reference formalizes the decision boundaries, heuristics, and research foundations for optimizing content citability in AI search engines (ChatGPT Search, Claude, Perplexity, Gemini).
 
@@ -85,12 +83,9 @@ Empirical research on 10,000 queries (Aggarwal et al., Princeton University / KD
 | Numbers present in header/footer only | Evaluate body text only | Header/footer navigation digits do not constitute substantive evidence. |
 | Page contains fewer than 50 total words | Defer to `discoverability-audit` | Handled by rendering gap checks (`RENDERED_CONTENT_GAP`). |
 
+---
 
-========================================================================
-=== SOURCE FILE: geo-templates.md ===
-========================================================================
-
-# Princeton KDD 2024 & AutoGEO Content Formatting Templates
+## Princeton KDD 2024 & AutoGEO Content Formatting Templates
 
 ## 1. Direct Q&A Answer-Block Pattern (AutoGEO)
 
@@ -148,12 +143,9 @@ Incorporate these causal markers to maximize RAG extraction probability (+28% se
 *   **Mechanistic Action:** `allows`, `enables`, `functions by`, `operates via`, `results in`
 *   **Quantifiable Validation:** `measured at`, `benchmarked at`, `demonstrating a [X]% increase`
 
+---
 
-========================================================================
-=== SOURCE FILE: sota-geo-research-compendium.md ===
-========================================================================
-
-# State-of-the-Art GEO & AI Search Research Compendium
+## State-of-the-Art GEO & AI Search Research Compendium
 
 Synthesis of empirical findings from:
 1. Princeton University / KDD 2024: "GEO: Generative Engine Optimization" (Aggarwal et al.)
@@ -226,8 +218,6 @@ AI content visibility is measured across seven fine-grained dimensions (0–5 sc
 - **Click-Follow Likelihood:** Persuasiveness and intent satisfaction prompting citation clicks.
 - **Subjective Positional Prominence:** Early placement in synthesized AI answer text.
 - **Subjective Content Volume:** Share of voice within the generated response.
-
-
 
 ---
 

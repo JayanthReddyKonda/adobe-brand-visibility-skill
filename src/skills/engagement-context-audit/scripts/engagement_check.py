@@ -17,14 +17,14 @@ import sys
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-from fact_extractor import extract_scoped_facts
+from fact_extractor import extract_scoped_facts  # type: ignore
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 
-from safe_fetch import safe_fetch
+from safe_fetch import safe_fetch  # type: ignore
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
 

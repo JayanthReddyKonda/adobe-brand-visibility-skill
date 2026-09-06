@@ -23,13 +23,9 @@
 
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: entity-contracts.md ===
-========================================================================
-
-# Entity & Content Audit — Check Contracts
+## Entity & Content Audit — Check Contracts
 
 Every check in this skill states what it measures, what evidence is required,
 and what does **not** constitute a defect. Findings are only emitted for
@@ -84,12 +80,9 @@ must not fabricate entity verdicts from an empty page.
 - The skill never infers facts from absent markup beyond what the check
   contract above explicitly licenses.
 
+---
 
-========================================================================
-=== SOURCE FILE: structured-data-validation.md ===
-========================================================================
-
-# Structured Data Reference & Validation Guide
+## Structured Data Reference & Validation Guide
 
 Implementation rules for JSON-LD structured data to ensure unambiguous entity recognition, offer extraction, and rich result eligibility.
 
@@ -171,12 +164,9 @@ Ensures commercial terms (pricing, availability, variants) are extracted determi
 - **Markup-vs-DOM Contradiction:** A verified defect (`finding`) if JSON-LD price contradicts visible on-page price.
 - **Incomplete Product Markup:** A low-severity defect if Product schema exists but omits price or availability.
 
+---
 
-========================================================================
-=== SOURCE FILE: no-jsonld.md ===
-========================================================================
-
-# False Positive Decision Table: Absence of JSON-LD Schema
+## False Positive Decision Table: Absence of JSON-LD Schema
 
 ## Signal
 Page contains readable HTML text but has no `<script type="application/ld+json">` blocks.
@@ -192,13 +182,9 @@ Page contains readable HTML text but has no `<script type="application/ld+json">
 ## Report As Defect ONLY When:
 - The page is a core commercial flagship product or organization page where crucial facts (pricing variants, availability state, technical specifications) are embedded in complex client-side tables or obfuscated structures that cannot be extracted deterministically without structured schema.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: schema-templates-catalog.md ===
-========================================================================
-
-# Schema.org Copy-Paste Templates Catalog
+## Schema.org Copy-Paste Templates Catalog
 
 ## 1. Master Linked Graph Template (Organization + WebSite + SearchAction)
 

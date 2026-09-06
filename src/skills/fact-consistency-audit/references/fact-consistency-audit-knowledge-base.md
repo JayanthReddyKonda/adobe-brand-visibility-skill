@@ -30,13 +30,9 @@
 
 This document contains all mandatory rules, schemas, and taxonomies required for this skill.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: multi-tier-pricing.md ===
-========================================================================
-
-# False Positive Decision Table: Multi-Tier Pricing Contexts
+## False Positive Decision Table: Multi-Tier Pricing Contexts
 
 ## Signal
 Multiple distinct price values (e.g. $10, $25, $50, $250) appear on the same domain or pricing page.
@@ -51,13 +47,9 @@ Multiple distinct price values (e.g. $10, $25, $50, $250) appear on the same dom
 - **Verified Cross-Page Contradiction**: The exact same product/tier (e.g. "Velocity X9 Drone") is stated at one price on the main product landing page (e.g. "₹5,499") and a different contradictory price on a secondary/legacy page (e.g. "₹4,999") without clear discount or archival context.
 - **Markup Discrepancy**: The visible on-page price states "$49", but the JSON-LD `offers.price` schema states `"99"`.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: entity-corroboration.md ===
-========================================================================
-
-# Entity Corroboration & Knowledge Graph Grounding
+## Entity Corroboration & Knowledge Graph Grounding
 
 AI assistants cross-verify facts against independent web sources to validate claims and resolve brand ambiguities. This document outlines best practices for entity disambiguation and cross-web grounding.
 
@@ -103,13 +95,9 @@ A machine-verifiable About Page must contain:
 2. **Physical / Legal Registry Data**: Legal registered company name, corporate headquarters city/state/country.
 3. **Canonical Domain Declarations**: Explicit statement of official operating domains.
 
+---
 
-
-========================================================================
-=== SOURCE FILE: temporal-freshness.md ===
-========================================================================
-
-# Temporal Freshness & Product Lifecycle Reference
+## Temporal Freshness & Product Lifecycle Reference
 
 This reference defines the verification rules for temporal freshness, copyright drift, and product lifecycle state consistency across multi-page brand websites.
 
@@ -148,12 +136,9 @@ A major failure mode in AI-generated answers is recommending discontinued or out
 ### Verification Guardrail:
 - Never classify an entire page as discontinued based on a single word in global headers or footers. The discontinued indicator must be strictly bound to the specific product entity or heading.
 
+---
 
-========================================================================
-=== SOURCE FILE: freshness-checklist.md ===
-========================================================================
-
-# Freshness & Temporal Signals Checklist
+## Freshness & Temporal Signals Checklist
 
 This reference covers the checks required to detect stale, unmaintained, or conflicting facts that cause AI assistants to downgrade trust or hallucinate outdated brand data.
 
@@ -183,13 +168,9 @@ This reference covers the checks required to detect stale, unmaintained, or conf
 - [] **Legacy Product References**: Does the site prominently advertise deprecated products, sunset APIs, or legacy pricing tiers without clear obsolescence notices?
 - [] **Changelog & Release Notes Cadence**: Are recent product updates or version release notes accessible within the last 90 days?
 
+---
 
-
-========================================================================
-=== SOURCE FILE: fact-contracts.md ===
-========================================================================
-
-# Fact Consistency & Lifecycle Audit — Check Contracts
+## Fact Consistency & Lifecycle Audit — Check Contracts
 
 Formal check contracts, decision thresholds, and evidence criteria for first-party fact consistency and lifecycle synchronization.
 
@@ -219,12 +200,9 @@ Formal check contracts, decision thresholds, and evidence criteria for first-par
 - **Measures:** Copyright year notices and dateModified timestamps.
 - **Defect:** Multi-year outdated copyright notices across core routes suggesting stale site maintenance (`TEMPORAL_FRESHNESS_DRIFT`, Severity: `low`).
 
+---
 
-========================================================================
-=== SOURCE FILE: fact-normalization.md ===
-========================================================================
-
-# Fact Normalization & Contradiction Detection Reference
+## Fact Normalization & Contradiction Detection Reference
 
 This reference defines the mathematical normalization algorithms and strict contextual scoping rules required to eliminate false positive contradiction findings across first-party pages.
 
