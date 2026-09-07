@@ -91,6 +91,23 @@ class TestOrchestratorScript(unittest.TestCase):
         val_res = run_validator(report)
         self.assertEqual(val_res.returncode, 0, f"Schema validation error: {val_res.stderr}")
 
+    def test_orchestrator_telemetry_execution(self):
+        """Verify orchestrator --telemetry emits empirical telemetry with causal state."""
+        res = run_skill_script(
+            "audit-orchestrator",
+            "orchestrator.py",
+            ["--site", "https://example.com", "--inventory", self.healthy_inv_path, "--telemetry"],
+        )
+        self.assertEqual(res.returncode, 0, f"Orchestrator --telemetry failed: {res.stderr}")
+        telemetry = res.json
+        self.assertEqual(telemetry.get("site"), "https://example.com")
+        self.assertIn("crawled_at", telemetry)
+        self.assertIn("archetype", telemetry)
+        self.assertIn("causal_state", telemetry)
+        self.assertIn("nodes", telemetry["causal_state"])
+        self.assertIn("evidence_index", telemetry)
+        self.assertIn("sensor_telemetry", telemetry)
+
 
 if __name__ == "__main__":
     unittest.main()

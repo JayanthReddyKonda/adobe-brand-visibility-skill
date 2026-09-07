@@ -20,8 +20,8 @@ AI retrieval engines separate search retrieval crawlers (needed to cite the bran
 | `PerplexityBot` | Perplexity AI | Perplexity Pro search citations | Critical: Excluded from Perplexity citations |
 | `Claude-SearchBot` | Anthropic | Claude search retrieval | Critical: Excluded from Claude citations |
 | `Bingbot` | Microsoft | Copilot & Bing grounding | Critical: Excluded from Copilot & Bing |
-| `Google-Extended` | Google | Gemini & Vertex AI grounding | High: Excluded from Gemini citations |
-| `Applebot-Extended` | Apple | Apple Intelligence search | Medium: Excluded from Siri / Apple AI answers |
+| `Google-Extended` | Google | Training control token (Gemini training data; uses Googlebot HTTP UA) | Low/Med: Governance decision (opts out of Gemini training) |
+| `Applebot-Extended` | Apple | Training control token (Apple Intelligence training; uses Applebot HTTP UA) | Low/Med: Governance decision (opts out of Apple training) |
 | `YouBot` | You.com | Generative search citations | Medium: Excluded from You.com search |
 | `GPTBot` | OpenAI | Foundation training ingestion | Low: Governance decision (protects IP) |
 | `ClaudeBot` | Anthropic | Foundation training ingestion | Low: Governance decision (protects IP) |

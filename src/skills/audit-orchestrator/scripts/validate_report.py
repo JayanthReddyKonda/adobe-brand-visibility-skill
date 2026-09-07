@@ -87,6 +87,29 @@ def validate_type(instance, schema, path="root"):
     return None
 
 
+def verify_summary_counts(report):
+    """Verify summary total_findings and categorical counts match findings array."""
+    errors = []
+    findings = report.get("findings", [])
+    summary = report.get("summary", {})
+
+    if not isinstance(findings, list) or not isinstance(summary, dict):
+        return errors
+
+    if "total_findings" in summary and summary["total_findings"] != len(findings):
+        errors.append(f"total_findings ({summary['total_findings']}) does not match findings count ({len(findings)})")
+
+    expected = {
+        sev: sum(1 for f in findings if isinstance(f, dict) and f.get("severity") == sev)
+        for sev in ("critical", "high", "medium", "low")
+    }
+    for sev, count in expected.items():
+        if sev in summary and summary[sev] != count:
+            errors.append(f"summary.{sev} ({summary[sev]}) does not match actual {sev} findings count ({count})")
+
+    return errors
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
         print("Usage: python3 validate_report.py [report.json | - < report.json]")
@@ -133,6 +156,11 @@ def main():
     err = validate_type(report, schema)
     if err:
         print(f"Schema validation failed: {err}", file=sys.stderr)
+        sys.exit(2)
+
+    summary_errs = verify_summary_counts(report)
+    if summary_errs:
+        print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
         sys.exit(2)
 
     print(json.dumps(report, indent=2))

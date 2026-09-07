@@ -300,6 +300,20 @@
     },
     "analytics_summary": {
       "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "description": "Explicit epistemic audit boundaries and measurement limitations",
+      "items": {
+        "type": "string"
+      }
+    },
+    "archetype": {
+      "type": [
+        "string",
+        "object"
+      ],
+      "description": "Detected business archetype and confidence"
     }
   },
   "additionalProperties": false

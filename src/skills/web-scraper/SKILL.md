@@ -6,14 +6,18 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Web Scraper Skill (Autonomous AI Retrieval Acquisition)
+# Web Scraper Skill (Sensor-Brain Acquisition Protocol)
+
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Acquisition:** `web-scraper` executes bounded, single-pass website acquisition (`run_scraper.py` emitting `inv.json`). It enforces pre-connect zero-trust SSRF validation, parses RFC 9309 crawler matrices across 16 AI bots, traverses XML sitemaps, and extracts Trafilatura-grade markdown. It **must not** recommend fixes, assign severities, or call LLMs.
+> - **Cognitive Orchestrator:** All downstream diagnostic sensors and the Master Orchestrator run offline against `inv.json`, eliminating redundant crawls.
 
 ## When to Use
 Invoke this skill whenever an AI agent or workflow needs to:

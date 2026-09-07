@@ -154,22 +154,48 @@ except ImportError:
 
 try:
     from causal_gate import (
+        DEFAULT_LIMITATIONS,
         LAYER0_CAUSE_IDS,
         LAYER1_CAUSE_IDS,
+        ROOT_CAUSE_PRECEDENCE,
         SUPPRESSED_BY_LAYER0,
         SUPPRESSED_BY_LAYER1,
         apply_causal_suppression,
         build_evidence_index,
+        compute_archetype_confidence,
+        compute_severity_score,
+        evaluate_causal_nodes,
         evaluate_epistemic_state,
+        severity_from_score,
     )
 except ImportError:
     apply_causal_suppression = None  # type: ignore
     build_evidence_index = None  # type: ignore
     evaluate_epistemic_state = None  # type: ignore
+    evaluate_causal_nodes = None  # type: ignore
+    compute_severity_score = None  # type: ignore
+    compute_archetype_confidence = None  # type: ignore
+    severity_from_score = None  # type: ignore
     LAYER0_CAUSE_IDS = _LAYER0_CAUSE_IDS
     LAYER1_CAUSE_IDS = _LAYER1_CAUSE_IDS
     SUPPRESSED_BY_LAYER0 = _SUPPRESSED_BY_LAYER0
     SUPPRESSED_BY_LAYER1 = _SUPPRESSED_BY_LAYER1
+    DEFAULT_LIMITATIONS = [
+        "No JavaScript browser rendering was performed.",
+        "Robots eligibility was simulated from the captured robots.txt; bot-specific server responses were not tested.",
+        "No external analytics were supplied, so engagement findings are content and navigation proxies rather than observed bounce rates.",
+        "No claim is made about actual citation by any specific AI assistant.",
+    ]
+    ROOT_CAUSE_PRECEDENCE = [
+        "SITE_UNAVAILABLE_OR_BLOCKED",
+        "AI_RETRIEVAL_BLOCKED",
+        "INDEXING_DISABLED",
+        "CLIENT_RENDERING_DEPENDENCY",
+        "ENTITY_AMBIGUITY",
+        "FACT_CONTRADICTION",
+        "LOW_CITABILITY",
+        "ENGAGEMENT_HANDOFF_FRICTION",
+    ]
 
 
 def parse_target_domain(site: str) -> tuple:
@@ -822,6 +848,8 @@ def synthesize_audit_report(
         "geo_citability_summary": geo_summary,
         "findings": deduped_findings,
         "proactive_actions": proactive_actions,
+        "limitations": DEFAULT_LIMITATIONS,
+        "archetype": archetype,
     }
 
     return report
@@ -1023,19 +1051,29 @@ def get_telemetry_payload(
             "root_causes": dag_root_causes,
             "suppressed_categories": sorted(list(suppressed_categories)),
         },
-        "causal_state": (
-            evaluate_epistemic_state(inv, specialist_results)
-            if evaluate_epistemic_state is not None
-            else {
-                "retrieval": "blocked" if has_layer0_block else "observed",
-                "rendering": "gap" if has_layer1_rendering_gap else "observed",
-                "entity": "observed",
-                "facts": "observed",
-                "corroboration": "observed",
-                "geo": "observed",
-                "engagement": "observed",
-            }
-        ),
+        "causal_state": {
+            **(
+                evaluate_epistemic_state(inv, specialist_results)
+                if evaluate_epistemic_state is not None
+                else {
+                    "retrieval": "blocked" if has_layer0_block else "observed",
+                    "rendering": "gap" if has_layer1_rendering_gap else "observed",
+                    "entity": "observed",
+                    "facts": "observed",
+                    "corroboration": "observed",
+                    "geo": "observed",
+                    "engagement": "observed",
+                }
+            ),
+            "nodes": (
+                evaluate_causal_nodes(inv, specialist_results)
+                if evaluate_causal_nodes is not None
+                else {}
+            ),
+            "confirmed_root_causes": [c["code"] for c in dag_root_causes],
+            "suppressed_checks": sorted(list(suppressed_categories)),
+            "uncertainties": list(DEFAULT_LIMITATIONS),
+        },
         "evidence_index": (
             build_evidence_index(inv, specialist_results)
             if build_evidence_index is not None

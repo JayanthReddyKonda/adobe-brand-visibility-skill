@@ -6,21 +6,22 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Corroboration & Authority Audit Skill
-
+# Corroboration & Authority Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **External sameAs Authority Prober** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `corroboration_check.py` probes declared `sameAs` identity links (Wikidata, Wikipedia, LinkedIn) and candidate backlinks under zero-trust SSRF sandboxing to confirm HTTP status, destination resolution, and anchor intactness. It does not treat mere URL presence as proof of authority.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests corroboration signals, tests identity-matching hypotheses (matching brand title and Organization attributes), and synthesizes actionable knowledge graph substantiation paths.
 
 Evaluates external entity authority by verifying that declared identity links (`sameAs` in Organization JSON-LD pointing to Wikidata, Crunchbase, Wikipedia, and official social channels) resolve cleanly with HTTP 200 without broken redirect loops or 4xx/5xx HTTP errors.
 

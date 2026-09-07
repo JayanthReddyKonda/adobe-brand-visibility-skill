@@ -6,21 +6,22 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Engagement & Context Continuity Audit Skill
-
+# Engagement & Context Continuity Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Visitor Continuity & Information Scent Check** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `engagement_check.py` measures orientation proxies, H1 semantic scent, viewport answer anchoring, and CTA reachability friction. Without first-party analytics, it operates strictly on structural UX proxies and never fabricates empirical bounce rates.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) correlates structural friction with simulated user intent handoffs, cross-correlates analytics when provided, and synthesizes clear above-the-fold value proposition and navigation continuity fixes.
 
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.
 

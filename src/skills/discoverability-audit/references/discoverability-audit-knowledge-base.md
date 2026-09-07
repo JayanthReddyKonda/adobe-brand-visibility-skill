@@ -139,19 +139,13 @@ robots.txt governs **crawling access**, not indexing.
 
 ### Path Syntax Rules
 ```txt
----
-
-## Blocks /admin, /admin/, /admin123
+# Blocks /admin, /admin/, /admin123
 Disallow: /admin
 
----
-
-## Blocks ONLY paths under /admin/
+# Blocks ONLY paths under /admin/
 Disallow: /admin/
 
----
-
-## Wildcards
+# Wildcards
 Disallow: /*.pdf$    # Blocks all PDF files
 Disallow: /*/temp/   # Blocks temp directory at any depth
 ```
@@ -278,3 +272,27 @@ Understanding crawler behavior is critical for accurate audit diagnosis:
 | **User-Triggered Fetchers** | `ChatGPT-User`, `Google-Agent` (Project Mariner), `Google-NotebookLM`, `Perplexity-User` | **NO (by design)** | Initiated directly by an active user session asking the assistant to fetch a specific URL. Per RFC 9309, robots.txt applies to autonomous web indexing, not user-directed agent requests. Cannot be governed by robots.txt; requires WAF/HTTP authentication. |
 | **AI Retrieval Crawlers** | `OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`, `Amazonbot`, `Meta-ExternalAgent` | **YES** | Proactively crawl and index web pages for real-time citation synthesis in generative search answers. Blocking these breaks AI visibility. |
 | **Foundation Training Crawlers** | `GPTBot`, `Google-Extended`, `ClaudeBot`, `Bytespider`, `Applebot-Extended`, `CCBot`, `cohere-ai` | **YES** | Collect bulk offline training data for model pre-training. Blocking these is an acceptable copyright governance decision that does NOT impair live search citations. |
+
+---
+
+## 7. International SEO & Localization Reference
+
+### Hreflang Placement & Reciprocal Requirements
+Google supports three equivalent methods: HTML `<link>` in `<head>`, HTTP `Link` headers, and XML sitemap `<xhtml:link>` elements. Google combines signals from both HTML and sitemaps. If the same language-region pair points to different URLs across methods, Google drops that pair rather than guessing.
+
+Every page must include itself (self-referencing) in the hreflang set. If page X links to page Y, page Y must link back to page X (reciprocal return tag). Missing self-referencing or return tags causes Google to drop the cluster.
+
+- **Reference**: [Google Search Central: Localized Versions](https://developers.google.com/search/docs/specialty/international/localized-versions)
+
+### Language & Region Codes
+Language must strictly follow ISO 639-1 (2-letter code). Region must follow ISO 3166-1 Alpha 2 (2-letter code). Format: `language[-script][-region]`.
+
+Common errors flagged by `discoverability_check.py`:
+- `en-UK` -> Invalid region code (must be `en-GB`)
+- `eng` -> Invalid language code (must be `en`)
+- `jp` -> Invalid language code (must be `ja`)
+
+### Canonicalization & i18n
+- **Self-Referencing Canonicals:** Each locale page must canonicalize to itself. Never use cross-locale canonicals (e.g., French page canonicalizing to English page)—this suppresses the non-canonical locale entirely from indexation.
+- **Canonical Overrides Hreflang:** If canonical points to a different host or URL outside the hreflang cluster, search engines ignore the hreflang annotation.
+

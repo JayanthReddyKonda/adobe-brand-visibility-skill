@@ -13,9 +13,15 @@ if ORCH_SCRIPTS not in sys.path:
     sys.path.insert(0, ORCH_SCRIPTS)
 
 from causal_gate import (
+    DEFAULT_LIMITATIONS,
+    ROOT_CAUSE_PRECEDENCE,
     apply_causal_suppression,
     build_evidence_index,
+    compute_archetype_confidence,
+    compute_severity_score,
+    evaluate_causal_nodes,
     evaluate_epistemic_state,
+    severity_from_score,
 )
 
 
@@ -121,6 +127,71 @@ class TestCausalGate(unittest.TestCase):
         for ev in evidence:
             self.assertIn("route", ev)
             self.assertIn("observation", ev)
+
+    def test_compute_severity_score_and_mapping(self):
+        """Severity score formula bounds factors and maps to correct severity categories."""
+        # Maximum factors: 100 * 1.0 * (0.35 + 0.30 + 0.20 + 0.15) = 100.0 -> critical
+        score_max = compute_severity_score(1.0, 1.0, 1.0, 1.0, 1.0)
+        self.assertEqual(score_max, 100.0)
+        self.assertEqual(severity_from_score(score_max), "critical")
+
+        # High severity: 70.0 -> high
+        score_high = compute_severity_score(0.9, 0.8, 0.8, 0.7, 0.8)
+        self.assertGreaterEqual(score_high, 65.0)
+        self.assertEqual(severity_from_score(score_high), "high")
+
+        # Medium severity
+        score_med = compute_severity_score(0.8, 0.6, 0.6, 0.6, 0.6)
+        self.assertTrue(40.0 <= score_med < 65.0)
+        self.assertEqual(severity_from_score(score_med), "medium")
+
+        # Low severity
+        score_low = compute_severity_score(0.5, 0.2, 0.2, 0.2, 0.2)
+        self.assertTrue(score_low < 40.0)
+        self.assertEqual(severity_from_score(score_low), "low")
+
+    def test_compute_archetype_confidence(self):
+        """Archetype confidence weights route (40%), vocab (25%), schema (20%), and commercial (15%)."""
+        conf_perfect = compute_archetype_confidence(1.0, 1.0, 1.0, 1.0)
+        self.assertEqual(conf_perfect, 1.0)
+
+        # Route heavy
+        conf_route = compute_archetype_confidence(1.0, 0.0, 0.0, 0.0)
+        self.assertEqual(conf_route, 0.40)
+
+        # Below 0.60 threshold
+        conf_low = compute_archetype_confidence(0.5, 0.4, 0.3, 0.2)
+        self.assertLess(conf_low, 0.60)
+
+    def test_default_limitations_and_precedence(self):
+        """DEFAULT_LIMITATIONS and ROOT_CAUSE_PRECEDENCE are defined and non-empty."""
+        self.assertEqual(len(DEFAULT_LIMITATIONS), 4)
+        self.assertIn("No JavaScript browser rendering was performed.", DEFAULT_LIMITATIONS)
+        self.assertEqual(len(ROOT_CAUSE_PRECEDENCE), 8)
+        self.assertEqual(ROOT_CAUSE_PRECEDENCE[0], "SITE_UNAVAILABLE_OR_BLOCKED")
+        self.assertEqual(ROOT_CAUSE_PRECEDENCE[1], "AI_RETRIEVAL_BLOCKED")
+
+    def test_evaluate_causal_nodes(self):
+        """evaluate_causal_nodes returns 8 core nodes in confirmed_pass/fail/unknown."""
+        inv = {
+            "pages": [{"url": "https://example.com/", "status": 200, "word_count": 500, "snr": 0.5}],
+        }
+        specialist = {
+            "discoverability-audit": {"coverage": {"retrieval_bots_allowed": 5}},
+            "entity-content-audit": {"coverage": {"jsonld_present": True}},
+            "fact-consistency-audit": {"coverage": {"facts_checked": 10, "fact_conflicts": 0}},
+            "geo-content-audit": {"coverage": {"average_citability_score": 85.0}},
+            "engagement-context-audit": {"coverage": {"pages_evaluated": 1}},
+        }
+        nodes = evaluate_causal_nodes(inv, specialist)
+        self.assertEqual(nodes["reachability"], "confirmed_pass")
+        self.assertEqual(nodes["retrieval_access"], "confirmed_pass")
+        self.assertEqual(nodes["static_readability"], "confirmed_pass")
+        self.assertEqual(nodes["entity_explicitness"], "confirmed_pass")
+        self.assertEqual(nodes["fact_consistency"], "confirmed_pass")
+        self.assertEqual(nodes["citability"], "confirmed_pass")
+        self.assertEqual(nodes["on_site_orientation"], "confirmed_pass")
+        self.assertEqual(nodes["engagement_handoff"], "confirmed_pass")
 
 
 if __name__ == "__main__":

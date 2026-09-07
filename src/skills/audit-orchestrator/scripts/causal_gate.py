@@ -307,3 +307,165 @@ def apply_causal_suppression(
     }
 
     return allowed, suppressed, dag_metadata
+
+
+# ---------------------------------------------------------------------------
+# Section 2 & 5 Mathematical Formulas & Epistemic Constants
+# ---------------------------------------------------------------------------
+
+DEFAULT_LIMITATIONS: List[str] = [
+    "No JavaScript browser rendering was performed.",
+    "Robots eligibility was simulated from the captured robots.txt; bot-specific server responses were not tested.",
+    "No external analytics were supplied, so engagement findings are content and navigation proxies rather than observed bounce rates.",
+    "No claim is made about actual citation by any specific AI assistant.",
+]
+
+ROOT_CAUSE_PRECEDENCE: List[str] = [
+    "SITE_UNAVAILABLE_OR_BLOCKED",
+    "AI_RETRIEVAL_BLOCKED",
+    "INDEXING_DISABLED",
+    "CLIENT_RENDERING_DEPENDENCY",
+    "ENTITY_AMBIGUITY",
+    "FACT_CONTRADICTION",
+    "LOW_CITABILITY",
+    "ENGAGEMENT_HANDOFF_FRICTION",
+]
+
+
+def compute_severity_score(
+    confidence: float,
+    causal_reach: float,
+    affected_coverage: float,
+    user_value_loss: float,
+    remediation_leverage: float,
+) -> float:
+    """Calculate empirical severity score [0, 100] per Section 2 Severity Formula.
+
+    score = 100 * confidence * (
+        0.35 * causal_reach +
+        0.30 * affected_coverage +
+        0.20 * user_value_loss +
+        0.15 * remediation_leverage
+    )
+    """
+    conf = max(0.0, min(1.0, confidence))
+    cr = max(0.0, min(1.0, causal_reach))
+    ac = max(0.0, min(1.0, affected_coverage))
+    uv = max(0.0, min(1.0, user_value_loss))
+    rl = max(0.0, min(1.0, remediation_leverage))
+    return round(100.0 * conf * (0.35 * cr + 0.30 * ac + 0.20 * uv + 0.15 * rl), 2)
+
+
+def severity_from_score(score: float) -> str:
+    """Map numeric severity score to Draft-07 compliant severity category."""
+    if score >= 85.0:
+        return "critical"
+    elif score >= 65.0:
+        return "high"
+    elif score >= 40.0:
+        return "medium"
+    return "low"
+
+
+def compute_archetype_confidence(
+    route_signal_strength: float,
+    vocabulary_signal_strength: float,
+    structured_data_signal_strength: float,
+    commercial_or_editorial_signal_strength: float,
+) -> float:
+    """Calculate archetype confidence [0, 1] per Section 5 Archetype Formula.
+
+    archetype_confidence = (
+        0.40 * route_signal_strength +
+        0.25 * vocabulary_signal_strength +
+        0.20 * structured_data_signal_strength +
+        0.15 * commercial_or_editorial_signal_strength
+    )
+    """
+    rs = max(0.0, min(1.0, route_signal_strength))
+    vs = max(0.0, min(1.0, vocabulary_signal_strength))
+    sd = max(0.0, min(1.0, structured_data_signal_strength))
+    ce = max(0.0, min(1.0, commercial_or_editorial_signal_strength))
+    return round(0.40 * rs + 0.25 * vs + 0.20 * sd + 0.15 * ce, 4)
+
+
+def evaluate_causal_nodes(
+    inv: Optional[Dict[str, Any]] = None,
+    specialist_results: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, str]:
+    """Evaluate 8 core Causal DAG nodes into the four epistemic states:
+    confirmed_pass | confirmed_fail | unknown | not_applicable
+    """
+    nodes: Dict[str, str] = {
+        "reachability": "unknown",
+        "retrieval_access": "unknown",
+        "static_readability": "unknown",
+        "entity_explicitness": "unknown",
+        "fact_consistency": "unknown",
+        "citability": "unknown",
+        "on_site_orientation": "unknown",
+        "engagement_handoff": "unknown",
+    }
+
+    if not inv:
+        return nodes
+
+    pages = inv.get("pages", [])
+    if not pages:
+        nodes["reachability"] = "confirmed_fail"
+        nodes["retrieval_access"] = "confirmed_fail"
+        return nodes
+
+    # Reachability & Retrieval
+    status_codes = [p.get("status") for p in pages if p.get("status") is not None]
+    if any(s == 200 for s in status_codes):
+        nodes["reachability"] = "confirmed_pass"
+    elif status_codes:
+        nodes["reachability"] = "confirmed_fail"
+        nodes["retrieval_access"] = "confirmed_fail"
+        return nodes
+
+    disc_cov = (specialist_results or {}).get("discoverability-audit", {}).get("coverage", {})
+    bots_allowed = disc_cov.get("retrieval_bots_allowed")
+    if bots_allowed is not None:
+        nodes["retrieval_access"] = "confirmed_pass" if bots_allowed > 0 else "confirmed_fail"
+    else:
+        nodes["retrieval_access"] = "confirmed_pass"
+
+    # Static Readability
+    has_spa_shell = any(p.get("snr", 1.0) < 0.05 and p.get("word_count", 0) < 30 for p in pages)
+    nodes["static_readability"] = "confirmed_fail" if has_spa_shell else "confirmed_pass"
+
+    # Entity Explicitness
+    entity_cov = (specialist_results or {}).get("entity-content-audit", {}).get("coverage", {})
+    jsonld_present = entity_cov.get("jsonld_present", False)
+    nodes["entity_explicitness"] = "confirmed_pass" if jsonld_present else "confirmed_fail"
+
+    # Fact Consistency
+    fact_cov = (specialist_results or {}).get("fact-consistency-audit", {}).get("coverage", {})
+    conflicts = fact_cov.get("fact_conflicts", 0)
+    checked = fact_cov.get("facts_checked", 0)
+    if checked > 0:
+        nodes["fact_consistency"] = "confirmed_fail" if conflicts > 0 else "confirmed_pass"
+    else:
+        nodes["fact_consistency"] = "unknown"
+
+    # Citability
+    geo_cov = (specialist_results or {}).get("geo-content-audit", {}).get("coverage", {})
+    cit_score = geo_cov.get("average_citability_score")
+    if cit_score is not None:
+        nodes["citability"] = "confirmed_pass" if cit_score >= 50.0 else "confirmed_fail"
+    else:
+        nodes["citability"] = "unknown"
+
+    # Orientation & Engagement
+    eng_cov = (specialist_results or {}).get("engagement-context-audit", {}).get("coverage", {})
+    pages_eval = eng_cov.get("pages_evaluated", 0)
+    if pages_eval > 0:
+        nodes["on_site_orientation"] = "confirmed_pass"
+        nodes["engagement_handoff"] = "confirmed_pass"
+    else:
+        nodes["on_site_orientation"] = "unknown"
+        nodes["engagement_handoff"] = "unknown"
+
+    return nodes

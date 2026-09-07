@@ -6,21 +6,22 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Generative Engine Optimization (GEO) Audit Skill
-
+# Generative Engine Optimization (GEO) Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Generative Engine Optimization (GEO) Scorer** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `geo_content_check.py` measures text quotability, answer density, heading/chunk alignment, statistical metrics, attributed quotes, and causal conjunction density across the 9 empirical Princeton KDD 2024 / AutoGEO vectors. It does not claim that any metric guarantees ranking or citation.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests citability metrics, executes simulated assistant query strategies, and synthesizes bespoke, information-dense passage chunking and explanatory rewrites.
 
 Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) extractability based on empirical Generative Engine Optimization research (Aggarwal et al., Princeton KDD 2024 and AutoGEO ICLR 2026). Determines whether content provides the causal mechanisms, statistical evidence, and structured definitions required for LLM citation.
 
@@ -47,21 +48,18 @@ Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) 
 
 Load these resources as needed during GEO content checks:
 
-### Core Knowledge Base (Load First)
-- [GEO Content Knowledge Base](references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO benchmarks, 134–167 word optimal chunk scoring, causal conjunction cheatsheets, and comparison table patterns.
+### Core Knowledge Base (Load First — MANDATORY)
+- [GEO Content Knowledge Base](references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO benchmarks, 134–167 word optimal chunk scoring, causal conjunction cheatsheets, comparison table patterns, and AI Writing Detection & Natural Content Patterns (Section 9).
 
-### Specialized Reference Guides (Load on Condition)
-- [AI Writing Detection & Natural Content Patterns](references/ai-writing-detection.md): Read when evaluating content quality to eliminate em dash overuse, buzzword fluff, and empty intensifiers in favor of mechanistic depth.
 ---
 
 ## Procedure
 
-### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+### Step 1: Read Domain Knowledge Base (MANDATORY)
 
-Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+Read the specialist knowledge base before executing checks:
 ```bash
 cat skills/geo-content-audit/references/geo-content-audit-knowledge-base.md
-cat skills/geo-content-audit/references/ai-writing-detection.md
 ```
 
 ### Step 2: Execution Command

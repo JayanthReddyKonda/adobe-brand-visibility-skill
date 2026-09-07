@@ -6,21 +6,22 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Discoverability Audit Skill
-
+# Discoverability Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Crawlability & AI Indexation Check** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory <inv>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `discoverability_check.py` is a pure measurement sensor. It inspects RFC 9309 crawler matrices, HTTP response codes, meta directives, canonical chains, and raw HTML extractability. It outputs observed empirical evidence without canned recommendation prose.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests this sensor's output, applies Layer 0 causal gating (suppressing downstream schema/GEO complaints if retrieval is blocked), simulates query strategies, and synthesizes bespoke dual-track fixes.
 
 Evaluates the accessibility and indexing pipeline of a website for AI retrieval engines (ChatGPT Search, Claude Search, Perplexity AI, Google Search). Determines whether AI crawlers can fetch the site's content and whether initial HTML payloads carry extractable text.
 
@@ -49,19 +50,16 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 
 Load these resources as needed during discoverability checks:
 
-### Core Knowledge Base (Load First)
-- [Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, and raw HTML extractability thresholds.
+### Core Knowledge Base (Load First — MANDATORY)
+- [Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, raw HTML extractability thresholds, and International SEO & Localization architecture (Section 7).
 
-### Specialized Reference Guides (Load on Condition)
-- [International SEO & Localization](references/international-seo.md): Read when auditing multi-lingual or multi-region websites to verify hreflang reciprocity, x-default tags, and ISO 639-1 / ISO 3166-1 Alpha 2 codes.
 ## Procedure
 
-### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+### Step 1: Read Domain Knowledge Base (MANDATORY)
 
-Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
+Read the specialist knowledge base before executing checks:
 ```bash
 cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
-cat skills/discoverability-audit/references/international-seo.md
 ```
 
 ### Step 2: Execution Command

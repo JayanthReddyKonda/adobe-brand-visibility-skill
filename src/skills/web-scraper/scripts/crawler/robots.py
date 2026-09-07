@@ -212,3 +212,24 @@ class RobotsAuditor:
             "groups_count": len(self.groups),
             "ai_bots_matrix": self.evaluate_ai_bots_matrix("/"),
         }
+
+
+def load_bot_registry() -> Dict[str, Any]:
+    """Load authoritative bot registry from references/bot-registry.json if available."""
+    import json
+    import os
+
+    reg_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "references",
+        "bot-registry.json",
+    )
+    if os.path.exists(reg_path):
+        try:
+            with open(reg_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+    return {"version": "2026-09-01", "bots": []}

@@ -53,21 +53,14 @@ The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist 
 
 Read these before synthesizing findings. They define your cognitive reasoning rules.
 
-### Core Knowledge Base (Load First — MANDATORY)
-- [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Root cause taxonomy, multi-signal evidence reconciliation rules, severity rubric, confidence model, dual-track remediation catalog, and the full Draft-07 report schema contract.
+### Core Knowledge Bases & Synthesis (Load First — MANDATORY)
+- [Core Synthesis Digest](references/core-synthesis-digest.md): Fast, single-turn executive briefing (< 2,500 tokens) covering the 6-layer DAG, composite scoring, Princeton GEO vectors, and keystone taxonomy.
+- [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks (Sections 18–20), and Archetype Dynamic Adaptation playbooks (Section 21).
 - [Epistemic Reasoning & Evidence Policy](references/reasoning-policy.md): Evidence vs. truth standards, four-state epistemic model (observed/inferred/unknown/suppressed), falsification rules, and component responsibility boundaries.
 
-### Output Schema (Load Before Writing Report — MANDATORY)
+### Schemas & Contracts (MANDATORY)
 - [Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
-
-### Technical Foundations (Load on Technical Inquiries)
-- [SEO & Brand Visibility Foundations](references/seo-foundations.md): Technical SEO principles, crawl priority hierarchy, and client-side JavaScript schema detection limitations.
-
-### Advanced Citability & Research Specifications
-- [State-of-the-Art GEO Benchmarks](references/state-of-the-art-geo-benchmarks.md): The 17-rule consolidated matrix (CR01-TX06) covering crawler access, machine-readable manifests, text citability, and Princeton GEO evidence density.
-- [Archetype Dynamic Adaptation Matrix](references/archetype-matrix.md): Business model contextualization across SaaS, E-Commerce, Enterprise B2B, Media/Publisher, and Local Services for severity re-weighting and simulated queries.
-- [SOTA AI Readiness Framework (2026)](references/sota-ai-readiness-framework-2026.md): 6-dimensional orthogonal readiness scoring model and Wilson 95% score confidence intervals across retrieval engines.
-- [Citation Absorption & SFE (2026)](references/citation-absorption-and-geo-sfe-2026.md): Mathematical formulations for Citation Absorption Index, Synthetic Flywheel Effect, and multi-sentence context decay.
+- [Telemetry Schema Draft-07](references/telemetry-schema.json): Exact JSON schema for empirical sensor telemetry emitted by `orchestrator.py --telemetry`.
 
 ---
 
@@ -98,11 +91,11 @@ Inspect `inv.json` signals to consult deep specialist references strictly on dem
 
 | Trigger Signal in Site Crawl | Specialist Reference to Load | Diagnostic Focus |
 |---|---|---|
-| Non-English routes (`/es/`, `/fr/`, `hreflang`) | `skills/discoverability-audit/references/international-seo.md` | Hreflang reciprocity, region codes, canonical links |
+| Non-English routes (`/es/`, `/fr/`, `hreflang`) | `skills/discoverability-audit/references/discoverability-audit-knowledge-base.md` | Hreflang reciprocity, region codes, canonical links (Section 7) |
 | Archetype == `ecommerce` | `skills/entity-content-audit/references/product.json`<br>`skills/engagement-context-audit/references/product-purchase.json` | Price float formatting, ISO currency, hero checkout CTAs |
 | Archetype == `saas` | `skills/engagement-context-audit/references/pricing-comparison.json` | Tier feature contrast, seat limits, `/pricing.md` format |
 | Missing/ambiguous brand identity | `skills/entity-content-audit/references/organization.json` | Schema.org `@graph` Organization & WebSite hierarchy |
-| Explanatory Depth < 3 / high fluff | `skills/geo-content-audit/references/ai-writing-detection.md` | Statistical burstiness, AI writing patterns, causal conjunctions |
+| Explanatory Depth < 3 / high fluff | `skills/geo-content-audit/references/geo-content-audit-knowledge-base.md` | Statistical burstiness, AI writing patterns, causal conjunctions (Section 9) |
 | Zero declared `sameAs` | `skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md` | 57% off-site citation rule, Wikidata, LinkedIn, YouTube |
 
 *(Automated Alternative: Run `python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com --inventory inv.json` to stream all triggered rules in a single pass).*

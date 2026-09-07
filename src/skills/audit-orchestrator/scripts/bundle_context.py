@@ -75,6 +75,25 @@ def detect_signals(inv: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return signals
 
 
+def extract_section(file_path: str, heading_prefix: str, max_chars: int = 2500) -> Optional[str]:
+    """Extracts a section starting with heading_prefix from a markdown file."""
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        idx = content.find(heading_prefix)
+        if idx == -1:
+            return None
+        sub = content[idx:]
+        next_sec = sub.find("\n## ", len(heading_prefix))
+        if next_sec != -1:
+            sub = sub[:next_sec].strip()
+        return sub[:max_chars]
+    except Exception:
+        return None
+
+
 def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
     """Builds unified markdown briefing for the AI agent."""
     signals = detect_signals(inv)
@@ -98,12 +117,19 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
 
     # 2. Append triggered specialist rules
     if signals["is_multilingual"]:
-        intl_path = os.path.join(SKILLS_DIR, "discoverability-audit", "references", "international-seo.md")
-        if os.path.exists(intl_path):
+        intl_content = extract_section(
+            os.path.join(SKILLS_DIR, "discoverability-audit", "references", "discoverability-audit-knowledge-base.md"),
+            "## 7. International SEO",
+        )
+        if not intl_content:
+            intl_path = os.path.join(SKILLS_DIR, "discoverability-audit", "references", "international-seo.md")
+            if os.path.exists(intl_path):
+                with open(intl_path, "r", encoding="utf-8") as f:
+                    intl_content = f.read()[:2000]
+        if intl_content:
             output_lines.append("#### International SEO & Localization Checklist:")
-            with open(intl_path, "r", encoding="utf-8") as f:
-                output_lines.append(f.read()[:2000])
-                output_lines.append("\n*(truncated for brevity)*\n")
+            output_lines.append(intl_content)
+            output_lines.append("\n*(extracted from discoverability-audit-knowledge-base.md)*\n")
 
     if signals["archetype"] == "ecommerce":
         prod_schema = os.path.join(SKILLS_DIR, "entity-content-audit", "references", "product.json")
@@ -113,12 +139,19 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
                 output_lines.append(f"```json\n{f.read()}\n```\n")
 
     if signals["low_depth_pages"] > 0:
-        ai_detect = os.path.join(SKILLS_DIR, "geo-content-audit", "references", "ai-writing-detection.md")
-        if os.path.exists(ai_detect):
+        ai_detect_content = extract_section(
+            os.path.join(SKILLS_DIR, "geo-content-audit", "references", "geo-content-audit-knowledge-base.md"),
+            "## 9. AI Writing Detection",
+        )
+        if not ai_detect_content:
+            ai_path = os.path.join(SKILLS_DIR, "geo-content-audit", "references", "ai-writing-detection.md")
+            if os.path.exists(ai_path):
+                with open(ai_path, "r", encoding="utf-8") as f:
+                    ai_detect_content = f.read()[:2000]
+        if ai_detect_content:
             output_lines.append("#### Content Quality & AI Writing Pattern Guardrails:")
-            with open(ai_detect, "r", encoding="utf-8") as f:
-                output_lines.append(f.read()[:2000])
-                output_lines.append("\n*(truncated for brevity)*\n")
+            output_lines.append(ai_detect_content)
+            output_lines.append("\n*(extracted from geo-content-audit-knowledge-base.md)*\n")
 
     return "\n".join(output_lines)
 

@@ -6,21 +6,22 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Entity & Content Audit Skill
-
+# Entity & Content Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Schema.org & Entity Answerability Check** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `entity_content_check.py` deterministically parses initial HTML DOM trees, extracts Schema.org JSON-LD nodes, resolves nested `@graph` hierarchies, and scores the 7-attribute Answerability Index. It reports empirical observations without generating boilerplate schema snippets.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests observed entities, validates archetype alignment (suppressing e-commerce Product penalties on SaaS/B2B sites), and synthesizes tailored, copy-pasteable Schema.org `@graph` blocks matching verified domain attributes.
 
 Evaluates whether an AI search system can resolve the brand's entity identity (`Organization`) and extract its commercial offerings (`Product`, `Offer`, `Service`). Computes the mathematically reproducible weighted **Answerability Index** across sampled HTML pages.
 
@@ -84,9 +85,9 @@ python3 skills/entity-content-audit/scripts/entity_content_check.py --site https
 ### Step 3: Decision Protocol & Check Logic
 
 1. **Organization Entity Resolution (`ENTITY.IDENTITY.MATERIAL_ENTITY_AMBIGUITY`):**
-   - Extract JSON-LD (`Organization`, `Brand`, `Corporation`), OpenGraph (`og:site_name`), and `<title>`.
-   - If no machine-explicit Organization block, `og:site_name`, or descriptive title exists -> `medium` finding.
-   - If stated in human text but lacking JSON-LD -> emit an extractability **recommendation**, NOT a defect finding.
+   - Extract JSON-LD (`Organization`, `Brand`, `Corporation`).
+   - If no machine-explicit Schema.org Organization block exists -> report `MATERIAL_ENTITY_AMBIGUITY` (Severity: `medium`).
+   - **Machine-Explicit Invariant:** HTML `<title>` and OpenGraph (`og:site_name`) tags do NOT suppress `MATERIAL_ENTITY_AMBIGUITY`, as generative engines and knowledge graph extractors require explicit linked data.
 2. **Offer Attribute Completeness (`ENTITY.ANSWERABILITY.INCOMPLETE_OFFER_ATTRIBUTES`):**
    - Extract Product and Offer entities. Flag when critical commercial fields (price, availability, product name) are omitted from structured markup.
 3. **Mathematical Answerability Engine (`ENTITY.ANSWERABILITY.MISSING_MATERIAL_FACT`):**

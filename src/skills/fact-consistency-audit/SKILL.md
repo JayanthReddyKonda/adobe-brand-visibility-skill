@@ -6,21 +6,22 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
+  version: "2.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Fact Consistency & Lifecycle Audit Skill
-
+# Fact Consistency & Lifecycle Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Cross-Page Factual Consistency Ledger** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `fact_consistency_check.py` constructs a normalized first-party fact ledger across all crawled routes, isolating strictly scoped commercial and operational attributes (prices, specs, contact info). It does not guess which conflicting fact is true.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected contradictions, applies epistemic falsification (ruling out billing cycles or feature tiering), and synthesizes a single-source-of-truth factual reconciliation runbook.
 
 Constructs a multi-attribute first-party fact ledger across sampled website pages. Detects verified commercial contradictions, product lifecycle conflicts (discontinued vs current), and legacy fact propagation.
 

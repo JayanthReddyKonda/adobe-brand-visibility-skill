@@ -51,9 +51,9 @@ Do not treat findings as a simplistic binary pass/fail. The engine employs a fou
 
 ## 3. Epistemic Falsification Protocol
 
-For every diagnostic finding emitted, the AI Agent must implicitly verify:
-
-$$\text{Claim} \longrightarrow \text{Observed Evidence} \longrightarrow \text{Inference Rule} \longrightarrow \text{Confidence} \longrightarrow \text{Possible Falsifier}$$
+```text
+Claim -> Observed Evidence -> Inference Rule -> Confidence -> Possible Falsifier
+```
 
 ### Example:
 - **Claim:** `"Pricing information is contradictory across commercial routes."`
@@ -86,3 +86,19 @@ Instead, the sensor evaluates **Observable Friction Proxies**:
 - Context retention across linked user journeys.
 
 Findings in this domain must be described as **`engagement_friction_signal`**, never as *"measured bounce rate"*.
+
+---
+
+## 6. Technical SEO & AI Search Priority Foundations
+
+### 6.1 Schema Markup Detection Limitations
+- Basic non-rendering HTTP fetchers cannot detect client-side JavaScript-injected Schema.org markup (e.g., plugins that mount JSON-LD dynamically).
+- To accurately evaluate what AI retrieval crawlers actually ingest, the audit measures initial raw HTML extractability directly.
+
+### 6.2 Priority Hierarchy of AI Search Readiness
+1. **Crawlability & Indexation:** Can AI retrieval bots (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) reach and fetch the page without HTTP 4xx/5xx or `noindex` blocks?
+2. **Entity Understanding:** Can machines resolve *Who* the brand is via Schema.org `Organization` and `sameAs` links?
+3. **Factual Consistency:** Are prices, contacts, and availability consistent across all first-party pages?
+4. **Answerability & GEO:** Does the content provide quantifiable numbers and mechanistic explanations (`how` / `why`)?
+5. **Visitor Continuity:** Does the landing page provide immediate information scent and commercial CTAs to prevent referral bounce?
+
