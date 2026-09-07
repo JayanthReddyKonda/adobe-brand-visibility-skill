@@ -152,6 +152,25 @@ try:
 except ImportError:
     validate_type = None  # type: ignore
 
+try:
+    from causal_gate import (
+        LAYER0_CAUSE_IDS,
+        LAYER1_CAUSE_IDS,
+        SUPPRESSED_BY_LAYER0,
+        SUPPRESSED_BY_LAYER1,
+        apply_causal_suppression,
+        build_evidence_index,
+        evaluate_epistemic_state,
+    )
+except ImportError:
+    apply_causal_suppression = None  # type: ignore
+    build_evidence_index = None  # type: ignore
+    evaluate_epistemic_state = None  # type: ignore
+    LAYER0_CAUSE_IDS = _LAYER0_CAUSE_IDS
+    LAYER1_CAUSE_IDS = _LAYER1_CAUSE_IDS
+    SUPPRESSED_BY_LAYER0 = _SUPPRESSED_BY_LAYER0
+    SUPPRESSED_BY_LAYER1 = _SUPPRESSED_BY_LAYER1
+
 
 def parse_target_domain(site: str) -> tuple:
     """Normalize site string into base URL and domain."""
@@ -264,6 +283,41 @@ def synthesize_audit_report(
     specialist_results: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Apply Causal DAG, Keystone Defect deduplication, and Draft-07 synthesis."""
+    base, domain = parse_target_domain(site)
+    pages = inv.get("pages", []) if inv else []
+    _domain_clean = domain.split(":")[0]
+    _brand_guess = _domain_clean.split(".")[0].capitalize()
+
+    for p in pages:
+        p_html = p.get("html", "")
+        m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
+        if m_og and m_og.group(1).strip():
+            _brand_guess = m_og.group(1).strip()
+            break
+        m_title = re.search(r'<title[^>]*>([^<]+)</title>', p_html, re.I)
+        if m_title and m_title.group(1).strip():
+            t_raw = m_title.group(1).strip()
+            t_parts = re.split(r'[\s|:–—\-]+', t_raw)
+            if t_parts and len(t_parts[0]) > 1:
+                _brand_guess = t_parts[0].strip()
+                break
+
+    sample_routes: List[str] = []
+    sample_product_route = None
+    sample_pricing_route = None
+    for p in pages:
+        p_url = p.get("url", "")
+        parsed_p = urlparse(p_url)
+        path = parsed_p.path or "/"
+        if path not in ("/", "") and path not in sample_routes:
+            sample_routes.append(path)
+        if not sample_product_route and any(k in path.lower() for k in ("/product", "/item", "/shop", "/catalog")):
+            sample_product_route = path
+        if not sample_pricing_route and any(k in path.lower() for k in ("/pricing", "/plans", "/billing")):
+            sample_pricing_route = path
+
+    has_llms_txt = any("llms.txt" in (p.get("url") or "").lower() for p in pages) or bool(inv.get("llms_txt") if inv else False)
+
     all_raw_findings: List[Dict[str, Any]] = []
     all_raw_recommendations: List[Dict[str, Any]] = []
 
@@ -328,8 +382,14 @@ def synthesize_audit_report(
         if sev not in ("critical", "high", "medium", "low"):
             sev = "medium"
 
+        raw_ftitle = f.get("title", "Detected Brand Visibility Defect")
+        f_title = clean_text_string(raw_ftitle)
+
+        raw_froot = f.get("root_cause") or f.get("cause_id") or f_title
+        f_root = clean_text_string(raw_froot)
+
         action = f.get("suggested_action") or {}
-        raw_act_sum = action.get("summary") or f.get("title") or "Remediate detected defect."
+        raw_act_sum = action.get("summary") or f.get("title") or f"Remediate {f_title.lower()} on target domain {domain}."
         action_summary = clean_text_string(raw_act_sum)
 
         raw_act_prio = action.get("priority") or sev
@@ -337,13 +397,7 @@ def synthesize_audit_report(
         if action_priority not in ("critical", "high", "medium", "low"):
             action_priority = sev
 
-        raw_ftitle = f.get("title", "Detected Brand Visibility Defect")
-        f_title = clean_text_string(raw_ftitle)
-
-        raw_froot = f.get("root_cause") or f.get("cause_id") or f_title
-        f_root = clean_text_string(raw_froot)
-
-        raw_ev = f.get("evidence", "Observed during multi-sensor site analysis.")
+        raw_ev = f.get("evidence") or f"Diagnostic observation recorded on {domain} across {len(pages)} analyzed inventory page(s)."
         if isinstance(raw_ev, str):
             evidence_val: Any = clean_text_string(raw_ev)
         elif isinstance(raw_ev, dict):
@@ -471,77 +525,106 @@ def synthesize_audit_report(
 
         proactive_actions.append(p_act)
 
-    # Archetype-Tailored Strategic Recommendations
+    # Archetype-Tailored Strategic Recommendations (Grounded in Verified Profile)
+    target_route = sample_product_route or (f"https://{domain}/products" if domain else "catalog routes")
+    pricing_source = sample_pricing_route or (f"https://{domain}/pricing" if domain else "pricing routes")
+    route_refs = ", ".join(sample_routes[:3]) if sample_routes else (f"https://{domain}/" if domain else "core routes")
+
     if archetype == "ecommerce" and not any("product & offer" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": "Deploy Machine-Readable Product & Offer Answer Graph (@graph)",
-            "summary": "Provide machine-explicit Schema.org Product markup with Offer pricing, ISO 4217 currency, inStock availability, and AggregateRating.",
+            "title": f"Deploy Machine-Readable Product & Offer Answer Graph for {_brand_guess}",
+            "summary": f"Provide machine-explicit Schema.org Product markup with Offer pricing, ISO 4217 currency, inStock availability, and AggregateRating for {_brand_guess}.",
             "priority": "medium",
-            "technical_fix": "Embed Schema.org Product JSON-LD on catalog routes with nested Offer, priceCurrency, and availability declarations.",
-            "creative_fix": "Ensure explicit specification tables (dimensions, materials, warranty) exist in clean HTML tables above the fold to maximize conversational recommendations in ChatGPT Search and Perplexity.",
-            "verification": "Validate product routes with Schema.org Validator or Google Rich Results Test to confirm 0 errors.",
+            "technical_fix": f"Embed Schema.org Product JSON-LD on {target_route} with nested Offer, priceCurrency, and availability declarations.",
+            "creative_fix": f"Ensure explicit specification tables (dimensions, materials, warranty) exist in clean HTML tables above the fold on {target_route} to maximize conversational recommendations in ChatGPT Search and Perplexity.",
+            "verification": f"Validate product routes on https://{domain}/ with Schema.org Validator or Google Rich Results Test to confirm 0 errors.",
         })
         proactive_counter += 1
 
     elif archetype == "saas" and not any("pricing.md" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": "Deploy Autonomous AI Buying Agent Pricing Manifest (/pricing.md)",
-            "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
+            "title": f"Deploy Autonomous AI Buying Agent Pricing Manifest (/pricing.md) for {_brand_guess}",
+            "summary": f"Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents evaluating {_brand_guess}.",
             "priority": "medium",
-            "technical_fix": "Serve /pricing.md at domain root over HTTPS with Content-Type: text/markdown containing structured plan comparison tables.",
-            "creative_fix": "Standardize plan names with transparent feature contrast rows, eliminating ambiguous asterisk conditions.",
-            "verification": "Request GET /pricing.md and verify HTTP 200 with text/markdown Content-Type.",
+            "technical_fix": f"Serve /pricing.md at https://{domain}/pricing.md with structured plan comparison tables extracted from {pricing_source}.",
+            "creative_fix": f"Standardize plan names across {pricing_source} with transparent feature contrast rows, eliminating ambiguous asterisk conditions.",
+            "verification": f"Request GET https://{domain}/pricing.md and verify HTTP 200 with text/markdown Content-Type.",
         })
         proactive_counter += 1
 
     elif archetype == "publisher" and not any("e-e-a-t" in str(p.get("title", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": "Structure E-E-A-T Author Credentials & Fact Attributions",
-            "summary": "Embed Schema.org Person markup for authors linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks directly beneath question headings.",
+            "title": f"Structure E-E-A-T Author Credentials & Fact Attributions for {_brand_guess}",
+            "summary": f"Embed Schema.org Person markup for {_brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks directly beneath question headings.",
             "priority": "medium",
-            "technical_fix": "Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles.",
+            "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
             "creative_fix": "Replace passive voice and speculative assertions with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
-            "verification": "Inspect article markup with Google Rich Results Test to confirm valid Person and author credentials.",
+            "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person and author credentials.",
         })
         proactive_counter += 1
 
     # Ensure baseline universal proactive actions per Adobe Hackathon Round 3 Rubric
     if not any("llms.txt" in str(p.get("summary", "")).lower() or "llms.txt" in str(p.get("title", "")).lower() for p in proactive_actions):
-        proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": "Deploy Machine-Readable llms.txt Manifest",
-            "summary": "Deploy an authoritative /llms.txt manifest at domain root with BLUF summaries and clean markdown links.",
-            "priority": "low",
-            "technical_fix": "Serve /llms.txt over HTTPS with Content-Type: text/plain and links to primary product guides.",
-            "creative_fix": "Author first-100-word executive overviews for every core product category.",
-            "verification": "Request GET /llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
-        })
+        if has_llms_txt:
+            proactive_actions.append({
+                "id": f"PROACTIVE-{proactive_counter:03d}",
+                "title": f"Audit & Expand Existing /llms.txt Manifest for {_brand_guess}",
+                "summary": f"Existing /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
+                "priority": "low",
+                "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
+                "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} product and documentation guide.",
+                "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
+            })
+        else:
+            proactive_actions.append({
+                "id": f"PROACTIVE-{proactive_counter:03d}",
+                "title": f"Deploy Machine-Readable llms.txt Manifest for {_brand_guess}",
+                "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links.",
+                "priority": "low",
+                "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
+                "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} service guide.",
+                "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
+            })
         proactive_counter += 1
 
     if not any("organization" in str(p.get("summary", "")).lower() or "sameas" in str(p.get("summary", "")).lower() for p in proactive_actions):
-        proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": "Strengthen Knowledge Graph Authority Nodes",
-            "summary": "Anchor brand identity with explicit Schema.org Organization JSON-LD linking to verified Wikidata, Wikipedia, and LinkedIn nodes.",
-            "priority": "low",
-            "technical_fix": "Embed Schema.org Organization schema with sameAs links to official external authority profiles.",
-            "creative_fix": "Maintain identical corporate legal name and contact details across all registered external profiles.",
-            "verification": "Inspect root HTML JSON-LD with Google Rich Results Test or Schema.org Validator.",
-        })
+        corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
+        corrob_cov_p = corrob_res_p.get("coverage", {})
+        p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
+        if p_sa_count > 0:
+            proactive_actions.append({
+                "id": f"PROACTIVE-{proactive_counter:03d}",
+                "title": f"Expand Knowledge Graph Authority Anchors for {_brand_guess}",
+                "summary": f"{_brand_guess} currently declares {p_sa_count} sameAs node(s). Expand third-party authority coverage with Wikidata and LinkedIn verification.",
+                "priority": "low",
+                "technical_fix": f"Add verified Wikidata entity URI and official LinkedIn organization profile to Schema.org Organization on https://{domain}/.",
+                "creative_fix": f"Maintain identical legal name '{_brand_guess}' and contact details across all registered external profiles.",
+                "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
+            })
+        else:
+            proactive_actions.append({
+                "id": f"PROACTIVE-{proactive_counter:03d}",
+                "title": f"Establish Authoritative Knowledge Graph Entity Anchors for {_brand_guess}",
+                "summary": f"Anchor {_brand_guess} brand identity with explicit Schema.org Organization JSON-LD linking to verified Wikidata, Wikipedia, and LinkedIn nodes.",
+                "priority": "low",
+                "technical_fix": f"Embed Schema.org Organization schema on https://{domain}/ with sameAs links to official external authority profiles.",
+                "creative_fix": f"Maintain identical corporate legal name '{_brand_guess}' across all registered external directory profiles.",
+                "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
+            })
         proactive_counter += 1
 
     if not any("citability architecture" in str(p.get("title", "")).lower() or "passage chunking" in str(p.get("summary", "")).lower() for p in proactive_actions):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": "Implement Princeton KDD 2024 Citability Architecture",
-            "summary": "Structure core landing sections into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
+            "title": f"Implement Princeton KDD 2024 Citability Architecture on {domain}",
+            "summary": f"Structure core sections on {domain} into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
             "priority": "low",
-            "technical_fix": "Structure content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
-            "creative_fix": "Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity names directly.",
-            "verification": "Audit section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
+            "technical_fix": f"Structure {domain} content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
+            "creative_fix": f"Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity name '{_brand_guess}' directly.",
+            "verification": f"Audit {domain} section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
         })
 
     # 4. Counts-by-Severity Summary (computed earlier after archetype reweighting)
@@ -649,24 +732,37 @@ def synthesize_audit_report(
     else:
         letter_grade = "F"
 
-    chatgpt_factors = ["OAI-SearchBot allowed" if crawl_score >= 80 else "Crawler access restricted"]
     _sa_anchor_count = int(_sa_declared or 0)
+    # Dynamic Engine Readiness Factors (Grounded in Verified Telemetry)
+    if crawl_score >= 80:
+        chatgpt_factors = [f"OAI-SearchBot retrieval permitted on {domain} for ChatGPT Search indexation"]
+    else:
+        chatgpt_factors = [f"OAI-SearchBot retrieval restricted or blocked in robots.txt on {domain}"]
     if _sa_anchor_count >= 1:
-        chatgpt_factors.append("Knowledge Graph authority anchors present")
+        chatgpt_factors.append(f"{_sa_anchor_count} external Knowledge Graph authority anchor(s) declared for {_brand_guess} entity disambiguation")
     if citation_score >= 70:
-        chatgpt_factors.append("Substantive depth suitable for synthetic answer absorption")
+        chatgpt_factors.append(f"Substantive fact density ({citation_score}/100) supports synthetic answer absorption")
 
-    claude_factors = ["Claude-SearchBot retrieval access permitted" if crawl_score >= 80 else "Claude crawler blocked"]
+    if crawl_score >= 80:
+        claude_factors = [f"Claude-SearchBot retrieval access permitted for Anthropic search grounding on {domain}"]
+    else:
+        claude_factors = [f"Claude-SearchBot crawler blocked or restricted on {domain}"]
     if retrieval_score >= 80:
-        claude_factors.append("Clean semantic markdown extractable from raw HTML")
+        claude_factors.append(f"Clean semantic markdown ({retrieval_score}/100) readily parseable from raw HTML")
 
-    perplexity_factors = ["PerplexityBot retrieval indexation enabled" if crawl_score >= 80 else "Perplexity crawler blocked"]
+    if crawl_score >= 80:
+        perplexity_factors = [f"PerplexityBot retrieval indexation enabled for {domain}"]
+    else:
+        perplexity_factors = [f"PerplexityBot blocked — {domain} excluded from Perplexity source index"]
     if citation_score >= 65:
-        perplexity_factors.append("Atomic facts and metrics present for direct citation cards")
+        perplexity_factors.append(f"Atomic facts and empirical metrics ({citation_score}/100) available for Perplexity citation cards")
 
-    google_factors = ["Googlebot access healthy" if crawl_score >= 85 else "Crawl directives restrict Google"]
+    if crawl_score >= 85:
+        google_factors = [f"Googlebot crawl access healthy across {domain}"]
+    else:
+        google_factors = [f"Crawl directives restrict Google retrieval on {domain}"]
     if retrieval_score >= 80:
-        google_factors.append("Semantic headings and content tables suitable for AI Overview extraction")
+        google_factors.append(f"Semantic headings and table structures ({retrieval_score}/100) suitable for AI Overview extraction")
 
     geo_summary: Dict[str, Any] = {
         "detected_archetype": archetype,
@@ -731,14 +827,13 @@ def synthesize_audit_report(
     return report
 
 
-def audit(
+def collect_telemetry(
     site: str,
     inventory: Optional[str] = None,
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
-    state_file: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Execute end-to-end multi-skill brand AI-readiness audit."""
+) -> tuple:
+    """Acquire inventory and execute all 6 specialist sensors, returning (inv, specialist_results)."""
     base, domain = parse_target_domain(site)
 
     # 1. Acquire or load inventory
@@ -817,10 +912,153 @@ def audit(
     except Exception:
         specialist_results["engagement-context-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
 
-    # 3. Cognitive Synthesis
+    return inv, specialist_results
+
+
+def get_telemetry_payload(
+    site: str,
+    inventory: Optional[str] = None,
+    analytics: Optional[str] = None,
+    candidate_backlinks: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return raw empirical telemetry across all 6 sensors for AI cognitive orchestration."""
+    base, domain = parse_target_domain(site)
+    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks)
+
+    # Precompute Causal DAG state and suppression boundaries
+    all_raw_findings: List[Dict[str, Any]] = []
+    for _skill_name, result in specialist_results.items():
+        all_raw_findings.extend(result.get("findings", []))
+
+    has_layer0_block = any(
+        (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
+        for f in all_raw_findings
+    )
+    has_layer1_rendering_gap = any(
+        (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
+        for f in all_raw_findings
+    )
+
+    dag_root_causes: List[Dict[str, Any]] = []
+    suppressed_categories: Set[str] = set()
+
+    if has_layer0_block:
+        dag_root_causes.append({
+            "code": "AI_RETRIEVAL_BLOCKED",
+            "scope": "site",
+            "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER0)),
+            "rationale": "RFC 9309 search retrieval bot blocked or HTTP 4xx/5xx crawl failure preempts downstream evaluation.",
+        })
+        suppressed_categories.update(_SUPPRESSED_BY_LAYER0)
+
+    if has_layer1_rendering_gap:
+        dag_root_causes.append({
+            "code": "RENDERED_CONTENT_GAP",
+            "scope": "site",
+            "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER1)),
+            "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability and fact evaluation.",
+        })
+        suppressed_categories.update(_SUPPRESSED_BY_LAYER1)
+
+    # Extract normalized sensor measurements
+    disc_res = specialist_results.get("discoverability-audit", {})
+    entity_res = specialist_results.get("entity-content-audit", {})
+    fact_res = specialist_results.get("fact-consistency-audit", {})
+    corrob_res = specialist_results.get("corroboration-authority-audit", {})
+    geo_res = specialist_results.get("geo-content-audit", {})
+    eng_res = specialist_results.get("engagement-context-audit", {})
+
+    return {
+        "site": site,
+        "domain": domain,
+        "crawled_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "archetype": detect_business_archetype(inv),
+        "inventory": {
+            "page_count": len(inv.get("pages", [])),
+            "pages": [
+                {
+                    "url": p.get("url"),
+                    "page_type": p.get("page_type"),
+                    "word_count": p.get("word_count"),
+                    "snr": p.get("snr"),
+                }
+                for p in inv.get("pages", [])
+            ],
+            "robots_summary": inv.get("robots", {}).get("summary", {}),
+            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in inv.get("pages", [])),
+        },
+        "retrieval": {
+            "robots_txt_found": bool(inv.get("robots")),
+            "bot_matrix": disc_res.get("ai_agent_scrapeability_summary", {}).get("retrieval_bot_matrix", {}),
+            "retrieval_bots_allowed": disc_res.get("coverage", {}).get("retrieval_bots_allowed"),
+            "retrieval_bots_total": disc_res.get("coverage", {}).get("retrieval_bots_total"),
+            "noindex_pages": [p.get("url") for p in inv.get("pages", []) if p.get("noindex")],
+        },
+        "rendering": {
+            "visible_words_initial_html": disc_res.get("coverage", {}).get("visible_words_initial_html"),
+            "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in inv.get("pages", [])),
+        },
+        "entity": {
+            "jsonld_present": entity_res.get("coverage", {}).get("jsonld_present", False),
+            "types_declared": entity_res.get("coverage", {}).get("types_declared", []),
+            "sameas_declared": corrob_res.get("coverage", {}).get("sameas_declared", 0),
+        },
+        "facts": {
+            "facts_checked": fact_res.get("coverage", {}).get("facts_checked", 0),
+            "fact_conflicts": fact_res.get("coverage", {}).get("fact_conflicts", 0),
+        },
+        "corroboration": {
+            "sameas_declared": corrob_res.get("coverage", {}).get("sameas_declared", 0),
+            "sameas_resolvable": corrob_res.get("coverage", {}).get("sameas_resolvable", 0),
+        },
+        "geo": {
+            "average_citability_score": geo_res.get("coverage", {}).get("average_citability_score"),
+        },
+        "engagement": {
+            "pages_evaluated": eng_res.get("coverage", {}).get("pages_evaluated", 0),
+        },
+        "dag": {
+            "has_layer0_block": has_layer0_block,
+            "has_layer1_rendering_gap": has_layer1_rendering_gap,
+            "root_causes": dag_root_causes,
+            "suppressed_categories": sorted(list(suppressed_categories)),
+        },
+        "causal_state": (
+            evaluate_epistemic_state(inv, specialist_results)
+            if evaluate_epistemic_state is not None
+            else {
+                "retrieval": "blocked" if has_layer0_block else "observed",
+                "rendering": "gap" if has_layer1_rendering_gap else "observed",
+                "entity": "observed",
+                "facts": "observed",
+                "corroboration": "observed",
+                "geo": "observed",
+                "engagement": "observed",
+            }
+        ),
+        "evidence_index": (
+            build_evidence_index(inv, specialist_results)
+            if build_evidence_index is not None
+            else []
+        ),
+        "sensor_telemetry": specialist_results,
+    }
+
+
+def audit(
+    site: str,
+    inventory: Optional[str] = None,
+    analytics: Optional[str] = None,
+    candidate_backlinks: Optional[str] = None,
+    state_file: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Execute end-to-end multi-skill brand AI-readiness audit."""
+    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks)
+
+    # Cognitive Synthesis
     report = synthesize_audit_report(site, inv, specialist_results)
 
-    # 4. Validate against Draft-07 schema
+    # Validate against Draft-07 schema
     schema = load_schema()
     if schema and validate_type is not None:
         err = validate_type(report, schema)
@@ -840,17 +1078,26 @@ def main():
     parser.add_argument("--analytics", help="Path to first-party analytics JSON (optional)")
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
+    parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
 
     args = parser.parse_args()
 
-    report = audit(
-        site=args.site,
-        inventory=args.inventory,
-        analytics=args.analytics,
-        candidate_backlinks=args.candidate_backlinks,
-    )
-
-    formatted_output = json.dumps(report, indent=2)
+    if args.telemetry:
+        payload = get_telemetry_payload(
+            site=args.site,
+            inventory=args.inventory,
+            analytics=args.analytics,
+            candidate_backlinks=args.candidate_backlinks,
+        )
+        formatted_output = json.dumps(payload, indent=2)
+    else:
+        report = audit(
+            site=args.site,
+            inventory=args.inventory,
+            analytics=args.analytics,
+            candidate_backlinks=args.candidate_backlinks,
+        )
+        formatted_output = json.dumps(report, indent=2)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:

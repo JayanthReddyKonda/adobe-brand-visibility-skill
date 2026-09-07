@@ -16,7 +16,8 @@ allowed-tools:
 
 | Tool | Command | Output |
 |---|---|---|
-| **Master Audit Runner (Deterministic)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json` | Complete Draft-07 Validated Report JSON |
+| **Master Audit Runner (Headless CI/CD)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json` | Complete Draft-07 Validated Report JSON |
+| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics |
 | **Web Scraper (Unified Acquisition)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical Site Inventory JSON |
 | **Site Inventory Wrapper** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Typed HTML page inventory (JSON) |
 | **Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json` | Exit Code 0 (pass) or 1 (fail) |
@@ -54,6 +55,7 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 
 ### Core Knowledge Base (Load First — MANDATORY)
 - [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Root cause taxonomy, multi-signal evidence reconciliation rules, severity rubric, confidence model, dual-track remediation catalog, and the full Draft-07 report schema contract.
+- [Epistemic Reasoning & Evidence Policy](references/reasoning-policy.md): Evidence vs. truth standards, four-state epistemic model (observed/inferred/unknown/suppressed), falsification rules, and component responsibility boundaries.
 
 ### Output Schema (Load Before Writing Report — MANDATORY)
 - [Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
@@ -63,6 +65,7 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 
 ### Advanced Citability & Research Specifications
 - [State-of-the-Art GEO Benchmarks](references/state-of-the-art-geo-benchmarks.md): The 17-rule consolidated matrix (CR01-TX06) covering crawler access, machine-readable manifests, text citability, and Princeton GEO evidence density.
+- [Archetype Dynamic Adaptation Matrix](references/archetype-matrix.md): Business model contextualization across SaaS, E-Commerce, Enterprise B2B, Media/Publisher, and Local Services for severity re-weighting and simulated queries.
 - [SOTA AI Readiness Framework (2026)](references/sota-ai-readiness-framework-2026.md): 6-dimensional orthogonal readiness scoring model and Wilson 95% score confidence intervals across retrieval engines.
 - [Citation Absorption & SFE (2026)](references/citation-absorption-and-geo-sfe-2026.md): Mathematical formulations for Citation Absorption Index, Synthetic Flywheel Effect, and multi-sentence context decay.
 
@@ -156,12 +159,20 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 **Step 10: Multi-Signal Evidence Triangulation & Scoring**
 Apply the cognitive reasoning rules from `audit-orchestrator-knowledge-base.md`:
 
-1. **Causal DAG & Keystone Deduplication:** If an upstream Layer 0 or Layer 1 defect is active, consolidate downstream symptoms as supporting evidence under the Keystone Defect to prevent finding inflation.
-2. **Epistemic Falsification Protocol:** Test counter-hypotheses before asserting defects (e.g. verify pricing tiering, nested `@graph` structures, edge WAF challenges, and training vs retrieval bot distinctions).
-3. **Dual-Track Remediation:** Provide BOTH a concrete `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers), plus an empirical `verification` check.
-4. **Query-Intent Scenario Modeling:** Contrast how each defect impairs both **Navigational Brand Queries** (*"What is [Brand]?"*) and **Categorical Discovery Queries** (*"Where can I buy [Category]?"*).
-5. **Orthogonal Scoring Model:** Compute the 6 orthogonal scores (0–100): Crawlability (20%), Retrieval Readiness (15%), Citation Readiness (25%), Entity Authority (20%), Cross-Engine Visibility (10%), Agentic Commerce (10%). Assign Letter Grade (A: 85–100, B: 70–84, C: 50–69, D: 30–49, F: 0–29).
-6. **Curated Strategic Proactive Actions:** Select up to 5 beyond-problem growth opportunities, prioritized from critical to low.
+1. **Deterministic Causal DAG & Keystone Deduplication:** If an upstream Layer 0 access block or Layer 1 rendering gap is active, respect the deterministic suppression boundaries in `telemetry.dag.suppressed_categories`. Consolidate downstream symptoms as supporting evidence under the Keystone Defect to prevent finding inflation.
+2. **Epistemic Falsification Protocol:** Test counter-hypotheses before asserting defects (Claim -> Observed Evidence -> Inference Rule -> Confidence -> Possible Falsifier). Verify pricing tiering, nested `@graph` structures, edge WAF challenges, and training vs. retrieval bot distinctions.
+3. **Query-Strategy Retrieval Simulation:** Model how each defect impairs simulated assistant query strategies across ChatGPT Search, Claude, and Perplexity Pro. Never claim to have observed actual platform ranking without live platform telemetry.
+4. **Engagement Friction Proxies:** Without first-party analytics, evaluate observable friction proxies (CTA DOM depth, H1 information scent, above-the-fold value density), never unmeasured bounce rates.
+5. **Dual-Track Remediation:** Provide BOTH a concrete `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers), plus an empirical `verification` check.
+6. **Orthogonal Scoring Model:** Compute the 6 orthogonal scores (0–100): Crawlability (20%), Retrieval Readiness (15%), Citation Readiness (25%), Entity Authority (20%), Cross-Engine Visibility (10%), Agentic Commerce (10%). Assign Letter Grade (A: 85–100, B: 70–84, C: 50–69, D: 30–49, F: 0–29).
+> [!IMPORTANT]
+> **Zero-Trust Cognitive Reasoning Mandate (Eliminating Repeated Static Boilerplate):**
+> As an AI Agent, you are the **Cognitive Reasoning Engine**, NOT a passive script runner or CLI pipe.
+> - The specialist scripts provide deterministic empirical telemetry (crawler matrices, word counts, DOM trees, status codes).
+> - You MUST apply True AI Reasoning to synthesize the report: never emit generic boilerplate or repetitive placeholder text.
+> - Ground every finding and proactive recommendation in the actual verified domain, brand name, and discovered URL routes from `inv.json`, citing specific `evidence_index` IDs (`EV-XXX`) wherever possible.
+> - Synthesize bespoke, copy-pasteable Schema.org `@graph` JSON-LD code blocks directly tailored to the audited entity.
+> - Apply Epistemic Falsification: Verify that pricing discrepancies are genuine contradictions rather than billing cycles (monthly vs annual) or feature tiers before logging defects.
 
 ---
 
