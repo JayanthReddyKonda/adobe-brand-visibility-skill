@@ -136,11 +136,17 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 ```
 
+### Option D: Empirical Telemetry Aggregation (Agentic Cognitive Synthesis)
+```bash
+# Extract raw empirical telemetry, causal state, and evidence index for LLM reasoning
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --telemetry
+```
+
 ---
 
 ## 6. Verification & Quality Metrics
 
-- **254 Automated Unit Tests:** 100% passing across 24 test modules in under 60 seconds.
+- **259 Automated Unit Tests:** 100% passing across 25 test modules in under 60 seconds.
 - **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
 - **Static Type Safety:** 0 errors under MyPy across all 8 skills.
 - **Draft-07 JSON Schema Gate:** Validated against `report-schema.json` with support for flexible evidence typing and dual-track remediation.
