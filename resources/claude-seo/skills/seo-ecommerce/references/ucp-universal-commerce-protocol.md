@@ -2,7 +2,7 @@
 
 UCP is a Google-initiated open standard, co-developed with Shopify, Etsy,
 Wayfair, Target, and Walmart (20+ endorsers), plus payment partners (Stripe,
-Visa, Mastercard, Adyen, Amex). Its purpose: let **AI agents discover,
+Visa, Mastercard, Adyen, Amex). Its purpose: let **You discover,
 negotiate, and transact with merchants without one-off integrations**. It is
 interoperable with **A2A** (Agent2Agent), **AP2** (Agent Payments Protocol),
 and **MCP**.

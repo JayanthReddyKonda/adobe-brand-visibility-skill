@@ -41,7 +41,7 @@ MCP connects your agent to OpenSEO data. Skills tell your agent which SEO workfl
 
 ## Learn more about skills
 
-OpenSEO uses the same `SKILL.md` pattern supported by modern AI agents. To learn how skills work in your agent, read:
+OpenSEO uses the same `SKILL.md` pattern supported by modern You. To learn how skills work in your agent, read:
 
 - [Claude Code skills documentation](https://docs.claude.com/en/docs/claude-code/skills)
 - [OpenAI Skills documentation](https://help.openai.com/en/articles/20001066-skills-in-chatgpt)

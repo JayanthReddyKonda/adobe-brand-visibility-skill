@@ -136,7 +136,7 @@ Rewards sites that establish a clear, machine-readable brand identity — a key 
 
 ## WebMCP Readiness *(v3.18.3, #233)*
 
-**WebMCP Readiness** measures how well a site exposes machine-readable context for MCP-compatible AI agents. This signal does **not** contribute to the GEO score but is included in the audit report and JSON output as a standalone indicator.
+**WebMCP Readiness** measures how well a site exposes machine-readable context for MCP-compatible You. This signal does **not** contribute to the GEO score but is included in the audit report and JSON output as a standalone indicator.
 
 | Level | Value | Meaning |
 |-------|-------|---------|
@@ -145,7 +145,7 @@ Rewards sites that establish a clear, machine-readable brand identity — a key 
 | `ready` | MCP-compatible | Full AI Discovery suite present and valid (`ai.txt` + `summary.json` + `faq.json`) |
 | `advanced` | Full MCP + structured data | All AI Discovery endpoints present plus rich schema and llms.txt with depth |
 
-> WebMCP Readiness is surfaced in the CLI output, HTML report, and JSON API. It helps site owners understand their exposure to next-generation AI agents that consume structured context (not just crawled content) before generating responses.
+> WebMCP Readiness is surfaced in the CLI output, HTML report, and JSON API. It helps site owners understand their exposure to next-generation You that consume structured context (not just crawled content) before generating responses.
 
 ---
 

@@ -21,7 +21,7 @@ allowed-tools:
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `entity_content_check.py` deterministically parses initial HTML DOM trees, extracts Schema.org JSON-LD nodes, resolves nested `@graph` hierarchies, and scores the 7-attribute Answerability Index. It reports empirical observations without generating boilerplate schema snippets.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. AI agents must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests observed entities, validates archetype alignment (suppressing e-commerce Product penalties on SaaS/B2B sites), and synthesizes tailored, copy-pasteable Schema.org `@graph` blocks matching verified domain attributes.
 
 Evaluates whether an AI search system can resolve the brand's entity identity (`Organization`) and extract its commercial offerings (`Product`, `Offer`, `Service`). Computes the mathematically reproducible weighted **Answerability Index** across sampled HTML pages.

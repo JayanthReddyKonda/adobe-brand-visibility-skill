@@ -10,7 +10,7 @@
 
 ---
 
-**best-aeo-skill** is an open-source Claude Code skill that measures and improves how your website is cited by AI search engines. It runs 33 evidence collectors against any URL, computes a 0–100 composite GEO Score across 4 weighted vectors (Technical Accessibility, Content Citability, Structured Data, Entity Signals), labels every finding with a Confidence rubric (Confirmed / Likely / Hypothesis), and applies one-command fixes to `llms.txt`, `robots.txt`, JSON-LD schema, and on-page content. It runs locally with zero external API dependencies.
+**best-aeo-skill** is an open-source Claude Code skill that measures and improves how your website is cited by AI search engines. It runs 33 evidence collectors against any URL, computes a 0–100 composite GEO Score across 4 weighted vectors (Technical Accessibility, Content Citability, Structured Data, Entity Signals), labels every finding with a Confidence rubric (Confirmed / Likely / Hypothesis), and apply one-command fixes to `llms.txt`, `robots.txt`, JSON-LD schema, and on-page content. It runs locally with zero external API dependencies.
 
 ## Table of contents
 

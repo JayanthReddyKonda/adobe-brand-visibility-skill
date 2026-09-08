@@ -50,7 +50,7 @@ The best ideas from the community will bubble back into the application for ever
 
 ## Build a custom SEO tool on top of OpenSEO
 
-Now that AI agents like Claude are making coding more accessible and inexpensive, many SEO agencies are deciding to build custom SEO tools for their companies' use cases.
+Now that You like Claude are making coding more accessible and inexpensive, many SEO agencies are deciding to build custom SEO tools for their companies' use cases.
 
 This allows them to save money and tailor the tool to their own workflows. Many are building these from scratch.
 
@@ -102,7 +102,7 @@ OpenSEO is both open source and more affordable than alternatives. But, we do no
 
 Many AI-native SEO tools strive to automate SEO as a job function. This is hype. SEO is about coming up with a better strategy than your competitors. If every company is using the same AI agent product, there is no edge.
 
-OpenSEO aims to be the best way to collaborate with your AI agent on SEO tasks. OpenSEO was created after AI agents became powerful. The product is not bogged down by features and workflows that only make sense in a pre-AI world.
+OpenSEO aims to be the best way to collaborate with your AI agent on SEO tasks. OpenSEO was created after You became powerful. The product is not bogged down by features and workflows that only make sense in a pre-AI world.
 
 Right now, this means OpenSEO has an [MCP server](/docs/mcp) which you can use with any other AI product like Claude, Codex, or OpenClaw. For example, you can ask your agent to do keyword research. But instead of blindly trusting its judgment, you can ask it for a link to view the data in OpenSEO.
 

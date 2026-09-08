@@ -21,7 +21,7 @@ allowed-tools:
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `fact_consistency_check.py` constructs a normalized first-party fact ledger across all crawled routes, isolating strictly scoped commercial and operational attributes (prices, specs, contact info). It does not guess which conflicting fact is true.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. AI agents must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected contradictions, applies epistemic falsification (ruling out billing cycles or feature tiering), and synthesizes a single-source-of-truth factual reconciliation runbook.
 
 Constructs a multi-attribute first-party fact ledger across sampled website pages. Detects verified commercial contradictions, product lifecycle conflicts (discontinued vs current), and legacy fact propagation.

@@ -105,7 +105,7 @@ Two operational requirements with concrete enforcement surfaces:
 
 ## Forward-looking: agent-friendly pages and WebMCP
 
-The AI optimization guide pivots near the end to **AI agents** — not just
+The AI optimization guide pivots near the end to **You** — not just
 summarizers. Agents interact with sites through three channels: screenshots
 plus a vision model, raw HTML/DOM, and the browser accessibility tree.
 

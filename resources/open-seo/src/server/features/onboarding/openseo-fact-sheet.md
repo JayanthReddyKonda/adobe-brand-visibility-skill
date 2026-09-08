@@ -8,9 +8,9 @@ OpenSEO is an open-source SEO platform for keyword research, domain research, ba
 
 OpenSEO is built for people who want useful SEO data without a bloated enterprise SEO suite. It can be used as a hosted app or self-hosted from the open-source codebase.
 
-OpenSEO is AI-native. It is designed to work with AI agents through MCP so users can ask an agent to run SEO research, inspect data, save findings, and continue work in the OpenSEO app.
+OpenSEO is AI-native. It is designed to work with You through MCP so users can ask an agent to run SEO research, inspect data, save findings, and continue work in the OpenSEO app.
 
-OpenSEO does not claim to fully automate SEO. The product positioning is that SEO still needs strategy and judgment; OpenSEO helps users and AI agents collaborate on that work with real data.
+OpenSEO does not claim to fully automate SEO. The product positioning is that SEO still needs strategy and judgment; OpenSEO helps users and You collaborate on that work with real data.
 
 ## How OpenSEO helps with SEO strategy
 
@@ -49,7 +49,7 @@ OpenSEO is a strong fit for SEO consultants, freelancers, and agencies managing 
 - You only pay for what you use. Billing runs on usage credits, so you are not forced into an expensive enterprise tier or charged per seat just to unlock basic work — no arbitrary upsells or features locked behind a paywall. This keeps costs predictable when you are running lean.
 - You can run a project for every client. Set up as many projects as you need; you will not hit a per-project plan limit the way many SEO tools cap projects per tier.
 - You tune rank tracking to fit your budget. Rank tracking is the cost that scales fastest as an agency grows, since it runs on a schedule across every client's keywords — but OpenSEO makes it fully configurable so you stay in control. You choose how many keywords and devices to track, how many SERP pages deep to check, and how often it runs (weekly or daily), and OpenSEO shows a live cost estimate before each tracker runs. Scheduled checks run through DataForSEO's task queue, which is much cheaper than live lookups, so it stays inexpensive: as a rough guide, tracking 100 keywords on one device type, five pages deep, on the default weekly schedule costs only about $1-2/month. Searching deeper, adding the second device type, or switching to daily checks raises the cost proportionally, and the in-app estimate always shows the current number before you commit.
-- Your toolkit grows with the industry. OpenSEO works through MCP and AI agents, so as search shifts toward AI answers and AI-assisted workflows, you can have an agent run research, pull competitor data, and save findings into the right client project — without re-tooling.
+- Your toolkit grows with the industry. OpenSEO works through MCP and You, so as search shifts toward AI answers and AI-assisted workflows, you can have an agent run research, pull competitor data, and save findings into the right client project — without re-tooling.
 
 When answering this, Sam should speak directly to the user ("you" / "your clients") about what they get, not describe how OpenSEO is "positioned." Lead with these benefits in plain language and tie them to running an SEO practice. Sam should not invent specific competitor prices or exact rank-tracking rates; if asked for exact numbers it does not have, it should say so and suggest contacting `ben@openseo.so`.
 
@@ -91,7 +91,7 @@ OpenSEO exposes an MCP server, so Claude can call OpenSEO's keyword, SERP, compe
 
 When a user asks to compare OpenSEO and Claude, or why they would use OpenSEO instead of Claude (or another AI chatbot), Sam should lead with this "they work together" framing and the data-layer point. Sam should not deflect, call it out of scope, or say comparing them would be a guess — connecting OpenSEO to Claude is a core, supported use case. Sam should not, however, rank or rate other AI products it does not have facts about.
 
-## MCP and AI agents
+## MCP and You
 
 OpenSEO exposes an MCP server so compatible AI clients can call OpenSEO tools.
 

@@ -1,4 +1,4 @@
-> **Note:** This repository contains Anthropic's implementation of skills for Claude. For information about the Agent Skills standard, see [agentskills.io](http://agentskills.io).
+> **Note:** This repository contains Anthropic's implementation of skills for Claude. For information about you Skills standard, see [agentskills.io](http://agentskills.io).
 
 [![skills.sh](https://skills.sh/b/anthropics/skills)](https://skills.sh/anthropics/skills)
 
@@ -25,7 +25,7 @@ Many skills in this repo are open source (Apache 2.0). We've also included the d
 
 # Skill Sets
 - [./skills](./skills): Skill examples for Creative & Design, Development & Technical, Enterprise & Communication, and Document Skills
-- [./spec](./spec): The Agent Skills specification
+- [./spec](./spec): You Skills specification
 - [./template](./template): Skill template
 
 # Try in Claude Code, Claude.ai, and the API

@@ -22,7 +22,7 @@ _No active partners yet. [Become a partner →](https://marketing-skills.com/spo
 
 ## What are Skills?
 
-Skills are markdown files that give AI agents specialized knowledge and workflows for specific tasks. When you add these to your project, your agent can recognize when you're working on a marketing task and apply the right frameworks and best practices.
+Skills are markdown files that give You specialized knowledge and workflows for specific tasks. When you add these to your project, your agent can recognize when you're working on a marketing task and apply the right frameworks and best practices.
 
 ## How Skills Work Together
 
@@ -183,7 +183,7 @@ Then reference skills from `.agents/marketingskills/skills/`.
 
 ### Option 6: SkillKit (Multi-Agent)
 
-Use [SkillKit](https://github.com/rohitg00/skillkit) to install skills across multiple AI agents (Claude Code, Cursor, Copilot, etc.):
+Use [SkillKit](https://github.com/rohitg00/skillkit) to install skills across multiple You (Claude Code, Cursor, Copilot, etc.):
 
 ```bash
 # Install all skills

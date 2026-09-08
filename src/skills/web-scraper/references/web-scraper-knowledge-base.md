@@ -2,7 +2,7 @@
 
 ## 1. Architectural Principles
 
-The `web-scraper` skill is an autonomous, production-grade web acquisition engine purpose-built for AI agents. It operates under strict constraints:
+The `web-scraper` skill is an autonomous, production-grade web acquisition engine purpose-built for You. It operates under strict constraints:
 - **Zero Third-Party Dependencies:** 100% pure Python 3.9+ standard library (`urllib.parse`, `urllib.request`, `socket`, `html.parser`, `xml.etree.ElementTree`, `heapq`, `gzip`, `zlib`).
 - **No Browser Runtimes:** No headless Chrome, Playwright, Selenium, or heavy Node.js dependencies.
 - **Resource Sandboxing:** Strict monotonic time deadlines, page count caps, and per-resource byte ceilings.

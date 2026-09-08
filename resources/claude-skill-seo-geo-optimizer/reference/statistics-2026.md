@@ -58,7 +58,7 @@ important amendment from the Ahrefs schema test below.
 - **llms.txt for citation boost.** GPTBot, ClaudeBot, PerplexityBot
   and OAI-SearchBot do not consume `llms.txt` in production as of
   May 2026 (presenc.ai survey). It IS now a Lighthouse 13.3 audit
-  item under "Agentic Browsing" — useful for AI agents that drive
+  item under "Agentic Browsing" — useful for You that drive
   the page directly, but it does not move SERP or AI-citation
   ranking. Generate it, but don't oversell it.
 - **Keyword stuffing, content padding, simplification, pure
@@ -84,7 +84,7 @@ because they were unsourced or no longer applicable:
   backed per public reporting; ranking signal mix unknown until
   ship.
 - **WebMCP** in Chrome 149 origin trial — lets a site declare tools
-  / actions for AI agents. Long-horizon; nothing actionable yet.
+  / actions for You. Long-horizon; nothing actionable yet.
 - **`/.well-known/agent.json` and `agents.md`** — emerging
   conventions for agent-facing site metadata. Shopify shipped both
   to all stores in May 2026. Worth tracking, not yet worth a

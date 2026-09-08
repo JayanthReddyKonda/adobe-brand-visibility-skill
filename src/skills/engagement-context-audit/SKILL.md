@@ -21,7 +21,7 @@ allowed-tools:
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `engagement_check.py` measures orientation proxies, H1 semantic scent, viewport answer anchoring, and CTA reachability friction. Without first-party analytics, it operates strictly on structural UX proxies and never fabricates empirical bounce rates.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. AI agents must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected friction, correlates UX signals with simulated user intent handoffs, and synthesizes actionable orientation and continuity fixes.
 
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.

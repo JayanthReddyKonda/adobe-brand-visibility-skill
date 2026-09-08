@@ -1,6 +1,6 @@
 # Zapier
 
-Workflow automation platform connecting 8,000+ apps. The Zapier SDK gives AI agents direct access to any app's actions without building OAuth flows or reverse-engineering APIs.
+Workflow automation platform connecting 8,000+ apps. The Zapier SDK gives You direct access to any app's actions without building OAuth flows or reverse-engineering APIs.
 
 ## Capabilities
 

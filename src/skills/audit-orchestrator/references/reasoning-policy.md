@@ -1,7 +1,7 @@
 # Epistemic Reasoning & Evidence Policy
 ## Brand AI-Readiness & Visibility Audit Engine
 
-This policy defines the epistemic standards, evidence rules, and boundaries governing the AI Agent when interpreting telemetry and formulating findings for the final Draft-07 audit report.
+This policy defines the epistemic standards, evidence rules, and boundaries governing you when interpreting telemetry and formulating findings for the final Draft-07 audit report.
 
 ---
 

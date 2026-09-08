@@ -26,7 +26,7 @@ allowed-tools:
 > 1. **Deterministic Master Runner (Automated Engine):** The Python script `orchestrator.py` executes single-pass web acquisition, runs all 6 specialist sensors, performs strict Causal DAG deduplication, calculates orthogonal math scores, and emits a perfect Draft-07 schema JSON report.
 > 2. **Agentic Runbook (Cognitive Reasoning):** As the AI agent, you do **not** manually run the specialist scripts or manually format the JSON. Instead, you run the master orchestrator, read the generated JSON report, and apply true AI Cognitive Reasoning (synthesizing the executive diagnosis, explaining epistemic falsification, and contextualizing the findings for the user).
 
-The AI Agent leverages the deterministic orchestrator script to handle the math, schema, and causal DAG routing. The Agent then loads the resulting schema and applies multi-signal cognitive reasoning against the knowledge bases to deliver high-level strategic guidance to the end user.
+You leverage the deterministic orchestrator script to handle the math, schema, and causal DAG routing. You then load the resulting schema and apply multi-signal cognitive reasoning against the knowledge bases to deliver high-level strategic guidance to the end user.
 
 ---
 
@@ -85,7 +85,7 @@ Read the master synthesis digest and schema output contract using your native fi
 
 > [!CAUTION]
 > **ZERO DIRECT URL READING TOOLS MANDATE:**
-> AI agents MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget` to fetch target web pages, `robots.txt`, or `sitemap.xml`.
+> You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget` to fetch target web pages, `robots.txt`, or `sitemap.xml`.
 > Direct agent URL reading completely bypasses socket-level zero-trust SSRF security (`safe_fetch.py`), breaks the single-pass inventory contract, and corrupts diagnostic reasoning.
 
 Do **NOT** attempt to run the 6 specialist sensors manually, and do **NOT** attempt to manually calculate the orthogonal math scores or build the Draft-07 JSON string by hand. LLMs cannot reliably execute 6-layer DAG deterministic deduplication.

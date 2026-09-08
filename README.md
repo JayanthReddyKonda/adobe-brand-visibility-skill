@@ -55,8 +55,8 @@ graph TD
 ```
 
 1. **Deterministic Single-Pass Acquisition:** The orchestrator invokes `web-scraper` to crawl the site once within budget, extracting HTML representations, RFC 9309 robots matrices, clean Markdown, and JSON-LD graphs into `inv.json`. Crawling is **never repeated** across specialists.
-2. **Independent Specialist Sensor Probing:** The AI Agent runs each of the 6 specialist audit tools via CLI against `inv.json`, collecting raw structured telemetry with zero additional network overhead.
-3. **Multi-Signal Cognitive Synthesis:** The AI Agent correlates findings across domains (e.g. connecting low word counts from discoverability, missing schema from entity-content, and missing H1 from engagement into a single SPA root cause).
+2. **Independent Specialist Sensor Probing:** You runs each of the 6 specialist audit tools via CLI against `inv.json`, collecting raw structured telemetry with zero additional network overhead.
+3. **Multi-Signal Cognitive Synthesis:** You correlates findings across domains (e.g. connecting low word counts from discoverability, missing schema from entity-content, and missing H1 from engagement into a single SPA root cause).
 4. **Dual-Track Remediation Synthesis:** Every detected finding is synthesized with both a **`technical_fix`** (code/markup for developers) and a **`creative_fix`** (content/UX for copywriters).
 5. **Strict Schema Validation Gate:** The final JSON report is piped through `validate_report.py`, guaranteeing 100% compliance with Draft-07 JSON Schema before completion.
 

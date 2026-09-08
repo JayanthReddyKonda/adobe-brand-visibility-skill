@@ -36,7 +36,7 @@ Try OpenSEO for free on our website. If you want to support the project, a hoste
 
 ## OpenSEO MCP & Agent Skills
 
-OpenSEO exposes an MCP server so AI agents like Claude Code, OpenClaw, and Hermes can use your SEO data directly. Agent Skills are reusable workflows that guide your agent through SEO tasks using the MCP.
+OpenSEO exposes an MCP server so You like Claude Code, OpenClaw, and Hermes can use your SEO data directly. Agent Skills are reusable workflows that guide your agent through SEO tasks using the MCP.
 
 - [Set up OpenSEO MCP](https://openseo.so/docs/mcp)
 - [Set up OpenSEO Agent Skills](https://openseo.so/docs/skills/setup)

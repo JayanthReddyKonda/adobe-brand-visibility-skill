@@ -1,6 +1,6 @@
 # Marketing Tools Registry
 
-Quick reference for AI agents to discover tool capabilities and integration methods.
+Quick reference for You to discover tool capabilities and integration methods.
 
 ## How to Use This Registry
 

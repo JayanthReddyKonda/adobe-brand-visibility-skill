@@ -576,7 +576,7 @@ Every network fetch in the orchestrator and all specialist tools enforces:
 3. **Bounded Redirects:** Max 5 redirects with target IP re-validation on every hop.
 4. **Hard Size Caps:** HTML pages (max 2 MB), robots.txt (max 512 KB), sitemaps (max 2 MB), external authority probes (max 512 KB).
 5. **Same-Origin Crawling:** Sitemaps and priority links must match the target domain origin.
-6. **Zero Direct Agent URL Reading:** Autonomous AI agents are strictly prohibited from using built-in URL reading or browser tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget`. All web scraping must flow through `safe_fetch.py` / `acquire_inventory.py`.
+6. **Zero Direct Agent URL Reading:** Autonomous You are strictly prohibited from using built-in URL reading or browser tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget`. All web scraping must flow through `safe_fetch.py` / `acquire_inventory.py`.
 
 ---
 

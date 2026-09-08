@@ -27,7 +27,7 @@ allowed-tools:
 
 > [!CAUTION]
 > **ZERO DIRECT AGENT URL READING MANDATE:**
-> AI agents MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to inspect websites or robots.txt.
+> You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to inspect websites or robots.txt.
 > All acquisition must flow through `python3 skills/web-scraper/scripts/run_scraper.py` (or `acquire_inventory.py`) to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
 
 Performs bounded, SSRF-safe, single-pass website acquisition. Emits a canonical `inv.json` site inventory consumed by all 6 downstream specialist diagnostic sensors. Never repeats network calls.

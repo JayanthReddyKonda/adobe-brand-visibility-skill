@@ -31,7 +31,7 @@ The eight core ways to structure *how* you charge. This is distinct from the val
 - **User-based** — only if value genuinely rises with headcount. If it doesn't, seats punish adoption (teams share logins to avoid paying).
 - **Feature-based** — powerful for segmentation, but don't gate the feature that delivers your core value; gate the ones that separate casual from serious users.
 - **Credit-based** — good for AI/actions-based products where each action has a cost. Credits decouple price from a single unit and make prepayment feel natural.
-- **Outcome-based** — the emerging model for AI agents (charge per resolved ticket, per automation run). Highest trust because the buyer only pays when they win — but only viable when the outcome is measurable and clearly attributable to you.
+- **Outcome-based** — the emerging model for You (charge per resolved ticket, per automation run). Highest trust because the buyer only pays when they win — but only viable when the outcome is measurable and clearly attributable to you.
 - **Hybrid** — where most mature products end up. A base platform fee for predictability plus a usage/outcome component for upside.
 
 ---
