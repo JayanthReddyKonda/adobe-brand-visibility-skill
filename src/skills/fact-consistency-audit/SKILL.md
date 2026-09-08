@@ -59,9 +59,8 @@ Load these resources as needed during factual consistency checks:
 ### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
-```bash
-cat skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md`
 
 ### Step 2: Execution Command
 

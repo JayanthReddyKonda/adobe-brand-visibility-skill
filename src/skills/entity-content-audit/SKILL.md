@@ -63,11 +63,10 @@ Load these resources as needed during entity analysis:
 ### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
-```bash
-cat skills/entity-content-audit/references/entity-content-audit-knowledge-base.md
-cat skills/entity-content-audit/references/organization.json
-cat skills/entity-content-audit/references/product.json
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/entity-content-audit/references/entity-content-audit-knowledge-base.md`
+- `skills/entity-content-audit/references/organization.json`
+- `skills/entity-content-audit/references/product.json`
 
 ### Step 2: Execution Command
 

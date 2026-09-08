@@ -57,9 +57,8 @@ Load these resources as needed during discoverability checks:
 ### Step 1: Read Domain Knowledge Base (MANDATORY)
 
 Read the specialist knowledge base before executing checks:
-```bash
-cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/discoverability-audit/references/discoverability-audit-knowledge-base.md`
 
 ### Step 2: Execution Command
 

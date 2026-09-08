@@ -22,11 +22,11 @@ allowed-tools:
 | **Site Inventory Wrapper** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Typed HTML page inventory (JSON) |
 | **Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json` | Exit Code 0 (pass) or 1 (fail) |
 
-> **Dual Execution Architecture:**
-> 1. **Agentic Runbook (Cognitive Reasoning):** As the AI agent, you load specialist contexts, execute individual sensors, apply the Causal DAG and Epistemic Falsification gates, and synthesize an executive diagnosis.
-> 2. **Deterministic Master Runner (Automated CI/CD):** `orchestrator.py` coordinates single-pass acquisition, executes all 6 specialist sensors, performs Causal DAG deduplication, and emits a Draft-07 validated report in a single headless CLI invocation.
+> **True Hybrid Orchestration Architecture:**
+> 1. **Deterministic Master Runner (Automated Engine):** The Python script `orchestrator.py` executes single-pass web acquisition, runs all 6 specialist sensors, performs strict Causal DAG deduplication, calculates orthogonal math scores, and emits a perfect Draft-07 schema JSON report.
+> 2. **Agentic Runbook (Cognitive Reasoning):** As the AI agent, you do **not** manually run the specialist scripts or manually format the JSON. Instead, you run the master orchestrator, read the generated JSON report, and apply true AI Cognitive Reasoning (synthesizing the executive diagnosis, explaining epistemic falsification, and contextualizing the findings for the user).
 
-The AI Agent coordinates a bounded, SSRF-safe site crawl, loads each specialist skill's context into memory, runs each specialist's diagnostic script directly, applies multi-signal cognitive reasoning against the knowledge bases, deduplicates and root-causes all findings, and emits a strictly validated JSON audit report conforming to the Draft-07 JSON report schema.
+The AI Agent leverages the deterministic orchestrator script to handle the math, schema, and causal DAG routing. The Agent then loads the resulting schema and applies multi-signal cognitive reasoning against the knowledge bases to deliver high-level strategic guidance to the end user.
 
 ---
 
@@ -66,133 +66,50 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 
 ## Procedure
 
-### Stage 1 — Context Ingestion & Signal Profiling
+### Stage 1 — Context Ingestion
 
 **Step 1: Ingest Core Synthesis Digest & Output Contract**
-Load the master synthesis digest and schema output contract in a single operation:
-```bash
-cat skills/audit-orchestrator/references/core-synthesis-digest.md
-cat skills/audit-orchestrator/references/report-schema.json
-```
+Read the master synthesis digest and schema output contract using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/audit-orchestrator/references/core-synthesis-digest.md`
+- `skills/audit-orchestrator/references/report-schema.json`
 
-**Step 2: Unified Single-Pass Acquisition via `web-scraper`**
+---
+
+### Stage 2 — Deterministic Master Execution
+
+**Step 2: Run Master Orchestrator (MANDATORY)**
 
 > [!CAUTION]
 > **ZERO DIRECT URL READING TOOLS MANDATE:**
 > AI agents MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget` to fetch target web pages, `robots.txt`, or `sitemap.xml`.
-> Direct agent URL reading completely bypasses socket-level zero-trust SSRF security (`safe_fetch.py`), breaks the single-pass inventory contract, fails to extract Schema.org JSON-LD `@graph` trees or the RFC 9309 16-bot matrix, and corrupts diagnostic reasoning.
-> Web crawling is strictly performed **once** via `acquire_inventory.py` or `run_scraper.py` emitting `inv.json`. All 7 downstream diagnostic specialist sensors run offline against `inv.json`.
+> Direct agent URL reading completely bypasses socket-level zero-trust SSRF security (`safe_fetch.py`), breaks the single-pass inventory contract, and corrupts diagnostic reasoning.
 
-Execute the single-pass web scraper to construct the canonical site inventory (`inv.json`). Crawling is performed **strictly once**, eliminating redundant network calls across downstream specialist skills:
+Do **NOT** attempt to run the 6 specialist sensors manually, and do **NOT** attempt to manually calculate the orthogonal math scores or build the Draft-07 JSON string by hand. LLMs cannot reliably execute 6-layer DAG deterministic deduplication.
+
+Instead, execute the deterministic orchestrator engine. This Python script automatically performs the single-pass scrape, runs all 6 specialist sensors, applies the Causal DAG, calculates all Orthogonal Scores, and writes the perfectly validated Draft-07 JSON report to disk.
 ```bash
-# Option A: Directly invoke web-scraper skill
-python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
-
-# Option B: Run orchestrator acquisition wrapper
-python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com > final_report.json
 ```
-*Emitted Artifact:* `inv.json` containing `site`, `pages[]` (`url`, `status`, `content_type`, `snr_ratio`, `word_count`, `jsonld`, `clean_markdown`, `html`), `robots` (RFC 9309 16-bot matrix), and `sitemaps[]`.
-
-**Step 3: Conditional Reference Routing Matrix**
-Inspect `inv.json` signals to consult deep specialist references strictly on demand:
-
-| Trigger Signal in Site Crawl | Specialist Reference to Load | Diagnostic Focus |
-|---|---|---|
-| Non-English routes (`/es/`, `/fr/`, `hreflang`) | `skills/discoverability-audit/references/discoverability-audit-knowledge-base.md` | Hreflang reciprocity, region codes, canonical links (Section 7) |
-| Archetype == `ecommerce` | `skills/entity-content-audit/references/product.json`<br>`skills/engagement-context-audit/references/product-purchase.json` | Price float formatting, ISO currency, hero checkout CTAs |
-| Archetype == `saas` | `skills/engagement-context-audit/references/pricing-comparison.json` | Tier feature contrast, seat limits, `/pricing.md` format |
-| Missing/ambiguous brand identity | `skills/entity-content-audit/references/organization.json` | Schema.org `@graph` Organization & WebSite hierarchy |
-| Explanatory Depth < 3 / high fluff | `skills/geo-content-audit/references/geo-content-audit-knowledge-base.md` | Statistical burstiness, AI writing patterns, causal conjunctions (Section 9) |
-| Zero declared `sameAs` | `skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md` | 57% off-site citation rule, Wikidata, LinkedIn, YouTube |
-
-*(Automated Alternative: Run `python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com --inventory inv.json` to stream all triggered rules in a single pass).*
+*(Wait for the script to finish executing and emitting `final_report.json`)*
 
 ---
 
-### Stage 2 — Causal Gated Specialist Execution
+### Stage 3 — Cognitive Synthesis & Executive Presentation
 
-Execute specialist diagnostic sensors against `inv.json` following the strictly ordered 6-layer dependency DAG:
+**Step 3: Read the Generated Report**
+Read the `final_report.json` file generated by the orchestrator script to ingest the empirical telemetry, calculated scores, and findings.
 
-**Step 4: Gate 0 — Discoverability & Retrieval Audit (Layer 0)**
-```bash
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
-```
-- *Diagnostic Target:* RFC 9309 crawler matrices (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), HTTP status, canonical tags, and raw SPA shell parity.
-- *Short-Circuit & Gating Rule:* If the target domain or entrypoint returns HTTP 403 or disallows search retrieval crawlers (`AI_RETRIEVAL_BLOCKED`), register as an upstream Keystone Defect and suppress downstream text/schema omission findings on blocked routes.
+**Step 4: True AI Reasoning & Dual-Track Customization**
+Act as the **Cognitive Reasoning Engine** (rather than a passive script runner):
+- Evaluate the findings in `final_report.json` against the Falsification Protocol in `audit-orchestrator-knowledge-base.md`.
+- Ensure the `technical_fix` and `creative_fix` provided by the automated script are perfectly tailored to the user's specific brand context. If the script's default text is generic, synthesize bespoke, copy-pasteable Schema.org `@graph` JSON-LD code blocks directly tailored to the audited entity.
+- Construct a high-level executive summary for the user explaining the business impact of the Keystone Defects.
 
-**Step 5: Gate 1 — Entity Identity & Schema Graph Audit (Layer 1)**
-```bash
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
-```
-- *Diagnostic Target:* Machine-explicit Schema.org `@graph` extraction (`Organization`, `WebSite`, `Product`, `Offer`).
-- *Gating Rule:* Flag `MATERIAL_ENTITY_AMBIGUITY` if explicit Schema.org JSON-LD is missing; HTML `<title>` or OpenGraph tags do NOT substitute for machine-explicit linked data.
-
-**Step 6: Gate 2 — Multi-Source Fact Consistency Audit (Layer 2)**
-```bash
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
-```
-- *Diagnostic Target:* Multi-page factual contradictions, cross-currency pricing discrepancies, and stale contact info.
-- *Gating Rule:* Compare only facts with identical entity scope. Do not flag distinct subscription tiers (e.g. Starter $10 vs Pro $50) as contradictions.
-
-**Step 7: Gate 3 — Authority & Identity Corroboration Audit (Layer 3)**
-```bash
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
-```
-- *Diagnostic Target:* Probes declared `sameAs` authority nodes (Wikidata, Wikipedia, LinkedIn) under zero-trust SSRF sandboxing to confirm 57% off-site grounding.
-
-**Step 8: Gate 4 — Generative Citability & AutoGEO Audit (Layer 4)**
-```bash
-python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
-```
-- *Diagnostic Target:* Princeton KDD 2024 / CMU AutoGEO citability vectors: causal conjunction density, quantitative statistics, pull quotes, and BLUF attention primacy.
-
-**Step 9: Gate 5 — Intent-Handoff & Engagement Continuity Audit (Layer 5)**
-```bash
-python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --analytics analytics.json --format json
-```
-- *Diagnostic Target:* AI referral landing orientation, above-the-fold answer presence, H1 semantic scent, and CTA reachability.
-
----
-
-### Stage 3 — Cross-Domain Cognitive Synthesis & Keystone Deduplication
-
-**Step 10: Multi-Signal Evidence Triangulation & Scoring**
-Apply the cognitive reasoning rules from `audit-orchestrator-knowledge-base.md`:
-
-1. **Deterministic Causal DAG & Keystone Deduplication:** If an upstream Layer 0 access block or Layer 1 rendering gap is active, respect the deterministic suppression boundaries in `telemetry.dag.suppressed_categories`. Consolidate downstream symptoms as supporting evidence under the Keystone Defect to prevent finding inflation.
-2. **Epistemic Falsification Protocol:** Test counter-hypotheses before asserting defects (Claim -> Observed Evidence -> Inference Rule -> Confidence -> Possible Falsifier). Verify pricing tiering, nested `@graph` structures, edge WAF challenges, and training vs. retrieval bot distinctions.
-3. **Query-Strategy Retrieval Simulation:** Model how each defect impairs simulated assistant query strategies across ChatGPT Search, Claude, and Perplexity Pro. Never claim to have observed actual platform ranking without live platform telemetry.
-4. **Engagement Friction Proxies:** Without first-party analytics, evaluate observable friction proxies (CTA DOM depth, H1 information scent, above-the-fold value density), never unmeasured bounce rates.
-5. **Dual-Track Remediation:** Provide BOTH a concrete `technical_fix` (for developers) AND a `creative_fix` (for copywriters/marketers), plus an empirical `verification` check.
-6. **Orthogonal Scoring Model:** Compute the 6 orthogonal scores (0–100): Crawlability (20%), Retrieval Readiness (15%), Citation Readiness (25%), Entity Authority (20%), Cross-Engine Visibility (10%), Agentic Commerce (10%). Assign Letter Grade (A: 85–100, B: 70–84, C: 50–69, D: 30–49, F: 0–29).
-> [!IMPORTANT]
-> **Zero-Trust Cognitive Reasoning Mandate (Eliminating Repeated Static Boilerplate):**
-> As an AI Agent, you are the **Cognitive Reasoning Engine**, NOT a passive script runner or CLI pipe.
-> - The specialist scripts provide deterministic empirical telemetry (crawler matrices, word counts, DOM trees, status codes).
-> - You MUST apply True AI Reasoning to synthesize the report: never emit generic boilerplate or repetitive placeholder text.
-> - Ground every finding and proactive recommendation in the actual verified domain, brand name, and discovered URL routes from `inv.json`, citing specific `evidence_index` IDs (`EV-XXX`) wherever possible.
-> - Synthesize bespoke, copy-pasteable Schema.org `@graph` JSON-LD code blocks directly tailored to the audited entity.
-> - Apply Epistemic Falsification: Verify that pricing discrepancies are genuine contradictions rather than billing cycles (monthly vs annual) or feature tiers before logging defects.
-
----
-
-### Stage 4 — Report Generation & Schema Gate Validation
-
-**Step 11: Construct Final Draft-07 JSON Report**
-Construct the final schema-compliant JSON report object conforming strictly to `references/report-schema.json`. Every required key (`site`, `audited_at`, `audit_status`, `summary`, `findings[]`, `proactive_actions[]`) must be fully populated.
-- **Clean JSON String Formatting Standard:** Every string field (`technical_fix`, `creative_fix`, `evidence.summary`, `proactive_actions[].summary`) MUST be a concise, coherent string. NEVER embed raw Markdown tables (`| Col | Col |`), HTML `<table>` markup, or escaped literal newlines (`\n\n`) inside JSON string properties. Use semicolons (` ; `) or clean single-line sentences for multi-step guidance.
-- Ensure zero unpopulated null values and zero unneeded debug blocks.
-
-**Step 12: Validate via Schema Gate**
-```bash
-python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json
-```
-Validation MUST pass with exit code 0. If any schema violations occur, correct the payload before final emission.
-
-**Step 13: Clean Direct Output Delivery (MANDATORY)**
-Emit the complete, unabridged Draft-07 JSON report directly inside a single ````json```` code block in your response.
-- **Zero Conversational Preamble:** Do NOT precede the JSON with conversational chatter ("Here is my full audit..."), intermediate tool logs, or scratch script traces.
-- **Zero Duplicate Markdown Tables:** Do NOT output duplicate Markdown tables summarizing findings before the JSON block. Output strictly the validated JSON report.
+**Step 5: Clean Direct Output Delivery (MANDATORY)**
+If the user requested the raw JSON report, emit the complete, unabridged Draft-07 JSON report directly inside a single ````json```` code block in your response.
+- **Zero Conversational Preamble:** Do NOT precede the JSON with conversational chatter ("Here is my full audit...").
+- **Zero Duplicate Markdown Tables:** Do NOT output duplicate Markdown tables summarizing findings before the JSON block.
+- **Clean JSON String Formatting Standard:** NEVER embed raw Markdown tables (`| Col | Col |`), HTML `<table>` markup, or escaped literal newlines (`\n\n`) inside JSON string properties.
 - Never substitute with a placeholder or point to disk.
 
 ---

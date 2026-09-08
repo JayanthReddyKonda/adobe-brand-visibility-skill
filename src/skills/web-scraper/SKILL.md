@@ -67,9 +67,8 @@ Performs bounded, SSRF-safe, single-pass website acquisition. Emits a canonical 
 ### Step 1: Read Domain Knowledge Base (MANDATORY)
 
 Read the knowledge base before execution to understand the 16-bot crawler matrix and SSRF constraints:
-```bash
-cat skills/web-scraper/references/web-scraper-knowledge-base.md
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/web-scraper/references/web-scraper-knowledge-base.md`
 
 ### Step 2: Execute Single-Pass Acquisition
 

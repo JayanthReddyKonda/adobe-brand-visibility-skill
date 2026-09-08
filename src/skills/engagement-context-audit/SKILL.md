@@ -64,11 +64,10 @@ Load these resources as needed during engagement context checks:
 ### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
-```bash
-cat skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md
-cat skills/engagement-context-audit/references/pricing-comparison.json
-cat skills/engagement-context-audit/references/product-purchase.json
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md`
+- `skills/engagement-context-audit/references/pricing-comparison.json`
+- `skills/engagement-context-audit/references/product-purchase.json`
 
 ### Step 2: Execution Command
 
