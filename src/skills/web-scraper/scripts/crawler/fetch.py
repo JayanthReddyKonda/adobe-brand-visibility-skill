@@ -128,7 +128,7 @@ class SafeFetcher:
     """Zero-dependency HTTP client configured with security guardrails and budget limits."""
 
     CHUNK_SIZE = 8192
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAuditBot/2.1.0; +https://agentskills.io/bot)"
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; BrandAuditBot; +https://agentskills.io/bot)"
 
     def __init__(
         self,

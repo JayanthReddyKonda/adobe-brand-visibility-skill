@@ -5,7 +5,6 @@ license: MIT
 compatibility: ">=Python-3.9"
 metadata:
   role: entrypoint
-  version: "2.1.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash

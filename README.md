@@ -1,7 +1,6 @@
 # Brand AI-Readiness & Visibility Marketplace
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 2.1.0  
 **Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 
 ---

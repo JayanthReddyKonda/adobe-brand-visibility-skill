@@ -748,7 +748,6 @@ For programmatic integration, CI/CD gates, and automated trend monitoring, the o
 ```html
 <!-- GEO-AUDIT-META
 {
-  "version": "2.1.0",
   "site": "https://example.com",
   "timestamp": "2026-09-02T17:40:00Z",
   "composite_geo_score": 78.5,
