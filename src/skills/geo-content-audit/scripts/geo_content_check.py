@@ -915,7 +915,7 @@ def audit(base, domain, inv=None, state_file=None):
                     }
                 )
 
-        # 3.1 Freshness & Recency Sensor (SE Ranking 1.3M Citation Study)
+        # 3.1 Freshness & Recency Sensor (industry analysis: recency correlates with AI citation frequency)
         if ptype in ("article", "content", "blog", "product_detail") and total_words >= 150:
             date_raw = parser.modified_date or parser.published_date
             if not date_raw:
@@ -924,7 +924,7 @@ def audit(base, domain, inv=None, state_file=None):
                         "id": "PROACTIVE.GEO.VISIBLE_RECENCY_DATE.001",
                         "title": "Publish visible last-updated dates on substantive content",
                         "category": "content",
-                        "summary": f"Substantive page {url} lacks visible publication or modification dates. Generative search engines (SE Ranking 1.3M study) deprioritize undated content, selecting pages updated within 3 months 3x more often.",
+                        "summary": f"Substantive page {url} lacks visible publication or modification dates. Generative search engines deprioritize undated content; pages updated within 3 months are cited more frequently across multiple industry analyses.",
                         "priority": "medium",
                         "technical_fix": "Add a <time datetime='YYYY-MM-DD'> element and article:modified_time meta tag to the page header.",
                         "creative_fix": "Prominently display 'Last Updated: [Month Year]' at the top of the article beside the author byline.",

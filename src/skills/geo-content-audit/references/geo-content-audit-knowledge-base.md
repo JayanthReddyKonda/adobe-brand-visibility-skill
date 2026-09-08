@@ -33,10 +33,10 @@ Empirical research on 10,000 queries (Aggarwal et al., Princeton University / KD
 
 | Optimization Vector | Measured Citation Impact | Implementation in Skill |
 | :--- | :--- | :--- |
-| **Cite Sources / Attributions** | **+115% visibility increase** | Recommends linking claims to authoritative primary repositories. |
+| **Cite Sources / Attributions** | **+24–30% citation lift overall** (rank-5 sources saw up to +115% in multi-source scenarios — a rank-specific outlier, not the general case) | Recommends linking claims to authoritative primary repositories. |
 | **Quantifiable Statistics** | **+40% citation rate** | Scans text for numerical data, metrics, currency values, and dates. |
 | **Authoritative Quotes** | **+41% citation likelihood** | Evaluates expert quotation structures (`"..." - Author, Org`). |
-| **Explanatory Mechanisms** | **+28% selection preference** | Analyzes causal conjunctions (`how`, `why`, `because`, `therefore`). |
+| **Explanatory Mechanisms** | **+28% selection preference** (causal conjunction density analysis, Aggarwal et al. 2024) | Analyzes causal conjunctions (`how`, `why`, `because`, `therefore`). |
 | **Keyword Stuffing** | **Negative to neutral impact** | Explicitly discouraged; penalized in AI ranking models. |
 
 ---
@@ -138,7 +138,7 @@ LLM parsers extract tabular data with near-100% precision compared to narrative 
 
 ## 3. Princeton KDD 2024 Causal Conjunction Cheatsheet
 
-Incorporate these causal markers to maximize RAG extraction probability (+28% selection gain):
+Incorporate these causal markers to maximize RAG extraction probability (+28% causal conjunction selection gain, Aggarwal et al. 2024):
 *   **Causal / Explanatory:** `because`, `therefore`, `as a result of`, `which leads to`
 *   **Mechanistic Action:** `allows`, `enables`, `functions by`, `operates via`, `results in`
 *   **Quantifiable Validation:** `measured at`, `benchmarked at`, `demonstrating a [X]% increase`
@@ -148,9 +148,9 @@ Incorporate these causal markers to maximize RAG extraction probability (+28% se
 ## State-of-the-Art GEO & AI Search Research Compendium
 
 Synthesis of empirical findings from:
-1. Princeton University / KDD 2024: "GEO: Generative Engine Optimization" (Aggarwal et al.)
-2. Carnegie Mellon University (CMU): "What Generative Search Engines Like & AutoGEO" (Wu et al.)
-3. TU Darmstadt / NAVER AI Lab: "C-SEO Bench: Does Conversational SEO Work?" (Puerto et al.)
+1. Princeton University / KDD 2024: "GEO: Generative Engine Optimization" (Aggarwal et al., arXiv:2311.09735)
+2. Carnegie Mellon University (CMU): "What Generative Search Engines Like & AutoGEO" (Wu et al., arXiv:2501.05361, preprint)
+3. TU Darmstadt / NAVER AI Lab: "C-SEO Bench: Does Conversational SEO Work?" (Puerto et al., arXiv:2506.11097, preprint)
 
 ---
 
@@ -192,9 +192,9 @@ Independent empirical studies reveal that traditional Domain Rating (DR/backlink
 
 ---
 
-## 4. Role-Augmented Intent-Driven GEO (RAID G-SEO Research, arXiv:2508.11158v2)
+## 4. Role-Augmented Intent-Driven GEO (RAID G-SEO, arXiv:2508.11158, preprint)
 
-Recent state-of-the-art research demonstrates that static keyword optimization and single-perspective rewriting fail in Generative Search Engines (GSE - Perplexity, ChatGPT Search, BingChat) because user queries are hidden in a black box. RAID G-SEO establishes an intent-aware optimization pathway:
+Recent preprint research demonstrates that static keyword optimization and single-perspective rewriting fail in Generative Search Engines (GSE - Perplexity, ChatGPT Search, BingChat) because user queries are hidden in a black box. RAID G-SEO proposes an intent-aware optimization pathway:
 
 ### 1. The 4-Stage Optimization Pipeline
 1. **Content Summarization:** Distill the source content's core informational essence, eliminating stylistic noise and filler.
@@ -207,10 +207,10 @@ Recent state-of-the-art research demonstrates that static keyword optimization a
 4. **Intent-Aligned Content Rewriting:** Synthesizes optimized passages preserving factual integrity while maximizing relevance to diverse retrieval scenarios.
 
 ### 2. The Head-First Information Cue Principle
-RAID G-SEO proves that front-loading key factual definitions, specifications, or answers into the introductory sentence ("head-first cues") significantly elevates citation frequency and positional prominence in AI answers, outperforming traditional linear or chronological exposition.
+RAID G-SEO proposes that front-loading key factual definitions, specifications, or answers into the introductory sentence ("head-first cues") elevates citation frequency and positional prominence in AI answers, outperforming traditional linear or chronological exposition.
 
-### 3. G-EVAL 2.0 Multi-Dimensional Evaluation Rubric
-AI content visibility is measured across seven fine-grained dimensions (0–5 scale):
+### 3. G-Eval Multi-Dimensional Evaluation Rubric
+AI content visibility is measured across seven fine-grained dimensions (0–5 scale; based on Liu et al., G-Eval: NLG Evaluation using GPT-4, EMNLP 2023):
 - **Relevance:** Direct topical pertinence to the retrieval query.
 - **Fluency:** Grammatical coherence and natural phrasing.
 - **Uniqueness:** Distinctive domain-specific vocabulary and differentiated perspective.
@@ -265,8 +265,8 @@ Hedge Density = (Total Hedge Words / Total Words) * 100
 ### 1. Cross-Platform Source Selection Divergence:
 Only **11% of domains** are cited by BOTH ChatGPT and Google AI Overviews for the same query. Each AI search engine employs different retrieval pipelines:
 - **Google AI Overviews (Gemini):**
-  - 92% of citations come from the top 10 organic Google results (traditional SEO is the gateway).
-  - 47% come from below position 5, heavily favoring direct 40–60 word answer leads and semantic HTML `<table>` structures.
+  - Organic rank overlap with AI Overviews is **lower than commonly assumed and declining**: Ahrefs' March 2026 analysis of 863K SERPs found only **38% overlap** between AI Overview sources and top-10 organic results (down from ~76% a year earlier). A separate Ahrefs 15K-query study found as low as **12% overlap**. The implication: traditional organic ranking is a necessary but insufficient condition — content must also satisfy the citation-selection criteria in §§1–6 above.
+  - Among AI Overview citations that do come from organic results, position 5 and below are well-represented, heavily favoring direct 40–60 word answer leads and semantic HTML `<table>` structures.
   - Generates **Query Fan-Out**: concurrent related queries synthesized together.
 - **ChatGPT Search (Bing Index):**
   - 47.9% of domain citations derive from Wikipedia; 11.3% from Reddit and YouTube.
@@ -275,9 +275,9 @@ Only **11% of domains** are cited by BOTH ChatGPT and Google AI Overviews for th
   - 46.7% of citations derive from Reddit and community discussion threads.
   - Cites 5–15 distinct sources per response, allowing mid-authority sites to win citations if community-validated.
 
-### 2. The Recency / Freshness Imperative (SE Ranking 1.3M Study):
-- Pages updated within the last **3 months are 3x more likely to be cited** in generative AI search results.
-- Pages left un-refreshed for **6+ months lose citation eligibility** across time-sensitive queries.
+### 2. The Recency / Freshness Imperative (industry analysis):
+- Pages updated within the last **3 months are cited more frequently** in generative AI search results across multiple independent industry studies.
+- Pages left un-refreshed for **6+ months** tend to lose citation eligibility across time-sensitive queries.
 - A scheduled quarterly refresh program updating statistics, publication dates (`article:modified_time`), and case studies is high-leverage GEO.
 
 ---

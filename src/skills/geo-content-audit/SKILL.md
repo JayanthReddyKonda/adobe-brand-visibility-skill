@@ -23,7 +23,7 @@ allowed-tools:
 > - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests citability metrics, executes simulated assistant query strategies, and synthesizes bespoke, information-dense passage chunking and explanatory rewrites.
 
-Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) extractability based on empirical Generative Engine Optimization research (Aggarwal et al., Princeton KDD 2024 and AutoGEO ICLR 2026). Determines whether content provides the causal mechanisms, statistical evidence, and structured definitions required for LLM citation.
+Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) extractability based on empirical Generative Engine Optimization research (Aggarwal et al., Princeton KDD 2024, arXiv:2311.09735; and Wu et al., CMU AutoGEO, arXiv:2501.05361 preprint). Determines whether content provides the causal mechanisms, statistical evidence, and structured definitions required for LLM citation.
 
 ---
 
@@ -115,7 +115,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
 6. **BLUF Top-30% Attention Primacy (`CONTENT.CONTEXT_PLACEMENT_DEGRADATION`):**
    - Verifies whether core definitional propositions or commercial answers are stated in the top 30% / first 250 words of content.
    - If missing on substantive content, emits `CONTEXT_PLACEMENT_DEGRADATION` (Severity: `medium`, Confidence: `high`).
-   - *Rationale (Stanford "Lost in the Middle" & Zyppy 2026):* 44.2% of citations occur in the top 30% of content; middle-buried answers suffer 30-40% lower retrieval recall.
+   - *Rationale (Stanford "Lost in the Middle", Liu et al. 2023):* Research indicates a disproportionate share of citations occur in the top portion of content; middle-buried answers may experience lower retrieval recall.
 
 7. **Attributed Expert Quotations (`PROACTIVE.GEO.ATTRIBUTED_EXPERT_QUOTES.001`):**
    - Checks for quotations attributed to named domain authorities or credentialed specialists (Dr., PhD, MD, Professor, Chief Scientist).

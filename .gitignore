@@ -28,4 +28,5 @@ ADOBE-Hackathon
 
 # Generated Artifacts
 *.zip
+*.sha256
 *.audit-report.json

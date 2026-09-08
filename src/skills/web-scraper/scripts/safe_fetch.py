@@ -154,7 +154,7 @@ def _decompress_bounded(response, max_bytes):
 def safe_fetch(
     url,
     timeout=10,
-    max_bytes=5 * 1024 * 1024,
+    max_bytes=2 * 1024 * 1024,
     user_agent=None,
     method="GET",
     deadline=None,
@@ -182,14 +182,6 @@ def safe_fetch(
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.9",
-        "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
     }
     req = urllib.request.Request(url, headers=headers, method=method)
 
