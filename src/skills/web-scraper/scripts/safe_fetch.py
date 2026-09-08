@@ -1,7 +1,14 @@
 """
-safe_fetch.py - Zero-dependency SSRF-safe HTTP/HTTPS fetching utility.
-Enforces strict redirect boundaries, IP validation per hop,
-bounded decompression, and DNS TOCTOU pinning.
+safe_fetch.py - Canonical zero-dependency SSRF-safe HTTP/HTTPS fetching utility.
+Part of the Brand AI-Readiness multi-skill suite (hosted in web-scraper).
+
+Enforces:
+- Strict socket-level zero-trust SSRF IP validation per hop
+- RFC-1918, loopback, link-local, carrier-grade NAT, and cloud metadata blocking
+- DNS TOCTOU resolution pinning before socket creation
+- Bounded decompression (zlib bomb protection) up to MAX_HTML_BYTES (2 MB)
+- Max 5 redirects with IP re-validation on every redirect
+- Honest, un-spoofed User-Agent with standard HTTP content negotiation headers
 """
 
 import http.client
@@ -13,10 +20,15 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+from typing import Any, Dict, List, Optional, Tuple
 
-DEFAULT_USER_AGENT = "Brand-AI-Readiness-Audit/1.0.0"
+# Canonical single source of truth for maximum HTML fetch size across all skills (2 MB)
+MAX_HTML_BYTES: int = 2 * 1024 * 1024
 
-BLOCKED_NETWORKS = [
+# Transparent, non-evasive audit user-agent
+DEFAULT_USER_AGENT: str = "Brand-AI-Readiness-Audit/1.0.0 (compatible; public audit sensor)"
+
+BLOCKED_NETWORKS: List[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
     ipaddress.ip_network("0.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("127.0.0.0/8"),
@@ -32,9 +44,8 @@ BLOCKED_NETWORKS = [
 ]
 
 
-def _is_safe_host(hostname):
+def _is_safe_host(hostname: Optional[str]) -> Tuple[bool, str, List[Any]]:
     try:
-        # Prevent malformed hostnames from reaching DNS
         if not hostname or " " in hostname:
             return False, "Malformed hostname", []
 
@@ -42,8 +53,8 @@ def _is_safe_host(hostname):
         ip_info = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
         safe_ips = []
         for sf in ip_info:
-            ip_obj = ipaddress.ip_address(sf[4][0])
-            if getattr(ip_obj, "ipv4_mapped", None):
+            ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(sf[4][0])
+            if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped is not None:
                 ip_obj = ip_obj.ipv4_mapped
             is_blocked = False
             if (
@@ -71,7 +82,7 @@ def _is_safe_host(hostname):
 
 
 class SafeHTTPConnection(http.client.HTTPConnection):
-    def connect(self):
+    def connect(self) -> None:
         is_safe, err, safe_ips = _is_safe_host(self.host)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked: {err}")
@@ -80,7 +91,7 @@ class SafeHTTPConnection(http.client.HTTPConnection):
 
 
 class SafeHTTPSConnection(http.client.HTTPSConnection):
-    def connect(self):
+    def connect(self) -> None:
         is_safe, err, safe_ips = _is_safe_host(self.host)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked: {err}")
@@ -95,21 +106,29 @@ class SafeHTTPSConnection(http.client.HTTPSConnection):
 
 
 class SafeHTTPHandler(urllib.request.HTTPHandler):
-    def http_open(self, req):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(SafeHTTPConnection, req)
 
 
 class SafeHTTPSHandler(urllib.request.HTTPSHandler):
-    def https_open(self, req):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(SafeHTTPSConnection, req, context=ssl.create_default_context())
 
 
 class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def __init__(self, max_redirects=5):
+    def __init__(self, max_redirects: int = 5) -> None:
         self.max_redirects = max_redirects
         self.redirects = 0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Optional[urllib.request.Request]:
         self.redirects += 1
         if self.redirects > self.max_redirects:
             raise urllib.error.URLError("Too many redirects")
@@ -124,13 +143,13 @@ class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def _decompress_bounded(response, max_bytes):
+def _decompress_bounded(response: Any, max_bytes: int) -> bytes:
     encoding = response.headers.get("Content-Encoding", "").lower()
     if encoding == "gzip":
         decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
     elif encoding == "deflate":
         decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
-    elif encoding == "zstd" or encoding == "br":
+    elif encoding in ("zstd", "br"):
         raise ValueError(f"Unsupported encoding: {encoding}")
     else:
         return response.read(max_bytes)
@@ -152,14 +171,19 @@ def _decompress_bounded(response, max_bytes):
 
 
 def safe_fetch(
-    url,
-    timeout=10,
-    max_bytes=2 * 1024 * 1024,
-    user_agent=None,
-    method="GET",
-    deadline=None,
-    is_retry=False,
-):
+    url: str,
+    timeout: float = 10.0,
+    max_bytes: int = MAX_HTML_BYTES,
+    user_agent: Optional[str] = None,
+    method: str = "GET",
+    deadline: Optional[float] = None,
+    is_retry: bool = False,
+) -> Tuple[Optional[int], str, Dict[str, str], str]:
+    """Fetch URL with strict SSRF controls, size limits, and non-evasive headers.
+
+    Returns:
+        (status_code, response_body_text, response_headers_dict, error_message)
+    """
     if deadline:
         remaining = deadline - time.monotonic()
         if remaining <= 0.1:
@@ -174,14 +198,20 @@ def safe_fetch(
     if max_bytes < 0:
         return None, "", {}, "Invalid max_bytes: must be non-negative"
 
-    opener = urllib.request.build_opener(SafeHTTPHandler(), SafeHTTPSHandler(), SafeRedirectHandler(max_redirects=5))
+    opener = urllib.request.build_opener(
+        SafeHTTPHandler(),
+        SafeHTTPSHandler(),
+        SafeRedirectHandler(max_redirects=5),
+    )
 
     ua = user_agent if user_agent else DEFAULT_USER_AGENT
+    # Standard HTTP content negotiation headers (no browser/OS spoofing)
     headers = {
         "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "close",
     }
     req = urllib.request.Request(url, headers=headers, method=method)
 
@@ -242,8 +272,25 @@ def safe_fetch(
         return None, "", {}, str(e)
 
 
-def safe_check_status(url, timeout=5, deadline=None):
+def safe_check_status(url: str, timeout: float = 5.0, deadline: Optional[float] = None) -> Optional[int]:
+    """Lightweight check to probe status code without downloading full response."""
     status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=1024, method="HEAD", deadline=deadline)
     if status in (403, 405, 501):
         status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=1024, method="GET", deadline=deadline)
     return status
+
+
+__all__ = [
+    "MAX_HTML_BYTES",
+    "DEFAULT_USER_AGENT",
+    "BLOCKED_NETWORKS",
+    "safe_fetch",
+    "safe_check_status",
+    "SafeHTTPConnection",
+    "SafeHTTPSConnection",
+    "SafeHTTPHandler",
+    "SafeHTTPSHandler",
+    "SafeRedirectHandler",
+    "_is_safe_host",
+    "_decompress_bounded",
+]

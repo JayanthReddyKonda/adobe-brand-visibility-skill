@@ -1,189 +1,128 @@
 {
-  "site": "https://fixture.invalid",
-  "audited_at": "2026-09-08T18:55:49.660952Z",
+  "site": "https://example-brand.com",
+  "audited_at": "2026-09-08T10:00:00Z",
   "audit_status": "complete",
   "summary": {
-    "total_findings": 2,
+    "total_findings": 5,
     "critical": 1,
-    "high": 0,
+    "high": 2,
     "medium": 1,
-    "low": 0,
-    "confirmed_problems": 2
+    "low": 1
   },
   "findings": [
     {
-      "check_id": "B4",
-      "title": "Repeated 404/5xx Responses Encountered",
-      "actual_band": "S4",
-      "finding_kind": "confirmed_problem",
-      "scope": "https://fixture.invalid/retired",
-      "observation": "HTTP 404 encountered for discovered link",
-      "severity_reason": "Broken internal links cause dead ends for AI crawlers",
-      "collection_complete_for_scope": true,
-      "remedy_readiness": "ready",
-      "resolved_context": {
-        "owner_intent": "redirect_to_guide"
-      },
-      "candidate": "Fix or redirect broken link /retired",
-      "validation_results": [
-        "404 confirmed"
-      ],
-      "suggested_action": {
-        "summary": "Redirect /retired to active guide",
-        "technical_fix": "Remediate B4 according to technical specifications.",
-        "creative_fix": null,
-        "verification": "Inspect live response to confirm remediation.",
-        "priority": "critical",
-        "acceptance_tests": [
-          "Recollect the exact cited scope after an owner-approved change.",
-          "Verify the original predicate and unaffected contexts; no live change is applied by this audit."
-        ],
-        "missing_context": []
-      },
-      "difficulty": 2,
-      "difficulty_reason": "Single HTTP 301 redirect configuration",
-      "evidence_refs": [
-        {
-          "artifact": "response-0003",
-          "locator": "status",
-          "quote": "404"
-        }
-      ],
-      "solution_level": "C",
-      "reference_band": "S4",
-      "benefit_area": [
-        "geo",
-        "engagement"
-      ],
-      "disposition": "conditional_proposal",
-      "queue": "confirmed",
-      "difficulty_range": null,
-      "depends_on": [],
-      "priority_index": 24,
-      "related_check_ids": [
-        "B4"
-      ],
-      "id": "F-2af25a2e86be",
-      "severity": "critical",
-      "evidence": "response-0003 at status: 404",
+      "id": "F-001",
+      "cause_id": "BLANKET_CRAWL_BLOCK",
+      "title": "robots.txt blocks all AI retrieval bots",
       "category": "discoverability",
-      "root_cause": "Broken internal links cause dead ends for AI crawlers",
-      "confidence": "high"
-    },
-    {
-      "check_id": "E5",
-      "title": "Invalid JSON-LD Syntax",
-      "actual_band": "S2",
-      "finding_kind": "confirmed_problem",
-      "scope": "https://fixture.invalid/",
-      "observation": "Malformed JSON-LD syntax on page",
-      "severity_reason": "Machine parsers cannot extract entity statements",
-      "collection_complete_for_scope": true,
-      "remedy_readiness": "ready",
-      "candidate": "<script type=\"application/ld+json\">{\"@type\":\"Organization\",\"name\":\"North Studio\"}</script>",
-      "validation_results": [
-        "Valid JSON-LD schema"
-      ],
-      "difficulty": 1,
-      "difficulty_reason": "Isolated syntax fix in static template",
-      "evidence_refs": [
-        {
-          "artifact": "response-0002",
-          "locator": "source.text",
-          "quote": "{\"@type\":\"Organization\",\"name\":}"
-        }
-      ],
-      "solution_level": "V",
-      "reference_band": "S2",
-      "benefit_area": [
-        "geo"
-      ],
-      "disposition": "validated_candidate",
-      "queue": "confirmed",
-      "difficulty_range": null,
-      "depends_on": [],
-      "priority_index": 15,
+      "severity": "critical",
+      "root_cause": "robots.txt contains blanket disallow directives for primary AI retrieval searchbots, preventing page ingestion.",
+      "confidence": "high",
+      "evidence": "robots.txt contains 'User-agent: GPTBot\\nDisallow: /' and 'User-agent: ClaudeBot\\nDisallow: /'. Both ChatGPT Search and Claude Search are explicitly excluded from crawling any page.",
       "suggested_action": {
-        "summary": "For https://fixture.invalid/: Repair unambiguous syntax/serialization defects while preserving known values, then parse and validate the supported subset. Ambiguous truncated text or conflicting semantic repairs require context. A parser passing cannot certify truth or all provider rules.",
-        "technical_fix": "Remediate E5 according to technical specifications.",
-        "creative_fix": null,
-        "verification": "Inspect live response to confirm remediation.",
-        "priority": "medium",
-        "acceptance_tests": [
-          "Recollect the exact cited scope after an owner-approved change.",
-          "Verify the original predicate and unaffected contexts; no live change is applied by this audit."
-        ],
-        "missing_context": []
-      },
-      "related_check_ids": [
-        "E5"
-      ],
-      "id": "F-98bd54d8c2c6",
-      "severity": "medium",
-      "evidence": "response-0002 at source.text: {\"@type\":\"Organization\",\"name\":}",
-      "category": "entity_content",
-      "root_cause": "Machine parsers cannot extract entity statements",
-      "confidence": "high"
-    }
-  ],
-  "observations": [
-    {
-      "check_id": "B1",
-      "title": "Robots.txt Evaluated",
-      "actual_band": "S0",
-      "finding_kind": "informational_observation",
-      "scope": "https://fixture.invalid/robots.txt",
-      "observation": "Robots.txt allows AI crawlers",
-      "severity_reason": "Informational",
-      "collection_complete_for_scope": true,
-      "evidence_refs": [
-        {
-          "artifact": "response-0001",
-          "locator": "source.text",
-          "quote": "User-agent: *\nAllow: /"
-        }
-      ],
-      "solution_level": "C",
-      "reference_band": "S4",
-      "benefit_area": [
-        "geo"
-      ]
+        "summary": "Remove or scope the GPTBot and ClaudeBot Disallow rules to allow AI retrieval of public marketing content.",
+        "priority": "critical",
+        "technical_fix": "Edit /robots.txt. Replace 'Disallow: /' for GPTBot and ClaudeBot with 'Disallow:' (empty, allow all) or scope to private paths only (e.g. 'Disallow: /account/').",
+        "creative_fix": "No content changes needed — this is a pure technical access fix.",
+        "verification": "Re-fetch https://example-brand.com/robots.txt and confirm GPTBot and ClaudeBot directives allow /."
+      }
     },
     {
-      "check_id": "J9",
-      "title": "404 Recovery Affordance Present",
-      "actual_band": "S0",
-      "finding_kind": "informational_observation",
-      "scope": "https://fixture.invalid/retired",
-      "observation": "404 error page provides return link to home",
-      "severity_reason": "Observation",
-      "collection_complete_for_scope": true,
-      "evidence_refs": [
-        {
-          "artifact": "response-0003",
-          "locator": "source.text",
-          "quote": "<a href=\"/\">Return home</a>"
-        }
-      ],
-      "solution_level": "V",
-      "reference_band": "S2",
-      "benefit_area": [
-        "engagement"
-      ]
+      "id": "F-002",
+      "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+      "title": "No Organization schema on homepage or About page",
+      "category": "entity_content",
+      "severity": "high",
+      "root_cause": "Absence of machine-readable Schema.org Organization declarations leaves entity identity ambiguous to generative engines.",
+      "confidence": "high",
+      "evidence": "Crawled 12 pages. No JSON-LD with @type Organization, LocalBusiness, or Corporation found on any page. The homepage title tag reads 'Example Brand — Enterprise Solutions' but no machine-readable identity declaration exists.",
+      "suggested_action": {
+        "summary": "Add Organization JSON-LD to the homepage and About page.",
+        "priority": "high",
+        "technical_fix": "Insert into <head>: <script type='application/ld+json'>{\"@context\":\"https://schema.org\",\"@type\":\"Organization\",\"name\":\"Example Brand\",\"url\":\"https://example-brand.com\",\"logo\":\"https://example-brand.com/logo.png\",\"sameAs\":[\"https://www.linkedin.com/company/example-brand\"]}</script>",
+        "creative_fix": "No body-copy changes required — schema is a head-level signal.",
+        "verification": "Run Google Rich Results Test on https://example-brand.com and confirm Organization entity is parsed."
+      }
+    },
+    {
+      "id": "F-003",
+      "cause_id": "CROSS_PAGE_FACT_DRIFT",
+      "title": "Founding year contradicts across pages",
+      "category": "fact_consistency",
+      "severity": "high",
+      "root_cause": "Inconsistent editorial facts across first-party pages degrade factual consensus in LLM knowledge representation.",
+      "confidence": "high",
+      "evidence": "About page states 'Founded in 2012'. Homepage footer states 'Serving customers since 2015'. Three-year discrepancy creates hallucination risk in LLM synthesis.",
+      "suggested_action": {
+        "summary": "Reconcile and standardize the founding year across all pages to the correct value.",
+        "priority": "high",
+        "technical_fix": "Update whichever page is incorrect. Add foundingDate to Organization schema once resolved.",
+        "creative_fix": "Verify the correct year via company registration records and update copy on both pages consistently.",
+        "verification": "Re-crawl both pages and confirm a single consistent founding year appears in all contexts."
+      }
+    },
+    {
+      "id": "F-004",
+      "cause_id": "MISSING_IN_DEPTH_MECHANISMS",
+      "title": "Product pages lack causal explanatory depth",
+      "category": "geo_content",
+      "severity": "medium",
+      "root_cause": "Content emphasizes superficial feature lists without explaining underlying causal mechanisms ('how' and 'why').",
+      "confidence": "high",
+      "evidence": "5 of 6 product pages scored depth_score < 2. Causal conjunctions (because, therefore, enables, results in) appear fewer than 2 times per page. Average word count: 220 words. Pages rely on bullet-point feature lists without mechanistic explanation.",
+      "suggested_action": {
+        "summary": "Expand product page body copy to explain the causal mechanisms behind key product capabilities.",
+        "priority": "medium",
+        "technical_fix": "Incorporate FAQ structured schema explaining product value propositions.",
+        "creative_fix": "For each product page, add 80-120 words explaining how the core feature works mechanistically. Example pattern: 'Feature X works because [mechanism], which enables [outcome], resulting in [measurable benefit].'",
+        "verification": "Re-run geo-content sensor; confirm depth_score >= 3 on all product pages."
+      }
+    },
+    {
+      "id": "F-005",
+      "cause_id": "MISSING_SAMEAS_LINKS",
+      "title": "No sameAs identity links to external authority sources",
+      "category": "corroboration_authority",
+      "severity": "low",
+      "root_cause": "Missing external sameAs links deprives the brand of external knowledge graph corroboration from authoritative registries.",
+      "confidence": "medium",
+      "evidence": "Organization schema present but sameAs array is absent. No Wikidata, Wikipedia, LinkedIn, or Crunchbase identity links declared.",
+      "suggested_action": {
+        "summary": "Add sameAs links to verified external identity sources in the Organization schema.",
+        "priority": "low",
+        "technical_fix": "Extend Organization JSON-LD: add '\"sameAs\": [\"https://www.linkedin.com/company/example-brand\", \"https://www.wikidata.org/wiki/Q12345678\"]'",
+        "creative_fix": "No content changes. Ensure LinkedIn company page and any Wikipedia/Wikidata entries are accurate and up to date before linking.",
+        "verification": "Re-crawl homepage; confirm sameAs array resolves cleanly in Google Rich Results Test."
+      }
     }
   ],
-  "dropped_findings": [],
-  "coverage": {
-    "total_catalogue_checks": 134,
-    "observed_checks": 4,
-    "needs_agent_review": 12,
-    "blocked_checks": 0,
-    "not_possible_checks": 2
-  },
-  "limitations": [
-    "An empty findings array is not a pass.",
-    "No citation, traffic or conversion uplift is measured.",
-    "Recommendations only; no changes were applied to the website."
-  ],
-  "proactive_actions": []
+  "proactive_actions": [
+    {
+      "id": "PA-001",
+      "title": "Add FAQ schema to top 3 product pages",
+      "summary": "Adding FAQPage JSON-LD with 40-80 word answers to the top 3 product pages is projected to increase Google AI Overview citation eligibility based on Princeton KDD 2024 evidence-genre research.",
+      "priority": "medium",
+      "technical_fix": "Inject FAQPage JSON-LD snippet containing primary customer questions and answers.",
+      "creative_fix": "Author direct 40-80 word answers following the BLUF (Bottom Line Up Front) pattern.",
+      "verification": "Test with Google Rich Results Test to verify FAQ rich result eligibility."
+    },
+    {
+      "id": "PA-002",
+      "title": "Add visible last-updated dates to all article pages",
+      "summary": "7 article pages lack visible publication or modification dates. Pages with explicit recency signals are cited more frequently in generative AI search results.",
+      "priority": "medium",
+      "technical_fix": "Add <time itemprop='dateModified' datetime='YYYY-MM-DD'> to article headers.",
+      "creative_fix": "Include visible 'Last updated on [Date]' byline next to author credentials.",
+      "verification": "Confirm dateModified appears in parsed Article schema."
+    },
+    {
+      "id": "PA-003",
+      "title": "Add statistical evidence to homepage value proposition",
+      "summary": "Homepage makes qualitative claims ('industry-leading', 'best-in-class') without quantitative support. Adding 2-3 concrete benchmark metrics will improve citability.",
+      "priority": "low",
+      "technical_fix": "Mark up statistics with DataFeed or ClaimReview schema where appropriate.",
+      "creative_fix": "Replace vague claims with verified metrics: '99.99% uptime SLA' and '< 12ms P95 latency'.",
+      "verification": "Confirm numerical density rises above 2.5% in text statistics sensor."
+    }
+  ]
 }

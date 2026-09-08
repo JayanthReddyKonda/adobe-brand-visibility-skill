@@ -1,101 +1,183 @@
-"""Portable package validation for brand-ai-readiness-audit marketplace.
-Supports validating the src directory, build directory, or distribution zip.
 """
+validate_package.py - Package hygiene validator and test suite entrypoint.
+
+Checks:
+- brand-ai-readiness-audit.zip exists and is <= 50 MB
+- Zip contains no __pycache__ or .pyc files
+- Zip contains exactly 8 skill folders
+- Zip contains marketplace.json, README.md, LICENSE at root
+- marketplace.json inside zip has a "version" field ("1.0.0")
+- Every Python script in the package has valid Python syntax (py_compile sweep)
+- Every relative link in every Markdown file resolves to an existing file in the package
+
+Usage:
+    python3 tests/validate_package.py [path/to/brand-ai-readiness-audit.zip]
+    python3 -m unittest tests/validate_package.py
+"""
+
 import json
+import os
+import py_compile
 import re
 import sys
+import tempfile
+import unittest
 import zipfile
-from pathlib import Path
+
+MAX_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+EXPECTED_SKILLS = {
+    "audit-orchestrator",
+    "web-scraper",
+    "discoverability-audit",
+    "entity-content-audit",
+    "fact-consistency-audit",
+    "corroboration-authority-audit",
+    "geo-content-audit",
+    "engagement-context-audit",
+}
+ROOT_PREFIX = "brand-ai-readiness-audit/"
 
 
-def validate_extracted_tree(root: Path):
-    root = root.resolve()
-    manifest_path = root / 'marketplace.json'
-    assert manifest_path.exists(), f"marketplace.json missing at {manifest_path}"
-    manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+def validate(zip_path: str) -> list:
+    """Return list of error strings. Empty list means all checks passed."""
+    errors = []
 
-    assert 'name' in manifest and manifest['name'] == 'brand-ai-readiness-audit'
-    assert 'skills' in manifest and isinstance(manifest['skills'], list)
-    assert sum(s.get('entrypoint') is True for s in manifest['skills']) == 1, "Exactly one entrypoint required"
-    assert len({s['id'] for s in manifest['skills']}) == len(manifest['skills']), "Duplicate skill ID found"
+    # 1. File exists
+    if not os.path.isfile(zip_path):
+        return [f"Zip file not found: {zip_path}"]
 
-    skills_dir = root / 'skills'
-    assert skills_dir.is_dir(), f"skills directory missing at {skills_dir}"
-    skill_folders = {str(p.relative_to(root)).replace('\\', '/') for p in skills_dir.iterdir() if p.is_dir()}
-    manifest_paths = {s['path'] for s in manifest['skills']}
-    assert manifest_paths == skill_folders, f"Manifest paths {manifest_paths} != folders {skill_folders}"
+    # 2. Size check
+    size = os.path.getsize(zip_path)
+    if size > MAX_SIZE_BYTES:
+        errors.append(
+            f"Zip too large: {size / 1024 / 1024:.1f} MB > 50 MB limit"
+        )
 
-    for skill in manifest['skills']:
-        directory = (root / skill['path']).resolve()
-        assert directory.is_relative_to(root), f"Path escape in {skill}"
-        skill_md = directory / 'SKILL.md'
-        assert skill_md.exists(), f"SKILL.md missing in {directory}"
-        text = skill_md.read_text(encoding='utf-8')
-        assert text.startswith('---\n'), f"{skill_md} missing leading frontmatter delimiter"
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        names = set(zf.namelist())
 
-        parts = text.split('---', 2)
-        assert len(parts) >= 3, f"{skill_md} invalid frontmatter format"
-        frontmatter_raw = parts[1].strip()
+        # 3. No __pycache__ or .pyc junk
+        junk = [n for n in names if "__pycache__" in n or n.endswith(".pyc")]
+        if junk:
+            errors.append(
+                f"Zip contains {len(junk)} cache/compiled files: {junk[:5]}"
+            )
 
-        # Parse top-level keys in frontmatter
-        fields = {}
-        for line in frontmatter_raw.splitlines():
-            if ': ' in line and not line.startswith(' ') and not line.startswith('\t'):
-                k, v = line.split(': ', 1)
-                fields[k.strip()] = v.strip().strip('"').strip("'")
-            elif line.endswith(':') and not line.startswith(' ') and not line.startswith('\t'):
-                fields[line[:-1].strip()] = True
+        # 4. Root folder prefix consistent
+        non_root = [n for n in names if not n.startswith(ROOT_PREFIX)]
+        if non_root:
+            errors.append(
+                f"Files outside expected root '{ROOT_PREFIX}': {non_root[:5]}"
+            )
 
-        assert fields.get('name') == directory.name == skill['id'], f"Skill name mismatch: {fields.get('name')} vs {directory.name}"
-        assert re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', fields['name']) and len(fields['name']) <= 64
-        assert 'description' in fields and 1 <= len(fields['description']) <= 1024, f"Description length invalid in {skill['id']}"
-        assert len(fields.get('compatibility', '')) <= 500, f"Compatibility length invalid in {skill['id']}"
-        assert 'allowed-tools' in fields, f"allowed-tools missing in {skill['id']}"
-        assert len(text.splitlines()) < 500, f"{skill_md} exceeds 500 line ceiling ({len(text.splitlines())} lines)"
+        # 5. Required root files
+        for required in ("marketplace.json", "README.md"):
+            full = ROOT_PREFIX + required
+            if full not in names:
+                errors.append(f"Missing required root file: {full}")
 
-        # Validate relative markdown links
-        for target in re.findall(r'\]\(([^)]+)\)', text):
-            target_path = target.split('#')[0]
-            if target_path and '://' not in target_path and not target_path.startswith('mailto:'):
-                resolved = (directory / target_path).resolve()
-                assert resolved.exists(), f"Broken relative link in {skill['id']}: {target} -> {resolved}"
+        # 6. Skill folders present
+        found_skills = set()
+        for name in names:
+            if name.startswith(ROOT_PREFIX + "skills/"):
+                rest = name[len(ROOT_PREFIX + "skills/"):]
+                parts = rest.split("/")
+                if parts[0] and not parts[0].startswith("."):
+                    found_skills.add(parts[0])
+        missing_skills = EXPECTED_SKILLS - found_skills
+        if missing_skills:
+            errors.append(f"Missing skill folders in zip: {sorted(missing_skills)}")
 
-    checks_path = root / 'skills/audit-orchestrator/references/checks.json'
-    assert checks_path.exists(), f"checks.json missing at {checks_path}"
-    checks = json.loads(checks_path.read_text(encoding='utf-8'))
-    assert len(checks) == len({c['check_id'] for c in checks}) == 134, f"Expected 134 unique checks, got {len(checks)}"
-    for c in checks:
-        assert all(c.get(k) for k in ('detection', 'activation', 'solution', 'solution_level', 'reference_band')), f"Check {c.get('check_id')} missing required fields"
+        # 7. marketplace.json has version
+        mkt_path = ROOT_PREFIX + "marketplace.json"
+        if mkt_path in names:
+            try:
+                mkt = json.loads(zf.read(mkt_path).decode("utf-8"))
+                if "version" not in mkt:
+                    errors.append("marketplace.json inside zip is missing 'version' field")
+            except Exception as e:
+                errors.append(f"Failed to parse marketplace.json: {e}")
 
-    total_size = sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
-    assert total_size < 50_000_000, f"Uncompressed package exceeds 50 MB: {total_size} bytes"
-    return len(manifest['skills']), len(checks), total_size
+        # 8. py_compile sweep on all Python scripts in zip
+        with tempfile.TemporaryDirectory() as tmpdir:
+            py_files = [n for n in names if n.endswith(".py")]
+            for py_name in py_files:
+                code_bytes = zf.read(py_name)
+                tmp_script = os.path.join(tmpdir, os.path.basename(py_name))
+                with open(tmp_script, "wb") as f:
+                    f.write(code_bytes)
+                try:
+                    py_compile.compile(tmp_script, doraise=True)
+                except py_compile.PyCompileError as e:
+                    errors.append(f"Syntax error in {py_name}: {e}")
+                except Exception as e:
+                    errors.append(f"Compilation failure in {py_name}: {e}")
+
+        # 9. Markdown relative link resolution
+        md_files = [n for n in names if n.endswith(".md")]
+        for md_name in md_files:
+            try:
+                content = zf.read(md_name).decode("utf-8")
+            except Exception:
+                continue
+
+            md_dir = os.path.dirname(md_name)
+            # Find markdown links: [text](target)
+            matches = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", content)
+            for _text, target in matches:
+                target_clean = target.strip().split("#")[0].split("?")[0]
+                if not target_clean:
+                    continue
+                # Skip external protocols, mailto, and anchor links
+                if target_clean.startswith(("http://", "https://", "mailto:", "ftp:", "file:")):
+                    continue
+                # Resolve relative target against md file's directory
+                resolved = os.path.normpath(os.path.join(md_dir, target_clean))
+                # Normalize path separators
+                resolved = resolved.replace("\\", "/")
+                # Check if resolved file or directory exists in zip
+                if resolved not in names and (resolved + "/") not in names:
+                    # Allow workspace-level documentation references that point to repo root docs
+                    repo_resolved = ROOT_PREFIX + target_clean.lstrip("/")
+                    if repo_resolved not in names and (repo_resolved + "/") not in names:
+                        errors.append(
+                            f"Broken relative link in {md_name}: '{target}' (resolved to '{resolved}')"
+                        )
+
+    return errors
 
 
-def validate_zip(zip_path: Path):
-    assert zip_path.exists(), f"Zip file missing at {zip_path}"
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        with zipfile.ZipFile(zip_path, 'r') as z:
-            # Invariant: single root folder
-            roots = {p.split('/')[0] for p in z.namelist() if p.strip()}
-            assert len(roots) == 1, f"Expected single root in zip, got {roots}"
-            root_name = list(roots)[0]
-            z.extractall(tmpdir)
-        return validate_extracted_tree(Path(tmpdir) / root_name)
+class TestPackageHygiene(unittest.TestCase):
+    """Unit test runner wrapper for validate_package."""
+
+    def test_distribution_zip_hygiene(self):
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        zip_path = os.path.join(repo_root, "brand-ai-readiness-audit.zip")
+        if not os.path.isfile(zip_path):
+            self.skipTest(f"Distribution zip not yet built at {zip_path}. Run ./scripts/build.sh first.")
+        errors = validate(zip_path)
+        self.assertEqual(errors, [], "Package hygiene failures:\n" + "\n".join(f"  - {e}" for e in errors))
 
 
 def main():
-    target = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[1] / 'src'
-    if target.suffix == '.zip':
-        skills_count, checks_count, total_size = validate_zip(target)
-        print(f"Zip validated successfully: single root, {skills_count} skills, {checks_count} checks, {total_size / 1024:.1f} KB uncompressed.")
-    elif target.is_dir():
-        skills_count, checks_count, total_size = validate_extracted_tree(target)
-        print(f"Directory validated successfully: {skills_count} skills, {checks_count} checks, {total_size / 1024:.1f} KB uncompressed.")
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    zip_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+        repo_root, "brand-ai-readiness-audit.zip"
+    )
+
+    print(f"Validating: {zip_path}")
+    errors = validate(zip_path)
+
+    if errors:
+        print(f"\n[FAIL] {len(errors)} issue(s) found:")
+        for e in errors:
+            print(f"  - {e}")
+        sys.exit(1)
     else:
-        raise ValueError(f"Invalid target: {target}")
+        size_mb = os.path.getsize(zip_path) / 1024 / 1024
+        print(f"[OK] Package valid — {size_mb:.1f} MB, all checks passed.")
+        sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

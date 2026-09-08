@@ -318,9 +318,6 @@
     "evidence_classes": {
       "type": "object"
     },
-    "analytics_summary": {
-      "type": "object"
-    },
     "coverage": {
       "type": "object",
       "description": "Assessment coverage across the 134-item research catalogue and execution environment capabilities"
