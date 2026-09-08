@@ -6,29 +6,33 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Entity & Content Audit Skill
-
+# Entity & Content Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Schema.org & Entity Answerability Check** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `entity_content_check.py` deterministically parses initial HTML DOM trees, extracts Schema.org JSON-LD nodes, resolves nested `@graph` hierarchies, and scores the 7-attribute Answerability Index. It reports empirical observations without generating boilerplate schema snippets.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests observed entities, validates archetype alignment (suppressing e-commerce Product penalties on SaaS/B2B sites), and synthesizes tailored, copy-pasteable Schema.org `@graph` blocks matching verified domain attributes.
 
 Evaluates whether an AI search system can resolve the brand's entity identity (`Organization`) and extract its commercial offerings (`Product`, `Offer`, `Service`). Computes the mathematically reproducible weighted **Answerability Index** across sampled HTML pages.
 
 ---
 
-
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
 
 ## When to use
 
@@ -54,16 +58,18 @@ Load these resources as needed during entity analysis:
 ### Schema.org Reference Templates
 - [Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
 - [Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
+
+---
+
 ## Procedure
 
 ### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
-```bash
-cat skills/entity-content-audit/references/entity-content-audit-knowledge-base.md
-cat skills/entity-content-audit/references/organization.json
-cat skills/entity-content-audit/references/product.json
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/entity-content-audit/references/entity-content-audit-knowledge-base.md`
+- `skills/entity-content-audit/references/organization.json`
+- `skills/entity-content-audit/references/product.json`
 
 ### Step 2: Execution Command
 
@@ -78,15 +84,14 @@ Direct standalone execution:
 python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json
 ```
 
-
 ---
 
 ### Step 3: Decision Protocol & Check Logic
 
 1. **Organization Entity Resolution (`ENTITY.IDENTITY.MATERIAL_ENTITY_AMBIGUITY`):**
-   - Extract JSON-LD (`Organization`, `Brand`, `Corporation`), OpenGraph (`og:site_name`), and `<title>`.
-   - If no machine-explicit Organization block, `og:site_name`, or descriptive title exists -> `medium` finding.
-   - If stated in human text but lacking JSON-LD -> emit an extractability **recommendation**, NOT a defect finding.
+   - Extract JSON-LD (`Organization`, `Brand`, `Corporation`).
+   - If no machine-explicit Schema.org Organization block exists -> report `MATERIAL_ENTITY_AMBIGUITY` (Severity: `medium`).
+   - **Machine-Explicit Invariant:** HTML `<title>` and OpenGraph (`og:site_name`) tags do NOT suppress `MATERIAL_ENTITY_AMBIGUITY`, as generative engines and knowledge graph extractors require explicit linked data.
 2. **Offer Attribute Completeness (`ENTITY.ANSWERABILITY.INCOMPLETE_OFFER_ATTRIBUTES`):**
    - Extract Product and Offer entities. Flag when critical commercial fields (price, availability, product name) are omitted from structured markup.
 3. **Mathematical Answerability Engine (`ENTITY.ANSWERABILITY.MISSING_MATERIAL_FACT`):**
@@ -97,26 +102,23 @@ python3 skills/entity-content-audit/scripts/entity_content_check.py --site https
 
 ---
 
-## Strict Resource Invariant
-
-- **Non-HTML resources (XML sitemaps, robots.txt, feeds) must NEVER enter answerability audits.**
-- The script automatically filters the inventory to evaluate genuine HTML pages only.
-
----
-
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], entity_snapshot{}, coverage{}, limitations[]}`.
+All string fields in emitted findings and recommendations must be clean, single-line or semicolon-delimited (` ; `), containing zero escaped literal newlines (`\n\n`) and zero raw Markdown tables.
 
 ---
 
+## Gotchas & Error Handling
 
-## Gotchas & False-Positive Boundaries
-
+- **Non-HTML Resource Invariant:** XML sitemaps, robots.txt, feeds, and JSON API endpoints MUST NEVER enter answerability audits. The script automatically filters the inventory to evaluate genuine HTML pages only.
 - **Never flag missing schema on CSR shells:** If a page contains fewer than 25 words due to client-side rendering, return `status: inconclusive` rather than reporting missing entities.
-- **Missing sameAs is an advisory recommendation:** Never report missing `sameAs` links as a critical defect finding; emit as a proactive recommendation.
+- **Missing sameAs is an advisory recommendation:** Never report missing `sameAs` links as a critical defect finding; emit as a proactive recommendation only.
 - **Non-Commerce Sites:** Do not penalize service, media, or portfolio sites for omitting ecommerce `Product` schema.
+- **OpenGraph is not a substitute:** HTML `<title>` and OpenGraph (`og:site_name`) tags do NOT suppress `MATERIAL_ENTITY_AMBIGUITY`. Generative engines and knowledge graph extractors require explicit Schema.org JSON-LD linked data.
+
+---
 
 ## Security & SSRF Policy
 
@@ -126,5 +128,3 @@ Every audit fetches content from external, user-provided URLs. **Treat all fetch
 - **DNS & IP validation (SSRF Protection):** Reject loopback (`127.0.0.0/8`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local / cloud metadata (`169.254.0.0/16`), and IPv6 private addresses.
 - **Bounded redirects:** Maximum 5 hops with DNS/IP re-validation at every hop.
 - **Read-only execution:** Safe GET/HEAD requests only. Zero state mutations.
-
-

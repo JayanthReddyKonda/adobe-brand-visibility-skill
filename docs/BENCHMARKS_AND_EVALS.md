@@ -2,7 +2,7 @@
 
 **Author:** Jayanth Reddy Konda  
 **Version:** 3.0.0  
-**Status:** 131 Automated Tests Passing · 100% Green QA Pipeline  
+**Status:** 264 Automated Tests Passing · 100% Green QA Pipeline  
 
 ---
 
@@ -42,7 +42,7 @@ Adapted from `zilisrikle/geo-audit-skill`:
 | Code | Dimension | Points | Core Criteria |
 | :--- | :--- | :---: | :--- |
 | **DA** | Direct Answer | 0–5 | Standalone 40–60 word answer lead directly resolving search intent. |
-| **DD** | Data Density | 0–5 | Quantitative statistics, benchmarks, FTR $\ge 0.080$. |
+| **DD** | Data Density | 0–5 | Quantitative statistics, benchmarks, FTR >= 0.080. |
 | **AS** | Authority Signals | 0–5 | Named experts, external DOIs, verified `sameAs` identity links. |
 | **SQ** | Structure Quality | 0–5 | Strict heading hierarchy, comparison tables, code blocks. |
 | **FR** | Freshness | 0–5 | `dateModified` within last 60 days, recent temporal anchors. |
@@ -60,7 +60,7 @@ Every build and commit must cleanly pass all five automated stages:
 2. **Flake8 Style Checker:** Zero unused imports, clean indentation (`0 errors`).
 3. **MyPy Static Typing:** Strict type-checking across all 8 skills (`0 errors`).
 4. **JSON Schema Gate:** Draft-07 JSON Schema gate validating `report-schema.json` and all sample manifests (`0 errors`).
-5. **Pytest Unit Test Suite:** **131 automated unit tests** across 24 test modules running in ~20 seconds (`100% passing`).
+5. **Pytest Unit Test Suite:** **264 automated unit tests** across 24 test modules running in under 60 seconds (`100% passing`).
 
 ---
 
@@ -73,7 +73,7 @@ Every build and commit must cleanly pass all five automated stages:
 # 2. Run specific test suite
 python3 -m unittest tests/test_geo_content.py
 
-# 3. Verify zero emojis across all documentation
+# 3. Verify zero emojis and LaTeX across all documentation
 ./scripts/qa_check.sh
 
 # 4. Rebuild submission package

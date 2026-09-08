@@ -65,6 +65,28 @@ class TestSafeFetch(unittest.TestCase):
         self.assertIsNone(status)
         self.assertFalse(body)
 
+    def test_safe_fetch_carrier_grade_nat_blocked(self):
+        """Failure test: Carrier-Grade NAT (100.64.0.0/10) is blocked."""
+        status, body, final_url, err = safe_fetch.safe_fetch("http://100.64.0.1/")
+        self.assertIsNone(status)
+        self.assertIn("blocked network", err)
+
+    def test_safe_fetch_alibaba_and_ecs_metadata_blocked(self):
+        """Failure test: Alibaba and AWS ECS metadata endpoints blocked."""
+        status, _, _, err = safe_fetch.safe_fetch("http://100.100.100.200/")
+        self.assertIsNone(status)
+        self.assertIn("blocked network", err)
+
+        status, _, _, err = safe_fetch.safe_fetch("http://169.254.170.2/")
+        self.assertIsNone(status)
+        self.assertIn("blocked network", err)
+
+    def test_safe_fetch_bracketed_ipv6_loopback_blocked(self):
+        """Failure test: Bracketed IPv6 loopback [::1] is cleanly blocked without DNS error."""
+        status, _, _, err = safe_fetch.safe_fetch("http://[::1]/")
+        self.assertIsNone(status)
+        self.assertIn("blocked network", err)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,75 +1,97 @@
 # Brand AI-Readiness & Visibility Marketplace
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 2.1.0  
 **Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 
 ---
 
 ## 1. Overview & Purpose
 
-The **Brand AI-Readiness & Visibility Marketplace** is a specialized suite of autonomous Agent Skills designed to diagnose why a website or brand is invisible, misrepresented, or experiencing high bounce rates across generative AI search assistants (such as ChatGPT Search, Claude, Perplexity Pro, and Google AI Overviews).
+The **Brand AI-Readiness & Visibility Marketplace** is an autonomous suite of Agent Skills designed to diagnose why a website or brand is invisible, misquoted, or experiencing high bounce rates across generative AI search assistants—including **ChatGPT Search, Claude, Perplexity Pro, and Google AI Overviews**.
 
-Operating entirely within a read-only sandbox using the pure Python 3.9+ standard library (zero runtime pip dependencies), the marketplace evaluates both halves of the modern AI discovery lifecycle:
+It evaluates both halves of the modern AI discovery lifecycle:
 1. **Off-Site AI Discoverability:** Can generative search engines crawl, parse, extract, and cite brand knowledge accurately?
 2. **On-Site AI Engagement & Continuity:** Do AI-referred visitors experience instant semantic orientation and clear intent-continuation upon landing?
 
+The marketplace requires zero external runtime dependencies (pure Python 3.9+ standard library) and operates entirely read-only within a secure agent sandbox.
+
 ---
 
-## 2. The Skills in the Marketplace
+## 2. How to Run (Prompt Examples)
 
-The marketplace is decomposed into **7 specialized domain skills** composed under **1 central entrypoint skill** (8 skills total), adhering strictly to the Principle of Least Privilege and genuine separation of concerns:
+To run an audit, invoke the AI Agent using natural language prompts. The marketplace's entrypoint skill (`audit-orchestrator`) automatically activates, acquires the target site inventory in a single pass, coordinates specialist domain skills, and emits a Draft-07 schema-validated report.
+
+### Quick Audit
+> *"Audit example.com"*
+
+> *"Audit https://example.com and check its AI search readiness."*
+
+### Full AI Citation & GEO Diagnosis
+> *"Run a comprehensive AI readiness audit on https://brand.com to diagnose why we aren't being cited in ChatGPT Search and Perplexity."*
+
+> *"Analyze our website for Generative Engine Optimization (GEO), schema completeness, and AI search crawler access."*
+
+### Targeted Diagnostic Prompts
+> *"Check if our robots.txt or meta tags are blocking AI search engines on example.com."*
+
+> *"Audit https://example.com for pricing consistency, entity authority, and visitor landing page orientation from AI search referrals."*
+
+---
+
+## 3. The Skills in the Marketplace
+
+The marketplace decomposes AI brand visibility into **7 specialized domain skills** composed under **1 central entrypoint skill** (8 skills total), adhering strictly to the Principle of Least Privilege:
 
 | Skill ID | Domain Responsibility | Key Failure Modes & Signals Detected |
 |---|---|---|
-| **`audit-orchestrator`** *(Entrypoint)* | Master AI runbook coordinator. Directs the single-pass acquisition of site inventory, runs specialists in causal order, synthesizes cross-domain telemetry, and validates the final report against the Draft-07 schema gate. | Cross-domain multi-signal root causes, priority conflicts, schema non-compliance. |
-| **`web-scraper`** | Autonomous, zero-dependency, SSRF-hardened web crawler and AI content extractor. Crawls websites within strict monotonic budgets, parses RFC 9309 robots.txt permissions across 16 AI retrieval & training bots, traverses XML sitemaps, flattens Schema.org JSON-LD graphs, extracts Trafilatura-grade clean Markdown with SNR scoring, scores commercial routes, and emits canonical site inventories (`inv.json`). | Crawl budget exhaustion, robots disallow matrices, missing XML sitemaps, low SNR text density, sparse SPA shells. |
-| **`discoverability-audit`** | Evaluates retrieval access and indexation barriers across search engines and AI retrieval bots (OAI-SearchBot, PerplexityBot, Claude-SearchBot). | Robots.txt crawler blocks (`AI_RETRIEVAL_BLOCKED`), meta `noindex` exclusions, canonical fragmentation, blank CSR shells. |
-| **`entity-content-audit`** | Extracts explicit Schema.org JSON-LD entities (`Organization`, `Product`, `@graph`) and scores Answerability attribute completeness. | Missing entity definitions (`MATERIAL_ENTITY_AMBIGUITY`), incomplete pricing/availability attributes (`ATTRIBUTE_INCOMPLETENESS`). |
-| **`fact-consistency-audit`** | Scopes first-party facts across multi-page inventories with global multi-currency normalization to detect contradictory pricing, contacts, or lifecycle terms. | Cross-page pricing conflicts (`FIRST_PARTY_FACT_CONFLICT`), conflicting support emails, stale marketing terms. |
-| **`corroboration-authority-audit`** | Validates external identity corroboration by probing declared `sameAs` authority links (Wikidata, LinkedIn, Wikipedia) with zero-trust SSRF sandboxing. | Broken authority anchors (`BROKEN_AUTHORITY_ANCHOR`), unlinked social profiles, ambiguous entity claims. |
-| **`geo-content-audit`** | Audits text based on empirical Generative Engine Optimization (Princeton KDD 2024 / CMU AutoGEO) research across all 9 citability vectors. | Missing explanatory mechanisms (`MISSING_IN_DEPTH_MECHANISMS`), missing primary source citations, low statistical density, marketing fluff. |
-| **`engagement-context-audit`** | Evaluates post-citation visitor orientation and intent-handoff continuity with OpenGraph metadata fallbacks. | Scent mismatches (`INTENT_TO_LANDING_MISMATCH`), missing commercial continuation CTAs, weak H1 entity anchoring. |
+| **`audit-orchestrator`** *(Entrypoint)* | Master Coordinator | Directs the single-pass acquisition of site inventory, runs specialists in causal order, synthesizes cross-domain telemetry, and validates the final report against the Draft-07 schema gate. |
+| **`web-scraper`** | Crawler & Extractor | Crawls websites within strict budgets, inspects RFC 9309 robots.txt permissions across 16 AI retrieval & training bots, extracts clean markdown, and flattens Schema.org JSON-LD graphs into a shared inventory. |
+| **`discoverability-audit`** | Search Engine Retrieval | Evaluates retrieval access and indexation barriers across search engines and AI retrieval bots (OAI-SearchBot, PerplexityBot, Claude-SearchBot), detecting crawler blocks, meta `noindex` exclusions, and blank CSR shells. |
+| **`entity-content-audit`** | Entity Identity & Schema | Extracts explicit Schema.org JSON-LD entities (`Organization`, `Product`, `@graph`) and audits Answerability attribute completeness. |
+| **`fact-consistency-audit`** | Factual Integrity & Drift | Scans across pages to detect contradictory pricing, conflicting support contacts, or stale lifecycle marketing terms. |
+| **`corroboration-authority-audit`** | Identity Corroboration | Probes declared `sameAs` authority links (Wikidata, LinkedIn, Wikipedia) to verify external third-party identity substantiation. |
+| **`geo-content-audit`** | Citation Probability (GEO) | Audits content based on empirical Generative Engine Optimization (Princeton KDD 2024 / CMU AutoGEO) research across all 9 citability vectors (direct answer leads, technical depth, evidence density). |
+| **`engagement-context-audit`** | Post-Citation Continuity | Evaluates above-the-fold clarity, heading scent, CTA visibility, and intent-handoff friction for visitors arriving from AI search summaries. |
 
 ---
 
-## 3. How the Entrypoint Composes the Skills
+## 4. How the Entrypoint Composes the Skills
 
-The entrypoint skill (`audit-orchestrator`) coordinates the audit through a **True Agentic Multi-Signal Reasoning Architecture** with a single-pass data acquisition model:
+The entrypoint skill (`audit-orchestrator`) coordinates the audit through a clean, single-pass pipeline:
 
 ```mermaid
 graph TD
     A["Target URL / Website"] --> B["audit-orchestrator (Entrypoint Skill)"]
-    B --> C["1. Web Scraper Skill (web-scraper/run_scraper.py)"]
-    C --> D["inv.json (Canonical Shared Site Inventory)"]
-    D --> E1["discoverability_check.py"]
-    D --> E2["entity_content_check.py"]
-    D --> E3["fact_consistency_check.py"]
-    D --> E4["corroboration_check.py"]
-    D --> E5["geo_content_check.py"]
-    D --> E6["engagement_check.py"]
-    E1 & E2 & E3 & E4 & E5 & E6 --> F["AI Cognitive Synthesis & Root-Cause Disambiguation"]
+    B --> C["web-scraper (Single-Pass Acquisition)"]
+    C --> D["Shared Site Inventory (inv.json)"]
+    D --> E1["discoverability-audit"]
+    D --> E2["entity-content-audit"]
+    D --> E3["fact-consistency-audit"]
+    D --> E4["corroboration-authority-audit"]
+    D --> E5["geo-content-audit"]
+    D --> E6["engagement-context-audit"]
+    E1 & E2 & E3 & E4 & E5 & E6 --> F["Cross-Domain Cognitive Synthesis"]
     F --> G["Dual-Track Remediation (Technical + Creative)"]
-    G --> H["validate_report.py (Draft-07 Schema Gate)"]
+    G --> H["Schema Validation Gate"]
     H --> I["Final Validated JSON Report"]
 ```
 
-1. **Deterministic Single-Pass Acquisition:** The orchestrator invokes `web-scraper` to crawl the site once within budget, extracting HTML representations, RFC 9309 robots matrices, clean Markdown, and JSON-LD graphs into `inv.json`. Crawling is **never repeated** across specialists.
-2. **Independent Specialist Sensor Probing:** The AI Agent runs each of the 6 specialist audit tools via CLI against `inv.json`, collecting raw structured telemetry with zero additional network overhead.
-3. **Multi-Signal Cognitive Synthesis:** The AI Agent correlates findings across domains (e.g. connecting low word counts from discoverability, missing schema from entity-content, and missing H1 from engagement into a single SPA root cause).
-4. **Dual-Track Remediation Synthesis:** Every detected finding is synthesized with both a **`technical_fix`** (code/markup for developers) and a **`creative_fix`** (content/UX for copywriters).
-5. **Strict Schema Validation Gate:** The final JSON report is piped through `validate_report.py`, guaranteeing 100% compliance with Draft-07 JSON Schema before completion.
+1. **Deterministic Single-Pass Acquisition:** The orchestrator invokes `web-scraper` to crawl the site once, extracting HTML representations, robots rules, clean Markdown, and JSON-LD graphs into a shared inventory (`inv.json`). Crawling is never repeated.
+2. **Specialist Sensor Probing:** Each specialist skill audits the shared inventory offline across its specific domain with zero redundant network overhead.
+3. **Multi-Signal Cognitive Synthesis:** The cognitive engine correlates findings across domains (e.g., connecting low word counts from discoverability, missing schema from entity-content, and missing H1 from engagement into an underlying Client-Side Rendering root cause).
+4. **Dual-Track Remediation:** Every detected finding is synthesized with both a **`technical_fix`** (code/markup for developers) and a **`creative_fix`** (content/UX for copywriters).
+5. **Schema Gate:** The final JSON report is verified against the Draft-07 specification before completion.
 
 ---
 
-## 4. Output Report Schema Guarantees
+## 5. Output Report Format
 
-Every report emitted by `audit-orchestrator` adheres strictly to the Production Draft-07 schema specification:
+The entrypoint emits a clear, structured JSON audit report adhering to Draft-07 schema specifications:
 
 ```json
 {
   "site": "https://example.com",
-  "audited_at": "2026-09-02T12:00:00Z",
+  "audited_at": "2026-09-08T12:00:00Z",
   "audit_status": "complete",
   "summary": {
     "total_findings": 2,
@@ -78,65 +100,40 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Production 
     "medium": 1,
     "low": 0
   },
-  "findings": [{
+  "findings": [
+    {
       "id": "finding-1",
       "title": "AI Search Crawlers Blocked in robots.txt",
       "severity": "high",
       "category": "discoverability",
       "root_cause": "The robots.txt file explicitly disallows search retrieval crawlers.",
       "evidence": {
-        "summary": "Disallow: / found for OAI-SearchBot.",
+        "summary": "Disallow: / found for OAI-SearchBot and PerplexityBot.",
         "scope": "robots.txt",
-        "sources": [{"url": "https://example.com/robots.txt", "type": "robots_txt", "observation": "Disallow: /"}
+        "sources": [
+          {
+            "url": "https://example.com/robots.txt",
+            "type": "robots_txt",
+            "observation": "Disallow: /"
+          }
         ]
       },
       "suggested_action": {
         "summary": "Allow AI search retrieval bots in robots.txt.",
         "priority": "high",
-        "technical_fix": "Add 'User-agent: OAI-SearchBot\nAllow: /' to robots.txt.",
-        "creative_fix": "Update website AI governance disclosures.",
+        "technical_fix": "Add 'User-agent: OAI-SearchBot\\nAllow: /' to robots.txt.",
+        "creative_fix": "Update website AI governance disclosures to clarify search crawling permissions.",
         "verification": "Request robots.txt with User-Agent: OAI-SearchBot and verify HTTP 200."
       }
     }
   ],
-  "proactive_actions": []
+  "proactive_actions": [
+    {
+      "id": "proactive-1",
+      "title": "Publish Curated /llms.txt Directory",
+      "summary": "Provide a machine-readable llms.txt index of key brand facts and product documentation for LLMs.",
+      "priority": "medium"
+    }
+  ]
 }
 ```
-
----
-
-## 5. Quick Start & Execution Guide
-
-```bash
-# 1. Run the production QA pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
-./scripts/qa_check.sh
-
-# 2. Acquire site inventory via single-pass web scraper
-python3 skills/web-scraper/scripts/run_scraper.py \
-  --site https://example.com --output inv.json --format json
-
-# (Or run orchestrator acquisition wrapper)
-# python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
-
-# 3. Execute specialist sensors
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
-python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
-python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
-
-# 4. Validate output report against Draft-07 schema gate
-python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
-```
-
----
-
-## 6. Verification & Quality Metrics
-
-- **247 Automated Unit Tests:** 100% passing across 24 test modules in ~38-49 seconds.
-- **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
-- **Static Type Safety:** 0 errors under MyPy across all 8 skills.
-- **Draft-07 JSON Schema Gate:** Validated against `report-schema.json` with support for flexible evidence typing and dual-track remediation.
-- **SSRF Hardening:** Pure stdlib socket-level IP validation against RFC-1918, link-local, loopback, and IPv4-mapped IPv6 ranges.
-

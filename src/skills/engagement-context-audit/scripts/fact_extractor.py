@@ -530,6 +530,8 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                             "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
                             "suggested_action": {
                                 "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
+                                "technical_fix": "Centralize pricing in a single structured JSON-LD PriceSpecification or database source of truth across all routes.",
+                                "creative_fix": "Audit promotional copy, landing pages, and comparison charts to remove outdated discount pricing.",
                                 "priority": "high",
                                 "verification": f"Re-crawl {', '.join(sorted(all_affected_urls))} and verify identical pricing appears on all pages.",
                             },
@@ -562,6 +564,8 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                         "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
                         "suggested_action": {
                             "summary": f"Update all pages referencing '{name}' to consistently reflect its current product lifecycle status.",
+                            "technical_fix": "Set Schema.org ItemAvailability to Discontinued or InStock uniformly across all product JSON-LD schemas.",
+                            "creative_fix": "Update legacy blog posts, product catalogs, and banners with clear migration notices to active product lines.",
                             "priority": "high",
                             "verification": f"Verify {', '.join(sorted(urls))} show consistent availability/discontinued markers.",
                         },
@@ -649,8 +653,11 @@ def compare_ai_observations(fact_ledger, responses_file):
                                     "cause_id": "AI_FACT_CONFLICT",
                                     "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
                                     "suggested_action": {
-                                        "summary": "Publish canonical pricing.",
+                                        "summary": "Publish canonical pricing in structured Schema.org markup.",
+                                        "technical_fix": "Deploy machine-explicit Schema.org Product Offer JSON-LD declaring price, priceCurrency, and validFrom/validThrough.",
+                                        "creative_fix": "Publish an authoritative pricing table in clean markdown on the canonical product page and /llms.txt.",
                                         "priority": "high",
+                                        "verification": "Re-evaluate assistant queries against updated canonical pricing ledger.",
                                     },
                                 }
                             )
@@ -667,8 +674,10 @@ def audit(base, domain, responses_file=None, inv=None):
 
     if inv is not None:
         for p in inv.get("pages", []):
-            u = p.get("url", "")
-            raw_html = p.get("html", "")
+            u = p.get("url") or ""
+            raw_html = p.get("html") or ""
+            if not u or not raw_html:
+                continue
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
             if (
@@ -677,8 +686,7 @@ def audit(base, domain, responses_file=None, inv=None):
                 or "<sitemapindex" in raw_html.lower()
             ):
                 continue
-            if raw_html:
-                page_fact_list.append(extract_scoped_facts(raw_html, u))
+            page_fact_list.append(extract_scoped_facts(raw_html, u))
     else:
         _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:

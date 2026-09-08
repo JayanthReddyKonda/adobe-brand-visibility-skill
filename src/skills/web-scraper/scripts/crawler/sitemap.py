@@ -151,12 +151,14 @@ class SitemapDiscovery:
 
     def discover(self, seed_sitemaps: List[str]) -> List[SitemapUrl]:
         """Traverse sitemap hierarchy starting from seed URLs."""
+        from collections import deque
+
         discovered_urls: List[SitemapUrl] = []
         visited_sitemaps: Set[str] = set()
-        queue: List[str] = list(seed_sitemaps)
+        queue: deque[str] = deque(seed_sitemaps)
 
         while queue and len(visited_sitemaps) < self.max_sitemaps:
-            sitemap_url = queue.pop(0)
+            sitemap_url = queue.popleft()
             if sitemap_url in visited_sitemaps:
                 continue
 

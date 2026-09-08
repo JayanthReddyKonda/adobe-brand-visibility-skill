@@ -43,8 +43,11 @@
 - [13. Epistemic Falsification & Disambiguation Protocol](#13-epistemic-falsification--disambiguation-protocol-anti-hallucination-gates)
 - [14. The 5-Step Cognitive Synthesis Protocol](#14-the-5-step-cognitive-synthesis-protocol-from-sensors-to-diagnostic-judgment)
 - [15. Multi-Engine Retrieval Simulation Matrix](#15-multi-engine-retrieval-simulation-matrix)
-- [16. Bayesian Evidence Triangulation & Sample Size Discounting](#16-bayesian-evidence-triangulation--sample-size-discounting)
 - [17. Effort-vs-Impact Executive Prioritization Matrix](#17-effort-vs-impact-executive-prioritization-matrix)
+- [18. State-of-the-Art Generative Engine Optimization (GEO) Benchmarks](#18-state-of-the-art-generative-engine-optimization-geo-benchmarks)
+- [19. Multiplicative Layered Probability Model & Advanced Citability Framework](#19-multiplicative-layered-probability-model--advanced-citability-framework)
+- [20. Citation Absorption & Structural Feature Engineering (GEO-SFE)](#20-citation-absorption--structural-feature-engineering-geo-sfe)
+- [21. Archetype Dynamic Adaptation & Query-Strategy Profiles](#21-archetype-dynamic-adaptation--query-strategy-profiles)
 
 ---
 
@@ -573,6 +576,7 @@ Every network fetch in the orchestrator and all specialist tools enforces:
 3. **Bounded Redirects:** Max 5 redirects with target IP re-validation on every hop.
 4. **Hard Size Caps:** HTML pages (max 2 MB), robots.txt (max 512 KB), sitemaps (max 2 MB), external authority probes (max 512 KB).
 5. **Same-Origin Crawling:** Sitemaps and priority links must match the target domain origin.
+6. **Zero Direct Agent URL Reading:** Autonomous AI agents are strictly prohibited from using built-in URL reading or browser tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget`. All web scraping must flow through `safe_fetch.py` / `acquire_inventory.py`.
 
 ---
 
@@ -675,7 +679,11 @@ Rules:
 Heuristics (like counting `<table>` tags or measuring keyword density) may be used to build a classifier profile, but **cannot alone trigger a finding**. Findings must require semantic corroboration or explicit logic breakdown (e.g., missing `<title>` tag).
 
 ## 5. Output Delivery Mandate (Output Standard)
-The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output:
+1. **Direct JSON Code Block:** The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a single ````json```` code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+2. **Zero Conversational Preamble:** Do NOT output conversational preambles ("Below is the complete audit..."), execution traces, or scratch script dumps before the JSON report.
+3. **Zero Duplicate Markdown Tables:** Do NOT render duplicate Markdown tables summarizing the findings before the JSON code block. Downstream consumers require clean, unpolluted output.
+4. **Clean String Formatting:** In all JSON string properties (such as `technical_fix`, `creative_fix`, `evidence.summary`, `proactive_actions[].summary`), strings MUST be concise, single-line or semicolon-delimited (` ; `). NEVER embed escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML `<table>` markup inside JSON strings.
 
 ## 6. Query-Intent Scenario Modeling
 When authoring `root_cause` and `impact` for findings, articulate the specific query mode failure in conversational AI search engines:
@@ -740,7 +748,6 @@ For programmatic integration, CI/CD gates, and automated trend monitoring, the o
 ```html
 <!-- GEO-AUDIT-META
 {
-  "version": "2.1.0",
   "site": "https://example.com",
   "timestamp": "2026-09-02T17:40:00Z",
   "composite_geo_score": 78.5,
@@ -763,6 +770,7 @@ For programmatic integration, CI/CD gates, and automated trend monitoring, the o
 To eliminate subjective ambiguity, audit findings must map directly to the canonical defect taxonomy:
 
 ### A. Hard Failures (HF-01 to HF-08) — Deterministic Blockers
+
 | Code | Title | Category | Severity | Root Cause Definition |
 | :--- | :--- | :--- | :--- | :--- |
 | **HF-01** | Target URL Unreachable / Non-200 | Crawlability | Critical | HTTP status >= 400 or network timeout. |
@@ -775,6 +783,7 @@ To eliminate subjective ambiguity, audit findings must map directly to the canon
 | **HF-08** | Schema Directly Contradicts Visible HTML | Structured Data | High | Schema entities state values incompatible with on-page copy. |
 
 ### B. High-Value Warnings (W-01 to W-08) — Probabilistic & Quality Risks
+
 | Code | Title | Category | Severity | Root Cause Definition |
 | :--- | :--- | :--- | :--- | :--- |
 | **W-01** | Initial HTML Extraction Deficit | Retrieval | Medium | SSR content availability gap exceeds 15% (CAG >= 0.15). |
@@ -905,7 +914,7 @@ The AI calibrates finding confidence using an objective Bayesian evidence framew
   Derived from single-page text metrics, word count heuristics, or isolated stylistic observations. **Action Rule:** Automatically demoted by the Eligibility Gate to `proactive_actions[]`; never emitted as a critical or high defect.
 
 ### Sample Size Discounting Rule:
-- When total crawled page count $n < 5$, sitewide extrapolations are strictly prohibited.
+- When total crawled page count n < 5, sitewide extrapolations are strictly prohibited.
 - Finding evidence scope must be annotated as `"sample-restricted"` rather than `"sitewide"`.
 - High-severity heuristic findings must be downgraded to `medium` severity until confirmed across a larger catalog crawl.
 
@@ -920,3 +929,266 @@ To provide clear strategic roadmaps rather than unprioritized laundry lists, the
 | **High Citability Impact** | **P1: Quick Wins**<br>• Unblock `OAI-SearchBot` and `PerplexityBot` in `robots.txt`.<br>• Add Schema.org `Organization` with Wikidata `sameAs`.<br>• Fix broken authority profile anchors.<br>• Synchronize contradictory visible prices. | **P2: Architectural Priorities**<br>• Migrate client-rendered SPA shells to Server-Side Rendering (SSR).<br>• Implement machine-readable `/llms.txt` and `/llms-full.txt`.<br>• Build automated catalog-to-schema synchronization pipeline.<br>• Re-architect core landing pages for BLUF 30% answer leads. |
 | **Moderate / Incremental Impact** | **P3: Optimization Polish**<br>• Invert generic H1 headings ("Home") to descriptive value propositions.<br>• Reduce epistemic hedge language density below 1.2%.<br>• Add explicit `dateModified` timestamps to substantive content.<br>• Enrich Product schema with optional SKU and review fields. | **P4: Deprioritized / Backlog**<br>• Re-writing non-commercial informational footer pages.<br>• Micro-optimizing text readability on low-traffic utility routes.<br>• Sitewide taxonomy restructuring without search engine impact. |
 
+---
+
+## 18. State-of-the-Art Generative Engine Optimization (GEO) Benchmarks
+
+### 18.1 Academic & Empirical Research Foundations
+
+#### 1. "GEO: Generative Engine Optimization" (Aggarwal et al., Princeton / ACM SIGKDD 2024 / arXiv:2311.09735)
+Optimization for generative engines differs fundamentally from traditional search engines across the 10,000-query GEO-bench:
+- **Statistics Addition:** **+30% to +41%** relative lift in AI visibility (replacing qualitative claims with specific, attributed numerical data).
+- **Cite Sources:** **+30% to +40%** relative lift across top results, and up to **+115% visibility lift** for lower-ranked niche pages.
+- **Quotation Addition:** **+30% to +40%** relative lift (extractable pull-quotes from named experts).
+- **Fluency & Simplification:** **+15% to +30%** lift.
+- **Authoritative Tone:** **+10.4%** on position-adjusted metrics, **+18.7%** on subjective impression.
+- **Keyword Stuffing:** Caused a **-10% to negative effect**, actively harming attribution.
+
+**Mathematical Formulation:**
+```text
+PAWC(S, R) = sum(WordCount(c) / log2(Rank(c) + 1))
+```
+Where C_S is the set of citations to source S in response R, WordCount(c) is the token volume attributed to the citation, and Rank(c) is the 1-indexed position of the citation within the synthesized response.
+
+#### 2. "C-SEO Bench: Does Conversational SEO Work?" (Puerto et al., NeurIPS 2025 / arXiv:2506.11097)
+In competitive multi-agent retrieval environments, pages featuring **LLM Guidance headers** (structured Markdown summaries directly beneath the main title, conceptually matching `/llms.txt`) substantially outperform standard narrative layouts by directing LLM context attention during RAG ingestion.
+
+#### 3. "Evaluating Verifiability in Generative Search Engines" (Liu, Zhang, & Liang, Stanford / Findings of EMNLP 2023 / arXiv:2304.09848)
+- **Citation Recall:** Only **51.5%** of generated sentences were fully supported by citations.
+- **Citation Precision:** Only **74.5%** of citations actually supported the sentence they cited.
+- LLMs penalize ambiguous or composite sentences. Retrieval systems favor source passages that present unambiguous, one-to-one semantic entailments. Content must be structured as atomic, self-contained claim-evidence propositions.
+
+#### 4. "Lost in the Middle: How Language Models Use Long Contexts" (Liu et al., Stanford / TACL 2024 / arXiv:2307.03172)
+LLM retrieval accuracy follows a U-shaped curve: information at the absolute beginning (top 15–20%) or end of context receives high attention, whereas retrieval degradation in the middle exceeds **30–40%**.
+- **Empirical AI Overviews Data:** **44.2% of citations in ChatGPT Search and Perplexity are pulled from the top 30% of the web page**.
+- **Audit Rule (BLUF Top-30%):** The direct definition, resolution, or transactional answer must appear within the first 250 words (or top 30% of DOM content) before contextual background or narrative exposition.
+
+### 18.2 Quantitative Scoring Formulas & Benchmarks
+
+1. **Lakoff & Hyland Linguistic Hedging Metric:**
+   ```text
+   HedgeRate = (Sum(w_hedge) / N_total_words) * 100
+   ```
+   - Authoritative / Highly Cited: HedgeRate <= 1.2%
+   - Neutral Informational: 1.2% < HedgeRate <= 2.2%
+   - Speculative / Low-Trust (Penalized): HedgeRate > 2.5%
+
+2. **Atomic Fact-to-Token Ratio (FTR):**
+   ```text
+   FTR = N_atomic_facts / N_tokens
+   ```
+   - Citable AI-Engineered Tier: FTR >= 0.080 (at least 1 atomic verifiable fact per 12.5 tokens).
+   - Fluff / Thin Content Tier: FTR <= 0.035 (verbose marketing prose lacking verifiable claims).
+
+3. **Shannon Text Entropy:**
+   ```text
+   H(X) = -Sum(p(x_i) * log2(p(x_i)))
+   ```
+   - Optimized Range for RAG Comprehension: 6.8 <= H(X) <= 7.6 bits (for English text chunks of 150–200 words).
+
+4. **Passage Extractability & Self-Containment:**
+   - Optimal RAG Chunk Size: **134 to 167 words** per section under each semantic header (`<h2>`/`<h3>`).
+   - Exophoric Pronoun Ratio: Leading sentence ambiguous pronoun ratio must equal 0.0%.
+
+### 18.3 Consolidated 17-Rule Audit Matrix (`CR01`–`TX06`)
+
+| Code | Category | Algorithmic Test | Benchmark / Pass Threshold |
+|---|---|---|---|
+| **CR01** | Crawler Access | RFC 9309 Parser | `OAI-SearchBot` Allowed = True |
+| **CR02** | Crawler Access | RFC 9309 Parser | `Claude-SearchBot` Allowed = True |
+| **CR03** | Crawler Access | RFC 9309 Parser | `PerplexityBot` Allowed = True |
+| **CR04** | Crawler Access | robots.txt File Size | <= 500 KiB (512,000 octets) |
+| **CR05** | Crawler Access | robots.txt Status Code | HTTP 200 (Fail if 5xx) |
+| **LL01** | Machine-Readable Standards | Root `/llms.txt` Fetch | HTTP 200, Content: MD/Plain |
+| **LL02** | Machine-Readable Standards | `/llms.txt` Structure | Has H1 Title + Blockquote Summary |
+| **RD01** | Rendering & Delivery | Content Availability Gap | CAG = 1 - (NoJS / JS) < 0.15 |
+| **RD02** | Content Extraction | Signal-to-Noise Ratio (SNR) | Text Bytes / HTML Bytes > 0.12 |
+| **SC01** | Structured Data | Extruct JSON-LD | `Organization` with >= 2 `sameAs` |
+| **SC02** | Structured Data | Extruct JSON-LD | `Product` offers: valid ISO 4217 |
+| **SC03** | Structured Data | Extruct JSON-LD | Schema `dateModified` <= 60 days |
+| **TX01** | Information Architecture | BLUF Top-30% Check | Entity answer in top 250 words |
+| **TX02** | Linguistic Hedging | Hyland Lexicon Density | HedgeRate <= 1.2% |
+| **TX03** | Information Density | Atomic Fact Ratio (FTR) | FTR >= 0.080 |
+| **TX04** | Passage Self-Containment | Exophoric Pronoun Check | Leading sentence ExoRatio = 0 |
+| **TX05** | Context Complexity | Shannon Entropy | 6.8 <= H(X) <= 7.6 bits |
+| **TX06** | Empirical Lift Factor | Princeton GEO Criteria | >= 1 stat + 1 quote / 150 words |
+
+---
+
+## 19. Multiplicative Layered Probability Model & Advanced Citability Framework
+
+### 19.1 Executive Probability Formulation
+
+The empirical literature establishes that AI search visibility is a multiplicative layered pipeline:
+```text
+AI Visibility ≈ Crawl Eligibility × Retrieval Eligibility × Content Citability × Entity/Source Authority × Citation Fidelity
+```
+
+- **Methodological Principle:** The "+40% visibility improvement" from the canonical GEO paper (Aggarwal et al., KDD 2024) is **Position-Adjusted Word Count (PAWC)** *among an already retrieved set of sources*, not a 40% increase in baseline retrieval probability.
+- **Engine-Specific Conditional Probability:**
+  ```text
+  P(Citation | Engine) != P(Citation)
+  ```
+
+### 19.2 Citation Quality Evaluation Frameworks
+
+1. **ALCE (Automatic LLM Citation Evaluation — Gao et al., EMNLP 2023):**
+   - Three-Dimensional Model: [Fluency + Correctness + Citation Quality]
+   - CitationCoverage = (claims with supporting citation) / (total claims)
+   - CitationPrecision = (citations that actually entail the claim) / (total citations)
+
+2. **FActScore (Atomic Fact Support — Min et al., EMNLP 2023):**
+   ```text
+   BrandFactScore = Sum(w_i * supported_i) / Sum(w_i)
+   ```
+   Where weights w_i are elevated for critical commercial claims (price, availability, certifications, product specifications, dates, performance metrics).
+
+3. **Citation Correctness vs. Faithfulness (Wallat et al., 2024 / arXiv:2412.18004):**
+   Up to **57% of citations lack faithfulness** due to post-hoc rationalization. Systems must evaluate both `entailment_score` and `faithfulness_score`.
+
+4. **Cross-Engine Citation Coverage (CECO) & Wilson 95% Confidence Intervals:**
+   ```text
+   CECO = (number of engines citing brand/domain) / (total engines tested)
+   CI_95% = (p_hat + z^2 / (2n) ± z * sqrt(p_hat * (1 - p_hat) / n + z^2 / (4n^2))) / (1 + z^2 / n)
+   ```
+   Where z = 1.96 and n >= 10 runs per engine (n = 5 minimum floor).
+
+---
+
+## 20. Citation Absorption & Structural Feature Engineering (GEO-SFE)
+
+### 20.1 "From Citation Selection to Citation Absorption" (Zhang, He, Yao — 2026 / arXiv:2604.25707)
+
+Citation influence quantifies how deeply an AI engine incorporates source content into the synthesized answer:
+```text
+Influence_i = 0.20 * min(ref_count_i / 3, 1) + 0.15 * (1 - first_position_ratio_i) + 0.20 * paragraph_coverage_ratio_i + 0.25 * tfidf_cosine_i + 0.20 * ((bigram_overlap_i + trigram_overlap_i) / 2)
+```
+
+#### Actionable Evidence-Genre Lift Table:
+
+| Detected Evidence Genre | Relative Influence Lift | Audit Action |
+| :--- | :---: | :--- |
+| **Code Snippets / Syntax Blocks** | **+76.9%** | Highest influence; provide executable CLI/code blocks. |
+| **Quantitative Numbers / Statistics** | **+61.6%** | Replace narrative claims with exact benchmarks. |
+| **Explicit Definition Markers** | **+57.3%** | Include unambiguous IS-A definitions (`defined as`, `refers to`). |
+| **Comparison Structures / Tables** | **+55.3%** | Provide head-to-head evaluation matrices (`vs`, `unlike`). |
+| **How-To / Procedural Guidance** | **+41.2%** | Numbered implementation workflows. |
+| **Standalone Q&A / FAQ Format Alone** | **-5.7% (Negative Penalty)** | **Do not rely on FAQ format alone!** Augment with data and comparisons. |
+
+#### Semantic-Role Influence Hierarchy:
+1. **Definition Content:** Mean influence 0.153
+2. **Comparison Content:** Mean influence 0.142
+3. **Statistical Data:** Mean influence 0.138
+4. **Procedural Steps:** Mean influence 0.119
+5. **Pure Background / Reference:** Mean influence 0.053 (lowest)
+
+### 20.2 Structural Feature Engineering for GEO (GEO-SFE — Yu et al., 2026 / arXiv:2603.29979)
+Structure-aware rewriting alone—holding textual content constant—delivers **+17.3% citation improvement and +18.5% perceptual quality gain**.
+- **Macro Architecture:** Strict heading hierarchy (`<h1>` -> `<h2>` -> `<h3>`), table of contents, executive takeaways.
+- **Meso Chunking:** Standalone section self-containment (134–167 words per section) extractable without antecedent loss.
+- **Micro Visual Emphasis:** Semantic bullet lists (density >= 0.40), comparison tables, and bold key takeaway leads.
+
+### 20.3 Citation Failure Modes Decision Tree (Tian et al., 2026 / arXiv:2603.09296)
+**43% of topically relevant pages receive zero citation** under baseline conditions due to 5 distinct failure modes:
+1. **Retrieval Failure:** `robots.txt` disallow / `noindex` / unindexed SSR shell -> Fix: SSR, crawler permissions, XML sitemap.
+2. **Relevance Failure:** Query intent mismatch / title-H1 semantic drift -> Fix: Target conversational intent, align H1 and title.
+3. **Redundancy Failure:** Generic content duplicate of higher-authority domain -> Fix: Proprietary benchmarks, first-party data.
+4. **Trust Failure:** Low FTR (<0.040) / excessive hedging (>2.5%) / no `sameAs` -> Fix: Eliminate weasel words, cite named experts.
+5. **Extraction Failure:** `nosnippet` / `data-nosnippet` / low SNR (<0.12) -> Fix: Clean DOM, remove nosnippet, elevate text ratio.
+
+### 20.4 Off-Site Third-Party Dominance (57% Branded Citation Footprint)
+- **57% of branded query citations** come from third-party reviews, comparison listicles, Reddit discussions, and independent press (Omniscient Digital 2026).
+- **Only ~4.5% of citations** derive from the brand's own official About, FAQ, or Homepage.
+- Top 15 third-party authority domains capture **~68%** of all generative engine citations (Reddit, Wikipedia, YouTube, LinkedIn, Forbes, Trustpilot, G2).
+- An audit that examines only on-page SEO misses 57% of the citation surface. External identity anchors and third-party corroboration nodes are mandatory.
+
+### 20.5 The 0–30 CITE Citability Score Rubric
+
+| Code | Dimension | Points | Evaluation Metric |
+| :--- | :--- | :---: | :--- |
+| **DA** | Direct Answer | 0–5 | Section openers provide standalone, extractable 40–60 word answer leads. |
+| **DD** | Data Density | 0–5 | Specific numbers, percentages, durations, benchmark statistics (FTR >= 0.080). |
+| **AS** | Authority Signals | 0–5 | Named researchers, DOIs, authoritative outbound citations, verified `sameAs` nodes. |
+| **SQ** | Structure Quality | 0–5 | Heading hierarchy, comparison tables, list density >= 0.40, code blocks. |
+| **FR** | Freshness | 0–5 | Visible `dateModified` <= 60 days, recent temporal grounding. |
+| **UQ** | Uniqueness | 0–5 | Proprietary case data, original frameworks, zero generic boilerplate. |
+
+**Score Bands:** Grade A (27–30) / Grade B (22–26) / Grade C (17–21) / Grade D (12–16) / Grade F (<12).
+
+---
+
+## 21. Archetype Dynamic Adaptation & Query-Strategy Profiles
+
+> **Generalization Invariant:** Archetype classification NEVER gates which sensors run. All 6 specialist sensors ALWAYS execute across all domains. Archetype classification is used strictly by the AI reasoning layer to re-weight defect severities, contextualize simulated assistant queries, and synthesize high-leverage proactive recommendations.
+
+### 21.1 Archetype Classification Matrix
+
+| Archetype | Primary Detection Signals (from Telemetry) | Highest-Priority Checks | Distinctive Technical Fixes | Distinctive Creative Fixes | Proactive Strategic Moves |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **SaaS / Developer Platform** | • `/docs`, `/api`, `/pricing`, `/billing` routes<br>• `SoftwareApplication` JSON-LD<br>• Code blocks and API endpoints in DOM | • `/llms.txt` presence and validity<br>• API doc chunking (`geo.avg_chunk_token_length`)<br>• Pricing comparison transparency<br>• Auth-wall orientation | Serve machine-readable `/llms.txt` and `/pricing.md`; structure doc pages with `<h2>` chunk boundaries every 300–500 tokens | Author 40–60 word BLUF answers under question headers; eliminate asterisk conditions on plan tiers | Deploy `/pricing.md` and `/llms.txt` manifests specifically formatted for autonomous AI purchasing agents |
+| **E-Commerce / Retail** | • `/product`, `/shop`, `/item`, `/cart` routes<br>• `Product` & `Offer` JSON-LD<br>• Currency symbols & pricing tables | • Schema.org `Product`/`Offer` completeness (`price`, `priceCurrency`, `availability`)<br>• Cross-page multi-currency consistency<br>• Merchant return policies | Embed nested `Offer` with ISO 4217 currency and `ItemAvailability` enum; add `MerchantReturnPolicy` schema | Reconcile visible "In Stock" copy with structured availability; provide clean tabular product specifications | Deploy comprehensive Schema.org `@graph` connecting `Product` to `MerchantReturnPolicy` and `AggregateRating` |
+| **Enterprise B2B** | • `/about`, `/leadership`, `/solutions`, `/investors`<br>• `Organization` JSON-LD<br>• Multiple external `sameAs` links | • Authority corroboration on Wikidata, LinkedIn, Crunchbase<br>• Named executive leadership in text & schema (`Person`)<br>• Entity disambiguation | Embed Schema.org `Organization` with disambiguated `sameAs` URIs; nest `Person` schema for leadership team | Maintain identical legal entity name and headquarters address across all external directory anchors | Establish verified Wikidata entity node and reconcile third-party corporate entity graphs |
+| **News / Media Publisher** | • Byline patterns, publication dates<br>• `NewsArticle` or `BlogPosting` JSON-LD<br>• Date-path URLs (e.g. `/2026/09/`) | • Pre-paywall machine-readability<br>• Author byline authority & E-E-A-T credentials<br>• RFC 9309 AI bot licensing directives | Add `isAccessibleForFree` and `hasPart` schema for paywalls; link author profiles to external credentials | Provide 50-word executive summary (dek) above paywall; attribute facts to verifiable primary studies | Replace blanket crawler disallow with granular RFC 9309 rules distinguishing search retrieval from model training |
+| **Local / Regional Service** | • `/locations`, `/contact`, store locator<br>• `LocalBusiness` JSON-LD<br>• Phone, physical address, NAP patterns | • `LocalBusiness` geo-coordinates (`latitude`, `longitude`)<br>• `openingHoursSpecification` completeness<br>• NAP consistency between footer and text | Declare `LocalBusiness.geo` coordinates and ISO 8601 opening hours; link to Google Maps CID | Reconcile phone number and address discrepancies between header, footer, and contact page | Embed localized `Service` schema with `areaServed` geographic polygons |
+
+### 21.2 Severity Reweighting Rubric by Archetype
+
+```python
+ARCHETYPE_SEVERITY_OVERRIDES = {
+    "ecommerce": {
+        "ATTRIBUTE_INCOMPLETENESS": "critical",       # Missing price/currency blocks checkout journey
+        "INCOMPLETE_OFFER_ATTRIBUTES": "critical",     # Missing availability misleads buying agents
+        "COMMERCIAL_PRODUCT_DATA_CONTRADICTION": "critical",
+        "MATERIAL_ENTITY_AMBIGUITY": "high",          # Brand must be identified for product citations
+        "FIRST_PARTY_FACT_CONFLICT": "critical",       # Pricing drift misleads AI comparisons
+    },
+    "saas": {
+        "LOW_FACT_TO_TOKEN_RATIO": "high",            # Thin text prevents category recommendation
+        "MISSING_IN_DEPTH_MECHANISMS": "high",        # Lack of causal depth prevents technical citations
+        "FIRST_PARTY_FACT_CONFLICT": "critical",       # Plan cost drift breaks AI purchasing agents
+        "CONTEXT_PLACEMENT_DEGRADATION": "high",       # Key value prop buried below auth wall
+    },
+    "publisher": {
+        "MATERIAL_ENTITY_AMBIGUITY": "high",          # Missing publisher authority drops citations
+        "STANDALONE_FAQ_DEFICIT": "high",             # Missing FAQ schema limits AI Overview rich snippets
+        "STALE_AUTHORITATIVE_FACT": "high",           # Outdated facts erode synthetic trust
+        "CONTENT_RECENCY_DEFICIT": "medium",
+    },
+    "local_business": {
+        "MATERIAL_ENTITY_AMBIGUITY": "critical",       # Local assistants cannot route without entity
+        "MISSING_MATERIAL_FACT": "critical",           # Missing address/phone makes brand invisible
+        "BROKEN_AUTHORITY_ANCHOR": "high",            # Broken map/directory link prevents grounding
+    },
+    "corporate": {}  # Baseline sensor severities
+}
+```
+
+### 21.3 Simulated Assistant Query Profiles by Archetype
+
+#### 1. SaaS / Developer Platform
+- **Navigational Query:** *"What does [Brand] do and what are its core features?"*
+  - *Retriever test:* Does `/` or `/about` contain a 40–60 word standalone definition without fluff?
+- **Commercial Investigation Query:** *"How much does [Brand] cost per user, and does it offer an API?"*
+  - *Retriever test:* Is pricing explicitly stated in visible text or `/pricing.md` without forced registration?
+- **Technical Comparison Query:** *"Compare [Brand] vs [Competitor] for enterprise scale."*
+  - *Retriever test:* Are architectural benchmarks and causal mechanisms (`because`, `therefore`) present?
+
+#### 2. E-Commerce / Retail
+- **Direct Product Query:** *"Where can I buy [Product Name] and is it in stock?"*
+  - *Retriever test:* Does the page expose Schema.org `Offer` with `price`, `priceCurrency`, and `InStock`?
+- **Specification Query:** *"What are the dimensions, materials, and warranty for [Product Name]?"*
+  - *Retriever test:* Are product attributes in a clean HTML `<table>` or structured bullet list?
+
+#### 3. Enterprise B2B
+- **Vendor Due Diligence Query:** *"Who owns [Brand], where is it headquartered, and who is the CEO?"*
+  - *Retriever test:* Does Schema.org `Organization` link to verified Wikidata/LinkedIn and declare `founder`/`employee`?
+- **Security & Compliance Query:** *"Is [Brand] SOC 2 certified or GDPR compliant?"*
+  - *Retriever test:* Are compliance statements un-gated and corroborated by third-party links?
+
+#### 4. Media / Publisher
+- **Fact Verification Query:** *"According to [Publisher], what is the latest finding on [Topic]?"*
+  - *Retriever test:* Is the headline supported by a 50-word BLUF paragraph with named researcher attribution?
+
+#### 5. Local Service
+- **Local Intent Query:** *"What time does [Brand] open in [City] and what is their phone number?"*
+  - *Retriever test:* Does `LocalBusiness` declare valid `openingHoursSpecification` and E.164 phone?

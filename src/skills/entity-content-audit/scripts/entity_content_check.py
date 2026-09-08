@@ -333,8 +333,10 @@ def audit(base, domain, inv=None, state_file=None):
     html_pages = []
     if inv is not None:
         for p in inv.get("pages", []):
-            u = p.get("url", "")
-            raw_html = p.get("html", "")
+            u = p.get("url") or ""
+            raw_html = p.get("html") or ""
+            if not u or not raw_html:
+                continue
             # Strict non-HTML / sitemap rejection
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
@@ -406,6 +408,8 @@ def audit(base, domain, inv=None, state_file=None):
                 "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
                 "suggested_action": {
                     "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
+                    "technical_fix": "Deploy Organization JSON-LD with @type, name, url, logo, and sameAs links to official profiles.",
+                    "creative_fix": "Clarify official brand name, founding year, and corporate mission in footer and about page copy.",
                     "priority": "medium",
                     "verification": "Inspect homepage JSON-LD and confirm Organization schema parses validly.",
                 },
@@ -435,7 +439,33 @@ def audit(base, domain, inv=None, state_file=None):
                 pass
             typed_objects = parse_json_ld(pdom.json_ld_contents, phtml)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
-            if isinstance(ans, dict) and ans.get("status") == "present":
+            if isinstance(ans, dict) and ans.get("status") == "missing_entity":
+                # Commercial product/catalog route completely missing Product schema
+                if not any(f.get("cause_id") == "ATTRIBUTE_INCOMPLETENESS" and purl in str(f.get("evidence", "")) for f in findings):
+                    findings.append(
+                        {
+                            "category": "product-answerability",
+                            "title": f"No Schema.org Product structured data on {ptype.replace('_', ' ')} page",
+                            "severity": "high",
+                            "confidence": "high",
+                            "root_cause": f"MISSING_PRODUCT_SCHEMA: Commercial {ptype.replace('_', ' ')} page on {purl} publishes no Schema.org Product or ItemList JSON-LD structured data.",
+                            "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
+                            "id": "ATTRIBUTE_INCOMPLETENESS",
+                            "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                            "url": purl,
+                            "scope": purl,
+                            "impact": "Generative shopping assistants (ChatGPT Instant Checkout, Perplexity Shopping, Google Shopping Graph) cannot resolve product catalog items, prices, or inventory status.",
+                            "evidence": f"Commercial route {purl} contains 0 Schema.org Product or ItemList entities in JSON-LD.",
+                            "suggested_action": {
+                                "summary": f"Deploy Schema.org Product markup on {purl}.",
+                                "technical_fix": "Embed Schema.org Product JSON-LD declaring name, description, offers with clean numeric price and ISO 4217 priceCurrency, and inStock availability.",
+                                "creative_fix": "Ensure visible product catalog titles, pricing, and availability are presented in semantic HTML above the fold.",
+                                "priority": "high",
+                                "verification": f"Validate {purl} with Schema.org Validator or Google Rich Results Test to confirm Product markup is detected.",
+                            },
+                        }
+                    )
+            elif isinstance(ans, dict) and ans.get("status") == "present":
                 results_list = ans.get("results")
                 if isinstance(results_list, list):
                     for res in results_list:
@@ -459,6 +489,8 @@ def audit(base, domain, inv=None, state_file=None):
                                             "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res.get('score', 0.0)}/1.0.",
                                             "suggested_action": {
                                                 "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
+                                                "technical_fix": f"Enrich Product JSON-LD with missing attributes ({', '.join(missing)}) under offers and specifications.",
+                                                "creative_fix": "Display visible pricing, availability, and product attributes in clear editorial tables adjacent to purchase CTAs.",
                                                 "priority": "medium",
                                                 "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
                                             },
@@ -637,6 +669,70 @@ def audit(base, domain, inv=None, state_file=None):
                                 }
                             )
 
+            # 3.3 Non-Text Fact Locking Check (Round 3 PS Page 3 & Round 2 Appendix Concept C/F)
+            # Detects critical commercial/pricing/specification charts locked inside unparsed raster images
+            locked_images = []
+            img_candidates = list(p.get("images", []))
+            if not img_candidates and phtml:
+                for im in re.finditer(r'<img\s+([^>]+)>', phtml, re.IGNORECASE):
+                    attrs_str = im.group(1)
+                    src_m = re.search(r'src=["\']([^"\']+)["\']', attrs_str, re.IGNORECASE)
+                    alt_m = re.search(r'alt=["\']([^"\']*)["\']', attrs_str, re.IGNORECASE)
+                    cls_m = re.search(r'class=["\']([^"\']+)["\']', attrs_str, re.IGNORECASE)
+                    id_m = re.search(r'id=["\']([^"\']+)["\']', attrs_str, re.IGNORECASE)
+                    img_candidates.append({
+                        "src": src_m.group(1) if src_m else "",
+                        "alt": alt_m.group(1) if alt_m else "",
+                        "class": cls_m.group(1) if cls_m else "",
+                        "id": id_m.group(1) if id_m else "",
+                    })
+
+            for im_obj in img_candidates:
+                src_val = (im_obj.get("src") or "").lower()
+                alt_val = (im_obj.get("alt") or "").strip().lower()
+                cls_id_val = f"{im_obj.get('class', '')} {im_obj.get('id', '')}".lower()
+                combined_img_str = f"{src_val} {cls_id_val}"
+
+                is_commercial_img = bool(
+                    re.search(
+                        r"\b(pricing|price|tier|plan|comparison|spec|specification|features|menu|chart|infographic|rates|dimensions)\b",
+                        combined_img_str,
+                    )
+                )
+                is_unannotated_alt = not alt_val or len(alt_val) < 15 or alt_val in (
+                    "pricing", "image", "chart", "table", "menu", "features", "infographic"
+                )
+                if is_commercial_img and is_unannotated_alt:
+                    img_filename = src_val.split("/")[-1].split("?")[0] or "raster_graphic"
+                    locked_images.append((img_filename, alt_val or "empty"))
+
+            has_prod_schema = any(matches_schema_type(o, ("product", "individualproduct", "offer")) for o in typed_objects)
+            has_html_table = bool(re.search(r"<table\b[^>]*>", phtml or "", re.IGNORECASE))
+
+            if locked_images and not has_prod_schema and not has_html_table:
+                sample_img, sample_alt = locked_images[0]
+                findings.append(
+                    {
+                        "category": "entity-answerability",
+                        "title": f"Key commercial facts locked in non-textual images without machine-readable schema on {purl}",
+                        "severity": "high",
+                        "confidence": "high",
+                        "root_cause": f"MISSING_MATERIAL_FACT: Graphic charts ('{sample_img}') lock essential pricing and specification facts inside raster images without machine-readable Schema.org JSON-LD or semantic HTML table markup.",
+                        "cause_family": "ENTITY.ANSWERABILITY",
+                        "id": "MISSING_MATERIAL_FACT",
+                        "cause_id": "MISSING_MATERIAL_FACT",
+                        "impact": "Generative search engines (ChatGPT Search, Claude, Perplexity) cannot perform OCR during search indexing, resulting in total omission of commercial specifications in AI comparison cards.",
+                        "evidence": f"Detected commercial graphic ('{sample_img}') with uninformative alt text ('{sample_alt}') on {purl}, with 0 Product/Offer JSON-LD schemas and 0 semantic HTML data tables present.",
+                        "suggested_action": {
+                            "summary": f"Extract pricing and specifications from '{sample_img}' into Schema.org Product/Offer JSON-LD and semantic HTML tables.",
+                            "priority": "high",
+                            "technical_fix": f"Deploy standard Schema.org Product/Offer JSON-LD representing the tiers and specifications shown in '{sample_img}', paired with an HTML5 <table>.",
+                            "creative_fix": "Retain visual marketing infographics for human visitors while providing an identical machine-readable structured data layer for AI crawlers.",
+                            "verification": "Confirm that search engine crawlers extract complete numeric prices and attributes without raster image processing.",
+                        },
+                    }
+                )
+
     if state_file:
         if "entities" not in state:
             state["entities"] = {}
@@ -658,7 +754,7 @@ def audit(base, domain, inv=None, state_file=None):
                 state["entities"][u].append(brand_name)
         import tempfile
 
-        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
         with os.fdopen(fd, "w") as f:
             json.dump(state, f)
         os.replace(tmp, state_file)
@@ -678,6 +774,16 @@ def audit(base, domain, inv=None, state_file=None):
             "html_pages_evaluated": len(html_pages),
             "answerability_evaluations": answerability_evaluations,
             "json_ld_count": len(json_ld_entities),
+            # Ratios for continuous orchestrator scoring (structured data completeness)
+            "org_schema_pages": 1 if org_entity else 0,
+            "product_schema_pages": sum(
+                1 for p in html_pages
+                if any(
+                    "product" in str(e.get("@type", "")).lower()
+                    for e in parse_json_ld(p.get("json_ld_contents", []), p.get("html", ""))
+                )
+            ) if len(html_pages) > 1 else (1 if any("product" in str(e.get("@type", "")).lower() for e in json_ld_entities) else 0),
+            "total_pages": len(html_pages),
         },
         "limitations": [
             "Entity and answerability analysis was performed on sampled first-party HTML; authenticated portals were not evaluated."

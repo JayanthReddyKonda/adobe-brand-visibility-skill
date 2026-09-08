@@ -144,4 +144,3 @@ Brand mentions correlate 3x more strongly with AI visibility than traditional ba
 | **Wikipedia** | **High** | **High (20%)** | Foundation model pre-training corpora establish base entity identity from Wikipedia. |
 | **LinkedIn** | **Moderate** | **Moderate (15%)** | Validates corporate founding, employee count, and B2B operational scale. |
 | **Backlinks (DR)** | **0.266** | **Low (15%)** | Traditional PageRank signals have weak correlation with generative citation selection. |
-

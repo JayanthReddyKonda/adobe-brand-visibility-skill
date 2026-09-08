@@ -69,6 +69,25 @@ class TestEntityContentUnit(unittest.TestCase):
         cause_ids = [f.get("cause_id") for f in findings if isinstance(f, dict)]
         self.assertIn("MATERIAL_ENTITY_AMBIGUITY", cause_ids)
 
+    def test_audit_flags_non_text_fact_locking(self):
+        """Failure test: Critical commercial charts in un-annotated raster images flag MISSING_MATERIAL_FACT."""
+        inv = {
+            "site": "https://example.com",
+            "crawled_at": "2026-09-06T12:00:00Z",
+            "pages": [
+                {
+                    "url": "https://example.com/pricing",
+                    "page_type": "pricing",
+                    "html": "<html><body><h1>Pricing</h1><img src='/images/pricing-table-chart.png' alt='pricing' /></body></html>",
+                    "images": [{"src": "/images/pricing-table-chart.png", "alt": "pricing", "class": "", "id": ""}],
+                }
+            ],
+        }
+        res = entity_content_check.audit("https://example.com", "example.com", inv)
+        findings = res.get("findings", [])
+        cause_ids = [f.get("cause_id") for f in findings if isinstance(f, dict)]
+        self.assertIn("MISSING_MATERIAL_FACT", cause_ids)
+
     def test_audit_empty_inventory_handled_safely(self):
         """Boundary/Failure test: Empty inventory handled gracefully."""
         inv = make_empty_inventory("https://example.com")

@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.invalid/brand-ai-readiness/telemetry-schema.json",
+  "title": "Brand AI Readiness Telemetry",
+  "description": "Draft-07 schema for empirical telemetry emitted by orchestrator.py --telemetry",
+  "type": "object",
+  "required": [
+    "site",
+    "domain",
+    "crawled_at",
+    "archetype",
+    "inventory",
+    "retrieval",
+    "rendering",
+    "entity",
+    "facts",
+    "corroboration",
+    "geo",
+    "engagement",
+    "dag",
+    "causal_state",
+    "evidence_index",
+    "sensor_telemetry"
+  ],
+  "properties": {
+    "site": {
+      "type": "string",
+      "format": "uri"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "crawled_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "archetype": {
+      "type": "string",
+      "enum": ["ecommerce", "saas", "publisher", "local_business", "corporate"]
+    },
+    "inventory": {
+      "type": "object",
+      "required": ["page_count", "pages", "robots_summary", "has_llms_txt"],
+      "properties": {
+        "page_count": {"type": "integer", "minimum": 0},
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {"type": "string"},
+              "page_type": {"type": ["string", "null"]},
+              "word_count": {"type": ["integer", "null"]},
+              "snr": {"type": ["number", "null"]}
+            }
+          }
+        },
+        "robots_summary": {"type": "object"},
+        "has_llms_txt": {"type": "boolean"}
+      }
+    },
+    "retrieval": {
+      "type": "object",
+      "required": ["robots_txt_found", "bot_matrix", "retrieval_bots_allowed", "retrieval_bots_total"],
+      "properties": {
+        "robots_txt_found": {"type": "boolean"},
+        "bot_matrix": {"type": "object"},
+        "retrieval_bots_allowed": {"type": ["integer", "null"]},
+        "retrieval_bots_total": {"type": ["integer", "null"]},
+        "noindex_pages": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "rendering": {
+      "type": "object",
+      "required": ["visible_words_initial_html", "spa_root_markers_detected"],
+      "properties": {
+        "visible_words_initial_html": {"type": ["integer", "null"]},
+        "spa_root_markers_detected": {"type": "boolean"}
+      }
+    },
+    "entity": {
+      "type": "object",
+      "required": ["jsonld_present", "types_declared", "sameas_declared"],
+      "properties": {
+        "jsonld_present": {"type": "boolean"},
+        "types_declared": {"type": "array", "items": {"type": "string"}},
+        "sameas_declared": {"type": "integer"}
+      }
+    },
+    "facts": {
+      "type": "object",
+      "required": ["facts_checked", "fact_conflicts"],
+      "properties": {
+        "facts_checked": {"type": "integer", "minimum": 0},
+        "fact_conflicts": {"type": "integer", "minimum": 0}
+      }
+    },
+    "corroboration": {
+      "type": "object",
+      "required": ["sameas_declared", "sameas_resolvable"],
+      "properties": {
+        "sameas_declared": {"type": "integer", "minimum": 0},
+        "sameas_resolvable": {"type": "integer", "minimum": 0}
+      }
+    },
+    "geo": {
+      "type": "object",
+      "required": ["average_citability_score"],
+      "properties": {
+        "average_citability_score": {"type": ["number", "null"]}
+      }
+    },
+    "engagement": {
+      "type": "object",
+      "required": ["pages_evaluated"],
+      "properties": {
+        "pages_evaluated": {"type": "integer", "minimum": 0}
+      }
+    },
+    "dag": {
+      "type": "object",
+      "required": ["has_layer0_block", "has_layer1_rendering_gap", "root_causes", "suppressed_categories"],
+      "properties": {
+        "has_layer0_block": {"type": "boolean"},
+        "has_layer1_rendering_gap": {"type": "boolean"},
+        "root_causes": {"type": "array"},
+        "suppressed_categories": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "causal_state": {
+      "type": "object",
+      "required": ["retrieval", "rendering", "entity", "facts", "corroboration", "geo", "engagement"],
+      "properties": {
+        "retrieval": {"type": "string"},
+        "rendering": {"type": "string"},
+        "entity": {"type": "string"},
+        "facts": {"type": "string"},
+        "corroboration": {"type": "string"},
+        "geo": {"type": "string"},
+        "engagement": {"type": "string"}
+      }
+    },
+    "evidence_index": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "route", "kind", "observation"],
+        "properties": {
+          "id": {"type": "string"},
+          "route": {"type": "string"},
+          "kind": {"type": "string"},
+          "observation": {"type": "string"}
+        }
+      }
+    },
+    "sensor_telemetry": {
+      "type": "object"
+    }
+  }
+}

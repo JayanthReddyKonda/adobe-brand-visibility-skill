@@ -6,6 +6,7 @@
   "required": [
     "site",
     "audited_at",
+    "audit_status",
     "summary",
     "findings"
   ],
@@ -34,7 +35,8 @@
         "total_findings",
         "critical",
         "high",
-        "medium"
+        "medium",
+        "low"
       ],
       "properties": {
         "total_findings": {
@@ -69,6 +71,9 @@
           "id",
           "title",
           "severity",
+          "category",
+          "root_cause",
+          "confidence",
           "evidence",
           "suggested_action"
         ],
@@ -76,6 +81,10 @@
           "id": {
             "type": "string",
             "description": "Unique finding identifier (e.g. F-001, finding-1)"
+          },
+          "cause_id": {
+            "type": "string",
+            "description": "Root cause key matching audit-orchestrator-knowledge-base.md"
           },
           "title": {
             "type": "string",
@@ -135,7 +144,10 @@
             "description": "Prioritized remediation instructions",
             "required": [
               "summary",
-              "priority"
+              "priority",
+              "technical_fix",
+              "creative_fix",
+              "verification"
             ],
             "properties": {
               "summary": {
@@ -296,6 +308,20 @@
     },
     "analytics_summary": {
       "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "description": "Explicit epistemic audit boundaries and measurement limitations",
+      "items": {
+        "type": "string"
+      }
+    },
+    "archetype": {
+      "type": [
+        "string",
+        "object"
+      ],
+      "description": "Detected business archetype and confidence"
     }
   },
   "additionalProperties": false

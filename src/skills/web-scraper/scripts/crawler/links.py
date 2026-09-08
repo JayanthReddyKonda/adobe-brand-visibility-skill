@@ -189,7 +189,10 @@ class LinkProcessor:
 
     @classmethod
     def resolve_and_filter_links(
-        cls, base_url: str, raw_links: List[Tuple[str, str, Optional[str]]]
+        cls,
+        base_url: str,
+        raw_links: List[Tuple[str, str, Optional[str]]],
+        allow_subdomains: bool = False,
     ) -> List[Link]:
         """Resolves raw (href, text, rel) tuples against base_url and discards invalid links."""
         results: List[Link] = []
@@ -205,7 +208,7 @@ class LinkProcessor:
                 continue
 
             seen.add(norm_url)
-            is_internal = cls.is_same_origin(base_url, norm_url, allow_subdomains=True)
+            is_internal = cls.is_same_origin(base_url, norm_url, allow_subdomains=allow_subdomains)
             results.append(
                 Link(
                     href=norm_url,

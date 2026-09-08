@@ -40,9 +40,30 @@ MAX_ROBOTS_BYTES = 500 * 1024
 class RobotsOutcome:
     OK = "robots_ok"
     NOT_FOUND = "robots_not_found"
-    TIMEOUT = "robots_timeout"
+    BLOCKED = "robots_blocked"
     SERVER_ERROR = "robots_server_error"
+    TIMEOUT = "robots_timeout"
     PARSE_ERROR = "robots_parse_error"
+
+
+BOT_TAXONOMY: Dict[str, Dict[str, str]] = {
+    "OAI-SearchBot": {"role": "search_crawler", "provider": "OpenAI", "description": "Search indexation crawler for ChatGPT Search"},
+    "Claude-SearchBot": {"role": "search_crawler", "provider": "Anthropic", "description": "Search indexation crawler for Claude"},
+    "PerplexityBot": {"role": "search_crawler", "provider": "Perplexity", "description": "Search retrieval crawler for Perplexity AI"},
+    "Amazonbot": {"role": "search_crawler", "provider": "Amazon", "description": "Web crawler for Alexa and Amazon AI"},
+    "cohere-ai": {"role": "training_bot", "provider": "Cohere", "description": "Model pretraining web crawler"},
+    "Meta-ExternalAgent": {"role": "search_crawler", "provider": "Meta", "description": "Search crawler for Meta AI"},
+    "Claude-User": {"role": "user_directed_fetch", "provider": "Anthropic", "description": "On-demand user request fetcher for Claude"},
+    "Perplexity-User": {"role": "user_directed_fetch", "provider": "Perplexity", "description": "On-demand user query fetcher for Perplexity"},
+    "ChatGPT-User": {"role": "user_directed_fetch", "provider": "OpenAI", "description": "On-demand browsing fetcher for ChatGPT"},
+    "GPTBot": {"role": "training_bot", "provider": "OpenAI", "description": "AI model training and fine-tuning crawler"},
+    "ClaudeBot": {"role": "training_bot", "provider": "Anthropic", "description": "AI model training crawler"},
+    "Bytespider": {"role": "training_bot", "provider": "ByteDance", "description": "AI model training crawler"},
+    "Applebot-Extended": {"role": "training_bot", "provider": "Apple", "description": "Control token for Apple Intelligence model training"},
+    "Google-Extended": {"role": "control_token", "provider": "Google", "description": "Control token for Gemini and Vertex AI training"},
+    "CCBot": {"role": "training_bot", "provider": "Common Crawl", "description": "Open web crawl repository for pretraining"},
+    "*": {"role": "wildcard", "provider": "Universal", "description": "Default crawler fallback directive"},
+}
 
 
 class RobotsRule:
@@ -101,7 +122,6 @@ class RobotsAuditor:
 
         for line in lines:
             line = line.strip()
-            # Strip comments
             if "#" in line:
                 line = line.split("#", 1)[0].strip()
             if not line or ":" not in line:
@@ -139,19 +159,28 @@ class RobotsAuditor:
         """Determines whether a given user agent is allowed to access the path.
 
         Follows RFC 9309 rule precedence:
-        1. Specific user-agent match takes precedence over wildcard (*).
-        2. Within the group, longest matching rule wins.
-        3. If same length, Allow takes precedence over Disallow.
-        4. Default is Allow if no rules match or on 404.
+        1. 401/403: restricted access, fail-closed (Disallow all).
+        2. 5xx / 429 / SERVER_ERROR: fail-closed per RFC 9309 section 2.3.1.2.
+        3. 404 / NOT_FOUND: fail-open (Allow all).
+        4. Multiple matching user-agent groups are combined per RFC 9309 section 2.2.1.
+        5. Specific user-agent match takes precedence over wildcard (*).
+        6. Within the combined group, longest matching rule wins.
+        7. If same length, Allow takes precedence over Disallow.
+        8. Default is Allow if no rules match.
         """
         # Support both (user_agent, url_or_path) and (url_or_path, user_agent)
         if user_agent.startswith(("http://", "https://", "/")) and not url_or_path.startswith(("http://", "https://", "/")):
             user_agent, url_or_path = url_or_path, user_agent
-        # If robots.txt returned 5xx, fail-closed per RFC 9309 section 2.3.1.2
-        if self.outcome == RobotsOutcome.SERVER_ERROR or self.status_code >= 500:
+
+        # RFC 9309 section 2.3.1.1: 401/403 restricted access -> fail closed
+        if self.outcome == RobotsOutcome.BLOCKED or self.status_code in (401, 403):
             return False
 
-        # If robots.txt returned 404, full access is granted (fail-open)
+        # RFC 9309 section 2.3.1.2: 5xx / 429 server error -> fail closed
+        if self.outcome == RobotsOutcome.SERVER_ERROR or self.status_code >= 500 or self.status_code == 429:
+            return False
+
+        # RFC 9309 section 2.3.1.3: 404 not found -> fail open
         if self.outcome == RobotsOutcome.NOT_FOUND or self.status_code == 404:
             return True
 
@@ -160,28 +189,33 @@ class RobotsAuditor:
         if parsed.query:
             path += "?" + parsed.query
 
-        # Step 1: Find best matching group (specific agent preferred over '*')
-        target_group: Optional[RobotsGroup] = None
-        wildcard_group: Optional[RobotsGroup] = None
-
+        matching_rules: List[RobotsRule] = []
         agent_lower = user_agent.lower()
+
+        # Step 1: Combine rules from ALL groups matching the user-agent product token (RFC 9309 section 2.2.1)
+        matched_specific = False
         for group in self.groups:
             for ua in group.user_agents:
-                if ua.lower() == agent_lower:
-                    target_group = group
+                ua_clean = ua.strip().lower()
+                if ua_clean != "*" and (ua_clean == agent_lower or ua_clean in agent_lower or agent_lower in ua_clean):
+                    matching_rules.extend(group.rules)
+                    matched_specific = True
                     break
-                elif ua == "*":
-                    wildcard_group = group
-            if target_group:
-                break
 
-        active_group = target_group or wildcard_group
-        if not active_group or not active_group.rules:
+        # Step 2: Fall back to wildcard (*) groups if no specific agent matched
+        if not matched_specific:
+            for group in self.groups:
+                for ua in group.user_agents:
+                    if ua.strip() == "*":
+                        matching_rules.extend(group.rules)
+                        break
+
+        if not matching_rules:
             return True
 
-        # Step 2: Apply longest-match rule
+        # Step 3: Apply longest-match rule per RFC 9309 section 2.2.2
         best_match: Optional[RobotsRule] = None
-        for rule in active_group.rules:
+        for rule in matching_rules:
             if rule.matches(path):
                 if best_match is None or rule.length > best_match.length:
                     best_match = rule
@@ -194,13 +228,17 @@ class RobotsAuditor:
         return best_match.is_allow
 
     def evaluate_ai_bots_matrix(self, path: str = "/") -> Dict[str, Dict[str, Any]]:
-        """Evaluate access permissions across all standard 16 AI crawler bots."""
+        """Evaluate access permissions across all standard 16 AI crawler bots with taxonomy metadata."""
         matrix: Dict[str, Dict[str, Any]] = {}
         for bot in AI_CRAWLER_BOTS:
             allowed = self.is_allowed(bot, path)
+            tax = BOT_TAXONOMY.get(bot, {"role": "unknown", "provider": "Unknown", "description": "AI bot"})
             matrix[bot] = {
                 "allowed": allowed,
                 "status": "allowed" if allowed else "blocked",
+                "role": tax.get("role", "unknown"),
+                "provider": tax.get("provider", "Unknown"),
+                "description": tax.get("description", ""),
             }
         return matrix
 
@@ -212,3 +250,24 @@ class RobotsAuditor:
             "groups_count": len(self.groups),
             "ai_bots_matrix": self.evaluate_ai_bots_matrix("/"),
         }
+
+
+def load_bot_registry() -> Dict[str, Any]:
+    """Load authoritative bot registry from references/bot-registry.json if available."""
+    import json
+    import os
+
+    reg_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "references",
+        "bot-registry.json",
+    )
+    if os.path.exists(reg_path):
+        try:
+            with open(reg_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+    return {"version": "2026-09-01", "bots": []}

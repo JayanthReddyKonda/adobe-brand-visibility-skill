@@ -114,6 +114,7 @@ class TestPartialFailureSemantics(unittest.TestCase):
                     "id": "finding-net-unreachable",
                     "title": "Target domain unreachable during audit acquisition",
                     "severity": "critical",
+                    "confidence": "high",
                     "category": "discoverability",
                     "root_cause": "DNS resolution failure or server timeout",
                     "evidence": "Socket timeout connecting to https://offline-example.com",

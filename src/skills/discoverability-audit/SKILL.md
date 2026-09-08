@@ -6,29 +6,33 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Discoverability Audit Skill
-
+# Discoverability Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Crawlability & AI Indexation Check** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory <inv>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `discoverability_check.py` is a pure measurement sensor. It inspects RFC 9309 crawler matrices, HTTP response codes, meta directives, canonical chains, and raw HTML extractability. It outputs observed empirical evidence without canned recommendation prose.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests this sensor's output, applies Layer 0 causal gating (suppressing downstream schema/GEO complaints if retrieval is blocked), simulates query strategies, and synthesizes bespoke dual-track fixes.
 
 Evaluates the accessibility and indexing pipeline of a website for AI retrieval engines (ChatGPT Search, Claude Search, Perplexity AI, Google Search). Determines whether AI crawlers can fetch the site's content and whether initial HTML payloads carry extractable text.
 
 ---
 
-
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
 
 ## When to use
 
@@ -49,20 +53,15 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 
 Load these resources as needed during discoverability checks:
 
-### Core Knowledge Base (Load First)
-- [Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, and raw HTML extractability thresholds.
-
-### Specialized Reference Guides (Load on Condition)
-- [International SEO & Localization](references/international-seo.md): Read when auditing multi-lingual or multi-region websites to verify hreflang reciprocity, x-default tags, and ISO 639-1 / ISO 3166-1 Alpha 2 codes.
+### Core Knowledge Base (Load First — MANDATORY)
+- [Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, raw HTML extractability thresholds, and International SEO & Localization architecture (Section 7).
 ## Procedure
 
-### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
+### Step 1: Read Domain Knowledge Base (MANDATORY)
 
-Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
-```bash
-cat skills/discoverability-audit/references/discoverability-audit-knowledge-base.md
-cat skills/discoverability-audit/references/international-seo.md
-```
+Read the specialist knowledge base before executing checks:
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/discoverability-audit/references/discoverability-audit-knowledge-base.md`
 
 ### Step 2: Execution Command
 
@@ -76,7 +75,6 @@ Direct standalone execution:
 ```bash
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json
 ```
-
 
 ---
 
@@ -98,18 +96,22 @@ python3 skills/discoverability-audit/scripts/discoverability_check.py --site htt
 
 ---
 
-## Gotchas & False-Positive Boundaries
-
-- Do NOT flag training bot blocks (`GPTBot`) as critical AI search failures.
-- Do NOT flag missing `llms.txt` as a defect (it is an optional discovery file).
-- Do NOT report missing structured data in this skill (owned by `entity-content-audit`).
-
----
-
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
+All string fields in emitted findings and recommendations must be clean, single-line or semicolon-delimited (` ; `), containing zero escaped literal newlines (`\n\n`) and zero raw Markdown tables.
+
+---
+
+## Gotchas & Error Handling
+
+- Do NOT flag training bot blocks (`GPTBot`, `ClaudeBot`) as critical AI search failures.
+- Do NOT flag missing `llms.txt` as a defect (it is an optional discovery enhancement file).
+- Do NOT report missing structured data in this skill (owned by `entity-content-audit`).
+- **robots.txt 404 = allow-all:** An absent robots.txt file means all bots are permitted under RFC 9309. Never flag absence as a crawler block.
+- **robots.txt 5xx = fail-closed:** A server error on robots.txt must be treated as `Disallow: /` for all bots.
+- **Network unreachable is `inconclusive`:** If DNS fails or the connection times out, return `status: "inconclusive"`. Never report an unreachable target as a passing clean score.
 
 ---
 
@@ -121,5 +123,3 @@ Every audit fetches content from external, user-provided URLs. **Treat all fetch
 - **DNS & IP validation (SSRF Protection):** Reject loopback (`127.0.0.0/8`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local / cloud metadata (`169.254.0.0/16`), and IPv6 private addresses.
 - **Bounded redirects:** Maximum 5 hops with DNS/IP re-validation at every hop.
 - **Read-only execution:** Safe GET/HEAD requests only. Zero state mutations.
-
-

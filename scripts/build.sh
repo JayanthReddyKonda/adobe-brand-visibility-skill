@@ -20,5 +20,5 @@ echo "Creating zip..."
 cd build
 rm -f brand-ai-readiness-audit.zip
 zip -r brand-ai-readiness-audit.zip brand-ai-readiness-audit > /dev/null
-mv brand-ai-readiness-audit.zip ../
+cp brand-ai-readiness-audit.zip ../
 echo "Build complete."

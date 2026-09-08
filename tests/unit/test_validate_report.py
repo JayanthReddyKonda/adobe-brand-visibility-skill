@@ -80,6 +80,13 @@ class TestValidateReport(unittest.TestCase):
         res = run_validator(report)
         self.assertEqual(res.returncode, 0)
 
+    def test_reject_boolean_as_integer_or_number(self):
+        """Failure test: Boolean True/False cannot pass as integer or number."""
+        report = json.loads(json.dumps(VALID_SCHEMA_REPORT))
+        report["summary"]["total_findings"] = True
+        res = run_validator(report)
+        self.assertNotEqual(res.returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -110,6 +110,29 @@ class TestSecurityPolicy(unittest.TestCase):
         self.assertIsNone(status)
         self.assertIn("blocked network", err)
 
+    def test_carrier_grade_nat_blocked(self):
+        """Failure test: Carrier-Grade NAT (100.64.0.0/10) is blocked."""
+        safe, msg = self.policy.is_ip_safe("100.64.0.1")
+        self.assertFalse(safe)
+        self.assertIn("carrier-grade nat", msg.lower())
+
+    def test_cloud_metadata_alibaba_and_ecs_blocked(self):
+        """Failure test: Alibaba (100.100.100.200) and AWS ECS (169.254.170.2) metadata blocked."""
+        safe, _ = self.policy.is_ip_safe("100.100.100.200")
+        self.assertFalse(safe)
+        safe, _ = self.policy.is_ip_safe("169.254.170.2")
+        self.assertFalse(safe)
+
+    def test_bracketed_ipv6_handling(self):
+        """Success & failure tests: Bracketed IPv6 addresses are parsed cleanly without DNS error."""
+        safe, msg, ip = self.policy.resolve_and_verify_host("[::1]")
+        self.assertFalse(safe)
+        self.assertIn("loopback", msg.lower())
+
+        safe, msg, ip = self.policy.resolve_and_verify_host("[2606:2800:220:1:248:1893:25c8:1946]")
+        self.assertTrue(safe)
+        self.assertIn("Public IP verified", msg)
+
 
 if __name__ == "__main__":
     unittest.main()

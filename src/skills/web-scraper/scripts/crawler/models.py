@@ -157,6 +157,7 @@ class PageModel:
     title: str = ""
     description: str = ""
     canonical: Optional[str] = None
+    canonicals: List[str] = field(default_factory=list)
     robots_meta: List[str] = field(default_factory=list)
     language: Optional[str] = None
     headings: List[Heading] = field(default_factory=list)
@@ -171,10 +172,12 @@ class PageModel:
     semantic_landmarks: List[str] = field(default_factory=list)
     tables: List[TableData] = field(default_factory=list)
     code_blocks: List[str] = field(default_factory=list)
+    images: List[Dict[str, str]] = field(default_factory=list)
     observations: List[Observation] = field(default_factory=list)
     facts: List[FactCandidate] = field(default_factory=list)
     claims: List[ClaimCandidate] = field(default_factory=list)
     fetch_telemetry: Dict[str, Any] = field(default_factory=dict)
+    headers: Dict[str, str] = field(default_factory=dict)
     raw_html: str = ""
 
     def to_dict(self, include_raw_html: bool = False) -> Dict[str, Any]:
@@ -187,6 +190,7 @@ class PageModel:
             "title": self.title,
             "description": self.description,
             "canonical": self.canonical,
+            "canonicals": self.canonicals,
             "robots_meta": self.robots_meta,
             "language": self.language,
             "headings": [h.to_dict() for h in self.headings],
@@ -197,13 +201,16 @@ class PageModel:
             "clean_markdown": self.clean_markdown,
             "word_count": self.word_count,
             "snr": round(self.snr, 4),
+            "text_density_ratio": round(self.snr, 4),
             "page_type": self.page_type,
             "semantic_landmarks": self.semantic_landmarks,
             "tables": [t.to_dict() for t in self.tables],
             "code_blocks": self.code_blocks,
+            "images": self.images,
             "observations": [o.to_dict() for o in self.observations],
             "facts": [f.to_dict() for f in self.facts],
             "claims": [c.to_dict() for c in self.claims],
+            "headers": self.headers,
             "fetch": self.fetch_telemetry,
         }
         if include_raw_html and self.raw_html:

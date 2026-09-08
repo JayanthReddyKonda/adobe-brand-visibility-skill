@@ -21,7 +21,7 @@ def validate_type(instance, schema, path="root"):
         valid = False
         for t in type_list:
             if t in type_map and isinstance(instance, type_map[t]):
-                if t == "integer" and type(instance) is bool:
+                if t in ("integer", "number") and type(instance) is bool:
                     continue  # bool is a subclass of int, but we want strict checking
                 valid = True
                 break
@@ -32,11 +32,22 @@ def validate_type(instance, schema, path="root"):
         if "string" in type_list and isinstance(instance, str) and schema.get("format") == "date-time":
             import datetime
 
+            # P1-88: Strict timezone qualification requirement (e.g. 'Z' or '+00:00' / '-05:00')
+            if not re.search(r"(Z|[+-]\d{2}:\d{2})$", instance):
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string (missing explicit timezone offset)"
             try:
                 dt_str = instance.replace("Z", "+00:00")
-                datetime.datetime.fromisoformat(dt_str)
+                dt = datetime.datetime.fromisoformat(dt_str)
+                if dt.tzinfo is None:
+                    return f"{path}: '{instance}' is missing timezone offset"
             except ValueError:
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
+
+    # P1-89: Disallow NaN and Infinity numeric values
+    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+        import math
+        if math.isnan(instance) or math.isinf(instance):
+            return f"{path}: Disallowed NaN or Infinity numeric value"
 
     if "minimum" in schema and isinstance(instance, (int, float)) and instance < schema["minimum"]:
         return f"{path}: Value {instance} is less than minimum {schema['minimum']}"
@@ -87,6 +98,29 @@ def validate_type(instance, schema, path="root"):
     return None
 
 
+def verify_summary_counts(report):
+    """Verify summary total_findings and categorical counts match findings array."""
+    errors = []
+    findings = report.get("findings", [])
+    summary = report.get("summary", {})
+
+    if not isinstance(findings, list) or not isinstance(summary, dict):
+        return errors
+
+    if "total_findings" in summary and summary["total_findings"] != len(findings):
+        errors.append(f"total_findings ({summary['total_findings']}) does not match findings count ({len(findings)})")
+
+    expected = {
+        sev: sum(1 for f in findings if isinstance(f, dict) and f.get("severity") == sev)
+        for sev in ("critical", "high", "medium", "low")
+    }
+    for sev, count in expected.items():
+        if sev in summary and summary[sev] != count:
+            errors.append(f"summary.{sev} ({summary[sev]}) does not match actual {sev} findings count ({count})")
+
+    return errors
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
         print("Usage: python3 validate_report.py [report.json | - < report.json]")
@@ -114,9 +148,12 @@ def main():
         )
         sys.exit(2)
 
+    def _reject_constant(c):
+        raise ValueError(f"Disallowed JSON constant '{c}' (NaN and Infinity are not valid JSON)")
+
     try:
-        report = json.loads(data)
-    except json.JSONDecodeError as e:
+        report = json.loads(data, parse_constant=_reject_constant)
+    except (json.JSONDecodeError, ValueError) as e:
         print(f"Invalid JSON input: {e}", file=sys.stderr)
         sys.exit(2)
 
@@ -133,6 +170,11 @@ def main():
     err = validate_type(report, schema)
     if err:
         print(f"Schema validation failed: {err}", file=sys.stderr)
+        sys.exit(2)
+
+    summary_errs = verify_summary_counts(report)
+    if summary_errs:
+        print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
         sys.exit(2)
 
     print(json.dumps(report, indent=2))

@@ -243,10 +243,10 @@ AI content visibility is measured across seven fine-grained dimensions (0–5 sc
    *Fix:* Eliminate filler or articulate the precise technical dimension.
 
 ### Mathematical Formula:
-$$\text{Hedge Density} = \frac{\text{Total Hedge Words}}{\text{Total Words}} \times 100$$
-- **Target:** $< 0.5\%$ (Authoritative)
-- **Warning:** $0.5\% - 1.5\%$ (Moderate qualification)
-- **Defect Threshold:** $> 1.5\%$ (`EXCESSIVE_HEDGE_LANGUAGE`)
+Hedge Density = (Total Hedge Words / Total Words) * 100
+- **Target:** < 0.5% (Authoritative)
+- **Warning:** 0.5% - 1.5% (Moderate qualification)
+- **Defect Threshold:** > 1.5% (`EXCESSIVE_HEDGE_LANGUAGE`)
 
 ---
 
@@ -292,11 +292,11 @@ Content optimization cannot rely on generic, one-size-fits-all recommendations. 
    - Self-Containment (25 pts): 120–180 word passage chunks, standalone entity attribution.
    - Mechanistic Depth (15 pts): Causal conjunction density (`how`, `why`, `because`, `therefore`, `enables`).
    - Statistical Density (15 pts): Verifiable numbers, benchmark metrics, percentages.
-   - Information Density & FTR (15 pts): Atomic Fact-to-Token Ratio $\ge 0.080$, low hedge rate $\le 0.5\%$.
+   - Information Density & FTR (15 pts): Atomic Fact-to-Token Ratio >= 0.080, low hedge rate <= 0.5%.
 2. **Gap Analysis:** Identifies precise deficiencies against empirical thresholds:
-   - Deficient depth score ($< 3$).
-   - High hedge word density ($> 0.5\%$).
-   - Sub-threshold atomic fact ratio ($< 0.080$).
+   - Deficient depth score (< 3).
+   - High hedge word density (> 0.5%).
+   - Sub-threshold atomic fact ratio (< 0.080).
    - Absence of semantic comparison tables or definition lists.
    - Exophoric pronouns in passage leads breaking context.
 3. **Deterministic Action Tracks:**
@@ -310,3 +310,24 @@ Every generated plan must include this explicit qualification:
 
 Engineers and copywriters can execute these concrete, deterministic recommendations directly to optimize pages for generative engine retrieval.
 
+---
+
+## 9. AI Writing Detection & Natural Content Patterns
+
+Words, phrases, and punctuation patterns commonly associated with generic AI-generated text. Avoid these patterns to ensure brand content provides genuine mechanistic depth and human credibility:
+
+### 1. Em Dash Overuse
+AI models consistently overuse em dashes (—) as a shortcut for sentence variety instead of standard commas, colons, or parentheses. Reserve em dashes for rare, deliberate emphasis only.
+
+### 2. Overused Buzzwords & Empty Transitions
+Avoid generic transitional fluff that dilutes information density:
+- **Avoid:** "In today's fast-paced digital world", "Proceed to delve into", "At its core", "To put it simply", "In essence", "Furthermore", "Moreover"
+- **Use Instead:** Jump straight to empirical facts, quantifiable data, and causal explanations.
+
+### 3. Empty Intensifiers
+Remove filler words that add no substantive information:
+`absolutely`, `basically`, `certainly`, `fundamentally`, `incredibly`, `naturally`, `obviously`, `significantly`, `truly`, `ultimately`.
+
+### 4. Princeton KDD 2024 Alternative: Causal Depth
+Instead of superficial prose, structure sentences around verifiable causal mechanisms:
+- *"The algorithm reduces sync latency by 45% because in-memory event buffers replace disk I/O."*

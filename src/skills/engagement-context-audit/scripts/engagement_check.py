@@ -142,12 +142,29 @@ VALID_CONTACT_TERMS = {
 
 
 class SemanticIntentEngine:
+    DEFAULT_INTENTS = {
+        "pricing_comparison": {
+            "intent_family": "pricing_comparison",
+            "required_on_page_facts": ["tier_names", "tier_prices", "billing_interval", "signup_or_trial_cta"],
+        },
+        "product_purchase": {
+            "intent_family": "product_purchase",
+            "required_on_page_facts": ["tier_prices", "availability", "add_to_cart_or_buy_cta"],
+        },
+        "documentation_lookup": {
+            "intent_family": "documentation_lookup",
+            "required_on_page_facts": ["feature_matrix"],
+        },
+    }
+
     def __init__(self, references_dir):
         self.references_dir = references_dir
-        self.intents = {}
+        self.intents = dict(self.DEFAULT_INTENTS)
         self._load_intents()
 
     def _load_intents(self):
+        if not self.references_dir or not os.path.exists(self.references_dir):
+            return
         import glob
 
         yaml_files = glob.glob(os.path.join(self.references_dir, "*.json"))
@@ -694,12 +711,21 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
         return (
             [
                 {
+                    "id": "HTML_PARSING_FAILED",
+                    "cause_id": "HTML_PARSING_FAILED",
                     "title": "HTML parsing failed",
-                    "severity": "info",
+                    "severity": "low",
+                    "confidence": "high",
                     "category": "extraction",
-                    "root_cause": "Malformed HTML",
+                    "root_cause": "Malformed HTML payload prevented complete DOM tree parsing.",
                     "evidence": str(e),
-                    "suggested_action": {"summary": "Fix HTML syntax", "priority": "low"},
+                    "suggested_action": {
+                        "summary": "Fix HTML syntax and unclosed tags on the page.",
+                        "technical_fix": "Validate document with W3C HTML validator and fix unclosed tags or invalid nesting.",
+                        "creative_fix": "Ensure CMS layout templates produce valid HTML5 markup across all viewports.",
+                        "priority": "low",
+                        "verification": "Re-parse page HTML with standard parser without syntax errors.",
+                    },
                 }
             ],
             [],
@@ -733,7 +759,10 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                     "evidence": f"Page {url} provides explicit commercial facts (pricing for '{facts['scoped_prices'][0]['entity']}'), satisfying a bottom-funnel intent, but provides no clear transactional or sales-contact navigation.",
                     "suggested_action": {
                         "summary": "Add explicit CTA (e.g., 'Buy', 'Contact Sales') immediately following the pricing facts to preserve task continuity.",
+                        "technical_fix": "Render accessible transactional buttons (<a href='/checkout'> or <button>) immediately adjacent to pricing specifications.",
+                        "creative_fix": "Design prominent visual callouts emphasizing next steps, free trials, or consultation bookings.",
                         "priority": "medium",
+                        "verification": "Verify presence of transactional CTA links within first viewport of pricing section.",
                     },
                 }
             )
@@ -767,7 +796,10 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                     "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
                     "suggested_action": {
                         "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
+                        "technical_fix": "Update template <h1> element to explicitly mention canonical brand entity name.",
+                        "creative_fix": "Craft descriptive hero headline combining brand entity name with unique value proposition.",
                         "priority": "medium",
+                        "verification": "Inspect rendered HTML to ensure <h1> contains primary brand entity name.",
                     },
                 }
             )
@@ -816,6 +848,30 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     # 5. Value-Driven CTA Copy Check (CRO & SXO best practices)
     weak_ctas = [txt for txt in dom.cta_texts if WEAK_CTA_PATTERNS.match(txt.strip())]
     if weak_ctas and len(" ".join(dom.body_text).split()) > 100:
+        if not any(f.get("cause_id") == "CTA_REACHABILITY_FRICTION" for f in findings):
+            findings.append(
+                {
+                    "category": "conversion-continuity",
+                    "title": f"Generic conversion action copy on {page_type or 'landing page'} ('{weak_ctas[0]}')",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": f"CTA_REACHABILITY_FRICTION: Primary interactive conversion trigger relies on generic action copy ('{weak_ctas[0]}') without specific outcome value nouns.",
+                    "cause_family": "EXPERIENCE.CONTINUITY",
+                    "id": "CTA_REACHABILITY_FRICTION",
+                    "cause_id": "CTA_REACHABILITY_FRICTION",
+                    "url": url,
+                    "scope": url,
+                    "impact": "AI referral visitors arriving with specific purchase intent experience context scent loss, depressing conversion rates.",
+                    "evidence": f"Found generic CTA trigger ('{weak_ctas[0]}') on {url}.",
+                    "suggested_action": {
+                        "summary": f"Replace generic '{weak_ctas[0]}' CTA with specific outcome copy.",
+                        "technical_fix": "Update CTA button markup to state the delivered value (e.g. 'Explore Fresh Roasts', 'Claim Coffee Rewards').",
+                        "creative_fix": "Align CTA verbs with the exact recommendation made by AI search engines.",
+                        "priority": "medium",
+                        "verification": "Confirm CTA text contains descriptive benefit nouns.",
+                    },
+                }
+            )
         recommendations.append(
             {
                 "id": "PROACTIVE.ENGAGEMENT.VALUE_DRIVEN_CTA.001",
@@ -848,13 +904,13 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
         findings.append(
             {
                 "category": "engagement",
-                "title": "Cited proposition missing from above-the-fold viewport (Orientation Shock)",
+                "title": "Cited proposition missing from early-content document section (Orientation Shock)",
                 "severity": "medium",
                 "confidence": "high",
                 "root_cause": (
-                    "VIEWPORT_ANSWER_ABSENCE: The initial viewport (first 150 words / top 2 paragraphs) fails to anchor "
+                    "VIEWPORT_ANSWER_ABSENCE: The early-content section (first 150 words / top 2 paragraphs) fails to anchor "
                     f"the core proposition ({', '.join(viewport_data['missing_propositions'])}). AI search visitors arriving from citations "
-                    "experience orientation shock when the cited fact is pushed below the fold by decorative banners."
+                    "experience orientation shock when the cited fact is delayed behind boilerplate banners."
                 ),
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "VIEWPORT_ANSWER_ABSENCE",
@@ -862,7 +918,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "evidence": f"Page {url} ({page_type}) lacks immediate proposition anchoring in its lead {viewport_data['lead_words_count']} words.",
                 "suggested_action": {
                     "summary": "Anchor the core product proposition, pricing figures, or direct answer in the lead 60 words.",
-                    "technical_fix": "Insert an above-the-fold answer summary box directly beneath the H1 before auxiliary navigation blocks.",
+                    "technical_fix": "Insert an early-content answer summary box directly beneath the H1 before auxiliary navigation blocks.",
                     "creative_fix": "Adopt the Direct Answer Inversion format: state the primary resolution immediately in paragraph 1.",
                     "priority": "high" if page_type == "pricing" else "medium",
                     "verification": "Confirm lead 100 words contain explicit entity prices or core definitions.",
@@ -889,7 +945,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "evidence": f"Page {url} ({page_type}) places its first commercial CTA at position #{cta_data['first_commercial_cta_index'] + 1 if cta_data['first_commercial_cta_index'] is not None else 'N/A'}.",
                 "suggested_action": {
                     "summary": "Position a prominent commercial continuation CTA within the first 3 interactive elements on the page.",
-                    "technical_fix": "Place a prominent primary action button ('Buy', 'Start Free Trial', 'Contact Sales') directly in the hero block above the fold.",
+                    "technical_fix": "Place a prominent primary action button ('Buy', 'Start Free Trial', 'Contact Sales') directly in the early-content hero section.",
                     "creative_fix": "Pair the primary value proposition with an instant action trigger to eliminate navigational friction.",
                     "priority": "medium",
                     "verification": "Confirm commercial CTA appears within the first 3 interactive DOM elements.",
@@ -924,7 +980,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "category": "engagement",
                 "summary": (
                     f"Lead paragraph on {url} has an elevated reading complexity score (ARI: {readability_data['ari_score']}, avg sentence: {readability_data['avg_sentence_length']} words). "
-                    "Arriving AI referral visitors skim for immediate answers; high sentence complexity increases abandonment.",
+                    "Arriving AI referral visitors skim for immediate answers; high sentence complexity increases abandonment."
                 ),
                 "priority": "low",
                 "technical_fix": "Break long compound sentences (exceeding 25 words) into concise declarative statements.",
@@ -966,8 +1022,10 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
     html_pages = []
     if inv is not None:
         for p in inv.get("pages", []):
-            u = p.get("url", "")
-            raw_html = p.get("html", "")
+            u = p.get("url") or ""
+            raw_html = p.get("html") or ""
+            if not u or not raw_html:
+                continue
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
             if (
@@ -976,8 +1034,7 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                 or "<sitemapindex" in raw_html.lower()
             ):
                 continue
-            if raw_html:
-                html_pages.append(p)
+            html_pages.append(p)
     else:
         _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
@@ -1024,7 +1081,7 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                         f["severity"] = "high"
                         f["evidence"] = (
                             f"{f.get('evidence', '')} [Empirically Corroborated: First-party analytics records "
-                            f"{b_rate * 100:.1f}% bounce rate and {d_time or 'N/A'}s dwell time, proving layout friction causes visitor bounce.]"
+                            f"{b_rate * 100:.1f}% bounce rate and {d_time or 'N/A'}s dwell time, providing behavioral evidence consistent with visitor drop-off.]"
                         )
                         corroborated_findings_count += 1
 
@@ -1055,16 +1112,16 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                             "root_cause": (
                                 f"Observed AI referral traffic exhibits a {ai_bounce * 100:.1f}% bounce rate compared to a "
                                 f"{baseline_bounce * 100:.1f}% organic search baseline. Visitors referred from generative AI answers "
-                                f"experience post-citation orientation shock because cited answers are not instantly anchored in the viewport."
+                                f"experience post-citation orientation friction when cited answers are not instantly visible in early content."
                             ),
                             "evidence": (
                                 f"First-party analytics for {p_url} reveals AI referral bounce rate of {ai_bounce * 100:.1f}% "
                                 f"versus {baseline_bounce * 100:.1f}% organic baseline (+{(ai_bounce - baseline_bounce) * 100:.1f}% gap)."
                             ),
                             "suggested_action": {
-                                "summary": "Anchor cited AI query propositions in hero section and place prominent continuation CTA above the fold.",
+                                "summary": "Anchor cited AI query propositions in the early-content document section and place prominent continuation CTA.",
                                 "priority": "high",
-                                "technical_fix": "Add an above-the-fold callout box verifying the specific product/service claims cited by AI assistants.",
+                                "technical_fix": "Add an early-content callout box verifying the specific product/service claims cited by AI assistants.",
                                 "creative_fix": "Align hero H1 and introductory sentence directly with the citation query intent.",
                                 "verification": "Monitor AI referral cohort bounce rate over 14 days post-remediation.",
                             },
@@ -1172,6 +1229,16 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                 1 for pm in page_metrics if pm.get("navigation_links_found", pm.get("anchor_links_found", 0)) > 0
             ),
             "pages_with_analytics": pages_with_analytics,
+            # Continuous scoring: orientation & intent-handoff ratios
+            "h1_aligned_pages": sum(
+                1 for pm in page_metrics
+                if pm["h1"] and pm.get("information_scent_score", 0.0) >= 0.4
+            ),
+            "cta_above_fold_pages": sum(
+                1 for pm in page_metrics
+                if pm.get("cta_reachability_score", 0.0) > 0.0
+            ),
+            "total_pages": len(page_metrics),
         },
         "limitations": limitations,
     }

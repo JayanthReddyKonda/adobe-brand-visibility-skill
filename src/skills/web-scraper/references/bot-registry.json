@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI Crawler and Retrieval Bot Registry",
+  "version": "2026-09-01",
+  "bots": [
+    {
+      "id": "oai-search",
+      "name": "OAI-SearchBot",
+      "purpose": "search_discovery",
+      "robots_tokens": ["OAI-SearchBot"],
+      "http_user_agents": ["OAI-SearchBot/1.0"],
+      "official_documentation": "https://platform.openai.com/docs/bots",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "claude-search",
+      "name": "Claude-SearchBot",
+      "purpose": "search_discovery",
+      "robots_tokens": ["Claude-SearchBot"],
+      "http_user_agents": ["Claude-SearchBot/1.0"],
+      "official_documentation": "https://docs.anthropic.com/en/docs/resources/crawlers",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "perplexity",
+      "name": "PerplexityBot",
+      "purpose": "search_discovery",
+      "robots_tokens": ["PerplexityBot"],
+      "http_user_agents": ["PerplexityBot/1.0"],
+      "official_documentation": "https://docs.perplexity.ai/docs/resources/perplexity-crawlers",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "perplexity-user",
+      "name": "Perplexity-User",
+      "purpose": "realtime_user_action",
+      "robots_tokens": ["Perplexity-User"],
+      "http_user_agents": ["Perplexity-User/1.0"],
+      "official_documentation": "https://docs.perplexity.ai/docs/resources/perplexity-crawlers",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "amazonbot",
+      "name": "Amazonbot",
+      "purpose": "search_and_answering",
+      "robots_tokens": ["Amazonbot"],
+      "http_user_agents": ["Amazonbot/1.0"],
+      "official_documentation": "https://developer.amazon.com/support/amazonbot",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "cohere-ai",
+      "name": "cohere-ai",
+      "purpose": "data_and_answering",
+      "robots_tokens": ["cohere-ai"],
+      "http_user_agents": ["cohere-ai/1.0"],
+      "official_documentation": "https://docs.cohere.com",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "meta-externalagent",
+      "name": "Meta-ExternalAgent",
+      "purpose": "search_and_retrieval",
+      "robots_tokens": ["Meta-ExternalAgent"],
+      "http_user_agents": ["Meta-ExternalAgent/1.0"],
+      "official_documentation": "https://www.facebook.com/externalagent_bm.html",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "claude-user",
+      "name": "Claude-User",
+      "purpose": "realtime_user_action",
+      "robots_tokens": ["Claude-User"],
+      "http_user_agents": ["Claude-User/1.0"],
+      "official_documentation": "https://docs.anthropic.com/en/docs/resources/crawlers",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "chatgpt-user",
+      "name": "ChatGPT-User",
+      "purpose": "realtime_user_action",
+      "robots_tokens": ["ChatGPT-User"],
+      "http_user_agents": ["ChatGPT-User/1.0"],
+      "official_documentation": "https://platform.openai.com/docs/bots",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": true
+    },
+    {
+      "id": "gptbot",
+      "name": "GPTBot",
+      "purpose": "model_training",
+      "robots_tokens": ["GPTBot"],
+      "http_user_agents": ["GPTBot/1.0"],
+      "official_documentation": "https://platform.openai.com/docs/bots",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "claudebot",
+      "name": "ClaudeBot",
+      "purpose": "model_training",
+      "robots_tokens": ["ClaudeBot"],
+      "http_user_agents": ["ClaudeBot/1.0"],
+      "official_documentation": "https://docs.anthropic.com/en/docs/resources/crawlers",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "bytespider",
+      "name": "Bytespider",
+      "purpose": "data_crawling",
+      "robots_tokens": ["Bytespider"],
+      "http_user_agents": ["Bytespider"],
+      "official_documentation": "https://zhanzhang.toutiao.com",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "applebot-extended",
+      "name": "Applebot-Extended",
+      "purpose": "training_governance_token",
+      "robots_tokens": ["Applebot-Extended"],
+      "http_user_agents": [],
+      "official_documentation": "https://support.apple.com/en-us/119829",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "google-extended",
+      "name": "Google-Extended",
+      "purpose": "training_governance_token",
+      "robots_tokens": ["Google-Extended"],
+      "http_user_agents": [],
+      "official_documentation": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "ccbot",
+      "name": "CCBot",
+      "purpose": "open_web_crawl",
+      "robots_tokens": ["CCBot"],
+      "http_user_agents": ["CCBot/2.0"],
+      "official_documentation": "https://commoncrawl.org/ccbot",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    },
+    {
+      "id": "wildcard",
+      "name": "*",
+      "purpose": "global_default",
+      "robots_tokens": ["*"],
+      "http_user_agents": [],
+      "official_documentation": "https://www.rfc-editor.org/rfc/rfc9309.html",
+      "last_verified": "2026-09-01",
+      "verification_mode": "official-documentation",
+      "is_retrieval": false
+    }
+  ]
+}

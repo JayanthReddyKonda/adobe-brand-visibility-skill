@@ -6,29 +6,33 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "1.0.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Engagement & Context Continuity Audit Skill
-
+# Engagement & Context Continuity Audit Skill (Sensor-Brain Protocol)
 
 | Task | Execution Command | Output Contract |
 |---|---|---|
 | **Visitor Continuity & Information Scent Check** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
 
-> **Black-Box Tooling Principle:** Bundled scripts in `scripts/` are deterministic tools. Run `python3 scripts/<script>.py --help` for interface documentation.
+> **Sensor-Brain Protocol Mandate:**
+> - **Deterministic Read-Only Sensor:** `engagement_check.py` measures orientation proxies, H1 semantic scent, viewport answer anchoring, and CTA reachability friction. Without first-party analytics, it operates strictly on structural UX proxies and never fabricates empirical bounce rates.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected friction, correlates UX signals with simulated user intent handoffs, and synthesizes actionable orientation and continuity fixes.
 
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.
 
 ---
 
-
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
 
 ## When to use
 
@@ -55,16 +59,18 @@ Load these resources as needed during engagement context checks:
 ### Reference Page Schemas
 - [Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
 - [Product Purchase Template](references/product-purchase.json): Standard conversion and purchase handoff structure.
+
+---
+
 ## Procedure
 
 ### Step 1: Read Domain Knowledge Base & Reference Files (MANDATORY)
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
-```bash
-cat skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md
-cat skills/engagement-context-audit/references/pricing-comparison.json
-cat skills/engagement-context-audit/references/product-purchase.json
-```
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
+- `skills/engagement-context-audit/references/engagement-context-audit-knowledge-base.md`
+- `skills/engagement-context-audit/references/pricing-comparison.json`
+- `skills/engagement-context-audit/references/product-purchase.json`
 
 ### Step 2: Execution Command
 
@@ -83,7 +89,6 @@ Direct standalone execution:
 ```bash
 python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --format json
 ```
-
 
 ---
 
@@ -111,19 +116,23 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, engagement_mode, analytics_summary, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
+All string fields in emitted findings and recommendations must be clean, single-line or semicolon-delimited (` ; `), containing zero escaped literal newlines (`\n\n`) and zero raw Markdown tables.
 
 ---
 
-
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **Static Proxies vs Observed Outcomes:** Static DOM indicators (missing H1, buried CTA) are structural friction proxies. Without first-party analytics, do not claim visitors are provably bouncing in the wild.
 - **Healthy Analytics Override:** Never escalate a missing H1 or layout warning to critical/high if first-party analytics prove 75% scroll depth and low bounce rates.
 - **AI Buying Agent Manifest:** Absence of `/pricing.md` is an advisory recommendation (`PROACTIVE.ENGAGEMENT.AGENT_PRICING_MANIFEST.001`), not a critical site defect.
+- **Generic H1 threshold:** An H1 of "Welcome" or "Home" triggers `LOW_INFORMATION_SCENT` at severity `low` only. It is NOT a `high` defect without analytics corroboration of actual bounce.
+- **Single-page scope:** This sensor evaluates individual page orientation signals, not site-wide user journey funnels. Do not make cross-page funnel abandonment claims from page-level DOM data.
+
+---
 
 ## Security & SSRF Policy
 

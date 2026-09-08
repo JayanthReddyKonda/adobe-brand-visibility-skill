@@ -344,6 +344,7 @@ def extract_scoped_facts(html_str, url):
         "url": url,
         "copyright_years": [],
         "brand_names": [],
+        "alternate_names": [],
         "taglines": [],
         "scoped_prices": [],
         "contact_emails": [],
@@ -374,13 +375,16 @@ def extract_scoped_facts(html_str, url):
             if o.get("slogan"):
                 facts["taglines"].append(str(o.get("slogan")).strip())
             if o.get("alternateName"):
-                facts["brand_names"].append(str(o.get("alternateName")).strip())
+                # P1-53: Do not map alternateName to brand_names to prevent false self-contradictions
+                facts["alternate_names"].append(str(o.get("alternateName")).strip())
         elif otypes.intersection({"product", "individualproduct", "productmodel", "softwareapplication", "service"}):
             pname = str(o.get("name") or "").strip()
             offers = o.get("offers") or {}
             offer_obj = offers[0] if isinstance(offers, list) and offers else offers
             if isinstance(offer_obj, dict):
-                p_val = offer_obj.get("price") if offer_obj.get("price") is not None else offer_obj.get("lowPrice")
+                has_exact = offer_obj.get("price") is not None
+                p_val = offer_obj.get("price") if has_exact else offer_obj.get("lowPrice")
+                price_type = "exact" if has_exact else "range_min"
                 p_curr = str(offer_obj.get("priceCurrency") or "UNKNOWN").upper()
                 avail = str(offer_obj.get("availability") or "").lower()
                 p_variant = str(offer_obj.get("sku") or offer_obj.get("name") or o.get("sku") or "default").strip()
@@ -401,13 +405,13 @@ def extract_scoped_facts(html_str, url):
                                     "currency": p_curr,
                                     "interval": "one_time",
                                     "variant": p_variant,
+                                    "price_type": price_type,
                                     "raw": f"{p_curr} {p_val}",
                                 }
                             )
+        # P1-52: Do not fall back dateModified to datePublished
         if "dateModified" in o and isinstance(o["dateModified"], str):
             facts["modification_dates"].append(o["dateModified"])
-        elif "datePublished" in o and isinstance(o["datePublished"], str):
-            facts["modification_dates"].append(o["datePublished"])
 
     # Meta / OpenGraph update timestamps and brand/title facts
     for meta_key in ("article:modified_time", "og:updated_time", "last-modified"):
@@ -519,10 +523,16 @@ def evaluate_fact_consistency(page_fact_list, base_url):
             ent = sp["entity"].lower().strip()
             if not is_valid_product_entity(ent):
                 continue
-            key = (ent, sp.get("currency", "USD"), sp.get("interval", "one_time"), sp.get("variant", "default"))
+            key = (
+                ent,
+                sp.get("currency", "USD"),
+                sp.get("interval", "one_time"),
+                sp.get("variant", "default"),
+                sp.get("price_type", "exact"),
+            )
             price_ledger.setdefault(key, {}).setdefault(sp["price"], set()).add(pf["url"])
 
-    for (ent, curr, invl, _var), val_map in price_ledger.items():
+    for (ent, curr, invl, _var, ptype), val_map in price_ledger.items():
         if len(val_map) >= 2:
             # Map each URL to all prices it asserts for this entity
             url_to_prices = {}
@@ -553,7 +563,7 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                             "title": f"Conflicting pricing published for '{ent}'",
                             "severity": "high",
                             "confidence": "high",
-                            "root_cause": f"Different price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
+                            "root_cause": f"Different {ptype} price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
                             "cause_family": "FACT.CONSISTENCY",
                             "id": "FIRST_PARTY_FACT_CONFLICT",
                             "cause_id": "FIRST_PARTY_FACT_CONFLICT",
@@ -561,6 +571,8 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                             "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
                             "suggested_action": {
                                 "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
+                                "technical_fix": "Centralize pricing in a single structured JSON-LD PriceSpecification or database source of truth across all routes.",
+                                "creative_fix": "Audit promotional copy, landing pages, and comparison charts to remove outdated discount pricing.",
                                 "priority": "high",
                                 "verification": f"Re-crawl {', '.join(sorted(all_affected_urls))} and verify identical pricing appears on all pages.",
                             },
@@ -594,6 +606,8 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                         "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
                         "suggested_action": {
                             "summary": f"Update all pages referencing '{name}' to consistently reflect its current product lifecycle status.",
+                            "technical_fix": "Set Schema.org ItemAvailability to Discontinued or InStock uniformly across all product JSON-LD schemas.",
+                            "creative_fix": "Update legacy blog posts, product catalogs, and banners with clear migration notices to active product lines.",
                             "priority": "high",
                             "verification": f"Verify {', '.join(sorted(urls))} show consistent availability/discontinued markers.",
                         },
@@ -682,8 +696,11 @@ def compare_ai_observations(fact_ledger, responses_file):
                                     "cause_id": "AI_FACT_CONFLICT",
                                     "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
                                     "suggested_action": {
-                                        "summary": "Publish canonical pricing.",
+                                        "summary": "Publish canonical pricing in structured Schema.org markup.",
+                                        "technical_fix": "Deploy machine-explicit Schema.org Product Offer JSON-LD declaring price, priceCurrency, and validFrom/validThrough.",
+                                        "creative_fix": "Publish an authoritative pricing table in clean markdown on the canonical product page and /llms.txt.",
                                         "priority": "high",
+                                        "verification": "Re-evaluate assistant queries against updated canonical pricing ledger.",
                                     },
                                 }
                             )
@@ -704,8 +721,10 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
 
     if inv is not None:
         for p in inv.get("pages", []):
-            u = p.get("url", "")
-            raw_html = p.get("html", "")
+            u = p.get("url") or ""
+            raw_html = p.get("html") or ""
+            if not u or not raw_html:
+                continue
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
             if (
@@ -714,8 +733,7 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
                 or "<sitemapindex" in raw_html.lower()
             ):
                 continue
-            if raw_html:
-                page_fact_list.append(extract_scoped_facts(raw_html, u))
+            page_fact_list.append(extract_scoped_facts(raw_html, u))
     else:
         _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
@@ -751,6 +769,21 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
                 for pf in page_fact_list
             ),
             "source": "shared-inventory" if inv is not None else "homepage-only",
+            # Continuous scoring: conflict ratio = fact_conflicts / facts_checked
+            "fact_conflicts": sum(
+                1 for f in findings
+                if f.get("cause_id") in (
+                    "FIRST_PARTY_FACT_CONFLICT", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+                    "DISCONTINUED_VS_CURRENT_CONFLICT", "CONFLICTING_COMMERCIAL_TERMS",
+                )
+            ),
+            "facts_checked": sum(
+                len(pf.get("scoped_prices", []))
+                + len(pf.get("contact_emails", []))
+                + len(pf.get("contact_phones", []))
+                + len(pf.get("copyright_years", []))
+                for pf in page_fact_list
+            ) or 1,  # guard against zero division in orchestrator
         },
         "limitations": ["Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"],
     }

@@ -23,6 +23,9 @@ BLOCKED_NETWORKS = [
     ipaddress.ip_network("169.254.0.0/16"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("100.100.100.200/32"),
+    ipaddress.ip_network("169.254.170.2/32"),
     ipaddress.ip_network("::1/128"),
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
@@ -35,7 +38,8 @@ def _is_safe_host(hostname):
         if not hostname or " " in hostname:
             return False, "Malformed hostname", []
 
-        ip_info = socket.getaddrinfo(hostname, 80, proto=socket.IPPROTO_TCP)
+        clean_hostname = (hostname or "").strip().strip("[]")
+        ip_info = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
         safe_ips = []
         for sf in ip_info:
             ip_obj = ipaddress.ip_address(sf[4][0])
@@ -147,7 +151,15 @@ def _decompress_bounded(response, max_bytes):
     return bytes(out)
 
 
-def safe_fetch(url, timeout=10, max_bytes=5 * 1024 * 1024, user_agent=None, method="GET", deadline=None):
+def safe_fetch(
+    url,
+    timeout=10,
+    max_bytes=5 * 1024 * 1024,
+    user_agent=None,
+    method="GET",
+    deadline=None,
+    is_retry=False,
+):
     if deadline:
         remaining = deadline - time.monotonic()
         if remaining <= 0.1:
@@ -167,8 +179,17 @@ def safe_fetch(url, timeout=10, max_bytes=5 * 1024 * 1024, user_agent=None, meth
     ua = user_agent if user_agent else DEFAULT_USER_AGENT
     headers = {
         "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
     }
     req = urllib.request.Request(url, headers=headers, method=method)
 
@@ -185,15 +206,46 @@ def safe_fetch(url, timeout=10, max_bytes=5 * 1024 * 1024, user_agent=None, meth
             except ValueError as e:
                 return status, "", resp_headers, str(e)
 
-            try:
-                charset = response.headers.get_content_charset() or "utf-8"
-                html = content.decode(charset, errors="replace")
-            except Exception:
-                html = content.decode("utf-8", errors="replace")
+            # Multi-stage encoding with BOM stripping
+            if content.startswith(b"\xef\xbb\xbf"):
+                content = content[3:]
+            elif content.startswith(b"\xff\xfe") or content.startswith(b"\xfe\xff"):
+                content = content[2:]
+
+            charset = response.headers.get_content_charset()
+            if charset:
+                try:
+                    html = content.decode(charset, errors="replace")
+                except Exception:
+                    html = content.decode("utf-8", errors="replace")
+            else:
+                try:
+                    html = content.decode("utf-8")
+                except UnicodeDecodeError:
+                    html = content.decode("latin-1")
+            html = html.replace("\ufeff", "")
 
             return status, html, resp_headers, ""
     except urllib.error.HTTPError as e:
-        return e.code, "", {k.lower(): v for k, v in e.headers.items()}, str(e)
+        if e.code in (429, 503) and not is_retry:
+            retry_header = e.headers.get("retry-after", "") if e.headers else ""
+            sleep_sec = 0.0
+            if retry_header.isdigit():
+                sleep_sec = min(float(retry_header), 2.0)
+            elif retry_header:
+                sleep_sec = 1.0
+            if 0.0 < sleep_sec <= 2.0:
+                time.sleep(sleep_sec)
+                return safe_fetch(
+                    url,
+                    timeout=timeout,
+                    max_bytes=max_bytes,
+                    user_agent=user_agent,
+                    method=method,
+                    deadline=deadline,
+                    is_retry=True,
+                )
+        return e.code, "", {k.lower(): v for k, v in e.headers.items()} if e.headers else {}, str(e)
     except Exception as e:
         return None, "", {}, str(e)
 
