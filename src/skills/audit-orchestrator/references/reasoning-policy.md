@@ -101,4 +101,3 @@ Findings in this domain must be described as **`engagement_friction_signal`**, n
 3. **Factual Consistency:** Are prices, contacts, and availability consistent across all first-party pages?
 4. **Answerability & GEO:** Does the content provide quantifiable numbers and mechanistic explanations (`how` / `why`)?
 5. **Visitor Continuity:** Does the landing page provide immediate information scent and commercial CTAs to prevent referral bounce?
-

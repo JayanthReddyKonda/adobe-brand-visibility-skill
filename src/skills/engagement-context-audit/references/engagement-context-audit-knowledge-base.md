@@ -240,4 +240,3 @@ Supported page-level metrics via `--analytics <file.json|file.csv>` or `inventor
 2. **Heuristic Mitigation:** When a static heuristic flags an issue (e.g. absent H1 tag or low word count), but first-party analytics prove healthy visitor retention (bounce rate <= 35%, dwell time >= 60s), the finding is downgraded to `low` or informational, noting that real-world users are not abandoning the page.
 3. **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds the organic baseline by >= 25%, the skill emits an `AI_REFERRAL_DISCONTINUITY` finding, diagnosing that post-citation visitors suffer orientation disconnect because cited claims are not immediately anchored in the viewport.
 4. **Heuristic-Only Operation (Clear Limitations):** When no analytics dataset is provided, the skill operates in heuristic-only mode with explicit disclaimers: static proxies highlight potential UX friction, but do not represent observed user drop-off in production.
-

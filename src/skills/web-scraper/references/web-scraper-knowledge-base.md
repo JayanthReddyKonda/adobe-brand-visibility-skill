@@ -96,6 +96,6 @@ All outgoing HTTP socket connections are pre-resolved and validated against proh
 | Private Class A | `10.0.0.0/8` | Internal Network | Block |
 | Private Class B | `172.16.0.0/12` | Internal Network | Block |
 | Private Class C | `192.168.0.0/16` | Internal Network | Block |
-| Link-Local | `169.254.0.0/16` | Auto-IP / Cloud Metadata | Block |
-| Cloud Metadata | `169.254.169.254` | AWS/GCP/Azure Metadata | Block |
+| Link-Local | `169.264.0.0/16` | Auto-IP / Cloud Metadata | Block |
+| Cloud Metadata | `169.264.169.264` | AWS/GCP/Azure Metadata | Block |
 | IPv4-mapped IPv6 | `::ffff:0:0/96` | Mapped Private IPs | Block |

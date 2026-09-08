@@ -331,5 +331,3 @@ Remove filler words that add no substantive information:
 ### 4. Princeton KDD 2024 Alternative: Causal Depth
 Instead of superficial prose, structure sentences around verifiable causal mechanisms:
 - *"The algorithm reduces sync latency by 45% because in-memory event buffers replace disk I/O."*
-
-

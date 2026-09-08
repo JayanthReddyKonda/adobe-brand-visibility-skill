@@ -572,7 +572,7 @@ The orchestrator enforces a strict total runtime budget (default 300 seconds):
 
 Every network fetch in the orchestrator and all specialist tools enforces:
 1. **Scheme Validation:** `http` and `https` only.
-2. **DNS & IP Validation:** Rejection of private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), and cloud-metadata addresses.
+2. **DNS & IP Validation:** Rejection of private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.264.0.0/16`, `fe80::/10`), and cloud-metadata addresses.
 3. **Bounded Redirects:** Max 5 redirects with target IP re-validation on every hop.
 4. **Hard Size Caps:** HTML pages (max 2 MB), robots.txt (max 512 KB), sitemaps (max 2 MB), external authority probes (max 512 KB).
 5. **Same-Origin Crawling:** Sitemaps and priority links must match the target domain origin.
@@ -771,6 +771,7 @@ For programmatic integration, CI/CD gates, and automated trend monitoring, the o
 To eliminate subjective ambiguity, audit findings must map directly to the canonical defect taxonomy:
 
 ### A. Hard Failures (HF-01 to HF-08) — Deterministic Blockers
+
 | Code | Title | Category | Severity | Root Cause Definition |
 | :--- | :--- | :--- | :--- | :--- |
 | **HF-01** | Target URL Unreachable / Non-200 | Crawlability | Critical | HTTP status >= 400 or network timeout. |
@@ -783,6 +784,7 @@ To eliminate subjective ambiguity, audit findings must map directly to the canon
 | **HF-08** | Schema Directly Contradicts Visible HTML | Structured Data | High | Schema entities state values incompatible with on-page copy. |
 
 ### B. High-Value Warnings (W-01 to W-08) — Probabilistic & Quality Risks
+
 | Code | Title | Category | Severity | Root Cause Definition |
 | :--- | :--- | :--- | :--- | :--- |
 | **W-01** | Initial HTML Extraction Deficit | Retrieval | Medium | SSR content availability gap exceeds 15% (CAG >= 0.15). |
@@ -1191,5 +1193,3 @@ ARCHETYPE_SEVERITY_OVERRIDES = {
 #### 5. Local Service
 - **Local Intent Query:** *"What time does [Brand] open in [City] and what is their phone number?"*
   - *Retriever test:* Does `LocalBusiness` declare valid `openingHoursSpecification` and E.164 phone?
-
-

@@ -55,7 +55,7 @@ Invoke this skill whenever an AI agent or workflow needs to:
 
 1. **Host Normalization & SSRF Pre-Flight:**
    - Normalize target URL to canonical scheme and domain (`https://example.com/`).
-   - Resolve DNS hostnames and validate against zero-trust SSRF constraints (blocking RFC 1918 private IPs, loopbacks `127.0.0.0/8`, link-local `169.254.0.0/16`, cloud metadata `169.254.169.254`, IPv6 equivalents).
+   - Resolve DNS hostnames and validate against zero-trust SSRF constraints (blocking RFC 1918 private IPs, loopbacks `127.0.0.0/8`, link-local `169.264.0.0/16`, cloud metadata `169.264.169.264`, IPv6 equivalents).
 
 2. **Robots.txt RFC 9309 Audit:**
    - Fetch `robots.txt` using streaming chunked reads (bounded to 512 KiB).

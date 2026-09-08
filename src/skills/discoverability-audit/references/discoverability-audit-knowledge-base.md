@@ -295,4 +295,3 @@ Common errors flagged by `discoverability_check.py`:
 ### Canonicalization & i18n
 - **Self-Referencing Canonicals:** Each locale page must canonicalize to itself. Never use cross-locale canonicals (e.g., French page canonicalizing to English page)—this suppresses the non-canonical locale entirely from indexation.
 - **Canonical Overrides Hreflang:** If canonical points to a different host or URL outside the hreflang cluster, search engines ignore the hreflang annotation.
-
