@@ -58,6 +58,18 @@
         "low": {
           "type": "integer",
           "minimum": 0
+        },
+        "info": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unassessable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed_problems": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -308,6 +320,24 @@
     },
     "analytics_summary": {
       "type": "object"
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Assessment coverage across the 134-item research catalogue and execution environment capabilities"
+    },
+    "observations": {
+      "type": "array",
+      "description": "Non-actionable or unassessable informational observations outside defect counts",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dropped_findings": {
+      "type": "array",
+      "description": "Mechanically rejected findings that lacked verifiable evidence locators or violated schema constraints",
+      "items": {
+        "type": "object"
+      }
     },
     "limitations": {
       "type": "array",

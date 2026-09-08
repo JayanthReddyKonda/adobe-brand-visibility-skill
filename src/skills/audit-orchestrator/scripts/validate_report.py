@@ -99,7 +99,7 @@ def validate_type(instance, schema, path="root"):
 
 
 def verify_summary_counts(report):
-    """Verify summary total_findings and categorical counts match findings array."""
+    """Verify summary total_findings, categorical counts, and finding invariants."""
     errors = []
     findings = report.get("findings", [])
     summary = report.get("summary", {})
@@ -118,7 +118,60 @@ def verify_summary_counts(report):
         if sev in summary and summary[sev] != count:
             errors.append(f"summary.{sev} ({summary[sev]}) does not match actual {sev} findings count ({count})")
 
+    # Invariant: Duplicate finding IDs for standardized finding IDs
+    finding_ids = [f.get("id") for f in findings if isinstance(f, dict) and isinstance(f.get("id"), str) and re.match(r"^F-\d+$", f.get("id", ""))]
+    if len(set(finding_ids)) != len(finding_ids):
+        errors.append("Duplicate finding ID detected in findings array")
+
+    # Invariant: actual_band to severity mapping and priority_index formula
+    band_to_sev = {"S4": "critical", "S3": "high", "S2": "medium", "S1": "low", "S0": "info", "U": "unassessable"}
+    for f in findings:
+        if not isinstance(f, dict):
+            continue
+        band = f.get("actual_band")
+        if band in band_to_sev and f.get("severity") and f["severity"] != band_to_sev[band]:
+            errors.append(f"Finding {f.get('id')}: severity '{f.get('severity')}' does not match actual_band '{band}'")
+        score = f.get("priority_index")
+        d = f.get("difficulty")
+        if score is not None and (
+            band not in ("S1", "S2", "S3", "S4")
+            or not isinstance(d, int)
+            or not (1 <= d <= 5)
+            or score != 5 * int(band[1]) + 6 - d
+        ):
+            errors.append(f"Finding {f.get('id')}: invalid or unsupported priority_index '{score}'")
     return errors
+
+
+def validate_report_dict(report, schema_path=None):
+    """Validate a Python dict report against schema and summary invariants.
+
+    Returns:
+        (is_valid, list_of_errors)
+    """
+    errors = []
+    if not isinstance(report, dict):
+        return False, ["Report must be a JSON object (dict)"]
+
+    if schema_path is None:
+        schema_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
+        )
+    if not os.path.exists(schema_path):
+        return False, [f"Schema not found at {schema_path}"]
+
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+
+    err = validate_type(report, schema)
+    if err:
+        errors.append(f"Schema validation failed: {err}")
+
+    summary_errs = verify_summary_counts(report)
+    if summary_errs:
+        errors.extend(summary_errs)
+
+    return (len(errors) == 0, errors)
 
 
 def main():

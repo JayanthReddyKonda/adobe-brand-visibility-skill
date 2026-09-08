@@ -52,8 +52,18 @@ def extract_sld(netloc: str) -> str:
     return clean
 
 
+def _walk_nodes(value):
+    if isinstance(value, dict):
+        yield value
+        for v in value.values():
+            yield from _walk_nodes(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _walk_nodes(v)
+
+
 def extract_sameas_links(html):
-    """Extract sameAs URLs from JSON-LD blocks, supporting strings and @id objects."""
+    """Extract sameAs URLs from JSON-LD blocks, supporting strings and @id objects at any nesting depth."""
     parser = SameAsExtractor()
     try:
         parser.feed(html)
@@ -63,10 +73,7 @@ def extract_sameas_links(html):
     for raw in parser.json_ld_contents:
         try:
             data = json.loads(raw)
-            objs = data if isinstance(data, list) else [data]
-            if isinstance(data, dict) and "@graph" in data:
-                objs = data["@graph"]
-            for o in objs:
+            for o in _walk_nodes(data):
                 if isinstance(o, dict) and "sameAs" in o:
                     s = o["sameAs"]
                     s_list = s if isinstance(s, list) else [s]

@@ -89,6 +89,10 @@ JUNK_PATH_PATTERNS: Tuple[str, ...] = (
     r"/p/\d+/?$",
 )
 
+UNSAFE_PATH_REGEX = re.compile(
+    r'(?i)(?:^|[/_.?&=+-])(logout|login|signin|signout|checkout|cart|basket|purchase|buy|delete|remove|unsubscribe|subscribe|confirm|activate|reset|admin|account|oauth|token|session|password|payment|action|download)(?:$|[/_.?&=+-])'
+)
+
 
 class LinkProcessor:
     """Provides canonicalization, extraction, and validation of links."""
@@ -170,7 +174,7 @@ class LinkProcessor:
 
     @classmethod
     def is_crawlable_html_url(cls, url: str) -> bool:
-        """Checks if URL is a substantive HTML page rather than an asset, utility route, or pagination noise."""
+        """Checks if URL is a substantive HTML page rather than an asset, utility route, or unsafe mutation endpoint."""
         try:
             parsed = urlparse(url)
         except Exception:
@@ -182,6 +186,12 @@ class LinkProcessor:
         path = parsed.path.lower()
         _, ext = os.path.splitext(path)
         if ext in IGNORED_EXTENSIONS:
+            return False
+
+        # Filter out unsafe / destructive routes (action=delete, logout, etc.)
+        from urllib.parse import unquote
+        full_query = parsed.path + ("?" + parsed.query if parsed.query else "")
+        if UNSAFE_PATH_REGEX.search(unquote(full_query)):
             return False
 
         # Filter out junk utility routes (cart, checkout, login, pagination)
@@ -219,3 +229,35 @@ class LinkProcessor:
             )
 
         return results
+
+
+def safe_path(url: str) -> bool:
+    """Check if URL contains unsafe or mutating query paths."""
+    from urllib.parse import unquote, urlsplit
+
+    p = urlsplit(url)
+    full = unquote(p.path + ("?" + p.query if p.query else ""))
+    return not bool(UNSAFE_PATH_REGEX.search(full))
+
+
+def normalize(url: str) -> str:
+    """Normalize public HTTP/HTTPS URL per strict safety contract."""
+    from urllib.parse import quote, urlsplit, urlunsplit
+
+    if "://" not in url:
+        url = "https://" + url
+    p = urlsplit(url)
+    if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
+        raise ValueError("Only public unauthenticated HTTP(S) URLs are accepted")
+    if p.port not in (None, 80, 443):
+        raise ValueError("Nonstandard ports are outside the public-site scope")
+    if any(ord(c) < 32 for c in url):
+        raise ValueError("Control character in URL")
+    host = p.hostname.encode("idna").decode("ascii").lower()
+    return urlunsplit((
+        p.scheme,
+        host + (f":{p.port}" if p.port else ""),
+        quote(p.path or "/", safe="/%:@!$&'()*+,;=-._~"),
+        quote(p.query, safe="%=&/?@:!$'()*+,;~-._"),
+        "",
+    ))

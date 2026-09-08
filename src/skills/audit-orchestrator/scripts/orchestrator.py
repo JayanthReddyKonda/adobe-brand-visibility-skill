@@ -498,17 +498,40 @@ def synthesize_audit_report(
             "verification": clean_text_string(action.get("verification")) or None,
         }
 
+        actual_band = f.get("actual_band") or {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}.get(sev, "S2")
+        finding_kind = f.get("finding_kind") or ("advisory" if sev == "low" else "confirmed_problem")
+        queue = f.get("queue") or ("advisory" if finding_kind == "advisory" else "confirmed")
+        disposition = f.get("disposition") or ("editorial_draft" if queue == "advisory" else "validated_candidate")
+        diff = f.get("difficulty")
+        prio_idx = None
+        if isinstance(diff, int) and 1 <= diff <= 5:
+            prio_idx = 5 * int(actual_band[1]) + (6 - diff)
+
         clean_finding: Dict[str, Any] = {
             "id": finding_id,
             "cause_id": cid,
             "title": f_title,
             "severity": sev,
+            "actual_band": actual_band,
             "category": str(f.get("category", "discoverability")),
             "root_cause": f_root,
             "confidence": conf,
             "evidence": evidence_val,
             "suggested_action": suggested_action,
+            "finding_kind": finding_kind,
+            "queue": queue,
+            "disposition": disposition,
         }
+
+        if f.get("check_id"):
+            clean_finding["check_id"] = f["check_id"]
+        if prio_idx is not None:
+            clean_finding["priority_index"] = prio_idx
+            clean_finding["difficulty"] = diff
+        if f.get("depends_on"):
+            clean_finding["depends_on"] = f["depends_on"]
+        if f.get("evidence_refs"):
+            clean_finding["evidence_refs"] = f["evidence_refs"]
 
         if f.get("impact"):
             clean_finding["impact"] = clean_text_string(f.get("impact"))
@@ -535,8 +558,46 @@ def synthesize_audit_report(
                         if finding.get("suggested_action"):
                             finding["suggested_action"]["priority"] = override_sev
 
-    # Re-sort after archetype reweighting (severity may have changed)
-    deduped_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
+    # Re-sync actual_band and priority_index after archetype reweighting
+    band_map = {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}
+    for finding in deduped_findings:
+        finding["actual_band"] = band_map.get(finding.get("severity", "medium"), "S2")
+        diff = finding.get("difficulty")
+        if isinstance(diff, int) and 1 <= diff <= 5:
+            finding["priority_index"] = 5 * int(finding["actual_band"][1]) + (6 - diff)
+
+    # Queue and Dependency-aware Topological Task Sort
+    queues = {"confirmed": 0, "advisory": 1, "investigation": 2}
+
+    def task_sort_key(item: Dict[str, Any]) -> tuple:
+        band = item.get("actual_band", "S2")
+        sev_num = int(band[1]) if band.startswith("S") and len(band) > 1 else 1
+        d = item.get("difficulty")
+        q = queues.get(item.get("queue", "confirmed"), 0)
+        return (q, -sev_num, d if d is not None else 0, item.get("id", ""))
+
+    has_deps = any(f.get("depends_on") for f in deduped_findings)
+    if has_deps:
+        pending = {f["id"]: f for f in deduped_findings}
+        done: Set[str] = set()
+        sorted_output: List[Dict[str, Any]] = []
+        while pending:
+            available = [
+                f for f in pending.values()
+                if set(f.get("depends_on", [])) <= done or not any(d in pending for d in f.get("depends_on", []))
+            ]
+            if not available:
+                break
+            first = min(available, key=task_sort_key)
+            sorted_output.append(first)
+            done.add(first["id"])
+            del pending[first["id"]]
+        for rem in sorted(pending.values(), key=task_sort_key):
+            sorted_output.append(rem)
+        deduped_findings = sorted_output
+    else:
+        deduped_findings.sort(key=task_sort_key)
+
     # Re-compute counts after reweighting
     crit_count = sum(1 for f in deduped_findings if f["severity"] == "critical")
     high_count = sum(1 for f in deduped_findings if f["severity"] == "high")
@@ -861,6 +922,66 @@ def synthesize_audit_report(
         "Robots eligibility simulated from captured robots.txt; bot-specific server challenge responses not tested.",
     ]
 
+    # Calculate 134-item catalogue coverage
+    checks_file = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "checks.json"
+    )
+    catalogue_checks: List[Dict[str, Any]] = []
+    if os.path.exists(checks_file):
+        try:
+            with open(checks_file, "r", encoding="utf-8") as cf:
+                catalogue_checks = json.load(cf)
+        except Exception:
+            catalogue_checks = []
+
+    cov_summary: Dict[str, Any] = {}
+    if catalogue_checks:
+        seen_ids = set()
+        for f in deduped_findings:
+            if f.get("check_id"):
+                seen_ids.add(f["check_id"])
+            cid = f.get("cause_id") or ""
+            for c in catalogue_checks:
+                if c["check_id"] == cid or c["check_id"] in (f.get("id") or ""):
+                    seen_ids.add(c["check_id"])
+        cov_checks = []
+        for c in catalogue_checks:
+            cid = c["check_id"]
+            if cid in seen_ids:
+                status, reason = "observed", "Scoped observations available; not a whole-check pass"
+            elif c.get("feasibility") == "Exclude":
+                status, reason = "not_applicable", "Duplicate; reuse H1/H3"
+            elif str(c.get("feasibility", "")).startswith("Not possible"):
+                status, reason = "not_possible", "URL-only scope cannot establish the requested conclusion"
+            elif not pages:
+                status, reason = "blocked", "No usable pages collected"
+            else:
+                status, reason = "needs_agent_review", "Apply reference predicate to available artifacts; absence of a finding is not a completed check"
+            cov_checks.append({
+                "check_id": cid,
+                "status": status,
+                "reason": reason,
+                "owner": c.get("owner", "audit-orchestrator"),
+            })
+        cov_summary = {
+            "checks": cov_checks,
+            "total_catalog_checks": len(catalogue_checks),
+            "observed_checks": sum(1 for r in cov_checks if r["status"] == "observed"),
+            "observed_pages": len(pages),
+            "whole_site_complete": False,
+            "browser_available": False,
+            "optional_capabilities": {
+                "independent_profile_search": False,
+                "pdf_ocr": False,
+                "history": False,
+                "authenticated_flows": False,
+            },
+        }
+
+    all_raw_observations: List[Dict[str, Any]] = []
+    for _skill_name, result in specialist_results.items():
+        all_raw_observations.extend(result.get("observations", []))
+
     report: Dict[str, Any] = {
         "site": site,
         "audited_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -871,6 +992,9 @@ def synthesize_audit_report(
             "high": high_count,
             "medium": med_count,
             "low": low_count,
+            "info": 0,
+            "unassessable": 0,
+            "confirmed_problems": sum(1 for f in deduped_findings if f.get("finding_kind") == "confirmed_problem"),
         },
         "geo_citability_summary": geo_summary,
         "findings": deduped_findings,
@@ -878,6 +1002,12 @@ def synthesize_audit_report(
         "limitations": clean_limitations,
         "archetype": archetype,
     }
+
+    if cov_summary:
+        report["coverage"] = cov_summary
+    if all_raw_observations:
+        report["observations"] = all_raw_observations
+    report["dropped_findings"] = []
 
     return report
 

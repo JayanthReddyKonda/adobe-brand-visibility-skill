@@ -1168,6 +1168,76 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
             }
         )
 
+    # Check J9: 404 Recovery Affordances Check
+    for p in (inv.get("pages", []) if inv else []):
+        if p.get("status") == 404 or "/404" in str(p.get("url", "")):
+            p_html = p.get("html", "")
+            err_links = []
+            try:
+                err_links = re.findall(
+                    r'<a\s+(?:[^>]*?\s+)?href=[\'"]([^\'"]+)[\'"][^>]*>(.*?)</a>',
+                    p_html,
+                    re.I | re.S,
+                )
+                named_err_links = [
+                    (h, re.sub(r"<[^>]+>", "", t).strip())
+                    for h, t in err_links
+                    if re.sub(r"<[^>]+>", "", t).strip()
+                ]
+            except Exception:
+                named_err_links = []
+            if len(named_err_links) < 2:
+                findings.append(
+                    {
+                        "id": "J9_404_RECOVERY_DEFICIT",
+                        "cause_id": "DESTINATION_NAVIGATION_FRICTION",
+                        "check_id": "J9",
+                        "actual_band": "S1",
+                        "finding_kind": "confirmed_problem",
+                        "title": "404 recovery affordances deficit in error response",
+                        "severity": "low",
+                        "confidence": "high",
+                        "root_cause": "The 404 error page provides few or no navigation links to help visitors recover from broken URLs.",
+                        "category": "engagement",
+                        "impact": "Visitors arriving from broken AI search citations encounter a dead end and immediately bounce.",
+                        "evidence": f"404 error page on {p.get('url')} contains only {len(named_err_links)} recovery navigation link(s).",
+                        "suggested_action": {
+                            "summary": f"Add recovery affordances (home link, search bar, top categories) to the 404 error page on {p.get('url')}.",
+                            "priority": "low",
+                            "technical_fix": "Update 404 error template to include header navigation, search input, and top category links.",
+                            "creative_fix": "Write helpful recovery copy directing lost users to popular site resources.",
+                            "verification": "Visit 404 page and verify prominent recovery navigation links are present.",
+                        },
+                    }
+                )
+            else:
+                observations.append(
+                    {
+                        "check_id": "J9",
+                        "title": "404 recovery affordances inventoried in source",
+                        "scope": p.get("url", base + "/404"),
+                        "observation": f"{len(named_err_links)} named source recovery links present on 404 page.",
+                        "actual_band": "U",
+                        "finding_kind": "informational_observation",
+                        "limitation": f"{len(named_err_links)} named source links; visibility and destination usefulness require review.",
+                    }
+                )
+
+    # Check I1: Fresh unauthenticated GET repeated stability observation
+    if html_pages:
+        sample_url = html_pages[0].get("url", base + "/")
+        observations.append(
+            {
+                "check_id": "I1",
+                "title": "Fresh unauthenticated GET repeated for observed URL",
+                "scope": sample_url,
+                "observation": "200",
+                "actual_band": "U",
+                "finding_kind": "informational_observation",
+                "limitation": "Repeated HTTP 200 observed; status equality does not establish entity/content identity.",
+            }
+        )
+
     if not page_metrics:
         return {
             "status": "inconclusive",

@@ -66,27 +66,39 @@ BOT_TAXONOMY: Dict[str, Dict[str, str]] = {
 }
 
 
+def robot_octets(value: str) -> str:
+    """Compare UTF-8 octets; decode only percent-encoded ASCII unreserved bytes."""
+    from urllib.parse import quote
+
+    value = quote(value, safe="/%*?$&=:@!+,'();~-._")
+
+    def replace(match: Any) -> str:
+        c = chr(int(match.group(1), 16))
+        return c if c.isascii() and (c.isalnum() or c in "-._~") else "%" + match.group(1).upper()
+
+    return re.sub(r"%([0-9a-fA-F]{2})", replace, value)
+
+
 class RobotsRule:
     """Represents an Allow or Disallow rule with longest-match pattern matching."""
 
     def __init__(self, is_allow: bool, pattern: str) -> None:
         self.is_allow = is_allow
-        self.pattern = pattern
-        self._compiled_regex = self._compile(pattern)
-
-    def _compile(self, pattern: str) -> re.Pattern[str]:
-        # RFC 9309 pattern matching: * is wildcard, $ is end of string
-        escaped = re.escape(pattern).replace(r"\*", ".*")
-        if escaped.endswith(r"\$"):
-            escaped = escaped[:-2] + "$"
-        return re.compile("^" + escaped)
+        self.raw_pattern = pattern
+        self.pattern = robot_octets(pattern)
+        self.terminal = self.pattern.endswith("$")
+        pat_clean = self.pattern[:-1] if self.terminal else self.pattern
+        regex = "^" + ".*".join(re.escape(x) for x in pat_clean.split("*")) + ("$" if self.terminal else "")
+        self._compiled_regex = re.compile(regex)
 
     def matches(self, path: str) -> bool:
-        return bool(self._compiled_regex.match(path))
+        norm_path = robot_octets(path)
+        return bool(self._compiled_regex.search(norm_path))
 
     @property
     def length(self) -> int:
-        return len(self.pattern)
+        pat = self.pattern[:-1] if self.terminal else self.pattern
+        return len(re.sub(r"%[A-F0-9]{2}", "x", pat.replace("*", "")))
 
 
 class RobotsGroup:
@@ -242,6 +254,14 @@ class RobotsAuditor:
             }
         return matrix
 
+    @property
+    def delay(self) -> float:
+        delays = [g.crawl_delay for g in self.groups if g.crawl_delay is not None]
+        return max(delays) if delays else 1.0
+
+    def allowed(self, url_or_path: str, user_agent: str = "ReadinessAudit") -> bool:
+        return self.is_allowed(user_agent, url_or_path)
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "status_code": self.status_code,
@@ -250,6 +270,10 @@ class RobotsAuditor:
             "groups_count": len(self.groups),
             "ai_bots_matrix": self.evaluate_ai_bots_matrix("/"),
         }
+
+
+# Standard alias for compatibility with test harnesses and single-pass collectors
+Robots = RobotsAuditor
 
 
 def load_bot_registry() -> Dict[str, Any]:
