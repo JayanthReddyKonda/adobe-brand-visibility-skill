@@ -368,10 +368,30 @@ def synthesize_audit_report(
 
     # 1. Full 6-Layer Causal DAG Precedence Analysis & Keystone Defect Identification
     # (Source: audit-orchestrator-knowledge-base.md Section 12)
-    has_layer0_block = any(
-        (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
+    def _is_sitewide_l0(f: Dict[str, Any]) -> bool:
+        c_id = f.get("cause_id") or f.get("id", "")
+        if c_id not in _LAYER0_CAUSE_IDS:
+            return False
+        if c_id in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO"):
+            return True
+        ev = str(f.get("evidence", "")).lower()
+        root = str(f.get("root_cause", "")).lower()
+        if c_id == "NOINDEX_EXCLUSION" and ("sitewide" in ev or "homepage" in ev or f.get("scope") in ("/", base, domain)):
+            return True
+        if c_id == "AI_RETRIEVAL_BLOCKED":
+            if "disallows all" in root or "disallow: / " in ev or "disallow: /\n" in ev:
+                return True
+            if "disallow: /" in ev and not any(sub in ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content")):
+                return True
+        return False
+
+    has_sitewide_layer0_block = any(_is_sitewide_l0(f) for f in all_raw_findings)
+    layer0_blocked_pages = {
+        str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
         for f in all_raw_findings
-    )
+        if (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
+    }
+    layer0_blocked_pages = {p for p in layer0_blocked_pages if p}
     rendering_gap_findings = [
         f for f in all_raw_findings
         if (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
@@ -381,10 +401,14 @@ def synthesize_audit_report(
         str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
         for f in rendering_gap_findings
     }
+    rendering_gap_pages = {p for p in rendering_gap_pages if p}
     # Site-wide only if all pages have low word count or single homepage crawl is a shell
+    home_page_obj = next((p for p in pages if (p.get("url") or "").rstrip("/") == base.rstrip("/")), pages[0] if pages else {})
+    home_wc = home_page_obj.get("word_count", 0)
     is_site_wide_rendering_gap = (
         has_layer1_rendering_gap and (
-            len(pages) <= 1 or all(p.get("word_count", 0) < 60 for p in pages)
+            (home_wc < 30 and home_wc > 0)
+            or (pages and all(p.get("word_count", 0) < 60 for p in pages))
         )
     )
 
@@ -404,15 +428,19 @@ def synthesize_audit_report(
             f_scope = f_scope or str(f["evidence"].get("scope", "")).lower()
 
         # Full 6-Layer Causal DAG Keystone Suppression (P0-11):
-        # Layer 0 access block (e.g. AI_RETRIEVAL_BLOCKED) preempts ALL downstream symptoms at Layers 2-5.
-        if has_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
+        # Layer 0 access block preempts downstream symptoms if site-wide or on the specific blocked page
+        if has_sitewide_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
+            continue
+        if f_scope and any(blk in f_scope or f_scope in blk for blk in layer0_blocked_pages) and cid in _SUPPRESSED_BY_LAYER0:
             continue
         # Layer 1 rendering gap only suppresses downstream if site-wide or on the specific unrendered page
-        if has_layer1_rendering_gap and cid in _SUPPRESSED_BY_LAYER1 and (is_site_wide_rendering_gap or f_scope in rendering_gap_pages):
+        if is_site_wide_rendering_gap and cid in _SUPPRESSED_BY_LAYER1:
+            continue
+        if f_scope and any(gap in f_scope or f_scope in gap for gap in rendering_gap_pages) and cid in _SUPPRESSED_BY_LAYER1:
             continue
 
-        # P0-10: Scope-aware dedup key so defects with same root cause on different entities/pages survive
-        dedup_key = f"{cid}::{f_scope}::{f.get('title', '')}" if f_scope else cid
+        # P0-10: Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
+        dedup_key = f"{cid}::{f.get('title', '')}"
         if dedup_key in seen_dedup_keys:
             continue
         seen_dedup_keys.add(dedup_key)
@@ -515,127 +543,90 @@ def synthesize_audit_report(
     med_count = sum(1 for f in deduped_findings if f["severity"] == "medium")
     low_count = sum(1 for f in deduped_findings if f["severity"] == "low")
 
-    proactive_actions: List[Dict[str, Any]] = []
-    proactive_seen = set()
-    proactive_counter = 1
-
-    for r in all_raw_recommendations:
-        raw_title = r.get("title") or r.get("summary") or ""
-        if isinstance(raw_title, (tuple, list)):
-            rtitle = " ".join(str(x) for x in raw_title)
-        else:
-            rtitle = str(raw_title)
-
-        norm_key = rtitle.lower()[:30]
-        if norm_key in proactive_seen:
-            continue
-        proactive_seen.add(norm_key)
-
-        p_id = f"PROACTIVE-{proactive_counter:03d}"
-        proactive_counter += 1
-        p_sev = str(r.get("priority", "low")).lower()
-        if p_sev not in ("critical", "high", "medium", "low"):
-            p_sev = "low"
-
-        raw_summary = r.get("summary", "Improve brand entity and search engine visibility.")
-        if isinstance(raw_summary, (tuple, list)):
-            r_summary = " ".join(str(x) for x in raw_summary)
-        else:
-            r_summary = str(raw_summary)
-
-        raw_t = r.get("title", "Proactive Discoverability Enhancement")
-        if isinstance(raw_t, (tuple, list)):
-            r_t = " ".join(str(x) for x in raw_t)
-        else:
-            r_t = str(raw_t)
-
-        p_act: Dict[str, Any] = {
-            "id": p_id,
-            "title": clean_text_string(r_t),
-            "summary": clean_text_string(r_summary),
-            "priority": p_sev,
-        }
-        if r.get("technical_fix"):
-            t_fix = clean_text_string(r["technical_fix"])
-            if t_fix:
-                p_act["technical_fix"] = t_fix
-        if r.get("creative_fix"):
-            c_fix = clean_text_string(r["creative_fix"])
-            if c_fix:
-                p_act["creative_fix"] = c_fix
-        if r.get("verification"):
-            v_fix = clean_text_string(r["verification"])
-            if v_fix:
-                p_act["verification"] = v_fix
-
-        proactive_actions.append(p_act)
-
-    # Archetype-Tailored Strategic Recommendations (Grounded in Verified Profile)
+    # -------------------------------------------------------------------------
+    # Proactive Actions (Strategic forward-looking enhancements ONLY)
+    # Genuinely proactive initiatives that do NOT duplicate explicit defects.
+    # -------------------------------------------------------------------------
+    finding_cids = {f.get("cause_id", "") for f in deduped_findings}
     target_route = sample_product_route or (f"https://{domain}/products" if domain else "catalog routes")
     pricing_source = sample_pricing_route or (f"https://{domain}/pricing" if domain else "pricing routes")
     route_refs = ", ".join(sample_routes[:3]) if sample_routes else (f"https://{domain}/" if domain else "core routes")
 
-    if archetype == "ecommerce" and not any("product & offer" in str(p.get("title", "")).lower() for p in proactive_actions):
+    proactive_actions: List[Dict[str, Any]] = []
+    proactive_counter = 1
+
+    # 1. Authoritative LLM Index Manifest (/llms.txt)
+    if has_llms_txt:
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": f"Deploy Machine-Readable Product & Offer Answer Graph for {_brand_guess}",
-            "summary": f"Provide machine-explicit Schema.org Product markup with Offer pricing, ISO 4217 currency, inStock availability, and AggregateRating for {_brand_guess}.",
-            "priority": "medium",
-            "technical_fix": f"Embed Schema.org Product JSON-LD on {target_route} with nested Offer, priceCurrency, and availability declarations.",
-            "creative_fix": f"Ensure explicit specification tables (dimensions, materials, warranty) exist in clean HTML tables above the fold on {target_route} to maximize conversational recommendations in ChatGPT Search and Perplexity.",
-            "verification": f"Validate product routes on https://{domain}/ with Schema.org Validator or Google Rich Results Test to confirm 0 errors.",
+            "title": f"Audit & Expand Existing /llms.txt Manifest for {_brand_guess}",
+            "summary": f"Authoritative /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
+            "priority": "low",
+            "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
+            "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} product and documentation guide.",
+            "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
+        })
+        proactive_counter += 1
+    else:
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": f"Deploy Machine-Readable /llms.txt Manifest for {_brand_guess}",
+            "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links for generative search assistants.",
+            "priority": "low",
+            "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
+            "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} service guide.",
+            "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
         })
         proactive_counter += 1
 
-    elif archetype == "saas" and not any("pricing.md" in str(p.get("title", "")).lower() for p in proactive_actions):
+    # 2. Dynamic Edge Markdown Negotiation (Zero-token retrieval) if no rendering gap
+    if "RENDERED_CONTENT_GAP" not in finding_cids:
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
-            "title": f"Deploy Autonomous AI Buying Agent Pricing Manifest (/pricing.md) for {_brand_guess}",
-            "summary": f"Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents evaluating {_brand_guess}.",
-            "priority": "medium",
+            "title": "Enable Edge Markdown Content Negotiation for AI Indexers",
+            "summary": "Configure web server or CDN to serve pre-rendered clean markdown when requests include Accept: text/markdown, cutting AI token ingestion cost by 80%.",
+            "priority": "low",
+            "technical_fix": "Configure CDN edge worker to inspect Accept header and serve pre-generated markdown for AI crawlers.",
+            "creative_fix": "Author clean markdown equivalents of core landing pages stripped of layout markup and navigation chrome.",
+            "verification": f"Request curl -H 'Accept: text/markdown' https://{domain}/ and verify HTTP 200 with text/markdown Content-Type.",
+        })
+        proactive_counter += 1
+
+    # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists)
+    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids:
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": f"Implement Structured Specification Comparison Tables for {_brand_guess}",
+            "summary": "Embed semantic HTML tables detailing product dimensions, materials, and origin to maximize conversational recommendations in ChatGPT Search and Perplexity.",
+            "priority": "low",
+            "technical_fix": f"Embed responsive HTML <table> markup on {target_route} with clean headers and numeric specifications.",
+            "creative_fix": "Structure product feature specifications into quantitative rows (weight, extraction ratio, temperature).",
+            "verification": f"Verify presence of semantic table elements in HTML of {target_route}.",
+        })
+        proactive_counter += 1
+    elif archetype == "saas" and "FIRST_PARTY_FACT_CONFLICT" not in finding_cids:
+        proactive_actions.append({
+            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "title": f"Deploy Autonomous AI Purchasing Agent Pricing Manifest (/pricing.md) for {_brand_guess}",
+            "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
+            "priority": "low",
             "technical_fix": f"Serve /pricing.md at https://{domain}/pricing.md with structured plan comparison tables extracted from {pricing_source}.",
-            "creative_fix": f"Standardize plan names across {pricing_source} with transparent feature contrast rows, eliminating ambiguous asterisk conditions.",
+            "creative_fix": f"Standardize plan names across {pricing_source} with transparent feature contrast rows.",
             "verification": f"Request GET https://{domain}/pricing.md and verify HTTP 200 with text/markdown Content-Type.",
         })
         proactive_counter += 1
-
-    elif archetype == "publisher" and not any("e-e-a-t" in str(p.get("title", "")).lower() for p in proactive_actions):
+    elif archetype == "publisher" and "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids:
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": f"Structure E-E-A-T Author Credentials & Fact Attributions for {_brand_guess}",
-            "summary": f"Embed Schema.org Person markup for {_brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks directly beneath question headings.",
-            "priority": "medium",
+            "summary": f"Embed Schema.org Person markup for {_brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks beneath question headings.",
+            "priority": "low",
             "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
-            "creative_fix": "Replace passive voice and speculative assertions with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
-            "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person and author credentials.",
+            "creative_fix": "Replace passive voice with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
+            "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
         })
         proactive_counter += 1
-
-    # Ensure baseline universal proactive actions per Adobe Hackathon Round 3 Rubric
-    if not any("llms.txt" in str(p.get("summary", "")).lower() or "llms.txt" in str(p.get("title", "")).lower() for p in proactive_actions):
-        if has_llms_txt:
-            proactive_actions.append({
-                "id": f"PROACTIVE-{proactive_counter:03d}",
-                "title": f"Audit & Expand Existing /llms.txt Manifest for {_brand_guess}",
-                "summary": f"Existing /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
-                "priority": "low",
-                "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
-                "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} product and documentation guide.",
-                "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
-            })
-        else:
-            proactive_actions.append({
-                "id": f"PROACTIVE-{proactive_counter:03d}",
-                "title": f"Deploy Machine-Readable llms.txt Manifest for {_brand_guess}",
-                "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links.",
-                "priority": "low",
-                "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
-                "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} service guide.",
-                "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
-            })
-        proactive_counter += 1
-
-    if not any("organization" in str(p.get("summary", "")).lower() or "sameas" in str(p.get("summary", "")).lower() for p in proactive_actions):
+    elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids:
         corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
         corrob_cov_p = corrob_res_p.get("coverage", {})
         p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
@@ -649,19 +640,10 @@ def synthesize_audit_report(
                 "creative_fix": f"Maintain identical legal name '{_brand_guess}' and contact details across all registered external profiles.",
                 "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
             })
-        else:
-            proactive_actions.append({
-                "id": f"PROACTIVE-{proactive_counter:03d}",
-                "title": f"Establish Authoritative Knowledge Graph Entity Anchors for {_brand_guess}",
-                "summary": f"Anchor {_brand_guess} brand identity with explicit Schema.org Organization JSON-LD linking to verified Wikidata, Wikipedia, and LinkedIn nodes.",
-                "priority": "low",
-                "technical_fix": f"Embed Schema.org Organization schema on https://{domain}/ with sameAs links to official external authority profiles.",
-                "creative_fix": f"Maintain identical corporate legal name '{_brand_guess}' across all registered external directory profiles.",
-                "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
-            })
-        proactive_counter += 1
+            proactive_counter += 1
 
-    if not any("citability architecture" in str(p.get("title", "")).lower() or "passage chunking" in str(p.get("summary", "")).lower() for p in proactive_actions):
+    # 4. Princeton Citability Architecture (Only if citability defects are not already flagged)
+    if not any(c in finding_cids for c in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS")):
         proactive_actions.append({
             "id": f"PROACTIVE-{proactive_counter:03d}",
             "title": f"Implement Princeton KDD 2024 Citability Architecture on {domain}",
@@ -671,6 +653,11 @@ def synthesize_audit_report(
             "creative_fix": f"Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity name '{_brand_guess}' directly.",
             "verification": f"Audit {domain} section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
         })
+        proactive_counter += 1
+
+    final_proactive = proactive_actions[:3]
+    for idx, act in enumerate(final_proactive, start=1):
+        act["id"] = f"PROACTIVE-{idx:03d}"
 
     # 4. Counts-by-Severity Summary (computed earlier after archetype reweighting)
     # (crit_count, high_count, med_count, low_count already set above)
@@ -781,37 +768,54 @@ def synthesize_audit_report(
     else:
         letter_grade = "F"
 
-    _sa_anchor_count = int(_sa_declared or 0)
-    # Dynamic Engine Readiness Factors (P0-16: Grounded in Observed Telemetry)
-    if crawl_score >= 80:
-        chatgpt_factors = [f"Observed robots.txt permission for OAI-SearchBot; eligible for OpenAI retrieval crawl on {domain}"]
-    else:
-        chatgpt_factors = [f"Observed robots.txt disallow for OAI-SearchBot on {domain}"]
-    if _sa_anchor_count >= 1:
-        chatgpt_factors.append(f"{_sa_anchor_count} external Knowledge Graph authority anchor(s) declared for {_brand_guess} entity disambiguation")
-    if citation_score >= 70:
-        chatgpt_factors.append(f"Substantive fact density ({citation_score}/100) satisfies neural answer extraction prerequisites")
+    # Dynamic Engine Readiness Factors (Grounded in Observed Findings & Telemetry)
+    chatgpt_factors = []
+    if any(f.get("cause_id") == "AI_RETRIEVAL_BLOCKED" and "oai" in str(f.get("evidence", "")).lower() for f in deduped_findings):
+        chatgpt_factors.append(f"OAI-SearchBot selectively restricted in robots.txt on {domain}")
+    elif crawl_score >= 80:
+        chatgpt_factors.append(f"Robots.txt grants crawl permission to OAI-SearchBot on {domain}")
+    if any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings):
+        chatgpt_factors.append("Unrendered client-side JS shell impairs catalog text indexing")
+    if any(f.get("cause_id") in ("MATERIAL_ENTITY_AMBIGUITY", "ATTRIBUTE_INCOMPLETENESS") for f in deduped_findings):
+        chatgpt_factors.append("Missing Schema.org Product or Organization data restricts instant answer grounding")
+    if not chatgpt_factors:
+        chatgpt_factors.append(f"Eligible for OpenAI retrieval crawl on {domain}")
 
+    claude_factors = []
     if crawl_score >= 80:
-        claude_factors = [f"Observed robots.txt permission for Claude-SearchBot on {domain}"]
+        claude_factors.append(f"Robots.txt grants crawl permission to Claude-SearchBot on {domain}")
     else:
-        claude_factors = [f"Observed robots.txt disallow for Claude-SearchBot on {domain}"]
-    if retrieval_score >= 80:
-        claude_factors.append(f"Clean semantic markdown ({retrieval_score}/100) readily parseable from raw HTML")
+        claude_factors.append("Claude-SearchBot is restricted in robots.txt")
+    if any(f.get("cause_id") in ("MATERIAL_ENTITY_AMBIGUITY", "WEAK_IDENTITY_SIGNALS") for f in deduped_findings):
+        claude_factors.append("Absence of Organization schema and external sameAs anchors impairs entity corroboration")
+    if any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings):
+        claude_factors.append("Client-side rendering shell impairs raw HTML text extraction for Claude search indexer")
+    if not claude_factors:
+        claude_factors.append("Satisfies Claude search ingestion prerequisites")
 
+    perplexity_factors = []
     if crawl_score >= 80:
-        perplexity_factors = [f"Observed robots.txt permission for PerplexityBot on {domain}; satisfies retrieval prerequisite"]
+        perplexity_factors.append(f"Robots.txt grants crawl permission to PerplexityBot on {domain}")
     else:
-        perplexity_factors = [f"Observed robots.txt disallow for PerplexityBot on {domain}"]
-    if citation_score >= 65:
-        perplexity_factors.append(f"Atomic facts and empirical metrics ({citation_score}/100) available for Perplexity citation cards")
+        perplexity_factors.append("PerplexityBot is restricted in robots.txt")
+    if any(f.get("cause_id") in ("LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS") for f in deduped_findings):
+        perplexity_factors.append("Low fact density and standalone FAQ format depress Perplexity citation cards")
+    if any(f.get("cause_id") == "WEAK_IDENTITY_SIGNALS" for f in deduped_findings):
+        perplexity_factors.append("Lack of third-party authority links (Wikidata/LinkedIn) reduces Perplexity consensus confidence")
+    if not perplexity_factors:
+        perplexity_factors.append("Satisfies Perplexity citation prerequisites")
 
+    google_factors = []
     if crawl_score >= 85:
-        google_factors = [f"Observed robots.txt permission for Googlebot on {domain}"]
+        google_factors.append(f"Robots.txt grants crawl permission to Googlebot on {domain}")
     else:
-        google_factors = [f"Observed crawl directives restricting Google retrieval on {domain}"]
-    if retrieval_score >= 80:
-        google_factors.append(f"Semantic headings and table structures ({retrieval_score}/100) suitable for AI Overview extraction")
+        google_factors.append("Googlebot crawl directives restrict retrieval on {domain}")
+    if any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings):
+        google_factors.append("Client-side rendering dependency blocks Google Shopping Graph and direct snippet extraction")
+    if any(f.get("cause_id") == "ATTRIBUTE_INCOMPLETENESS" for f in deduped_findings):
+        google_factors.append("Missing Product and Offer structured data prevents pricing cards in Google AI Overviews")
+    if not google_factors:
+        google_factors.append("Satisfies Google AI Overview prerequisites")
 
     geo_summary: Dict[str, Any] = {
         "detected_archetype": archetype,
@@ -827,36 +831,36 @@ def synthesize_audit_report(
         },
         "engine_readiness_simulation": {
             "chatgpt_search": {
-                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 else "restricted",
+                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 and not any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings) else "restricted",
                 "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": chatgpt_factors,
             },
             "claude_search": {
-                "status": "eligible" if crawl_score >= 75 and retrieval_score >= 70 else "restricted",
+                "status": "eligible" if crawl_score >= 75 and retrieval_score >= 70 and not any(f.get("cause_id") == "MATERIAL_ENTITY_AMBIGUITY" for f in deduped_findings) else "restricted",
                 "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": claude_factors,
             },
             "perplexity_ai": {
-                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 else "restricted",
+                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 and not any(f.get("cause_id") == "LOW_FACT_TO_TOKEN_RATIO" for f in deduped_findings) else "restricted",
                 "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": perplexity_factors,
             },
             "google_ai_overviews": {
-                "status": "eligible" if crawl_score >= 80 and retrieval_score >= 75 else "restricted",
+                "status": "eligible" if crawl_score >= 80 and retrieval_score >= 75 and not any(f.get("cause_id") in ("RENDERED_CONTENT_GAP", "ATTRIBUTE_INCOMPLETENESS") for f in deduped_findings) else "restricted",
                 "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": google_factors,
             },
         },
     }
 
-    # Sort proactive actions by priority and limit to top 5 highest-leverage actions
-    prio_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    proactive_actions.sort(key=lambda a: prio_order.get(a.get("priority", "low"), 4))
-    proactive_actions = proactive_actions[:5]
-    for idx, act in enumerate(proactive_actions, start=1):
-        act["id"] = f"PROACTIVE-{idx:03d}"
+    # Proactive actions already built cleanly with zero defect duplication
 
-    # 6. Assemble Final Draft-07 Compliant Report (Strictly Signal, Zero Fluff)
+    # 6. Assemble Final Draft-07 Compliant Report (Signal Only, Zero Bloat)
+    clean_limitations = [
+        "No JavaScript browser rendering was performed; initial raw HTML inspected for AI crawler visibility.",
+        "Robots eligibility simulated from captured robots.txt; bot-specific server challenge responses not tested.",
+    ]
+
     report: Dict[str, Any] = {
         "site": site,
         "audited_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -870,8 +874,8 @@ def synthesize_audit_report(
         },
         "geo_citability_summary": geo_summary,
         "findings": deduped_findings,
-        "proactive_actions": proactive_actions,
-        "limitations": DEFAULT_LIMITATIONS,
+        "proactive_actions": final_proactive,
+        "limitations": clean_limitations,
         "archetype": archetype,
     }
 

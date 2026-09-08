@@ -609,7 +609,7 @@ def audit(base, domain, inv=None, state_file=None):
         ]
         depth_score = sum(1 for w in mechanism_words if re.search(rf"\b{w}\b", full_text.lower()))
 
-        if depth_score < 2:
+        if depth_score < 2 and total_words >= 60:
             findings.append(
                 {
                     "category": "content",
@@ -620,6 +620,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.SHALLOW_COVERAGE",
                     "id": "MISSING_IN_DEPTH_MECHANISMS",
                     "cause_id": "MISSING_IN_DEPTH_MECHANISMS",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} lacks causal conjunctions or explanatory depth markers (depth score: {depth_score}/10).",
                     "impact": "Generative Engines prefer to cite sources that offer deep explanatory context rather than surface-level assertions.",
                     "suggested_action": {
@@ -646,6 +648,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.SHALLOW_COVERAGE",
                     "id": "LOW_CITABILITY_SCORE",
                     "cause_id": "LOW_CITABILITY_SCORE",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} achieved a citability score of {citability['total']}/100 (Answer Block Quality: {citability['answer_block_quality']}/30, Self-Containment: {citability['self_containment']}/25).",
                     "impact": "Generative engines (Perplexity, ChatGPT Search) downrank the page in passage retrieval because it lacks extractable 80-250 word standalone answer blocks.",
                     "suggested_action": {
@@ -670,6 +674,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.STANDALONE_FAQ_DEFICIT",
                     "id": "STANDALONE_FAQ_DEFICIT",
                     "cause_id": "STANDALONE_FAQ_DEFICIT",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} utilizes FAQ/Q&A structure but contains only {evidence_genre_data['genre_count']} of the 5 high-influence evidence genres ({', '.join(evidence_genre_data['genres_detected']) or 'none'}).",
                     "impact": "LLM retrieval engines heavily discount unverified FAQ prose in favor of multi-dimensional evidence passages.",
                     "suggested_action": {
@@ -707,6 +713,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.KEYWORD_STUFFING_DEGRADATION",
                     "id": "EXCESSIVE_KEYWORD_DENSITY",
                     "cause_id": "EXCESSIVE_KEYWORD_DENSITY",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} contains extreme term frequency for '{top_word}' ({top_density * 100:.1f}% of body tokens). Top repeated terms: {', '.join(f'{w} ({d * 100:.1f}%)' for w, d in kw_stuffing_data['top_repeated_words'][:3])}.",
                     "impact": "Generative retrieval models (Perplexity, ChatGPT Search, Claude) penalize keyword-stuffed passages during neural reranking.",
                     "suggested_action": {
@@ -732,6 +740,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.CONTEXT_PLACEMENT_DEGRADATION",
                     "id": "CONTEXT_PLACEMENT_DEGRADATION",
                     "cause_id": "CONTEXT_PLACEMENT_DEGRADATION",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} ({total_words} words) does not state its definitive resolution or entity proposition within the top {bluf_data['lead_word_count']} words.",
                     "impact": "Generative search engines truncate or downweight answers buried deep within long narrative text blocks.",
                     "suggested_action": {
@@ -789,6 +799,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.SHALLOW_COVERAGE",
                     "id": "LOW_FACT_TO_TOKEN_RATIO",
                     "cause_id": "LOW_FACT_TO_TOKEN_RATIO",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} contains only {atomic_facts} verifiable factual assertions (dates, numbers, direct definitions) across {total_words} words.",
                     "impact": "Generative engines (Perplexity, ChatGPT Search) favor high-density source passages with verifiable facts.",
                     "suggested_action": {
@@ -853,6 +865,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_family": "CONTENT.SHALLOW_COVERAGE",
                     "id": "EXCESSIVE_HEDGE_LANGUAGE",
                     "cause_id": "EXCESSIVE_HEDGE_LANGUAGE",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Page {url} contains {len(hedge_matches)} hedge expression(s) ({', '.join(set(m.lower() for m in hedge_matches[:5]))}) across {total_words} words.",
                     "impact": "Empirical studies demonstrate that hedged language ranks 3x lower in LLM citation selection than confident, data-backed assertions.",
                     "suggested_action": {

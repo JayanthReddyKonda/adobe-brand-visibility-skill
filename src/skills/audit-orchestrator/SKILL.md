@@ -13,33 +13,31 @@ allowed-tools:
 
 # Audit Orchestrator (Entrypoint Skill)
 
-| Tool | Command | Output |
+| Component | Execution Command | Output Contract |
 |---|---|---|
-| **Master Audit Runner (Headless CI/CD)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json` | Complete Draft-07 Validated Report JSON |
-| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics |
-| **Web Scraper (Unified Acquisition)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical Site Inventory JSON |
-| **Site Inventory Wrapper** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Typed HTML page inventory (JSON) |
-| **Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json` | Exit Code 0 (pass) or 1 (fail) |
+| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) |
+| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics |
+| **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements |
+| **Deterministic Master Runner (Headless CI/CD)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json` | Baseline Draft-07 Validated Report JSON |
+| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or 1 (fail) |
 
-> **True Hybrid Orchestration Architecture:**
-> 1. **Deterministic Master Runner (Automated Engine):** The Python script `orchestrator.py` executes single-pass web acquisition, runs all 6 specialist sensors, performs strict Causal DAG deduplication, calculates orthogonal math scores, and emits a perfect Draft-07 schema JSON report.
-> 2. **Agentic Runbook (Cognitive Reasoning):** As the AI agent, you do **not** manually run the specialist scripts or manually format the JSON. Instead, you run the master orchestrator, read the generated JSON report, and apply true AI Cognitive Reasoning (synthesizing the executive diagnosis, explaining epistemic falsification, and contextualizing the findings for the user).
-
-Leverage the deterministic orchestrator script to handle the math, schema, and causal DAG routing. Then load the resulting schema and apply multi-signal cognitive reasoning against the knowledge bases to deliver high-level strategic guidance to the end user.
+> **Cognitive Multi-Skill Orchestration Protocol:**
+> 1. **Deterministic Telemetry Engine:** Outbound crawling and network measurements strictly use Python standard library tools under socket-level SSRF protection. Downstream sensors measure crawler matrices, HTML SNR, Schema.org coverage, and citability heuristics against `inv.json`.
+> 2. **Active Multi-Skill Reasoning:** As the AI Agent, you are the **Cognitive Diagnostic Brain**. You do NOT merely copy-paste script outputs. You actively read the specialist skill guides and domain knowledge bases, inspect the empirical site inventory, apply 5-Whys root cause analysis through the 6-Layer Causal DAG, eliminate bloat, and author bespoke, high-value dual-track remediations (tailored Schema.org JSON-LD code blocks and Princeton KDD 2024 copy rewrites).
 
 ---
 
 > [!TIP]
-> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/`. Find the absolute path to the marketplace root before running any scripts. Adapt shell commands (`python3`, `python`, `cat`, `type`) to your host OS (Linux, macOS, Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/` or `src/skills/`. Resolve the root path before running commands. Always adapt shell commands (`python3`, `python`) to your host environment and use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Coordinates the 7 specialist skills to perform a full-spectrum audit of brand discoverability, machine-explicit entity clarity, and generative citation readiness across ChatGPT Search, Claude Search, Perplexity Pro, and Google AI Overviews.
 
 ## When to use
 
 - Perform a full-spectrum AI discoverability, content extractability, and visitor engagement audit on any brand website.
-- Diagnose why AI search assistants (ChatGPT Search, Claude, Perplexity, Gemini) fail to crawl, extract, or accurately quote facts about a brand.
+- Diagnose why AI search assistants (ChatGPT Search, Claude, Perplexity, Google AI Overviews) fail to crawl, extract, or accurately quote facts about a brand.
 - Uncover why AI-referred visitors bounce after landing on a website.
 - Evaluate brand visibility without third-party dependencies or external API keys under a strict wall-clock time budget (< 5 min).
 
@@ -47,8 +45,9 @@ This skill executes diagnostic checks for its specific domain.
 
 ## Inputs
 
-- **`--site`** (string, required): The target domain or URL to audit (e.g. `example.com` or `https://example.com`).
+- **`--site`** (string, required): The target domain or URL to audit (e.g. `https://example.com` or `example.com`).
 - **`--inventory`** (string, optional): Path to a pre-built inventory JSON file (skips crawl phase, speeds up re-audits).
+- **`--telemetry`** (flag, optional): Emits raw aggregated empirical sensor measurements for cognitive synthesis.
 
 ---
 
@@ -57,63 +56,107 @@ This skill executes diagnostic checks for its specific domain.
 Read these before synthesizing findings. They define your cognitive reasoning rules.
 
 ### Core Knowledge Bases & Synthesis (Load First — MANDATORY)
-- [Core Synthesis Digest](references/core-synthesis-digest.md): Fast, single-turn executive briefing (< 2,500 tokens) covering the 6-layer DAG, composite scoring, Princeton GEO vectors, and keystone taxonomy.
-- [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks (Sections 18–20), and Archetype Dynamic Adaptation playbooks (Section 21).
+- [Core Synthesis Digest](references/core-synthesis-digest.md): Fast executive briefing (< 2,500 tokens) covering the 6-Layer Causal DAG, composite scoring weights, 9 Princeton GEO vectors, and keystone taxonomy.
+- [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks, and Archetype Dynamic Adaptation playbooks.
 - [Epistemic Reasoning & Evidence Policy](references/reasoning-policy.md): Evidence vs. truth standards, four-state epistemic model (observed/inferred/unknown/suppressed), falsification rules, and component responsibility boundaries.
 
+### Specialist Skill Guides & Domain References (Consult by Anomaly)
+- [Discoverability Audit](../discoverability-audit/SKILL.md) & [Discoverability KB](../discoverability-audit/references/discoverability-audit-knowledge-base.md): RFC 9309 crawler matrices, meta directives, canonical loops, and CSR unrendered shells.
+- [Entity Content Audit](../entity-content-audit/SKILL.md) & [Entity Content KB](../entity-content-audit/references/entity-content-audit-knowledge-base.md): Schema.org `@graph`, `Organization`, `Product`, `Offer`, priceCurrency, and answerability.
+- [Fact Consistency Audit](../fact-consistency-audit/SKILL.md) & [Fact Consistency KB](../fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md): Multi-page factual discrepancies, pricing conflicts, and stale terms.
+- [Corroboration Authority Audit](../corroboration-authority-audit/SKILL.md) & [Corroboration Authority KB](../corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md): External `sameAs` identity links, Wikidata, Wikipedia, LinkedIn verification.
+- [GEO Content Audit](../geo-content-audit/SKILL.md) & [GEO Content KB](../geo-content-audit/references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO citability metrics, BLUF answers, statistical density, and FAQ penalty.
+- [Engagement Context Audit](../engagement-context-audit/SKILL.md) & [Engagement Context KB](../engagement-context-audit/references/engagement-context-audit-knowledge-base.md): Post-citation information scent, H1 alignment, above-the-fold CTA proximity.
+
 ### Schemas & Contracts (MANDATORY)
-- [Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every field, every enum value, every required key.
-- [Telemetry Schema Draft-07](references/telemetry-schema.json): Exact JSON schema for empirical sensor telemetry emitted by `orchestrator.py --telemetry`.
+- [Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every required field, summary arithmetic, and enum value.
+- [Telemetry Schema Draft-07](references/telemetry-schema.json): Schema for empirical sensor telemetry emitted by `orchestrator.py --telemetry`.
 
 ---
 
 ## Procedure
 
-### Stage 1 — Context Ingestion
-
-**Step 1: Ingest Core Synthesis Digest & Output Contract**
-Read the master synthesis digest and schema output contract using your native file reading capabilities (do NOT use bash `cat`):
-- `skills/audit-orchestrator/references/core-synthesis-digest.md`
-- `skills/audit-orchestrator/references/report-schema.json`
-
----
-
-### Stage 2 — Deterministic Master Execution
-
-**Step 2: Run Master Orchestrator (MANDATORY)**
+### Stage 1 — Single-Pass Acquisition & Empirical Telemetry
 
 > [!CAUTION]
-> **ZERO DIRECT URL READING TOOLS MANDATE:**
-> You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget` to fetch target web pages, `robots.txt`, or `sitemap.xml`.
+> **ZERO DIRECT AGENT URL READING MANDATE:**
+> You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to fetch target web pages, `robots.txt`, or `sitemap.xml`.
 > Direct agent URL reading completely bypasses socket-level zero-trust SSRF security (`safe_fetch.py`), breaks the single-pass inventory contract, and corrupts diagnostic reasoning.
 
-Do **NOT** attempt to run the 6 specialist sensors manually, and do **NOT** attempt to manually calculate the orthogonal math scores or build the Draft-07 JSON string by hand. LLMs cannot reliably execute 6-layer DAG deterministic deduplication.
-
-Instead, execute the deterministic orchestrator engine. This Python script automatically performs the single-pass scrape, runs all 6 specialist sensors, applies the Causal DAG, calculates all Orthogonal Scores, and writes the perfectly validated Draft-07 JSON report to disk.
+**Step 1: Acquire Inventory via Safe Crawler**
+Execute single-pass web crawl to build the authoritative site inventory under SSRF protection:
 ```bash
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com > final_report.json
+python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 ```
-*(Wait for the script to finish executing and emitting `final_report.json`)*
+
+**Step 2: Collect Telemetry Grid Across Sensors**
+Run the telemetry aggregator to execute all 6 specialist sensors offline against `inv.json`:
+```bash
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry > telemetry.json
+```
 
 ---
 
-### Stage 3 — Cognitive Synthesis & Executive Presentation
+### Stage 2 — Specialist Knowledge & Domain Ingestion
 
-**Step 3: Read the Generated Report**
-Read the `final_report.json` file generated by the orchestrator script to ingest the empirical telemetry, calculated scores, and findings.
+**Step 3: Read Core Synthesis & Evidence Policy**
+Read the foundational synthesis rules using your native file-reading tools:
+- Read `skills/audit-orchestrator/references/core-synthesis-digest.md`
+- Read `skills/audit-orchestrator/references/reasoning-policy.md`
 
-**Step 4: True AI Reasoning & Dual-Track Customization**
-Act as the **Cognitive Reasoning Engine** (rather than a passive script runner):
-- Evaluate the findings in `final_report.json` against the Falsification Protocol in `audit-orchestrator-knowledge-base.md`.
-- Ensure the `technical_fix` and `creative_fix` provided by the automated script are perfectly tailored to the user's specific brand context. If the script's default text is generic, synthesize bespoke, copy-pasteable Schema.org `@graph` JSON-LD code blocks directly tailored to the audited entity.
-- Construct a high-level executive summary for the user explaining the business impact of the Keystone Defects.
+**Step 4: Consult Domain Knowledge Bases for Observed Signals**
+Inspect `telemetry.json` and read the corresponding specialist skill documents:
+- If crawl/robots disallows or rendering gaps are observed: read `skills/discoverability-audit/SKILL.md` and its knowledge base.
+- If Schema.org or product catalog gaps are observed: read `skills/entity-content-audit/SKILL.md` and its knowledge base.
+- If zero or broken `sameAs` links exist: read `skills/corroboration-authority-audit/SKILL.md` and its knowledge base.
+- If low citability score or FAQ deficits appear: read `skills/geo-content-audit/SKILL.md` and its knowledge base.
+- If above-the-fold CTA or H1 scent issues occur: read `skills/engagement-context-audit/SKILL.md` and its knowledge base.
+- If pricing or contact discrepancies occur across routes: read `skills/fact-consistency-audit/SKILL.md` and its knowledge base.
 
-**Step 5: Clean Direct Output Delivery (MANDATORY)**
-If the user requested the raw JSON report, emit the complete, unabridged Draft-07 JSON report directly inside a single ````json```` code block in your response.
-- **Zero Conversational Preamble:** Do NOT precede the JSON with conversational chatter ("Below is my full audit...").
-- **Zero Duplicate Markdown Tables:** Do NOT output duplicate Markdown tables summarizing findings before the JSON block.
-- **Clean JSON String Formatting Standard:** NEVER embed raw Markdown tables (`| Col | Col |`), HTML `<table>` markup, or escaped literal newlines (`\n\n`) inside JSON string properties.
-- Never substitute with a placeholder or point to disk.
+---
+
+### Stage 3 — Cognitive AI Reasoning & Bespoke Synthesis
+
+Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated diagnosis:
+
+1. **Apply 6-Layer Causal DAG & Keystone Deduplication:**
+   - **Layer 0 (`AI_RETRIEVAL_BLOCKED`)**: If robots.txt or HTTP 403 blocks live AI retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), suppress downstream text citability and entity ambiguity findings on blocked routes.
+   - **Layer 1 (`RENDERED_CONTENT_GAP`)**: If initial raw HTML contains only an unrendered client-side JS shell (< 25 words), suppress downstream body-text depth and fact consistency findings on that route. Report the client rendering gap as the keystone cause.
+   - **Consolidate Multi-Route Findings**: When the same defect occurs across multiple language or catalog routes (e.g. `/en/products`, `/fr/products`, `/es/products` all missing Product schema), consolidate them into a single finding with comprehensive scope and evidence. Never emit duplicate finding objects.
+
+2. **Author Bespoke Dual-Track Remediations (No Generic Canned Text):**
+   - **`technical_fix`**: Craft precise, copy-pasteable code, config, or Schema.org JSON-LD `@graph` snippets customized to the brand's actual domain name, real product names, currency, and entity anchors.
+   - **`creative_fix`**: Provide concrete, actionable copywriting and architecture guidance grounded in Princeton KDD 2024 / AutoGEO research (+40.9% quotation lift, +40.0% statistics lift, +28.2% causal conjunction lift, 40-60 word BLUF answers).
+   - **`verification`**: Provide a deterministic test command or validation step to verify remediation.
+
+3. **Eliminate Report Bloat:**
+   - Ensure `proactive_actions` contains strictly forward-looking, value-add enhancements (e.g. authoritative `/llms.txt` manifest, edge markdown content negotiation `Accept: text/markdown`) where no explicit defect exists. Never duplicate findings in proactive actions.
+   - Ensure all JSON string fields are clean prose or semicolon-delimited (` ; `). Never embed literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML tags inside JSON strings.
+
+---
+
+### Stage 4 — Schema Validation Gate
+
+**Step 5: Validate Synthesized Report**
+Ensure the final report validates against `report-schema.json`:
+```bash
+python3 skills/audit-orchestrator/scripts/validate_report.py < report.json
+```
+Ensure exit code is 0 (pass).
+
+---
+
+### Stage 5 — Executive Briefing & Final Delivery
+
+**Step 6: Deliver Executive Diagnostic Briefing + Valid JSON Report**
+Deliver your final response structured as:
+1. **Executive Diagnostic Briefing (Markdown):**
+   - Brand AI Readiness Grade and Composite Citability Score.
+   - Breakdown across generative engines (ChatGPT Search, Claude Search, Perplexity Pro, Google AI Overviews).
+   - Keystone Root-Cause Analysis (5-Whys diagnosis explaining why engines currently fail to recommend or cite the brand).
+   - Prioritized Dual-Track Action Plan.
+2. **Draft-07 Validated Report (JSON):**
+   - The complete, unabridged Draft-07 JSON report enclosed inside a single ````json```` code block with zero string pollution.
 
 ---
 
@@ -140,7 +183,7 @@ The final report must strictly conform to the `references/report-schema.json` Dr
 
 ## Gotchas & Error Handling
 
-- **Non-Destructive Execution & User Approval Gate:** All diagnostic audits are strictly read-only, non-destructive, and analytical. Never execute destructive operations such as HTTP POST, PUT, DELETE, data purging, or file removal. Any operation that modifies or deletes resources requires explicit user confirmation and approval before execution.
+- **Non-Destructive Execution & User Approval Gate:** All diagnostic audits are strictly read-only, non-destructive, and analytical. Never execute destructive operations such as HTTP POST, PUT, DELETE, data purging, or file removal.
 - **SSRF Hard Boundary:** All fetches pass through `safe_fetch.py`. Never probe private RFC-1918 subnets, cloud metadata (169.254.169.254), or loopback interfaces.
 - **Non-HTML Resource Invariant:** XML sitemaps, robots.txt, JSON feeds, and PDFs are infrastructure metadata and must NEVER be audited for narrative or heading content.
 - **Training Bot vs Retrieval Bot:** Blocking `GPTBot` (training) is a governance decision — NOT a critical defect. Blocking `OAI-SearchBot` or `PerplexityBot` (retrieval) IS a critical defect. See `discoverability-audit/SKILL.md` for the full crawler matrix.

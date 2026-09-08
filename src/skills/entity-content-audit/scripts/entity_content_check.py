@@ -439,7 +439,33 @@ def audit(base, domain, inv=None, state_file=None):
                 pass
             typed_objects = parse_json_ld(pdom.json_ld_contents, phtml)
             ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
-            if isinstance(ans, dict) and ans.get("status") == "present":
+            if isinstance(ans, dict) and ans.get("status") == "missing_entity":
+                # Commercial product/catalog route completely missing Product schema
+                if not any(f.get("cause_id") == "ATTRIBUTE_INCOMPLETENESS" and purl in str(f.get("evidence", "")) for f in findings):
+                    findings.append(
+                        {
+                            "category": "product-answerability",
+                            "title": f"No Schema.org Product structured data on {ptype.replace('_', ' ')} page",
+                            "severity": "high",
+                            "confidence": "high",
+                            "root_cause": f"MISSING_PRODUCT_SCHEMA: Commercial {ptype.replace('_', ' ')} page on {purl} publishes no Schema.org Product or ItemList JSON-LD structured data.",
+                            "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
+                            "id": "ATTRIBUTE_INCOMPLETENESS",
+                            "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                            "url": purl,
+                            "scope": purl,
+                            "impact": "Generative shopping assistants (ChatGPT Instant Checkout, Perplexity Shopping, Google Shopping Graph) cannot resolve product catalog items, prices, or inventory status.",
+                            "evidence": f"Commercial route {purl} contains 0 Schema.org Product or ItemList entities in JSON-LD.",
+                            "suggested_action": {
+                                "summary": f"Deploy Schema.org Product markup on {purl}.",
+                                "technical_fix": "Embed Schema.org Product JSON-LD declaring name, description, offers with clean numeric price and ISO 4217 priceCurrency, and inStock availability.",
+                                "creative_fix": "Ensure visible product catalog titles, pricing, and availability are presented in semantic HTML above the fold.",
+                                "priority": "high",
+                                "verification": f"Validate {purl} with Schema.org Validator or Google Rich Results Test to confirm Product markup is detected.",
+                            },
+                        }
+                    )
+            elif isinstance(ans, dict) and ans.get("status") == "present":
                 results_list = ans.get("results")
                 if isinstance(results_list, list):
                     for res in results_list:

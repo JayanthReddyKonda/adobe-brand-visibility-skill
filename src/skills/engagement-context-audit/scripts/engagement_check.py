@@ -848,6 +848,30 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     # 5. Value-Driven CTA Copy Check (CRO & SXO best practices)
     weak_ctas = [txt for txt in dom.cta_texts if WEAK_CTA_PATTERNS.match(txt.strip())]
     if weak_ctas and len(" ".join(dom.body_text).split()) > 100:
+        if not any(f.get("cause_id") == "CTA_REACHABILITY_FRICTION" for f in findings):
+            findings.append(
+                {
+                    "category": "conversion-continuity",
+                    "title": f"Generic conversion action copy on {page_type or 'landing page'} ('{weak_ctas[0]}')",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": f"CTA_REACHABILITY_FRICTION: Primary interactive conversion trigger relies on generic action copy ('{weak_ctas[0]}') without specific outcome value nouns.",
+                    "cause_family": "EXPERIENCE.CONTINUITY",
+                    "id": "CTA_REACHABILITY_FRICTION",
+                    "cause_id": "CTA_REACHABILITY_FRICTION",
+                    "url": url,
+                    "scope": url,
+                    "impact": "AI referral visitors arriving with specific purchase intent experience context scent loss, depressing conversion rates.",
+                    "evidence": f"Found generic CTA trigger ('{weak_ctas[0]}') on {url}.",
+                    "suggested_action": {
+                        "summary": f"Replace generic '{weak_ctas[0]}' CTA with specific outcome copy.",
+                        "technical_fix": "Update CTA button markup to state the delivered value (e.g. 'Explore Fresh Roasts', 'Claim Coffee Rewards').",
+                        "creative_fix": "Align CTA verbs with the exact recommendation made by AI search engines.",
+                        "priority": "medium",
+                        "verification": "Confirm CTA text contains descriptive benefit nouns.",
+                    },
+                }
+            )
         recommendations.append(
             {
                 "id": "PROACTIVE.ENGAGEMENT.VALUE_DRIVEN_CTA.001",

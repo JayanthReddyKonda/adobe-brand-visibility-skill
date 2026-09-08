@@ -243,6 +243,27 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
 
     # 3. Check declared identity nodes (sameAs)
     if not sameas_urls:
+        findings.append(
+            {
+                "category": "authority",
+                "title": "Unlinked Brand Entity (No third-party sameAs authority anchors)",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": "WEAK_IDENTITY_SIGNALS: The website declares no Schema.org sameAs links connecting the brand to external authoritative knowledge graph nodes.",
+                "cause_family": "ENTITY.AUTHORITY",
+                "id": "WEAK_IDENTITY_SIGNALS",
+                "cause_id": "WEAK_IDENTITY_SIGNALS",
+                "impact": "Generative search engines (ChatGPT Search, Claude, Perplexity) cannot corroborate brand claims against third-party authority sources, reducing citation trust.",
+                "evidence": f"Scanned homepage {base}/; found 0 sameAs authority links in structured data.",
+                "suggested_action": {
+                    "summary": "Declare verified third-party identity anchors in Organization sameAs schema.",
+                    "technical_fix": "Add verified Wikidata entity ID, LinkedIn corporate profile, and Wikipedia URLs to the Organization sameAs array.",
+                    "creative_fix": "Establish and maintain official corporate profiles on recognized authority platforms.",
+                    "priority": "medium",
+                    "verification": "Confirm Organization JSON-LD contains at least 2 valid sameAs URLs linking to external authority profiles.",
+                },
+            }
+        )
         recommendations.append(
             {
                 "title": "Establish an integrated brand identity block with authoritative sameAs links",

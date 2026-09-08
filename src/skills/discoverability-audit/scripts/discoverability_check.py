@@ -597,6 +597,52 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
+    # 3. Multi-Page Client-Side Rendering Shell Check on Commercial/Catalog Routes
+    if not any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in findings) and inv:
+        unrendered_pages = []
+        for p in inv.get("pages", []):
+            p_url = p.get("url", "")
+            p_html = p.get("html", "")
+            p_type = p.get("page_type", "")
+            if not p_html or p_type == "homepage":
+                continue
+            p_words = p.get("word_count", 0)
+            if p_words < 25 and (
+                "<script type=\"importmap\"" in p_html
+                or 'type="module"' in p_html
+                or 'id="root"' in p_html
+                or 'id="app"' in p_html
+                or "storefront-" in p_html
+                or "<noscript" in p_html
+            ):
+                unrendered_pages.append((p_url, p_words, p_type))
+
+        if unrendered_pages:
+            rep_url, rep_words, rep_type = unrendered_pages[0]
+            findings.append(
+                {
+                    "category": "rendering",
+                    "title": f"Primary copy missing from initial raw HTML (client-side rendering gap on {rep_type or 'catalog'})",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": f"RENDERED_CONTENT_GAP: Page {rep_url} serves an unrendered client-side JavaScript shell containing only {rep_words} words.",
+                    "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
+                    "id": "RENDERED_CONTENT_GAP",
+                    "cause_id": "RENDERED_CONTENT_GAP",
+                    "url": rep_url,
+                    "scope": rep_url,
+                    "impact": "Non-JavaScript AI retrieval engines (SearchGPT, PerplexityBot) ingest an empty shell without product listings or catalog prose.",
+                    "evidence": f"Initial HTML on {rep_url} contains only {rep_words} words before JavaScript execution across {len(unrendered_pages)} route(s).",
+                    "suggested_action": {
+                        "summary": f"Enable server-side rendering or edge pre-rendering for {rep_url}.",
+                        "technical_fix": "Implement edge pre-rendering or SSR to serve hydrated HTML with complete catalog listings to search bots.",
+                        "creative_fix": "Provide descriptive static fallback copy in <noscript> or static HTML blocks for crawler indexing.",
+                        "priority": "high",
+                        "verification": f"Fetch raw HTML of {rep_url} without JavaScript and verify catalog text is present.",
+                    },
+                }
+            )
+
     # Rule HF-05: Restrictive Snippet Controls on Core Content (nosnippet / max-snippet:0 / data-nosnippet)
     all_pages = inv.get("pages", []) if inv else [{"url": base + "/", "html": html}]
     for page in all_pages:
@@ -782,6 +828,41 @@ def audit(base, domain, inv=None, state_file=None):
                     "role": "training",
                 }
             )
+
+        # Check for selective path disallows targeting search retrieval bots
+        for bot in AI_BOTS:
+            sem = CRAWLER_SEMANTICS.get(bot, {"role": "general", "impact_desc": ""})
+            if sem.get("role") != "retrieval":
+                continue
+            disallowed_sections = []
+            for g in groups:
+                agents = [a.lower() for a in g.get("agents", [])]
+                if bot.lower() in agents:
+                    for k, v in g.get("rules", []):
+                        if k == "disallow" and v and v != "":
+                            disallowed_sections.append(v)
+            if disallowed_sections and not any(bot == b[0] for b in blocked_retrieval):
+                findings.append(
+                    {
+                        "category": "crawlability",
+                        "title": f"AI search crawler '{bot}' selectively restricted in robots.txt",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": f"robots.txt disallows AI search retrieval crawler '{bot}' from specific content paths ({', '.join(disallowed_sections)}).",
+                        "cause_family": "CRAWLER.ACCESS_DENIED",
+                        "id": "AI_RETRIEVAL_BLOCKED",
+                        "cause_id": "AI_RETRIEVAL_BLOCKED",
+                        "impact": f"Search assistant '{sem['platform']}' is blocked from indexing or grounding answers using content under {', '.join(disallowed_sections)}.",
+                        "evidence": f"robots.txt declares: User-agent: {bot} -> Disallow: {', '.join(disallowed_sections)}.",
+                        "suggested_action": {
+                            "summary": f"Review robots.txt disallow rules for {bot}.",
+                            "technical_fix": f"Remove disallow rules for public content routes under 'User-agent: {bot}' in robots.txt.",
+                            "creative_fix": "Ensure high-value editorial and educational content is accessible to AI search engines.",
+                            "priority": "medium",
+                            "verification": f"Verify {bot} is permitted to crawl {disallowed_sections[0]} in robots.txt.",
+                        },
+                    }
+                )
 
     # 4. Proactive /llms.txt and /llms-full.txt content manifest discovery
     llms_present = False
