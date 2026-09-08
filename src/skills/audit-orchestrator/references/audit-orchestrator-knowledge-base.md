@@ -572,7 +572,7 @@ The orchestrator enforces a strict total runtime budget (default 300 seconds):
 
 Every network fetch in the orchestrator and all specialist tools enforces:
 1. **Scheme Validation:** `http` and `https` only.
-2. **DNS & IP Validation:** Rejection of private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.264.0.0/16`, `fe80::/10`), and cloud-metadata addresses.
+2. **DNS & IP Validation:** Rejection of private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), and cloud-metadata addresses.
 3. **Bounded Redirects:** Max 5 redirects with target IP re-validation on every hop.
 4. **Hard Size Caps:** HTML pages (max 2 MB), robots.txt (max 512 KB), sitemaps (max 2 MB), external authority probes (max 512 KB).
 5. **Same-Origin Crawling:** Sitemaps and priority links must match the target domain origin.
