@@ -181,5 +181,3 @@ Evaluates the arrival experience of high-intent citation traffic:
 Reachability Index = 1 / (1 + Preceding Interactive Elements)
 ```
   If the primary commercial action is delayed behind > 3 auxiliary header/nav links, the sensor flags `CTA_REACHABILITY_FRICTION`.
-
-

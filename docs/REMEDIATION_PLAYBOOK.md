@@ -155,4 +155,3 @@ Every brand AI-readiness defect has two complementary remediation vectors:
 - **Technical Fix:** Place a prominent primary action `<button>` or `<a href>` directly in the hero block above the fold before the navigation bar in DOM tab order, or provide a skip-to-action anchor.
 - **Creative Fix:** Pair the primary value headline with an instant value-driven CTA button ('Start Free Trial', 'Explore Live Demo') to eliminate user hesitation.
 - **Verification:** Confirm that the commercial continuation CTA appears within the first 3 interactive DOM elements on the page.
-
