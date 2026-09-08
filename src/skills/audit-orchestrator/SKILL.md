@@ -76,6 +76,13 @@ cat skills/audit-orchestrator/references/report-schema.json
 ```
 
 **Step 2: Unified Single-Pass Acquisition via `web-scraper`**
+
+> [!CAUTION]
+> **ZERO DIRECT URL READING TOOLS MANDATE:**
+> AI agents MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget` to fetch target web pages, `robots.txt`, or `sitemap.xml`.
+> Direct agent URL reading completely bypasses socket-level zero-trust SSRF security (`safe_fetch.py`), breaks the single-pass inventory contract, fails to extract Schema.org JSON-LD `@graph` trees or the RFC 9309 16-bot matrix, and corrupts diagnostic reasoning.
+> Web crawling is strictly performed **once** via `acquire_inventory.py` or `run_scraper.py` emitting `inv.json`. All 7 downstream diagnostic specialist sensors run offline against `inv.json`.
+
 Execute the single-pass web scraper to construct the canonical site inventory (`inv.json`). Crawling is performed **strictly once**, eliminating redundant network calls across downstream specialist skills:
 ```bash
 # Option A: Directly invoke web-scraper skill
@@ -172,7 +179,9 @@ Apply the cognitive reasoning rules from `audit-orchestrator-knowledge-base.md`:
 ### Stage 4 — Report Generation & Schema Gate Validation
 
 **Step 11: Construct Final Draft-07 JSON Report**
-Construct the final schema-compliant JSON report object conforming strictly to `references/report-schema.json`. Every required key (`site`, `audited_at`, `audit_status`, `summary`, `findings[]`, `proactive_actions[]`) must be fully populated. Ensure zero newline escape sequences (`\n`), zero unpopulated null values, and zero unneeded debug blocks.
+Construct the final schema-compliant JSON report object conforming strictly to `references/report-schema.json`. Every required key (`site`, `audited_at`, `audit_status`, `summary`, `findings[]`, `proactive_actions[]`) must be fully populated.
+- **Clean JSON String Formatting Standard:** Every string field (`technical_fix`, `creative_fix`, `evidence.summary`, `proactive_actions[].summary`) MUST be a concise, coherent string. NEVER embed raw Markdown tables (`| Col | Col |`), HTML `<table>` markup, or escaped literal newlines (`\n\n`) inside JSON string properties. Use semicolons (` ; `) or clean single-line sentences for multi-step guidance.
+- Ensure zero unpopulated null values and zero unneeded debug blocks.
 
 **Step 12: Validate via Schema Gate**
 ```bash
@@ -180,8 +189,11 @@ python3 skills/audit-orchestrator/scripts/validate_report.py < final_report.json
 ```
 Validation MUST pass with exit code 0. If any schema violations occur, correct the payload before final emission.
 
-**Step 13: Direct Output Delivery (MANDATORY)**
-Emit the complete, unabridged Draft-07 JSON report directly inside a `json` code block in your response. Never substitute with a placeholder or point to disk.
+**Step 13: Clean Direct Output Delivery (MANDATORY)**
+Emit the complete, unabridged Draft-07 JSON report directly inside a single ````json```` code block in your response.
+- **Zero Conversational Preamble:** Do NOT precede the JSON with conversational chatter ("Here is my full audit..."), intermediate tool logs, or scratch script traces.
+- **Zero Duplicate Markdown Tables:** Do NOT output duplicate Markdown tables summarizing findings before the JSON block. Output strictly the validated JSON report.
+- Never substitute with a placeholder or point to disk.
 
 ---
 
@@ -195,8 +207,8 @@ Emit the complete, unabridged Draft-07 JSON report directly inside a `json` code
 6. **Network unreachable / timeout status is recorded as `inconclusive`, NEVER converted to a "clean" score.**
 7. **A heuristic signal alone cannot create a `high`-severity causal finding.**
 8. **Every finding must cite concrete, verifiable evidence from the actual pages.**
-9. **Every recommendation must map to a `cause_id` or be explicitly tagged as `proactive`.**
-10. **Every report must validate against `references/report-schema.json` before emission.**
+9. **Zero direct agent URL reading tools:** Crawling is strictly single-pass via `acquire_inventory.py`; downstream sensors run offline against `inv.json`.
+10. **Clean output standard:** Every report must validate against `references/report-schema.json`, containing zero conversational preamble, zero duplicate Markdown tables before the JSON, and zero literal `\n\n` or raw Markdown tables inside JSON string values.
 
 ---
 

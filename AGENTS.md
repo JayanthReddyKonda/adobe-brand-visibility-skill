@@ -35,14 +35,21 @@ Always mirror `src/` to `.agents/` after any edit:
    - All outbound requests must resolve target IPs before socket creation and immediately abort on RFC 1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopbacks (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`), carrier-grade NAT (`100.64.0.0/10`), AWS/GCP metadata (`169.254.169.254`), and IPv4-mapped IPv6 ranges.
 4. **Single-Pass Acquisition (Zero Redundant Crawls):**
    - Web crawling is strictly performed once by `web-scraper` (or `acquire_inventory.py`) emitting `inv.json`. All downstream diagnostic sensors run offline against `inv.json`.
-5. **Clean Marketplace Distribution:**
+5. **Zero Direct Agent URL Reading (Strictly Banned Tools):**
+   - AI agents MUST NEVER use built-in URL reading or browser tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget`.
+   - Direct agent fetching completely bypasses socket-level zero-trust SSRF protection, breaks single-pass inventory contracts, fails to parse Schema.org JSON-LD `@graph` hierarchies, and corrupts multi-skill analysis.
+   - All website crawling must strictly flow through `python3 skills/audit-orchestrator/scripts/acquire_inventory.py` or `python3 skills/web-scraper/scripts/run_scraper.py`.
+6. **Clean JSON Output Standard (Zero Preamble & Pollution):**
+   - Agents MUST NOT output conversational preambles ("Here is the complete audit..."), intermediate tool logs, scratch script traces, or duplicate Markdown tables before the JSON report.
+   - In JSON report string properties (`technical_fix`, `creative_fix`, `evidence.summary`, `proactive_actions[].summary`), agents MUST NEVER emit escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML markup. All strings must be clean, single-line or semicolon-delimited (` ; `).
+7. **Clean Marketplace Distribution:**
    - `brand-ai-readiness-audit.zip` unpacks into a single root folder `brand-ai-readiness-audit/` containing ONLY:
      - `marketplace.json`
      - `README.md`
      - `LICENSE`
      - `skills/` (the 8 skill folders)
    - Final archive size MUST be <= 50 MB (current artifact is ~274 KB).
-6. **Execution Ceiling:**
+8. **Execution Ceiling:**
    - Complete multi-skill audit for any standard domain must finish in < 5 minutes.
 
 ---
@@ -75,6 +82,9 @@ This matrix governs recurring implementation and automation errors. Follow these
 | **Schema validation error on root status** | Emitting `"ok"` or `"inconclusive"` at report root. | Root status must strictly be one of: `"complete"`, `"partial"`, or `"failed"`. |
 | **False-negative finding suppression** | Suppressing entity schema defects when HTML `<title>` or OpenGraph tags exist. | Machine search engines require explicit Schema.org JSON-LD. Never suppress `MATERIAL_ENTITY_AMBIGUITY` just because HTML title tags are present. |
 | **Sensor crash on empty crawl** | Target site unreachable or empty inventory passed. | Sensors must gracefully return `{"status": "inconclusive", "findings": [], "recommendations": []}`. Tests must accept `["ok", "inconclusive"]`. |
+| **Direct Agent URL Reading** | Calling built-in environment tools (`read_url_content`, `open_browser_url`) or `curl` on audited domain. | **STRICTLY PROHIBITED**. Always run `python3 skills/audit-orchestrator/scripts/acquire_inventory.py` to produce `inv.json` under SSRF protection. |
+| **Conversational Preamble / Duplicate Tables** | Dumping chatter, tool traces, or Markdown tables before the JSON report. | **STRICTLY FORBIDDEN**. Output strictly the final clean report in a ````json```` block without conversational noise. |
+| **Polluted JSON string values (`\n\n`, tables)** | Pasting multi-line Markdown tables or literal `\n\n` escape chains into JSON string fields. | **STRICTLY FORBIDDEN**. Format all string values (`technical_fix`, `creative_fix`, `summary`) as clean, single-line or semicolon-delimited (` ; `) prose. |
 | **Terminal / subagent hanging** | Shell blocked on interactive process or background command. | Avoid persistent interactive shells. Run standalone commands with timeout or use direct file inspection. |
 
 ---
@@ -148,12 +158,20 @@ pytest tests/ -q
 - Author code strictly under `src/skills/` and tests under `tests/`.
 - Run `./scripts/sync.sh` immediately after altering skill logic or manifests.
 - Keep `SKILL.md` documents concise and below 500 lines; place extended tables in `references/`.
+- Maintain unified knowledge bases per skill: avoid fragmented satellite files that cause reading fatigue; use structured sections (`bundle_context.py` section extraction).
+- Zero-LaTeX Markdown Standard: format all math, algorithms, and logic relations as clean plain text or unicode (no `$`, `$$`, `\frac{}{}`, `\sum`, `\text{}`).
 - Validate that helper functions accommodate argument inversion (e.g., `is_allowed(bot, url)` and `is_allowed(url, bot)`).
 - Provide dual-track remediation (both `technical_fix` and `creative_fix`) for every diagnostic finding.
+- Execute single-pass crawl via `acquire_inventory.py` emitting `inv.json`; all downstream specialist sensors run offline against `inv.json`.
+- Enforce the Clean Output Standard: emit strictly the final valid JSON report inside a single ````json```` code block with zero preamble, zero scratch dumps, and clean string values.
 
 ### Strictly Forbidden:
 - **DO NOT** edit files inside `.agents/` or `build/` directly.
 - **DO NOT** modify, format, or lint files in `resources/`.
 - **DO NOT** import runtime `pip` packages in `src/skills/`.
+- **DO NOT** use built-in agent URL reading or browser tools (`read_url_content`, `open_browser_url`, `browser_subagent`, `curl`).
 - **DO NOT** execute redundant network crawls across sensors when `inv.json` exists.
+- **DO NOT** output conversational chatter, execution logs, or duplicate Markdown tables before the final JSON report.
+- **DO NOT** embed literal `\n\n` escape chains or raw Markdown tables inside JSON string properties (`technical_fix`, `creative_fix`, `summary`).
+- **DO NOT** use LaTeX delimiters in user-facing Markdown documentation or knowledge bases.
 - **DO NOT** commit cache files (`__pycache__`, `*.pyc`).

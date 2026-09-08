@@ -21,7 +21,8 @@ allowed-tools:
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `engagement_check.py` measures orientation proxies, H1 semantic scent, viewport answer anchoring, and CTA reachability friction. Without first-party analytics, it operates strictly on structural UX proxies and never fabricates empirical bounce rates.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) correlates structural friction with simulated user intent handoffs, cross-correlates analytics when provided, and synthesizes clear above-the-fold value proposition and navigation continuity fixes.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. AI agents must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
+> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected friction, correlates UX signals with simulated user intent handoffs, and synthesizes actionable orientation and continuity fixes.
 
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.
 
@@ -116,6 +117,7 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, engagement_mode, analytics_summary, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
+All string fields in emitted findings and recommendations must be clean, single-line or semicolon-delimited (` ; `), containing zero escaped literal newlines (`\n\n`) and zero raw Markdown tables.
 
 ---
 

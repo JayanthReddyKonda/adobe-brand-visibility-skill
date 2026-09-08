@@ -108,3 +108,12 @@ Autonomous agents evaluate websites via clean plain-text endpoints:
 
 1. **`/llms.txt`**: Standardized markdown index summarizing brand offerings with BLUF overviews and hierarchical links.
 2. **`/pricing.md`**: Un-gated structured markdown comparison table detailing plan tiers, seat limits, shipping thresholds, and volume discounts for autonomous purchasing agents (OpenAI Operator, Google Mariner).
+
+---
+
+## 7. Execution Invariants & Clean Output Delivery Standard
+
+1. **Single-Pass Acquisition Mandate:** Web crawling is strictly performed once via `acquire_inventory.py` / `web-scraper` emitting `inv.json`. All downstream diagnostic sensors analyze `inv.json` offline.
+2. **Strictly Banned Agent Tools:** Never use agent built-in URL reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget`. Direct agent reading bypasses socket-level zero-trust SSRF validation and corrupts multi-skill analysis.
+3. **Clean Output Delivery:** Emit strictly the final validated Draft-07 JSON report in a single ````json```` block. Never prepend conversational preambles, intermediate tool traces, or duplicate Markdown tables before the JSON block.
+4. **Clean String Formatting:** In JSON report string fields (`technical_fix`, `creative_fix`, `summary`, `evidence`), never embed escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML. Strings must be clean, single-line or semicolon-delimited (` ; `).

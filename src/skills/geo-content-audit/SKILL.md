@@ -21,6 +21,7 @@ allowed-tools:
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `geo_content_check.py` measures text quotability, answer density, heading/chunk alignment, statistical metrics, attributed quotes, and causal conjunction density across the 9 empirical Princeton KDD 2024 / AutoGEO vectors. It does not claim that any metric guarantees ranking or citation.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. AI agents must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests citability metrics, executes simulated assistant query strategies, and synthesizes bespoke, information-dense passage chunking and explanatory rewrites.
 
 Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) extractability based on empirical Generative Engine Optimization research (Aggarwal et al., Princeton KDD 2024 and AutoGEO ICLR 2026). Determines whether content provides the causal mechanisms, statistical evidence, and structured definitions required for LLM citation.
@@ -134,6 +135,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], page_improvement_plans[], coverage{}, limitations[]}`.
+All string fields in emitted findings, recommendations, and improvement plans must be clean, single-line or semicolon-delimited (` ; `), containing zero escaped literal newlines (`\n\n`) and zero raw Markdown tables.
 
 ---
 

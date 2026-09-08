@@ -221,19 +221,26 @@ def load_schema() -> Optional[Dict[str, Any]]:
 
 
 def clean_text_string(val: Any) -> str:
-    """Normalize string for clean JSON report output, eliminating literal newlines and redundant whitespace."""
+    """Normalize string for clean JSON report output, eliminating literal newlines, raw tables, and redundant whitespace."""
     if val is None:
         return ""
     if isinstance(val, (tuple, list)):
         return " ; ".join(clean_text_string(x) for x in val if x)
     text = str(val)
+    # Strip markdown table delimiter lines e.g. |---|---| or |:---:|:---:|
+    text = re.sub(r"\|(?:\s*:?-+:?\s*\|)+", " ", text)
+    # Strip leading and trailing table pipes e.g. | col1 | col2 | -> col1 ; col2
+    text = re.sub(r"(?m)^\s*\|\s*", "", text)
+    text = re.sub(r"(?m)\s*\|\s*$", "", text)
+    text = re.sub(r"\s*\|\s*", " ; ", text)
     # If text has newlines between sentences (ends with punctuation), replace with space
     text = re.sub(r"([.!?])\s*[\r\n]+\s*", r"\1 ", text)
     # If text has code/config lines (like robots.txt or markdown lists), join with ' ; '
     text = re.sub(r"\s*[\r\n]+\s*", " ; ", text)
-    # Collapse excessive spaces
-    text = re.sub(r"[ \t]+", " ", text).strip()
-    return text
+    # Clean up duplicated semicolons and spaces
+    text = re.sub(r"(?:\s*;\s*)+", " ; ", text)
+    text = re.sub(r"[ \t]+", " ", text).strip(" ;")
+    return text.strip()
 
 
 def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, Any], extra_arg=None) -> Dict[str, Any]:

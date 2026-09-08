@@ -21,6 +21,7 @@ allowed-tools:
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `discoverability_check.py` is a pure measurement sensor. It inspects RFC 9309 crawler matrices, HTTP response codes, meta directives, canonical chains, and raw HTML extractability. It outputs observed empirical evidence without canned recommendation prose.
+> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. AI agents must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests this sensor's output, applies Layer 0 causal gating (suppressing downstream schema/GEO complaints if retrieval is blocked), simulates query strategies, and synthesizes bespoke dual-track fixes.
 
 Evaluates the accessibility and indexing pipeline of a website for AI retrieval engines (ChatGPT Search, Claude Search, Perplexity AI, Google Search). Determines whether AI crawlers can fetch the site's content and whether initial HTML payloads carry extractable text.
@@ -108,6 +109,7 @@ python3 skills/discoverability-audit/scripts/discoverability_check.py --site htt
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
+All string fields in emitted findings and recommendations must be clean, single-line or semicolon-delimited (` ; `), containing zero escaped literal newlines (`\n\n`) and zero raw Markdown tables.
 
 ---
 

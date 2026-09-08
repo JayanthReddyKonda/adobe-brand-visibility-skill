@@ -19,6 +19,11 @@ allowed-tools:
 > - **Deterministic Read-Only Acquisition:** `web-scraper` executes bounded, single-pass website acquisition (`run_scraper.py` emitting `inv.json`). It enforces pre-connect zero-trust SSRF validation, parses RFC 9309 crawler matrices across 16 AI bots, traverses XML sitemaps, and extracts Trafilatura-grade markdown. It **must not** recommend fixes, assign severities, or call LLMs.
 > - **Cognitive Orchestrator:** All downstream diagnostic sensors and the Master Orchestrator run offline against `inv.json`, eliminating redundant crawls.
 
+> [!CAUTION]
+> **ZERO DIRECT AGENT URL READING MANDATE:**
+> AI agents MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to inspect websites or robots.txt.
+> All acquisition must flow through `python3 skills/web-scraper/scripts/run_scraper.py` (or `acquire_inventory.py`) to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
+
 ## When to Use
 Invoke this skill whenever an AI agent or workflow needs to:
 - Crawl a target website to extract page representations, HTML, clean Markdown, and metadata.

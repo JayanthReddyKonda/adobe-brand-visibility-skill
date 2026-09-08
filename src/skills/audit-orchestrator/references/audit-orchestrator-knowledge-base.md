@@ -576,6 +576,7 @@ Every network fetch in the orchestrator and all specialist tools enforces:
 3. **Bounded Redirects:** Max 5 redirects with target IP re-validation on every hop.
 4. **Hard Size Caps:** HTML pages (max 2 MB), robots.txt (max 512 KB), sitemaps (max 2 MB), external authority probes (max 512 KB).
 5. **Same-Origin Crawling:** Sitemaps and priority links must match the target domain origin.
+6. **Zero Direct Agent URL Reading:** Autonomous AI agents are strictly prohibited from using built-in URL reading or browser tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget`. All web scraping must flow through `safe_fetch.py` / `acquire_inventory.py`.
 
 ---
 
@@ -678,7 +679,11 @@ Rules:
 Heuristics (like counting `<table>` tags or measuring keyword density) may be used to build a classifier profile, but **cannot alone trigger a finding**. Findings must require semantic corroboration or explicit logic breakdown (e.g., missing `<title>` tag).
 
 ## 5. Output Delivery Mandate (Output Standard)
-The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output. The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a ```json``` code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output:
+1. **Direct JSON Code Block:** The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a single ````json```` code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
+2. **Zero Conversational Preamble:** Do NOT output conversational preambles ("Here is the complete audit..."), execution traces, or scratch script dumps before the JSON report.
+3. **Zero Duplicate Markdown Tables:** Do NOT render duplicate Markdown tables summarizing the findings before the JSON code block. Downstream consumers require clean, unpolluted output.
+4. **Clean String Formatting:** In all JSON string properties (such as `technical_fix`, `creative_fix`, `evidence.summary`, `proactive_actions[].summary`), strings MUST be concise, single-line or semicolon-delimited (` ; `). NEVER embed escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML `<table>` markup inside JSON strings.
 
 ## 6. Query-Intent Scenario Modeling
 When authoring `root_cause` and `impact` for findings, articulate the specific query mode failure in conversational AI search engines:
