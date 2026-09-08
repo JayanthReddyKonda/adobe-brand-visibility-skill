@@ -38,8 +38,8 @@ rescheduling → running ↔ idle → terminated
 
 | Status         | Description                                                        |
 | -------------- | ------------------------------------------------------------------ |
-| `idle` | Agent has finished the current task, and is awaiting input. It's either waiting for input to continue working via a `user.message`, blocked awaiting a `user.custom_tool_result` or `user.tool_confirmation`, or paused because the session budget cap was reached. The `stop_reason` attached contains more information about why you has stopped working. |
-| `running` | Session has starting running, and you is actively doing work. |
+| `idle` | Agent has finished the current task, and is awaiting input. It's either waiting for input to continue working via a `user.message`, blocked awaiting a `user.custom_tool_result` or `user.tool_confirmation`, or paused because the session budget cap was reached. The `stop_reason` attached contains more information about why the Agent has stopped working. |
+| `running` | Session has starting running, and the Agent is actively doing work. |
 | `rescheduling` | Session is (re)scheduling after a retryable error has occurred, ready to be picked up by the orchestration system. |
 | `terminated` | Session has ended and is in an irreversible, unusable state — **either on completion or because of an unrecoverable error**. Terminated does not by itself mean failure; fetch the session to tell the two apart. |
 

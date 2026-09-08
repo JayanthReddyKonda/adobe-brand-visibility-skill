@@ -186,7 +186,7 @@ Create talking-head videos without filming. An AI avatar delivers your script wi
 
 Best lip-sync and micro-expressions. 230+ avatars, 140+ languages.
 
-**Agent integration:** HeyGen has an official MCP server — You can generate avatar videos directly.
+**Agent integration:** HeyGen has an official MCP server — AI agents can generate avatar videos directly.
 
 | Plan | Videos | Duration |
 |------|--------|----------|

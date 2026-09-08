@@ -333,8 +333,10 @@ def audit(base, domain, inv=None, state_file=None):
     html_pages = []
     if inv is not None:
         for p in inv.get("pages", []):
-            u = p.get("url", "")
-            raw_html = p.get("html", "")
+            u = p.get("url") or ""
+            raw_html = p.get("html") or ""
+            if not u or not raw_html:
+                continue
             # Strict non-HTML / sitemap rejection
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue

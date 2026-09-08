@@ -1,6 +1,6 @@
 # Cogny
 
-Hosted MCP gateway that bundles several marketing tools behind one URL with managed OAuth. Useful when you want You to talk to multiple marketing channels without standing up your own OAuth proxy.
+Hosted MCP gateway that bundles several marketing tools behind one URL with managed OAuth. Useful when you want AI agents to talk to multiple marketing channels without standing up your own OAuth proxy.
 
 ## Capabilities
 

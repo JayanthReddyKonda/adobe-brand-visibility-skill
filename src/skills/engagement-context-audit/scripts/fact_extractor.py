@@ -667,8 +667,10 @@ def audit(base, domain, responses_file=None, inv=None):
 
     if inv is not None:
         for p in inv.get("pages", []):
-            u = p.get("url", "")
-            raw_html = p.get("html", "")
+            u = p.get("url") or ""
+            raw_html = p.get("html") or ""
+            if not u or not raw_html:
+                continue
             if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
                 continue
             if (
@@ -677,8 +679,7 @@ def audit(base, domain, responses_file=None, inv=None):
                 or "<sitemapindex" in raw_html.lower()
             ):
                 continue
-            if raw_html:
-                page_fact_list.append(extract_scoped_facts(raw_html, u))
+            page_fact_list.append(extract_scoped_facts(raw_html, u))
     else:
         _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:

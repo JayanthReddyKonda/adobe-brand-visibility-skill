@@ -164,7 +164,7 @@ pytest tests/ -q
 - Provide dual-track remediation (both `technical_fix` and `creative_fix`) for every diagnostic finding.
 - Execute single-pass crawl via `acquire_inventory.py` emitting `inv.json`; all downstream specialist sensors run offline against `inv.json`.
 - Enforce the Clean Output Standard: emit strictly the final valid JSON report inside a single ````json```` code block with zero preamble, zero scratch dumps, and clean string values.
-- Enforce True Hybrid Orchestration: When orchestrating multi-skill diagnostic workflows, agents must delegate deterministic tasks (Causal DAG deduplication, orthogonal math scoring, schema construction) to the Python engine (`orchestrator.py`). You's role is strictly cognitive reasoning over the JSON output.
+- Enforce True Hybrid Orchestration: When orchestrating multi-skill diagnostic workflows, agents must delegate deterministic tasks (Causal DAG deduplication, orthogonal math scoring, schema construction) to the Python engine (`orchestrator.py`). The agent's role is strictly cognitive reasoning over the JSON output.
 - Tool-Agnostic File Reading: When authoring Agentic Runbooks (`SKILL.md`), explicitly instruct agents to use their native file-reading tools. Never embed bash `cat` commands for file ingestion.
 - Production Standard Order: Enforce the 14-section Production Standard Order for all `SKILL.md` files (Frontmatter, Title, Table, Protocol Mandate, Caution Block, Summary, When to use, Inputs, References, `---`, Procedure, Output Format, Gotchas, Security/SSRF Policy).
 
@@ -178,5 +178,5 @@ pytest tests/ -q
 - **DO NOT** embed literal `\n\n` escape chains or raw Markdown tables inside JSON string properties (`technical_fix`, `creative_fix`, `summary`).
 - **DO NOT** use LaTeX delimiters in user-facing Markdown documentation or knowledge bases.
 - **DO NOT** commit cache files (`__pycache__`, `*.pyc`).
-- **DO NOT** instruct You to act as manual calculators or perform multi-layered deterministic deduplication (Fake Orchestration).
-- **DO NOT** instruct You to use bash `cat` to read files.
+- **DO NOT** instruct AI agents to act as manual calculators or perform multi-layered deterministic deduplication (Fake Orchestration).
+- **DO NOT** instruct AI agents to use bash `cat` to read files.

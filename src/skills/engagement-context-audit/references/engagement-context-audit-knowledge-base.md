@@ -209,7 +209,7 @@ A page can achieve a 95/100 technical SEO score and still fail completely in AI 
 
 ## 7. Autonomous AI Buying Agent Readiness (`/pricing.md`)
 
-Autonomous You (OpenAI Operator, Google Project Mariner) increasingly evaluate software and service options programmatically before human buyers ever visit the site:
+Autonomous AI agents (OpenAI Operator, Google Project Mariner) increasingly evaluate software and service options programmatically before human buyers ever visit the site:
 - **Opaque Pricing Failure:** If pricing is locked behind client-rendered dynamic JavaScript or a forced "Contact Sales" wall, automated agents skip the vendor and recommend competitors with machine-readable plans.
 - **Standard Machine-Readable Manifests:**
   - `/pricing.md` or `/pricing.txt`: A structured markdown summary of tiers, monthly/annual rates, usage limits, and core features.

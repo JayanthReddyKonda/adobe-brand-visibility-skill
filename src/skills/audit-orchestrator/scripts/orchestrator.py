@@ -322,7 +322,7 @@ def synthesize_audit_report(
     _brand_guess = _domain_clean.split(".")[0].capitalize()
 
     for p in pages:
-        p_html = p.get("html", "")
+        p_html = p.get("html") or ""
         m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
         if m_og and m_og.group(1).strip():
             _brand_guess = m_og.group(1).strip()
@@ -339,7 +339,7 @@ def synthesize_audit_report(
     sample_product_route = None
     sample_pricing_route = None
     for p in pages:
-        p_url = p.get("url", "")
+        p_url = p.get("url") or ""
         parsed_p = urlparse(p_url)
         path = parsed_p.path or "/"
         if path not in ("/", "") and path not in sample_routes:
@@ -929,7 +929,7 @@ def collect_telemetry(
 
     try:
         from corroboration_check import audit as audit_corrob
-        extra = {"candidate_backlinks_file": candidate_backlinks} if candidate_backlinks else None
+        extra = {"candidate_backlinks": candidate_backlinks} if candidate_backlinks else None
         specialist_results["corroboration-authority-audit"] = run_specialist_sensor(audit_corrob, base, domain, inv, extra)
     except Exception:
         specialist_results["corroboration-authority-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
@@ -942,7 +942,7 @@ def collect_telemetry(
 
     try:
         from engagement_check import audit as audit_eng
-        extra = {"analytics_file": analytics} if analytics else None
+        extra = {"analytics": analytics} if analytics else None
         specialist_results["engagement-context-audit"] = run_specialist_sensor(audit_eng, base, domain, inv, extra)
     except Exception:
         specialist_results["engagement-context-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}

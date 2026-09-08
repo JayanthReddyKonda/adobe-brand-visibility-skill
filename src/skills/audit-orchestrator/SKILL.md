@@ -26,7 +26,7 @@ allowed-tools:
 > 1. **Deterministic Master Runner (Automated Engine):** The Python script `orchestrator.py` executes single-pass web acquisition, runs all 6 specialist sensors, performs strict Causal DAG deduplication, calculates orthogonal math scores, and emits a perfect Draft-07 schema JSON report.
 > 2. **Agentic Runbook (Cognitive Reasoning):** As the AI agent, you do **not** manually run the specialist scripts or manually format the JSON. Instead, you run the master orchestrator, read the generated JSON report, and apply true AI Cognitive Reasoning (synthesizing the executive diagnosis, explaining epistemic falsification, and contextualizing the findings for the user).
 
-You leverage the deterministic orchestrator script to handle the math, schema, and causal DAG routing. You then load the resulting schema and apply multi-signal cognitive reasoning against the knowledge bases to deliver high-level strategic guidance to the end user.
+Leverage the deterministic orchestrator script to handle the math, schema, and causal DAG routing. Then load the resulting schema and apply multi-signal cognitive reasoning against the knowledge bases to deliver high-level strategic guidance to the end user.
 
 ---
 

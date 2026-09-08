@@ -264,7 +264,7 @@ Contributions welcome! Please follow the [Agent Skills specification](https://ag
 ## Resources
 
 - [Google Lighthouse Documentation](https://developer.chrome.com/docs/lighthouse/)
-- [Lighthouse audits with You](https://developer.chrome.com/docs/devtools/agents/use-cases/lighthouse-audit)
+- [Lighthouse audits with AI agents](https://developer.chrome.com/docs/devtools/agents/use-cases/lighthouse-audit)
 - [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp)
 - [Chrome UX Report](https://developer.chrome.com/docs/crux/)
 - [web.dev Learn Performance](https://web.dev/learn/performance/)

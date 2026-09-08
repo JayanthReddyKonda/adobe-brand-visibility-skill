@@ -273,13 +273,13 @@ AI systems don't just cite your website — they cite where you appear.
 >
 > **Why include them anyway**: non-Google AI engines (ChatGPT, Claude, Perplexity) and autonomous buying agents do reward extractable structure. The files below help with those engines without harming Google.
 
-You aren't just answering questions — they're becoming buyers. When an AI agent evaluates tools on behalf of a user, it needs structured, parseable information. If your pricing is locked in a JavaScript-rendered page or a "contact sales" wall, agents will skip you and recommend competitors whose information they can actually read.
+AI agents aren't just answering questions — they're becoming buyers. When an AI agent evaluates tools on behalf of a user, it needs structured, parseable information. If your pricing is locked in a JavaScript-rendered page or a "contact sales" wall, agents will skip you and recommend competitors whose information they can actually read.
 
 **Audit this layer first**: [references/agent-readiness.md](references/agent-readiness.md) — the access/discovery/parseability checklist, free scoring tools (`npx is-agentic`, Frase's checker), Markdown content negotiation + `Link` headers, `llms-full.txt`, and the emerging agent-*actionable* layer (WebMCP).
 
 Add these machine-readable files to your site root:
 
-**`/pricing.md` or `/pricing.txt`** — Structured pricing data for You
+**`/pricing.md` or `/pricing.txt`** — Structured pricing data for AI agents
 
 ```markdown
 # Pricing — [Your Product Name]
@@ -301,7 +301,7 @@ Add these machine-readable files to your site root:
 ```
 
 **Why this matters now:**
-- You increasingly compare products programmatically before a human ever visits your site
+- AI agents increasingly compare products programmatically before a human ever visits your site
 - Opaque pricing gets filtered out of AI-mediated buying journeys
 - A simple markdown file is trivially parseable by any LLM — no rendering, no JavaScript, no login walls
 - Same principle as `robots.txt` (for crawlers), `llms.txt` (for AI context), and `AGENTS.md` (for agent capabilities)
@@ -434,7 +434,7 @@ Google's guide calls these out explicitly — they hurt across both traditional 
 3. **Generate at scale for ranking manipulation**. AI-generated content is fine *if* it meets Search Essentials and spam policies. Mass-producing thin variations does not.
 4. **Pursue inauthentic mentions**. Don't fabricate citations or bulk-spam Reddit/Wikipedia for AI visibility. Real participation only.
 5. **Block AI crawlers if you want citation**. Blocking GPTBot, PerplexityBot, ClaudeBot, Google-Extended means those engines literally cannot cite you. Block training-only crawlers (CCBot) if you must, not the search-and-cite ones.
-6. **Hide your main content behind JS that doesn't render**. Both core Search and You need to see your content; JS-only rendering loses both audiences.
+6. **Hide your main content behind JS that doesn't render**. Both core Search and AI agents need to see your content; JS-only rendering loses both audiences.
 7. **Skip E-E-A-T fundamentals**. Author identity, first-hand experience, expertise signals, transparent sourcing — Google's guide leans heavily on these for AI features.
 
 ---
@@ -455,7 +455,7 @@ For tactical guidance on SaaS product pages, blog content, comparison/alternativ
 - **Ignoring third-party presence** — You may get more AI citations from a Wikipedia mention than from your own blog
 - **No structured data** — Schema markup gives AI systems structured context about your content
 - **Keyword stuffing** — Unlike traditional SEO where it's just ineffective, keyword stuffing actively reduces AI visibility by 10% (Princeton GEO study)
-- **Hiding pricing behind "contact sales" or JS-rendered pages** — You evaluating your product on behalf of buyers can't parse what they can't read. Add a `/pricing.md` file
+- **Hiding pricing behind "contact sales" or JS-rendered pages** — AI agents evaluating your product on behalf of buyers can't parse what they can't read. Add a `/pricing.md` file
 - **Blocking AI bots** — If GPTBot, PerplexityBot, or ClaudeBot are blocked in robots.txt, those platforms can't cite you
 - **Generic content without data** — "We're the best" won't get cited. "Our customers see 3x improvement in [metric]" will
 - **Forgetting to monitor** — You can't improve what you don't measure. Check AI visibility monthly at minimum

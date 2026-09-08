@@ -97,10 +97,10 @@ Use this library to generate per-tier variants. Swap `[product]`, `[category]`, 
 **Target:** Glama, APITracker, Linux Foundation MCP Registry, AI Agents List, AI Agent Store, AgentHunter
 
 **Tagline:**
-> MCP-native [category] for You.
+> MCP-native [category] for AI agents.
 
 **Long description:**
-> [Product] is an MCP-native [category] that lets You [capability]. It exposes [MCP server capabilities] via the Model Context Protocol, so agents in Claude, ChatGPT, Cursor, and any MCP-compatible client can [actions].
+> [Product] is an MCP-native [category] that lets AI agents [capability]. It exposes [MCP server capabilities] via the Model Context Protocol, so agents in Claude, ChatGPT, Cursor, and any MCP-compatible client can [actions].
 >
 > MCP capabilities:
 > • [Tool 1] — [what the agent can do]

@@ -156,7 +156,7 @@ Google updated its JavaScript SEO documentation in December 2025 with critical c
 
 ## Agent-Friendly Pages & Agentic Browsing
 
-You (not just AI summarizers) increasingly read sites through three
+AI agents (not just AI summarizers) increasingly read sites through three
 channels: vision models on screenshots, raw HTML/DOM, and the **accessibility
 tree** (the cleanest signal). Audit criteria: semantic HTML (real `<button>`
 and `<a>`, not `<div onclick>`), label associations, interactive target sizing,

@@ -13,7 +13,7 @@ Both checks are non-scoring. They produce a pass or a recommendation, never a de
 
 Identified while auditing [isitagentready.com](https://isitagentready.com/), a Cloudflare tool that evaluates agent-layer readiness. It checks for Markdown content negotiation and RFC 8288 Link headers; geo-seo-claude did not.
 
-**Markdown content negotiation:** Cloudflare's "Markdown for Agents" feature lets servers respond to `Accept: text/markdown` with clean Markdown instead of HTML. You that support content negotiation receive content without boilerplate stripping. The mechanism (HTTP content negotiation, RFC 7231) is universal; adoption is expected to grow beyond Cloudflare.
+**Markdown content negotiation:** Cloudflare's "Markdown for Agents" feature lets servers respond to `Accept: text/markdown` with clean Markdown instead of HTML. AI agents that support content negotiation receive content without boilerplate stripping. The mechanism (HTTP content negotiation, RFC 7231) is universal; adoption is expected to grow beyond Cloudflare.
 
 **RFC 8288 Link headers:** The HTTP `Link:` response header (RFC 8288) lets servers advertise related resources — API catalog, service docs, MCP server card — in a machine-readable way directly in the HTTP response, without HTML parsing. This is most relevant for API-first sites and companies building MCP integrations. Standard business sites that lack these headers should not see the recommendation.
 

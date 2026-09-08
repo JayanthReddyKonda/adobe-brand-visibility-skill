@@ -6,11 +6,11 @@
 
 ---
 
-## 1. The Core Architectural Philosophy: You IS the Orchestrator
+## 1. The Core Architectural Philosophy: The AI Agent IS the Orchestrator
 
 This system implements a **True Agentic Marketplace**. There is no monolithic master Python runner in `src/` that conceals decision logic in procedural code. 
 
-You acts as the cognitive engine:
+The AI agent acts as the cognitive engine:
 1. The AI reads each skill's `SKILL.md` and domain knowledge bases to understand decision boundaries.
 2. The AI invokes pure-Python deterministic sensor scripts via CLI to gather telemetry.
 3. The AI applies multi-signal cognitive reasoning to diagnose root causes, deduplicate findings, and map evidence.

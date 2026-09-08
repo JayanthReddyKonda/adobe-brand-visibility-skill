@@ -102,7 +102,7 @@ adobe-brand-visibility-skill/
 
 ---
 
-## 4. Critical Environment Quirks & Watch-Outs for you
+## 4. Critical Environment Quirks & Watch-Outs for the Agent
 
 1. **IDE Buffer Lock / File Reversion Danger:**
    - In this development environment, calling interactive replacement tools across multiple files can trigger an editor buffer review lock. If the user dismisses the review widget, files roll back to the last clean git commit.

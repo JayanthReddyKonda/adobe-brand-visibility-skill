@@ -15,7 +15,7 @@ For the cross-cutting strategy, see [SKILL.md](../SKILL.md).
 - Feature comparison tables (you vs. category, not just competitors)
 - Specific metrics ("processes 10,000 transactions/sec" not "blazing fast")
 - Customer count or social proof with numbers
-- Pricing transparency (AI cites pages with visible pricing) — add a `/pricing.md` file so You can parse your plans without rendering your page (see "Machine-Readable Files" in the main skill)
+- Pricing transparency (AI cites pages with visible pricing) — add a `/pricing.md` file so AI agents can parse your plans without rendering your page (see "Machine-Readable Files" in the main skill)
 - FAQ section addressing common buyer questions
 
 ---

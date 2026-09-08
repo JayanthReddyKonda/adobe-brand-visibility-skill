@@ -184,7 +184,7 @@ This keeps secrets out of reusable agent definitions. Each vault credential is t
 
 > 💡 **Changing tools/MCP servers on a running session:** `sessions.update()` can replace `agent.tools` and `agent.mcp_servers` while the session is `idle` — a session-local override that doesn't touch the agent object. `vault_ids` is create-only. See `shared/managed-agents-core.md` → Updating the agent configuration mid-session.
 
-**Large tool outputs.** If a tool returns more than **100,000 characters (roughly 25,000 tokens)**, the output is automatically offloaded to a file in the sandbox — the agent receives a truncated preview plus the file path and can `read` the full content. No configuration required. The threshold is in *characters*, not tokens, and apply to built-in agent tools as well as MCP tools.
+**Large tool outputs.** If a tool returns more than **100,000 characters (roughly 25,000 tokens)**, the output is automatically offloaded to a file in the sandbox — the agent receives a truncated preview plus the file path and can `read` the full content. No configuration required. The threshold is in *characters*, not tokens, and applies to built-in agent tools as well as MCP tools.
 
 **Invalid vault credentials don't block session creation.** If a vault credential is invalid for a declared MCP server, the session still creates successfully; a `session.error` event describes the MCP auth failure, and auth retries on the next `session.status_idle` → `session.status_running` transition.
 

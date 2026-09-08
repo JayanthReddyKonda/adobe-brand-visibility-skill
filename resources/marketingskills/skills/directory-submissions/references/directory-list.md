@@ -166,7 +166,7 @@ Relevant only if the product exposes agent capabilities or MCP servers. These ar
 | **AI Agents Base** | Agents | All-in-one directory. |
 | **AI Agents Directory** | Agents | Specialized, updated daily. |
 | **AI Agents Verse** | Agents | Curated directory. |
-| **AgentHunter** | Agents | "Discover the best You." |
+| **AgentHunter** | Agents | "Discover the best AI agents." |
 | **Add AI Directory** | Agents | Catalogs agents + tools. |
 | **AI Agents Live** | Agents | Discovery + sharing. |
 | **AI Agents Marketplace** | Agents | Organized by 300+ human role equivalents. |

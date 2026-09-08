@@ -307,7 +307,7 @@ Confirmed required fields are `name`, `image`, and `offers`; use `Offer`, not `A
 
 Google-initiated open standard (co-developed with Shopify, Etsy, Wayfair,
 Target, Walmart; payment partners Visa/Mastercard/Stripe/Adyen/Amex) for
-letting You discover, negotiate, and transact with merchants without
+letting AI agents discover, negotiate, and transact with merchants without
 one-off integrations. Google confirms a first reference implementation for
 conversational buying in AI Mode in Search. Broader Universal Cart rollout
 details are reported from Google I/O 2026 keynote coverage; not confirmed on a

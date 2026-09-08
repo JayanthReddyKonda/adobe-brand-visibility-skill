@@ -23,6 +23,9 @@ BLOCKED_NETWORKS = [
     ipaddress.ip_network("169.254.0.0/16"),
     ipaddress.ip_network("172.16.0.0/12"),
     ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("100.100.100.200/32"),
+    ipaddress.ip_network("169.254.170.2/32"),
     ipaddress.ip_network("::1/128"),
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
@@ -35,7 +38,8 @@ def _is_safe_host(hostname):
         if not hostname or " " in hostname:
             return False, "Malformed hostname", []
 
-        ip_info = socket.getaddrinfo(hostname, 80, proto=socket.IPPROTO_TCP)
+        clean_hostname = (hostname or "").strip().strip("[]")
+        ip_info = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
         safe_ips = []
         for sf in ip_info:
             ip_obj = ipaddress.ip_address(sf[4][0])
@@ -241,7 +245,7 @@ def safe_fetch(
                     deadline=deadline,
                     is_retry=True,
                 )
-        return e.code, "", {k.lower(): v for k, v in e.headers.items()}, str(e)
+        return e.code, "", {k.lower(): v for k, v in e.headers.items()} if e.headers else {}, str(e)
     except Exception as e:
         return None, "", {}, str(e)
 

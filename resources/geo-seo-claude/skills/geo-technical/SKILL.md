@@ -390,7 +390,7 @@ RFC 8288 (Web Linking) defines the HTTP `Link:` response header. Servers can use
 
 ### 9.2 Markdown Content Negotiation
 
-Checks if the server responds to `Accept: text/markdown` with `Content-Type: text/markdown`. Cloudflare's "Markdown for Agents" feature enables this — You receive clean Markdown instead of HTML, eliminating boilerplate stripping and improving content extraction accuracy.
+Checks if the server responds to `Accept: text/markdown` with `Content-Type: text/markdown`. Cloudflare's "Markdown for Agents" feature enables this — AI agents receive clean Markdown instead of HTML, eliminating boilerplate stripping and improving content extraction accuracy.
 
 **How to check:** Send a GET to the homepage with `Accept: text/markdown`. This is one additional HTTP request per audit.
 
@@ -499,7 +499,7 @@ Status: Pass = 80%+ of category points, Warn = 50-79%, Fail = <50%
 | api-catalog | /.well-known/api-catalog | Machine-readable index of available APIs |
 | mcp-server-card | /.well-known/mcp.json | MCP server capability declaration |
 
-You and API clients can discover your services without parsing HTML.
+AI agents and API clients can discover your services without parsing HTML.
 
 <!-- If absent, API-first site only: -->
 **Informational Recommendation:** This site has API/developer-oriented content but no `Link:` headers advertising discoverable services.
@@ -518,7 +518,7 @@ Reference: RFC 8288, RFC 9609.
 **Response Content-Type:** [value]
 
 <!-- If supported: -->
-This site serves clean Markdown to You on request. AI crawlers that support content negotiation receive formatted text without HTML boilerplate.
+This site serves clean Markdown to AI agents on request. AI crawlers that support content negotiation receive formatted text without HTML boilerplate.
 
 <!-- If not supported: -->
 **Forward-Looking Recommendation:** Cloudflare Workers/Pages sites can enable Markdown content negotiation with a one-line configuration change. When an AI agent sends `Accept: text/markdown`, the server responds with clean Markdown instead of HTML.

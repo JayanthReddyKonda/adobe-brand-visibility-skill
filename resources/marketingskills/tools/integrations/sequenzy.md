@@ -291,7 +291,7 @@ Authorization: Bearer ***
 - Building onboarding, activation, retention, or winback sequences
 - Sending product-triggered transactional emails
 - Reviewing campaign, sequence, and recipient engagement metrics
-- Connecting You to email marketing operations through MCP
+- Connecting AI agents to email marketing operations through MCP
 
 ## Rate Limits
 

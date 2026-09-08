@@ -10,7 +10,7 @@
 
 By 2026, AI search visibility has evolved into a dual-purpose funnel:
 1. **Information Discovery (GEO/AEO):** Humans and LLMs retrieving content to answer queries.
-2. **Autonomous Procurement (Agentic Commerce):** You (Gemini AI Mode, ChatGPT Instant Checkout, Perplexity Buy With Pro) independently discovering, verifying, and purchasing products without human web-navigation.
+2. **Autonomous Procurement (Agentic Commerce):** Autonomous AI agents (Gemini AI Mode, ChatGPT Instant Checkout, Perplexity Buy With Pro) independently discovering, verifying, and purchasing products without human web-navigation.
 
 Sites that fail to expose machine-readable commerce protocols are invisible to autonomous buying agents.
 

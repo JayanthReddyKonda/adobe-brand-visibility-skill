@@ -67,8 +67,8 @@ Event types use dot notation, grouped by namespace:
 | `agent.mcp_tool_result` | Result from an MCP tool |
 | `agent.custom_tool_use` | Agent invoked a custom tool — session goes idle, you respond with `user.custom_tool_result` |
 | `agent.thread_context_compacted` | Conversation context was compacted |
-| `session.status_idle` | Agent has finished the current task, and is awaiting input. It's either waiting for input to continue working via a `user.message`, blocked awaiting a `user.custom_tool_result` or `user.tool_confirmation`, or paused because the session budget cap was reached. The `stop_reason` attached contains more information about why you has stopped working. |
-| `session.status_running` | Session has starting running, and you is actively doing work. |
+| `session.status_idle` | Agent has finished the current task, and is awaiting input. It's either waiting for input to continue working via a `user.message`, blocked awaiting a `user.custom_tool_result` or `user.tool_confirmation`, or paused because the session budget cap was reached. The `stop_reason` attached contains more information about why the Agent has stopped working. |
+| `session.status_running` | Session has starting running, and the Agent is actively doing work. |
 | `session.status_rescheduled` | Session is (re)scheduling after a retryable error has occurred, ready to be picked up by the orchestration system. |
 | `session.status_terminated` | Session ended and is irreversibly unusable — **on completion or on error**, not error-only. |
 | `session.updated` | A session update changed at least one field — carries only the changed fields (a budget removal carries `budget: null`) |

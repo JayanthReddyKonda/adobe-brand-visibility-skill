@@ -138,7 +138,7 @@ geo snapshots  --url URL [--save | --compare SNAPSHOT_ID]
 
 | Check | What it detects |
 |-------|-----------------|
-| WebMCP Readiness | SearchAction, labeled forms, tool attributes for You |
+| WebMCP Readiness | SearchAction, labeled forms, tool attributes for AI agents |
 | Negative Signals | CTA overload, thin content, keyword stuffing, boilerplate |
 | Prompt Injection | LLM instructions in content, HTML comment injection, hidden text |
 | Trust Stack | 5-layer trust score (technical, identity, social, academic, consistency) |
