@@ -144,18 +144,25 @@ def main() -> int:
     engine = WebAuditEngine(
         time_limit_sec=args.timeout,
         max_pages=args.max_pages,
+        max_depth=args.max_depth,
+        strict_robots=args.strict_robots,
     )
 
+    crawl_error = None
     try:
         engine.crawl(args.site)
     except Exception as exc:
         sys.stderr.write(f"[!] Crawl encountered error: {exc}\n")
+        crawl_error = str(exc)
 
     elapsed = time.monotonic() - start_time
     inventory = engine.to_inventory_dict()
     if "stats" not in inventory or not isinstance(inventory["stats"], dict):
         inventory["stats"] = {}
     inventory["stats"]["elapsed_seconds"] = elapsed
+    if crawl_error:
+        inventory["error"] = crawl_error
+        inventory["status"] = "failed"
 
     if args.verbose:
         sys.stderr.write(
@@ -169,8 +176,9 @@ def main() -> int:
         out_dir = os.path.dirname(os.path.abspath(args.output))
         if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
+        content_to_write = md_str if args.format == "markdown" else json_str
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(json_str)
+            f.write(content_to_write)
         if args.verbose:
             sys.stderr.write(f"[*] Inventory written to {args.output}\n")
 
@@ -184,6 +192,9 @@ def main() -> int:
             print(json_str)
         print("\n---\n")
         print(md_str)
+
+    if crawl_error and len(inventory.get("pages", [])) == 0:
+        return 1
 
     return 0
 

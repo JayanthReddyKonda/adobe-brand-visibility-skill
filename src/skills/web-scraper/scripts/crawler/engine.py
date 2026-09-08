@@ -23,7 +23,7 @@ from .frontier import Frontier
 from .jsonld import JsonLdExtractor
 from .links import LinkProcessor
 from .metadata import MetadataProcessor
-from .models import EvidenceModel, FactCandidate, Observation, PageModel
+from .models import ClaimCandidate, EvidenceModel, FactCandidate, Observation, PageModel
 from .policy import SecurityPolicy
 from .robots import RobotsAuditor, RobotsOutcome
 from .sitemap import SitemapParser
@@ -36,13 +36,18 @@ class WebAuditEngine:
         self,
         time_limit_sec: float = 120.0,
         max_pages: int = 25,
+        max_depth: int = 3,
         max_concurrency: int = 6,
         user_agent: Optional[str] = None,
         allow_private_ips: bool = False,
+        strict_robots: bool = False,
     ) -> None:
+        self.max_depth = max_depth
+        self.strict_robots = strict_robots
         self.budget = Budget(
             time_limit_sec=time_limit_sec,
             max_pages=max_pages,
+            max_depth=max_depth,
             max_concurrency=max_concurrency,
         )
         self.policy = SecurityPolicy(allow_private_ips=allow_private_ips)
@@ -57,6 +62,7 @@ class WebAuditEngine:
         self.pages: List[PageModel] = []
         self.observations: List[Observation] = []
         self.all_facts: List[FactCandidate] = []
+        self.all_claims: List[ClaimCandidate] = []
         self.llms_txt_content: Optional[str] = None
         self.llms_full_txt_content: Optional[str] = None
         self.pricing_manifest_content: Optional[str] = None
@@ -72,20 +78,52 @@ class WebAuditEngine:
         parsed = urlparse(self.site_url)
         base_origin = f"{parsed.scheme}://{parsed.netloc}"
 
-        # Step 1: Discover & Audit robots.txt
+        # Step 1: Discover & Audit robots.txt with distinct RFC 9309 status classification
         robots_url = urljoin(base_origin, "/robots.txt")
         declared_sitemaps: List[str] = []
         try:
             robots_res = self.fetcher.fetch(robots_url, timeout=5.0)
             robots_content = robots_res.body_bytes.decode("utf-8", errors="replace")
+            if robots_res.status == 200:
+                outcome = RobotsOutcome.OK
+            elif robots_res.status == 404:
+                outcome = RobotsOutcome.NOT_FOUND
+            elif robots_res.status in (401, 403):
+                outcome = RobotsOutcome.BLOCKED
+            elif robots_res.status == 429 or robots_res.status >= 500:
+                outcome = RobotsOutcome.SERVER_ERROR
+            else:
+                outcome = RobotsOutcome.SERVER_ERROR
+
             self.robots_auditor = RobotsAuditor(
                 content=robots_content,
                 status_code=robots_res.status,
-                outcome=RobotsOutcome.OK if robots_res.status == 200 else RobotsOutcome.NOT_FOUND,
+                outcome=outcome,
             )
             declared_sitemaps.extend(self.robots_auditor.sitemaps)
         except Exception:
             self.robots_auditor = RobotsAuditor(outcome=RobotsOutcome.TIMEOUT)
+
+        # Enforce strict robots if specified
+        if self.strict_robots and self.robots_auditor and not self.robots_auditor.is_allowed("BrandAuditBot", self.site_url):
+            self.observations.append(
+                Observation(
+                    type="crawler_access",
+                    value="robots_disallow_seed",
+                    confidence="high",
+                    evidence=f"Seed URL {self.site_url} is blocked by robots.txt under strict mode",
+                    severity_hint="critical",
+                )
+            )
+            crawled_at = datetime.now(timezone.utc).isoformat()
+            return EvidenceModel(
+                site=self.site_url,
+                crawled_at=crawled_at,
+                pages=[],
+                observations=self.observations,
+                facts=[],
+                scrapeability_summary={},
+            )
 
         # Step 2: Proactive discovery of /llms.txt, /llms-full.txt, and pricing manifests
         self._check_llms_txt(base_origin)
@@ -103,23 +141,27 @@ class WebAuditEngine:
         # Step 4: Enqueue Seed URL
         self.frontier.push(self.site_url, depth=0)
 
-        # Step 5: Bounded Concurrent Fetching Loop
+        # Step 5: Bounded Concurrent Fetching Loop with Hard Monotonic Deadline Enforcement
         workers = min(self.budget.max_concurrency, 6)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            active_futures: Dict[concurrent.futures.Future[Optional[PageModel]], str] = {}
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=workers)
+        active_futures: Dict[concurrent.futures.Future[Optional[PageModel]], str] = {}
 
+        try:
             while (self.frontier.size() > 0 or active_futures) and not self.budget.is_exhausted():
-                # Fill worker slots from frontier
-                while len(active_futures) < workers and not self.frontier.is_empty():
-                    if not self.budget.can_fetch_page():
-                        break
+                if self.budget.remaining_time() <= 0:
+                    break
 
+                # Fill worker slots from frontier using atomic slot reservation
+                while len(active_futures) < workers and not self.frontier.is_empty():
                     item = self.frontier.pop()
                     if not item:
                         break
+                    if not self.budget.reserve_page_slot(item.depth):
+                        continue
 
                     # Check robots.txt permissions
                     if self.robots_auditor and not self.robots_auditor.is_allowed("BrandAuditBot", item.url):
+                        self.budget.release_page_slot()
                         self.observations.append(
                             Observation(
                                 type="crawler_access",
@@ -137,9 +179,13 @@ class WebAuditEngine:
                 if not active_futures:
                     break
 
-                # Wait for next worker to complete
+                # Bounded wait with remaining time ceiling
+                wait_sec = max(0.05, min(0.5, self.budget.remaining_time()))
+                if self.budget.remaining_time() <= 0:
+                    break
+
                 done, _ = concurrent.futures.wait(
-                    active_futures.keys(), return_when=concurrent.futures.FIRST_COMPLETED
+                    active_futures.keys(), timeout=wait_sec, return_when=concurrent.futures.FIRST_COMPLETED
                 )
 
                 for fut in done:
@@ -147,8 +193,10 @@ class WebAuditEngine:
                     try:
                         page_model = fut.result()
                         if page_model:
+                            self.budget.commit_page_slot()
                             self.pages.append(page_model)
                             self.all_facts.extend(page_model.facts)
+                            self.all_claims.extend(page_model.claims)
                             self.observations.extend(page_model.observations)
 
                             # Enqueue child links
@@ -157,17 +205,26 @@ class WebAuditEngine:
                                 for link in page_model.links:
                                     if link.is_internal and LinkProcessor.is_crawlable_html_url(link.href):
                                         self.frontier.push(link.href, depth=next_depth, source_url=page_model.url)
+                        else:
+                            self.budget.release_page_slot()
 
                     except Exception as e:
+                        self.budget.release_page_slot()
                         self.observations.append(
                             Observation(
                                 type="fetch_failure",
                                 value="crawl_exception",
                                 confidence="high",
-                                evidence=f"Failed to crawl {completed_url}: {e}",
+                                evidence=f"Processing failed for {completed_url}: {e}",
                                 severity_hint="medium",
                             )
                         )
+        finally:
+            # Release any uncompleted reservations and shutdown
+            for _ in active_futures:
+                self.budget.release_page_slot()
+            active_futures.clear()
+            executor.shutdown(wait=False, cancel_futures=True)
 
         # Build aggregate EvidenceModel
         crawled_at = datetime.now(timezone.utc).isoformat()
@@ -178,6 +235,7 @@ class WebAuditEngine:
             pages=self.pages,
             observations=self.observations,
             facts=self.all_facts,
+            claims=self.all_claims,
             scrapeability_summary=scrapeability,
         )
 
@@ -233,9 +291,15 @@ class WebAuditEngine:
 
     def _fetch_and_parse_page(self, url: str, depth: int, base_origin: str) -> Optional[PageModel]:
         """Fetches, parses, extracts, and enriches a single web page."""
+        if self.budget.remaining_time() <= 0:
+            return None
         try:
             res = self.fetcher.fetch(url)
         except Exception:
+            return None
+
+        # P1-14: Separate resource_status from page_status; only status 200 HTML can become a normal page
+        if res.status != 200:
             return None
 
         # Only parse HTML content
@@ -329,6 +393,7 @@ class WebAuditEngine:
             title=parser.title,
             description=metadata.get("standard", {}).get("description", ""),
             canonical=parser.canonical,
+            canonicals=parser.canonicals,
             robots_meta=metadata.get("robots_directives", []),
             language=parser.language,
             headings=parser.headings,
@@ -347,6 +412,7 @@ class WebAuditEngine:
             observations=page_observations,
             facts=all_page_facts,
             claims=claims,
+            headers=res.headers,
             fetch_telemetry={
                 "latency_ms": res.latency_ms,
                 "bytes": len(res.body_bytes),
@@ -421,9 +487,16 @@ class WebAuditEngine:
             "snr": page.snr,
         }
 
-    def find_attribute(self, attribute: str) -> List[FactCandidate]:
-        """Queries the global fact ledger for a specific attribute (e.g. 'price', 'phone', 'email')."""
-        return [f for f in self.all_facts if f.attribute.lower() == attribute.lower()]
+    def find_attribute(
+        self, attribute: str, entity: Optional[str] = None, source_url: Optional[str] = None
+    ) -> List[FactCandidate]:
+        """Queries the global fact ledger with optional entity and source scoping."""
+        results = [f for f in self.all_facts if f.attribute.lower() == attribute.lower()]
+        if entity:
+            results = [f for f in results if f.entity and entity.lower() in f.entity.lower()]
+        if source_url:
+            results = [f for f in results if f.source_url == source_url]
+        return results
 
     def to_inventory_dict(self) -> Dict[str, Any]:
         """Converts crawled site data to backward-compatible inventory JSON format."""
@@ -454,10 +527,12 @@ class WebAuditEngine:
                     "page_type": ptype_val,
                     "page_type_confidence": pconf_val,
                     "logical_template": logical_template,
-                    "locale": p.language or "en",
+                    "language": p.language,
+                    "locale": None,  # Distinct from language; not defaulted to 'en'
                     "title": p.title,
                     "description": p.description,
                     "canonical": p.canonical,
+                    "canonicals": p.canonicals,
                     "robots_meta": p.robots_meta,
                     "h1": [h.text for h in p.headings if h.level == 1],
                     "h2": [h.text for h in p.headings if h.level == 2],
@@ -467,12 +542,13 @@ class WebAuditEngine:
                     "clean_markdown": p.clean_markdown,
                     "word_count": p.word_count,
                     "snr": p.snr,
+                    "text_density_ratio": round(p.snr, 4),
                     "semantic_landmarks": landmarks_dict,
                     "semantic_landmarks_list": p.semantic_landmarks,
                     "internal_links": [link.href for link in p.links if link.is_internal],
                     "external_links": [link.href for link in p.links if not link.is_internal],
                     "html": p.raw_html,
-                    "headers": {"content-type": p.content_type},
+                    "headers": p.headers,
                     "latency_ms": p.fetch_telemetry.get("latency_ms", 0.0),
                 }
             )
@@ -536,6 +612,8 @@ class WebAuditEngine:
             "llms_full_txt": self.llms_full_txt_content,
             "ai_agent_scrapeability_summary": self._compile_scrapeability_summary(),
             "pages": inv_pages,
+            "all_facts": [f.to_dict() for f in self.all_facts],
+            "all_claims": [c.to_dict() for c in self.all_claims],
             "stats": {
                 "pages_crawled": len(self.pages),
                 "total_bytes": total_raw_bytes,

@@ -18,6 +18,7 @@ VALID_SCHEMA_REPORT = {
             "severity": "high",
             "category": "discoverability",
             "root_cause": "User-agent Disallow directive",
+            "confidence": "high",
             "evidence": {
                 "summary": "Disallow: / found for OAI-SearchBot",
                 "scope": "robots.txt",
@@ -69,6 +70,7 @@ VALID_STRING_EVIDENCE_REPORT = {
             "severity": "critical",
             "category": "discoverability",
             "root_cause": "noindex meta tag present",
+            "confidence": "high",
             "evidence": "Found <meta name='robots' content='noindex'> on homepage",
             "suggested_action": {
                 "summary": "Remove noindex tag",
@@ -100,6 +102,7 @@ INVALID_SEVERITY_REPORT = {
             "severity": "info",  # Forbidden by Draft-07 schema
             "category": "discoverability",
             "root_cause": "Test",
+            "confidence": "low",
             "evidence": "Test evidence",
             "suggested_action": {
                 "summary": "Fix",

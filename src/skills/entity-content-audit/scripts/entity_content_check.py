@@ -724,7 +724,7 @@ def audit(base, domain, inv=None, state_file=None):
                 state["entities"][u].append(brand_name)
         import tempfile
 
-        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(state_file))
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
         with os.fdopen(fd, "w") as f:
             json.dump(state, f)
         os.replace(tmp, state_file)

@@ -38,9 +38,11 @@ class Budget:
 
         self._start_time = time.monotonic()
         self._deadline = self._start_time + self.time_limit_sec
+        self._requests_made = 0
         self._pages_fetched = 0
+        self._pages_reserved = 0
         self._bytes_downloaded = 0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def remaining_time(self) -> float:
         """Returns the number of seconds remaining before the deadline (minimum 0.0)."""
@@ -67,12 +69,44 @@ class Budget:
         with self._lock:
             return (
                 time.monotonic() < self._deadline
-                and self._pages_fetched < self.max_pages
+                and (self._pages_fetched + self._pages_reserved) < self.max_pages
                 and self._bytes_downloaded < self.max_total_bytes
             )
 
+    def reserve_page_slot(self, depth: int = 0) -> bool:
+        """Atomically reserves a page slot for an in-flight worker task."""
+        if depth > self.max_depth:
+            return False
+        with self._lock:
+            if (
+                time.monotonic() < self._deadline
+                and (self._pages_fetched + self._pages_reserved) < self.max_pages
+                and self._bytes_downloaded < self.max_total_bytes
+            ):
+                self._pages_reserved += 1
+                return True
+            return False
+
+    def commit_page_slot(self) -> None:
+        """Atomically commits a successfully fetched HTML page, decrementing reservation."""
+        with self._lock:
+            if self._pages_reserved > 0:
+                self._pages_reserved -= 1
+            self._pages_fetched += 1
+
+    def release_page_slot(self) -> None:
+        """Atomically releases a reserved page slot on fetch failure or non-HTML resource."""
+        with self._lock:
+            if self._pages_reserved > 0:
+                self._pages_reserved -= 1
+
+    def record_request(self) -> None:
+        """Thread-safely records an HTTP request attempt (infrastructure or page)."""
+        with self._lock:
+            self._requests_made += 1
+
     def record_page(self) -> None:
-        """Thread-safely records a completed page fetch."""
+        """Thread-safely records a completed HTML content page fetch."""
         with self._lock:
             self._pages_fetched += 1
 
@@ -96,6 +130,7 @@ class Budget:
             return {
                 "elapsed_sec": round(self.elapsed_time(), 2),
                 "remaining_sec": round(self.remaining_time(), 2),
+                "requests_made": self._requests_made,
                 "pages_fetched": self._pages_fetched,
                 "max_pages": self.max_pages,
                 "bytes_downloaded": self._bytes_downloaded,

@@ -20,15 +20,38 @@ from .models import ClaimCandidate, FactCandidate, Heading, Observation, TableDa
 class EvidenceExtractor:
     """Extracts structured facts, clean Markdown, and epistemic observations from HTML."""
 
+    CURRENCY_MAP = {
+        "$": "USD",
+        "USD": "USD",
+        "€": "EUR",
+        "EUR": "EUR",
+        "£": "GBP",
+        "GBP": "GBP",
+        "¥": "JPY",
+        "JPY": "JPY",
+        "₹": "INR",
+        "INR": "INR",
+    }
+
+    INTERVAL_MAP = {
+        "mo": "monthly",
+        "month": "monthly",
+        "yr": "yearly",
+        "year": "yearly",
+        "user": "per_user",
+        "day": "daily",
+        "week": "weekly",
+    }
+
     PRICE_REGEX = re.compile(
-        r"(?:[\$\€\£]|USD|EUR|GBP)\s*(\d{1,5}(?:\.\d{2})?)\s*(?:/(?:mo|month|yr|year|user))?",
+        r"(?P<currency>[\$\€\£\¥\₹]|USD|EUR|GBP|JPY|INR)\s*(?P<amount>\d{1,6}(?:,\d{3})*(?:\.\d{2})?)\s*(?:/(?P<interval>mo|month|yr|year|user|day|week))?",
         re.IGNORECASE,
     )
     PHONE_REGEX = re.compile(
-        r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
+        r"(?:\+?\d{1,4}[-.\s]?)?(?:\(?\d{1,4}\)?[-.\s]?)?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{2,9}"
     )
     EMAIL_REGEX = re.compile(
-        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b"
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
     )
     STAT_REGEX = re.compile(
         r"\b(?:\d{1,3}(?:\.\d+)?%|\d+(?:\.\d+)?x|\d{1,3}(?:,\d{3})+(?:\.\d+)?)\b"
@@ -76,13 +99,16 @@ class EvidenceExtractor:
         return "\n".join(clean_lines)
 
     @classmethod
-    def calculate_snr(cls, clean_text: str, raw_html: str) -> float:
-        """Calculates Signal-to-Noise Ratio (SNR) = clean text bytes / raw HTML bytes."""
+    def calculate_text_density_ratio(cls, clean_text: str, raw_html: str) -> float:
+        """Calculates Text Density Ratio (clean text bytes / raw HTML bytes)."""
         html_bytes = len(raw_html.encode("utf-8"))
         if html_bytes == 0:
             return 0.0
         clean_bytes = len(clean_text.encode("utf-8"))
-        return clean_bytes / float(html_bytes)
+        return round(clean_bytes / float(html_bytes), 4)
+
+    # Backward-compatible alias for existing references
+    calculate_snr = calculate_text_density_ratio
 
     @classmethod
     def detect_rendering_limitations(
@@ -177,18 +203,24 @@ class EvidenceExtractor:
         # Price facts
         for match in cls.PRICE_REGEX.finditer(clean_text):
             try:
-                price_val = float(match.group(1))
+                raw_amt = match.group("amount").replace(",", "")
+                price_val = float(raw_amt)
+                raw_curr = match.group("currency")
+                currency = cls.CURRENCY_MAP.get(raw_curr.upper(), raw_curr) if raw_curr else "USD"
+                raw_interval = match.group("interval")
+                interval = cls.INTERVAL_MAP.get(raw_interval.lower(), raw_interval) if raw_interval else None
                 facts.append(
                     FactCandidate(
                         attribute="price",
                         value=price_val,
-                        currency="USD",
+                        currency=currency,
+                        interval=interval,
                         source_url=source_url,
                         locator="visible_text",
                         mechanism="visible_text",
                     )
                 )
-            except ValueError:
+            except (ValueError, AttributeError):
                 pass
 
         # Contact facts
@@ -205,7 +237,8 @@ class EvidenceExtractor:
 
         for match in cls.PHONE_REGEX.finditer(clean_text):
             phone_str = match.group(0).strip()
-            if len(re.sub(r"\D", "", phone_str)) >= 10:
+            digits_only = re.sub(r"\D", "", phone_str)
+            if 7 <= len(digits_only) <= 15:
                 facts.append(
                     FactCandidate(
                         attribute="phone",

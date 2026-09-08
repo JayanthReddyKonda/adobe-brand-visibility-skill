@@ -98,8 +98,8 @@ _EXOPHORIC_LEAD_RE = re.compile(
     re.IGNORECASE,
 )
 
-# FActScore atomic fact patterns (TX03)
-_FACT_SCORE_PATTERNS = [
+# Atomic Fact Density Heuristic (AFDH) patterns (TX03)
+_AFDH_PATTERNS = [
     re.compile(r"\b\d+(\.\d+)?%?\b"),  # Numbers & percentages
     re.compile(r"\$\d+(?:,\d{3})*(?:\.\d+)?"),  # Currency values
     re.compile(r"\b(?:19|20)\d{2}\b"),  # Years / dates
@@ -108,8 +108,8 @@ _FACT_SCORE_PATTERNS = [
 
 
 def count_atomic_facts(text: str) -> int:
-    """Estimate atomic verifiable factual propositions based on FActScore heuristic."""
-    return sum(len(p.findall(text)) for p in _FACT_SCORE_PATTERNS)
+    """Estimate atomic verifiable factual propositions based on Atomic Fact Density Heuristic (AFDH)."""
+    return sum(len(p.findall(text)) for p in _AFDH_PATTERNS)
 
 
 import math
@@ -271,7 +271,7 @@ def detect_keyword_stuffing(full_text: str) -> dict:
 
 def analyze_bluf_placement(full_text: str, total_words: int) -> dict:
     """Analyze Bottom Line Up Front (BLUF) answer placement (Liu et al. Stanford 'Lost in the Middle').
-    44.2% of citations are extracted from the top 30% / first 250 words.
+    Generative engines exhibit strong positional bias favoring the beginning of document context (top 30% / first 250 words).
     """
     words_list = full_text.split()
     if not words_list:
@@ -480,11 +480,11 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
 
     # 2. Self-Containment & Optimal Length (max 25 pts)
     sc = 0
-    if 134 <= word_count <= 167:
+    if 80 <= word_count <= 250:
         sc += 15
-    elif 100 <= word_count <= 250:
+    elif 60 <= word_count <= 350:
         sc += 10
-    elif word_count > 60:
+    elif word_count > 40:
         sc += 5
 
     pronouns = re.findall(r"\b(it|they|them|he|she|this|these|those)\b", text.lower())
@@ -642,14 +642,14 @@ def audit(base, domain, inv=None, state_file=None):
                     "title": "Substantive page has low passage citability score",
                     "severity": "medium",
                     "confidence": "high",
-                    "root_cause": "LOW_CITABILITY_SCORE: Page lacks structured answer blocks, self-contained passage chunks (134-167w), and direct definition leads, reducing LLM extraction probability.",
+                    "root_cause": "LOW_CITABILITY_SCORE: Page lacks structured answer blocks, self-contained passage chunks (80-250 words), and direct definition leads, reducing LLM extraction probability.",
                     "cause_family": "CONTENT.SHALLOW_COVERAGE",
                     "id": "LOW_CITABILITY_SCORE",
                     "cause_id": "LOW_CITABILITY_SCORE",
                     "evidence": f"Page {url} achieved a citability score of {citability['total']}/100 (Answer Block Quality: {citability['answer_block_quality']}/30, Self-Containment: {citability['self_containment']}/25).",
-                    "impact": "Generative engines (Perplexity, ChatGPT Search) downrank the page in passage retrieval because it lacks extractable 134-167 word answer blocks.",
+                    "impact": "Generative engines (Perplexity, ChatGPT Search) downrank the page in passage retrieval because it lacks extractable 80-250 word standalone answer blocks.",
                     "suggested_action": {
-                        "summary": "Structure content under question headings with 40-60 word direct answers and self-contained 134-167 word passage chunks.",
+                        "summary": "Structure content under question headings with 40-60 word direct answers and self-contained 80-250 word passage chunks.",
                         "technical_fix": "Format key sections under <h2> question headings with an immediate direct answer in the first sentence.",
                         "creative_fix": "Adopt the Direct Answer Inversion pattern: state what the entity/topic is, why it matters, and concrete statistics in the lead paragraph.",
                         "priority": "medium",
@@ -702,7 +702,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "category": "content",
                     "title": "Unnatural keyword concentration depresses neural citation retrieval",
                     "severity": "medium",
-                    "confidence": "high",
+                    "confidence": "medium",
                     "root_cause": f"EXCESSIVE_KEYWORD_DENSITY: Term '{top_word}' occurs at {top_density * 100:.1f}% density (threshold: < 4.5%). Repetitive keyword targeting degrades neural embedding perplexity and incurs an empirical -8.3% to -10% citation penalty in modern LLM generative engines.",
                     "cause_family": "CONTENT.KEYWORD_STUFFING_DEGRADATION",
                     "id": "EXCESSIVE_KEYWORD_DENSITY",
@@ -728,7 +728,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "title": "Core answer proposition delayed beyond top 30% of document (Lost in the Middle)",
                     "severity": "medium",
                     "confidence": "high",
-                    "root_cause": "CONTEXT_PLACEMENT_DEGRADATION: Primary definitional proposition or answer is delayed beyond the first 250 words / top 30% of content. Stanford research proves that 44.2% of citations occur in the top 30% of content, while mid-document claims suffer 30-40% lower retrieval recall.",
+                    "root_cause": "CONTEXT_PLACEMENT_DEGRADATION: Primary definitional proposition or answer is delayed beyond the first 250 words / top 30% of content. Positional bias in RAG and neural retrieval ('Lost in the Middle', Liu et al.) degrades extraction recall when core propositions are buried in mid-document narrative.",
                     "cause_family": "CONTENT.CONTEXT_PLACEMENT_DEGRADATION",
                     "id": "CONTEXT_PLACEMENT_DEGRADATION",
                     "cause_id": "CONTEXT_PLACEMENT_DEGRADATION",
@@ -748,7 +748,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "id": "PROACTIVE.GEO.BLUF_TOP30_PERCENT.001",
                     "title": "Front-load primary answer/definition in the top 30% of content (BLUF)",
                     "category": "content",
-                    "summary": f"Page {url} delays core definitions beyond the first 250 words. Stanford research ('Lost in the Middle') and empirical AI citation studies prove that 44.2% of citations are extracted from the top 30% of a page.",
+                    "summary": f"Page {url} delays core definitions beyond the first 250 words. Positional attention decay in RAG systems ('Lost in the Middle') causes neural extractors to prioritize facts positioned in opening sections.",
                     "priority": "medium",
                     "technical_fix": "Invert paragraph structure: place the definitive resolution or entity answer in the lead 40-60 words.",
                     "creative_fix": "Adopt the Direct Answer Inversion format: answer the title's core question immediately before providing background.",

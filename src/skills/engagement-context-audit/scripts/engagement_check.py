@@ -142,12 +142,29 @@ VALID_CONTACT_TERMS = {
 
 
 class SemanticIntentEngine:
+    DEFAULT_INTENTS = {
+        "pricing_comparison": {
+            "intent_family": "pricing_comparison",
+            "required_on_page_facts": ["tier_names", "tier_prices", "billing_interval", "signup_or_trial_cta"],
+        },
+        "product_purchase": {
+            "intent_family": "product_purchase",
+            "required_on_page_facts": ["tier_prices", "availability", "add_to_cart_or_buy_cta"],
+        },
+        "documentation_lookup": {
+            "intent_family": "documentation_lookup",
+            "required_on_page_facts": ["feature_matrix"],
+        },
+    }
+
     def __init__(self, references_dir):
         self.references_dir = references_dir
-        self.intents = {}
+        self.intents = dict(self.DEFAULT_INTENTS)
         self._load_intents()
 
     def _load_intents(self):
+        if not self.references_dir or not os.path.exists(self.references_dir):
+            return
         import glob
 
         yaml_files = glob.glob(os.path.join(self.references_dir, "*.json"))
@@ -848,13 +865,13 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
         findings.append(
             {
                 "category": "engagement",
-                "title": "Cited proposition missing from above-the-fold viewport (Orientation Shock)",
+                "title": "Cited proposition missing from early-content document section (Orientation Shock)",
                 "severity": "medium",
                 "confidence": "high",
                 "root_cause": (
-                    "VIEWPORT_ANSWER_ABSENCE: The initial viewport (first 150 words / top 2 paragraphs) fails to anchor "
+                    "VIEWPORT_ANSWER_ABSENCE: The early-content section (first 150 words / top 2 paragraphs) fails to anchor "
                     f"the core proposition ({', '.join(viewport_data['missing_propositions'])}). AI search visitors arriving from citations "
-                    "experience orientation shock when the cited fact is pushed below the fold by decorative banners."
+                    "experience orientation shock when the cited fact is delayed behind boilerplate banners."
                 ),
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "VIEWPORT_ANSWER_ABSENCE",
@@ -862,7 +879,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "evidence": f"Page {url} ({page_type}) lacks immediate proposition anchoring in its lead {viewport_data['lead_words_count']} words.",
                 "suggested_action": {
                     "summary": "Anchor the core product proposition, pricing figures, or direct answer in the lead 60 words.",
-                    "technical_fix": "Insert an above-the-fold answer summary box directly beneath the H1 before auxiliary navigation blocks.",
+                    "technical_fix": "Insert an early-content answer summary box directly beneath the H1 before auxiliary navigation blocks.",
                     "creative_fix": "Adopt the Direct Answer Inversion format: state the primary resolution immediately in paragraph 1.",
                     "priority": "high" if page_type == "pricing" else "medium",
                     "verification": "Confirm lead 100 words contain explicit entity prices or core definitions.",
@@ -889,7 +906,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "evidence": f"Page {url} ({page_type}) places its first commercial CTA at position #{cta_data['first_commercial_cta_index'] + 1 if cta_data['first_commercial_cta_index'] is not None else 'N/A'}.",
                 "suggested_action": {
                     "summary": "Position a prominent commercial continuation CTA within the first 3 interactive elements on the page.",
-                    "technical_fix": "Place a prominent primary action button ('Buy', 'Start Free Trial', 'Contact Sales') directly in the hero block above the fold.",
+                    "technical_fix": "Place a prominent primary action button ('Buy', 'Start Free Trial', 'Contact Sales') directly in the early-content hero section.",
                     "creative_fix": "Pair the primary value proposition with an instant action trigger to eliminate navigational friction.",
                     "priority": "medium",
                     "verification": "Confirm commercial CTA appears within the first 3 interactive DOM elements.",
@@ -1025,7 +1042,7 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                         f["severity"] = "high"
                         f["evidence"] = (
                             f"{f.get('evidence', '')} [Empirically Corroborated: First-party analytics records "
-                            f"{b_rate * 100:.1f}% bounce rate and {d_time or 'N/A'}s dwell time, proving layout friction causes visitor bounce.]"
+                            f"{b_rate * 100:.1f}% bounce rate and {d_time or 'N/A'}s dwell time, providing behavioral evidence consistent with visitor drop-off.]"
                         )
                         corroborated_findings_count += 1
 
@@ -1056,16 +1073,16 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                             "root_cause": (
                                 f"Observed AI referral traffic exhibits a {ai_bounce * 100:.1f}% bounce rate compared to a "
                                 f"{baseline_bounce * 100:.1f}% organic search baseline. Visitors referred from generative AI answers "
-                                f"experience post-citation orientation shock because cited answers are not instantly anchored in the viewport."
+                                f"experience post-citation orientation friction when cited answers are not instantly visible in early content."
                             ),
                             "evidence": (
                                 f"First-party analytics for {p_url} reveals AI referral bounce rate of {ai_bounce * 100:.1f}% "
                                 f"versus {baseline_bounce * 100:.1f}% organic baseline (+{(ai_bounce - baseline_bounce) * 100:.1f}% gap)."
                             ),
                             "suggested_action": {
-                                "summary": "Anchor cited AI query propositions in hero section and place prominent continuation CTA above the fold.",
+                                "summary": "Anchor cited AI query propositions in the early-content document section and place prominent continuation CTA.",
                                 "priority": "high",
-                                "technical_fix": "Add an above-the-fold callout box verifying the specific product/service claims cited by AI assistants.",
+                                "technical_fix": "Add an early-content callout box verifying the specific product/service claims cited by AI assistants.",
                                 "creative_fix": "Align hero H1 and introductory sentence directly with the citation query intent.",
                                 "verification": "Monitor AI referral cohort bounce rate over 14 days post-remediation.",
                             },

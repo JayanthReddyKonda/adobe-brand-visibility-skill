@@ -208,16 +208,13 @@ def parse_target_domain(site: str) -> tuple:
     return base, domain
 
 
-def load_schema() -> Optional[Dict[str, Any]]:
-    """Load canonical Draft-07 report schema."""
+def load_schema() -> Dict[str, Any]:
+    """Load canonical Draft-07 report schema. Fails closed if missing or corrupt."""
     schema_path = os.path.join(os.path.dirname(SCRIPT_DIR), "references", "report-schema.json")
-    if os.path.exists(schema_path):
-        try:
-            with open(schema_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return None
-    return None
+    if not os.path.exists(schema_path):
+        raise FileNotFoundError(f"Canonical report schema missing at {schema_path}")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def clean_text_string(val: Any) -> str:
@@ -251,8 +248,8 @@ def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, An
         return sensor_func(base, domain, inv=inv)
     except Exception as e:
         return {
-            "status": "inconclusive",
-            "reason": f"Sensor exception: {e}",
+            "status": "failed",
+            "error": f"Sensor exception: {type(e).__name__}: {e}",
             "findings": [],
             "recommendations": [],
         }
@@ -360,7 +357,9 @@ def synthesize_audit_report(
         all_raw_findings.extend(result.get("findings", []))
         all_raw_recommendations.extend(result.get("recommendations", []))
 
-    if all(s == "ok" for s in statuses):
+    if inv.get("status") == "failed" or (not pages and not inv.get("infrastructure", {}).get("homepage_reachable", True)):
+        audit_status = "failed"
+    elif all(s == "ok" for s in statuses):
         audit_status = "complete"
     elif any(s in ("ok", "inconclusive") for s in statuses):
         audit_status = "partial"
@@ -373,14 +372,25 @@ def synthesize_audit_report(
         (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
         for f in all_raw_findings
     )
-    has_layer1_rendering_gap = any(
-        (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
-        for f in all_raw_findings
+    rendering_gap_findings = [
+        f for f in all_raw_findings
+        if (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
+    ]
+    has_layer1_rendering_gap = bool(rendering_gap_findings)
+    rendering_gap_pages = {
+        str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
+        for f in rendering_gap_findings
+    }
+    # Site-wide only if all pages have low word count or single homepage crawl is a shell
+    is_site_wide_rendering_gap = (
+        has_layer1_rendering_gap and (
+            len(pages) <= 1 or all(p.get("word_count", 0) < 60 for p in pages)
+        )
     )
 
-    # 2. Deduplicate Findings by cause_id and normalized title
+    # 2. Scope-Aware Deduplication of Findings
     deduped_findings: List[Dict[str, Any]] = []
-    seen_cause_ids: Set[str] = set()
+    seen_dedup_keys: Set[str] = set()
     finding_counter = 1
 
     # Order by severity: critical -> high -> medium -> low
@@ -389,24 +399,30 @@ def synthesize_audit_report(
 
     for f in all_raw_findings:
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
+        f_scope = str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
+        if isinstance(f.get("evidence"), dict):
+            f_scope = f_scope or str(f["evidence"].get("scope", "")).lower()
 
-        # Full 6-Layer Causal DAG Keystone Suppression:
-        # Layer 0 access block (e.g. AI_RETRIEVAL_BLOCKED) preempts ALL downstream symptoms at
-        # Layers 2-5. Recording them as separate findings inflates the report and misleads
-        # remediation priority. They are clustered as supporting evidence under the Keystone.
+        # Full 6-Layer Causal DAG Keystone Suppression (P0-11):
+        # Layer 0 access block (e.g. AI_RETRIEVAL_BLOCKED) preempts ALL downstream symptoms at Layers 2-5.
         if has_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
             continue
-        # Layer 1 rendering gap (e.g. RENDERED_CONTENT_GAP) preempts Layers 3-4.
-        # Cannot evaluate citation quality or fact consistency on an unrendered shell.
+        # Layer 1 rendering gap only suppresses downstream if site-wide or on the specific unrendered page
         if has_layer1_rendering_gap and cid in _SUPPRESSED_BY_LAYER1:
+            if is_site_wide_rendering_gap or f_scope in rendering_gap_pages:
+                continue
+
+        # P0-10: Scope-aware dedup key so defects with same root cause on different entities/pages survive
+        dedup_key = f"{cid}::{f_scope}::{f.get('title', '')}" if f_scope else cid
+        if dedup_key in seen_dedup_keys:
+            continue
+        seen_dedup_keys.add(dedup_key)
+
+        # P0-15: Never fabricate synthetic evidence text. Discard findings without observable proof.
+        raw_ev = f.get("evidence")
+        if not raw_ev:
             continue
 
-        if cid in seen_cause_ids:
-            continue
-        seen_cause_ids.add(cid)
-
-        # Build clean finding conforming strictly to Draft-07 schema
-        # Note: archetype severity reweighting is applied below after archetype detection
         finding_id = f"F-{finding_counter:03d}"
         finding_counter += 1
 
@@ -418,8 +434,15 @@ def synthesize_audit_report(
         raw_ftitle = f.get("title", "Detected Brand Visibility Defect")
         f_title = clean_text_string(raw_ftitle)
 
-        raw_froot = f.get("root_cause") or f.get("cause_id") or f_title
+        # P0-14: Require mechanism root cause; do not default to title
+        raw_froot = f.get("root_cause") or f.get("cause_id") or "Mechanism unconfirmed / unknown"
         f_root = clean_text_string(raw_froot)
+
+        # P0-13: Missing or invalid confidence defaults to 'low', never 'high'
+        raw_conf = str(f.get("confidence") or "").lower()
+        conf = raw_conf if raw_conf in ("high", "medium", "low") else "low"
+        if not f.get("root_cause") and not f.get("cause_id"):
+            conf = "low"
 
         action = f.get("suggested_action") or {}
         raw_act_sum = action.get("summary") or f.get("title") or f"Remediate {f_title.lower()} on target domain {domain}."
@@ -430,7 +453,6 @@ def synthesize_audit_report(
         if action_priority not in ("critical", "high", "medium", "low"):
             action_priority = sev
 
-        raw_ev = f.get("evidence") or f"Diagnostic observation recorded on {domain} across {len(pages)} analyzed inventory page(s)."
         if isinstance(raw_ev, str):
             evidence_val: Any = clean_text_string(raw_ev)
         elif isinstance(raw_ev, dict):
@@ -444,19 +466,10 @@ def synthesize_audit_report(
         suggested_action: Dict[str, Any] = {
             "summary": action_summary,
             "priority": action_priority,
+            "technical_fix": clean_text_string(action.get("technical_fix")) or None,
+            "creative_fix": clean_text_string(action.get("creative_fix")) or None,
+            "verification": clean_text_string(action.get("verification")) or None,
         }
-        if action.get("technical_fix"):
-            t_fix = clean_text_string(action["technical_fix"])
-            if t_fix:
-                suggested_action["technical_fix"] = t_fix
-        if action.get("creative_fix"):
-            c_fix = clean_text_string(action["creative_fix"])
-            if c_fix:
-                suggested_action["creative_fix"] = c_fix
-        if action.get("verification"):
-            v_fix = clean_text_string(action["verification"])
-            if v_fix:
-                suggested_action["verification"] = v_fix
 
         clean_finding: Dict[str, Any] = {
             "id": finding_id,
@@ -465,7 +478,7 @@ def synthesize_audit_report(
             "severity": sev,
             "category": str(f.get("category", "discoverability")),
             "root_cause": f_root,
-            "confidence": f.get("confidence", "high") if f.get("confidence") in ("high", "medium", "low") else "high",
+            "confidence": conf,
             "evidence": evidence_val,
             "suggested_action": suggested_action,
         }
@@ -730,20 +743,24 @@ def synthesize_audit_report(
         authority_score = 45.0 if has_entity_ambiguity else 75.0
 
     # 5e. Agentic Commerce Score — pricing completeness + offer schema + fact consistency
-    # Source: fact-consistency coverage.fact_conflicts / facts_checked
     fact_cov = specialist_results.get("fact-consistency-audit", {}).get("coverage", {})
-    _fact_conflicts = fact_cov.get("fact_conflicts", None)
-    _facts_checked = fact_cov.get("facts_checked", None)
-    has_fact_conflict = any("FIRST_PARTY_FACT_CONFLICT" in (f.get("cause_id") or "") for f in deduped_findings)
-    if _fact_conflicts is not None and _facts_checked is not None and int(_facts_checked) > 0:
-        conflict_ratio = float(_fact_conflicts) / float(_facts_checked)
-        commerce_score = round(max(10.0, (1.0 - conflict_ratio) * 100.0), 1)
+    _fact_conflicts = fact_cov.get("fact_conflicts", 0)
+    has_fact_conflict = any(
+        f.get("cause_id") in ("FIRST_PARTY_FACT_CONFLICT", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION", "CONFLICTING_COMMERCIAL_TERMS")
+        for f in deduped_findings
+    )
+    if has_fact_conflict or (_fact_conflicts and int(_fact_conflicts) > 0):
+        commerce_score = max(20.0, 85.0 - (int(_fact_conflicts or 1) * 15.0))
     else:
-        commerce_score = 40.0 if has_fact_conflict else 85.0
+        commerce_score = 90.0 if any(p.get("page_type") in ("pricing", "product_detail") for p in pages) else 80.0
 
-    # Cross-Engine Visibility: weighted composite of crawl + citation + authority
-    cross_engine_score = round((crawl_score * 0.40 + citation_score * 0.35 + authority_score * 0.25), 1)
+    # Cross-Engine Visibility (P1-77): independent parity measure across major AI retrieval engines
+    matrix = inv.get("robots", {}).get("matrix", {}) if inv else {}
+    major_engines = ["OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "Googlebot"]
+    allowed_count = sum(1 for e in major_engines if matrix.get(e, True))
+    cross_engine_score = round((allowed_count / len(major_engines)) * 100.0, 1)
 
+    # Orthogonal composite weighting summing strictly to 1.00 (Zero double-counting)
     composite_score = round(
         crawl_score * 0.20
         + retrieval_score * 0.20
@@ -766,34 +783,34 @@ def synthesize_audit_report(
         letter_grade = "F"
 
     _sa_anchor_count = int(_sa_declared or 0)
-    # Dynamic Engine Readiness Factors (Grounded in Verified Telemetry)
+    # Dynamic Engine Readiness Factors (P0-16: Grounded in Observed Telemetry)
     if crawl_score >= 80:
-        chatgpt_factors = [f"OAI-SearchBot retrieval permitted on {domain} for ChatGPT Search indexation"]
+        chatgpt_factors = [f"Observed robots.txt permission for OAI-SearchBot; eligible for OpenAI retrieval crawl on {domain}"]
     else:
-        chatgpt_factors = [f"OAI-SearchBot retrieval restricted or blocked in robots.txt on {domain}"]
+        chatgpt_factors = [f"Observed robots.txt disallow for OAI-SearchBot on {domain}"]
     if _sa_anchor_count >= 1:
         chatgpt_factors.append(f"{_sa_anchor_count} external Knowledge Graph authority anchor(s) declared for {_brand_guess} entity disambiguation")
     if citation_score >= 70:
-        chatgpt_factors.append(f"Substantive fact density ({citation_score}/100) supports synthetic answer absorption")
+        chatgpt_factors.append(f"Substantive fact density ({citation_score}/100) satisfies neural answer extraction prerequisites")
 
     if crawl_score >= 80:
-        claude_factors = [f"Claude-SearchBot retrieval access permitted for Anthropic search grounding on {domain}"]
+        claude_factors = [f"Observed robots.txt permission for Claude-SearchBot on {domain}"]
     else:
-        claude_factors = [f"Claude-SearchBot crawler blocked or restricted on {domain}"]
+        claude_factors = [f"Observed robots.txt disallow for Claude-SearchBot on {domain}"]
     if retrieval_score >= 80:
         claude_factors.append(f"Clean semantic markdown ({retrieval_score}/100) readily parseable from raw HTML")
 
     if crawl_score >= 80:
-        perplexity_factors = [f"PerplexityBot retrieval indexation enabled for {domain}"]
+        perplexity_factors = [f"Observed robots.txt permission for PerplexityBot on {domain}; satisfies retrieval prerequisite"]
     else:
-        perplexity_factors = [f"PerplexityBot blocked — {domain} excluded from Perplexity source index"]
+        perplexity_factors = [f"Observed robots.txt disallow for PerplexityBot on {domain}"]
     if citation_score >= 65:
         perplexity_factors.append(f"Atomic facts and empirical metrics ({citation_score}/100) available for Perplexity citation cards")
 
     if crawl_score >= 85:
-        google_factors = [f"Googlebot crawl access healthy across {domain}"]
+        google_factors = [f"Observed robots.txt permission for Googlebot on {domain}"]
     else:
-        google_factors = [f"Crawl directives restrict Google retrieval on {domain}"]
+        google_factors = [f"Observed crawl directives restricting Google retrieval on {domain}"]
     if retrieval_score >= 80:
         google_factors.append(f"Semantic headings and table structures ({retrieval_score}/100) suitable for AI Overview extraction")
 
@@ -811,23 +828,23 @@ def synthesize_audit_report(
         },
         "engine_readiness_simulation": {
             "chatgpt_search": {
-                "status": "ready" if crawl_score >= 75 and citation_score >= 60 else "impaired",
-                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 else "restricted",
+                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": chatgpt_factors,
             },
             "claude_search": {
-                "status": "ready" if crawl_score >= 75 and retrieval_score >= 70 else "impaired",
-                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "status": "eligible" if crawl_score >= 75 and retrieval_score >= 70 else "restricted",
+                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": claude_factors,
             },
             "perplexity_ai": {
-                "status": "ready" if crawl_score >= 75 and citation_score >= 60 else "impaired",
-                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 else "restricted",
+                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": perplexity_factors,
             },
             "google_ai_overviews": {
-                "status": "ready" if crawl_score >= 80 and retrieval_score >= 75 else "impaired",
-                "citation_potential": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
+                "status": "eligible" if crawl_score >= 80 and retrieval_score >= 75 else "restricted",
+                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
                 "key_factors": google_factors,
             },
         },
@@ -901,13 +918,37 @@ def collect_telemetry(
             inv = {
                 "site": site,
                 "domain": domain,
-                "pages": [{"url": site, "status": 200, "html": "<html><body></body></html>", "word_count": 0}],
+                "status": "failed",
+                "error": {
+                    "type": "acquisition_failure",
+                    "message": f"Target {site} was unreachable or inventory acquisition failed.",
+                    "url": site,
+                },
+                "pages": [],
                 "robots": {},
                 "sitemaps": [],
             }
 
     # 2. Execute all 6 specialist sensors
     specialist_results: Dict[str, Dict[str, Any]] = {}
+
+    if inv.get("status") == "failed":
+        # Epistemic invariant (P0-1): Never synthesize evidence when acquisition fails.
+        for skill_id in [
+            "discoverability-audit",
+            "entity-content-audit",
+            "fact-consistency-audit",
+            "corroboration-authority-audit",
+            "geo-content-audit",
+            "engagement-context-audit",
+        ]:
+            specialist_results[skill_id] = {
+                "status": "inconclusive",
+                "findings": [],
+                "recommendations": [],
+                "error": inv.get("error"),
+            }
+        return inv, specialist_results
 
     try:
         from discoverability_check import audit as audit_disc
@@ -1108,7 +1149,8 @@ def audit(
     if schema and validate_type is not None:
         err = validate_type(report, schema)
         if err:
-            sys.stderr.write(f"Schema Warning during audit synthesis: {err}\n")
+            sys.stderr.write(f"Schema Validation Error during audit synthesis: {err}\n")
+            raise ValueError(f"Audit report failed Draft-07 schema validation: {err}")
 
     return report
 
@@ -1127,22 +1169,26 @@ def main():
 
     args = parser.parse_args()
 
-    if args.telemetry:
-        payload = get_telemetry_payload(
-            site=args.site,
-            inventory=args.inventory,
-            analytics=args.analytics,
-            candidate_backlinks=args.candidate_backlinks,
-        )
-        formatted_output = json.dumps(payload, indent=2)
-    else:
-        report = audit(
-            site=args.site,
-            inventory=args.inventory,
-            analytics=args.analytics,
-            candidate_backlinks=args.candidate_backlinks,
-        )
-        formatted_output = json.dumps(report, indent=2)
+    try:
+        if args.telemetry:
+            payload = get_telemetry_payload(
+                site=args.site,
+                inventory=args.inventory,
+                analytics=args.analytics,
+                candidate_backlinks=args.candidate_backlinks,
+            )
+            formatted_output = json.dumps(payload, indent=2)
+        else:
+            report = audit(
+                site=args.site,
+                inventory=args.inventory,
+                analytics=args.analytics,
+                candidate_backlinks=args.candidate_backlinks,
+            )
+            formatted_output = json.dumps(report, indent=2)
+    except Exception as e:
+        sys.stderr.write(f"Orchestration Error: {e}\n")
+        sys.exit(1)
 
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:

@@ -32,11 +32,22 @@ def validate_type(instance, schema, path="root"):
         if "string" in type_list and isinstance(instance, str) and schema.get("format") == "date-time":
             import datetime
 
+            # P1-88: Strict timezone qualification requirement (e.g. 'Z' or '+00:00' / '-05:00')
+            if not re.search(r"(Z|[+-]\d{2}:\d{2})$", instance):
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string (missing explicit timezone offset)"
             try:
                 dt_str = instance.replace("Z", "+00:00")
-                datetime.datetime.fromisoformat(dt_str)
+                dt = datetime.datetime.fromisoformat(dt_str)
+                if dt.tzinfo is None:
+                    return f"{path}: '{instance}' is missing timezone offset"
             except ValueError:
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
+
+    # P1-89: Disallow NaN and Infinity numeric values
+    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+        import math
+        if math.isnan(instance) or math.isinf(instance):
+            return f"{path}: Disallowed NaN or Infinity numeric value"
 
     if "minimum" in schema and isinstance(instance, (int, float)) and instance < schema["minimum"]:
         return f"{path}: Value {instance} is less than minimum {schema['minimum']}"
@@ -137,9 +148,12 @@ def main():
         )
         sys.exit(2)
 
+    def _reject_constant(c):
+        raise ValueError(f"Disallowed JSON constant '{c}' (NaN and Infinity are not valid JSON)")
+
     try:
-        report = json.loads(data)
-    except json.JSONDecodeError as e:
+        report = json.loads(data, parse_constant=_reject_constant)
+    except (json.JSONDecodeError, ValueError) as e:
         print(f"Invalid JSON input: {e}", file=sys.stderr)
         sys.exit(2)
 

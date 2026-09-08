@@ -381,7 +381,7 @@ def audit(base, domain, inv=None, state_file=None):
         if state_file:
             import tempfile as _tf
 
-            _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(state_file))
+            _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
             with os.fdopen(_fd, "w") as f:
                 json.dump(state, f)
             os.replace(_tmp, state_file)
@@ -415,7 +415,8 @@ def audit(base, domain, inv=None, state_file=None):
         )
 
     # Check Contract C3: Differential AI Crawler Access / WAF Block Probe
-    if inv is None or status == 200:
+    # P1-46: Skip live bot probe when inv is provided (zero redundant crawls)
+    if inv is None:
         bot_ua = "Mozilla/5.0 (compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot)"
         bot_status, _, _, _ = safe_fetch(base + "/", timeout=6, max_bytes=65536, user_agent=bot_ua, method="HEAD")
         if bot_status in (403, 405, 501):
@@ -767,19 +768,18 @@ def audit(base, domain, inv=None, state_file=None):
             )
 
     # 4. Proactive /llms.txt and /llms-full.txt content manifest discovery
-    llms_info = inv.get("infrastructure", {}).get("llms_txt") if inv else None
     llms_present = False
-    if llms_info:
-        llms_present = llms_info.get("present", False)
+    llms_full_present = False
+    if inv is not None:
+        llms_info = inv.get("infrastructure", {}).get("llms_txt")
+        if llms_info:
+            llms_present = llms_info.get("present", False)
+        llms_full_info = inv.get("infrastructure", {}).get("llms_full_txt")
+        if llms_full_info:
+            llms_full_present = llms_full_info.get("present", False)
     else:
         status, l_body, _, _ = safe_fetch(f"{base}/llms.txt", timeout=5, max_bytes=512 * 1024)
         llms_present = status == 200 and bool(l_body)
-
-    llms_full_info = inv.get("infrastructure", {}).get("llms_full_txt") if inv else None
-    llms_full_present = False
-    if llms_full_info:
-        llms_full_present = llms_full_info.get("present", False)
-    else:
         f_status, f_body, _, _ = safe_fetch(f"{base}/llms-full.txt", timeout=5, max_bytes=1024 * 1024)
         llms_full_present = f_status == 200 and bool(f_body)
 
@@ -868,7 +868,7 @@ def audit(base, domain, inv=None, state_file=None):
     if state_file:
         import tempfile as _tf
 
-        _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(state_file))
+        _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
         with os.fdopen(_fd, "w") as f:
             json.dump(state, f)
         os.replace(_tmp, state_file)

@@ -6,7 +6,7 @@ compatibility: ">=Python-3.9"
 metadata:
   role: specialist
   parent: audit-orchestrator
-  version: "2.0.0"
+  version: "2.1.0"
   author: "Jayanth Reddy Konda"
 allowed-tools:
   - Bash

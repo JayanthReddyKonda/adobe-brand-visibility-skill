@@ -27,6 +27,7 @@ class StreamingHTMLParser(HTMLParser):
         self.title: str = ""
         self.language: Optional[str] = None
         self.canonical: Optional[str] = None
+        self.canonicals: List[str] = []
         self.meta_tags: List[Dict[str, str]] = []
         self.meta_robots: List[str] = []
 
@@ -38,6 +39,7 @@ class StreamingHTMLParser(HTMLParser):
         self.tables: List[TableData] = []
         self.code_blocks: List[str] = []
         self.images: List[Dict[str, str]] = []
+        self._text_chunks: List[str] = []
 
         # State machines
         self._tag_stack: List[str] = []
@@ -65,22 +67,21 @@ class StreamingHTMLParser(HTMLParser):
 
         # Table state
         self._in_table: bool = False
-        self._current_table_headers: List[str] = []
-        self._current_table_rows: List[List[str]] = []
-        self._current_table_row: List[str] = []
         self._in_th: bool = False
         self._in_td: bool = False
         self._cell_chunks: List[str] = []
-
-        # Text stream
-        self._text_chunks: List[str] = []
+        self._current_table_headers: List[str] = []
+        self._current_table_rows: List[List[str]] = []
+        self._current_table_row: List[str] = []
 
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         tag_lower = tag.lower()
         self._tag_stack.append(tag_lower)
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
 
-        if tag_lower == "body":
+        if tag_lower == "head":
+            self._current_location = "head"
+        elif tag_lower == "body":
             self._current_location = "body"
 
         if tag_lower == "html" and "lang" in attr_dict:
@@ -114,13 +115,15 @@ class StreamingHTMLParser(HTMLParser):
                 directives = [d.strip().lower() for d in content.split(",") if d.strip()]
                 self.meta_robots.extend(directives)
 
-        # Canonical link
+        # Canonical link (preserves all canonical declarations to detect duplicate conflicts)
         elif tag_lower == "link":
             rel = attr_dict.get("rel", "").lower()
             if "canonical" in rel.split():
-                href = attr_dict.get("href", "")
+                href = attr_dict.get("href", "").strip()
                 if href:
-                    self.canonical = href
+                    self.canonicals.append(href)
+                    if not self.canonical:
+                        self.canonical = href
 
         # Title
         elif tag_lower == "title":
@@ -260,8 +263,16 @@ class StreamingHTMLParser(HTMLParser):
         if self._in_th or self._in_td:
             self._cell_chunks.append(data)
 
-        # Append to general visible text stream if not inside ignore tags and not in hidden DOM container
-        if self._hidden_depth == 0 and not any(t in self.IGNORE_TAGS for t in self._tag_stack):
+        # Append to general visible text stream if inside body, not title/code/table-cell, and not hidden
+        if (
+            self._current_location == "body"
+            and not self._in_title
+            and not self._in_code
+            and not self._in_th
+            and not self._in_td
+            and self._hidden_depth == 0
+            and not any(t in self.IGNORE_TAGS for t in self._tag_stack)
+        ):
             self._text_chunks.append(data)
 
     def get_accumulated_text(self) -> str:
