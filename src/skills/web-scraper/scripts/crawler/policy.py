@@ -90,7 +90,7 @@ class SecurityPolicy:
 
     def resolve_and_verify_host(self, host: str, port: int = 443) -> Tuple[bool, str, Optional[str]]:
         """Pre-resolve hostname via DNS and check all returned IPs for safety."""
-        clean_host = host.strip().lower()
+        clean_host = host.strip().lower().strip("[]")
         if not clean_host:
             return False, "Empty hostname", None
 

@@ -21,7 +21,7 @@ def validate_type(instance, schema, path="root"):
         valid = False
         for t in type_list:
             if t in type_map and isinstance(instance, type_map[t]):
-                if t == "integer" and type(instance) is bool:
+                if t in ("integer", "number") and type(instance) is bool:
                     continue  # bool is a subclass of int, but we want strict checking
                 valid = True
                 break
