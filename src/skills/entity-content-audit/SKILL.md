@@ -31,6 +31,10 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - A brand is described vaguely or misattributed by AI assistants.
@@ -99,7 +103,7 @@ python3 skills/entity-content-audit/scripts/entity_content_check.py --site https
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], entity_snapshot{}, coverage{}, limitations[]}`.
@@ -107,7 +111,7 @@ All string fields in emitted findings and recommendations must be clean, single-
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **Non-HTML Resource Invariant:** XML sitemaps, robots.txt, feeds, and JSON API endpoints MUST NEVER enter answerability audits. The script automatically filters the inventory to evaluate genuine HTML pages only.
 - **Never flag missing schema on CSR shells:** If a page contains fewer than 25 words due to client-side rendering, return `status: inconclusive` rather than reporting missing entities.

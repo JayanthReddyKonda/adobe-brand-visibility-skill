@@ -321,7 +321,7 @@ AI models consistently overuse em dashes (—) as a shortcut for sentence variet
 
 ### 2. Overused Buzzwords & Empty Transitions
 Avoid generic transitional fluff that dilutes information density:
-- **Avoid:** "In today's fast-paced digital world", "Let's delve into", "At its core", "To put it simply", "In essence", "Furthermore", "Moreover"
+- **Avoid:** "In today's fast-paced digital world", "Proceed to delve into", "At its core", "To put it simply", "In essence", "Furthermore", "Moreover"
 - **Use Instead:** Jump straight to empirical facts, quantifiable data, and causal explanations.
 
 ### 3. Empty Intensifiers

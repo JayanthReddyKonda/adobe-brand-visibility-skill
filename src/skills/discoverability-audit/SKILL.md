@@ -31,6 +31,10 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - Diagnose why AI search assistants cannot retrieve or cite a site's pages.
@@ -93,7 +97,7 @@ python3 skills/discoverability-audit/scripts/discoverability_check.py --site htt
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
@@ -101,7 +105,7 @@ All string fields in emitted findings and recommendations must be clean, single-
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - Do NOT flag training bot blocks (`GPTBot`, `ClaudeBot`) as critical AI search failures.
 - Do NOT flag missing `llms.txt` as a defect (it is an optional discovery enhancement file).

@@ -31,6 +31,10 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - Verify that prices, specifications, and commercial terms are consistent across all brand pages.
@@ -89,7 +93,7 @@ python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site h
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], coverage{}, limitations[]}`.
@@ -97,7 +101,7 @@ All string fields in emitted findings and recommendations must be clean, single-
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **Strict Entity & Scope Matching:** Only flag price conflicts when facts share the identical entity, currency, billing interval, and product variant.
 - **Tiered Pricing Tables:** Do not flag multiple distinct price tiers (e.g. Starter $49 vs Pro $99) on the same page as a factual conflict.

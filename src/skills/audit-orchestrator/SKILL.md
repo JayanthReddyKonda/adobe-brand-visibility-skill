@@ -33,6 +33,10 @@ The AI Agent leverages the deterministic orchestrator script to handle the math,
 > [!TIP]
 > **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/`. Find the absolute path to the marketplace root before running any scripts. Adapt shell commands (`python3`, `python`, `cat`, `type`) to your host OS (Linux, macOS, Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - Perform a full-spectrum AI discoverability, content extractability, and visitor engagement audit on any brand website.
@@ -107,7 +111,7 @@ Act as the **Cognitive Reasoning Engine** (rather than a passive script runner):
 
 **Step 5: Clean Direct Output Delivery (MANDATORY)**
 If the user requested the raw JSON report, emit the complete, unabridged Draft-07 JSON report directly inside a single ````json```` code block in your response.
-- **Zero Conversational Preamble:** Do NOT precede the JSON with conversational chatter ("Here is my full audit...").
+- **Zero Conversational Preamble:** Do NOT precede the JSON with conversational chatter ("Below is my full audit...").
 - **Zero Duplicate Markdown Tables:** Do NOT output duplicate Markdown tables summarizing findings before the JSON block.
 - **Clean JSON String Formatting Standard:** NEVER embed raw Markdown tables (`| Col | Col |`), HTML `<table>` markup, or escaped literal newlines (`\n\n`) inside JSON string properties.
 - Never substitute with a placeholder or point to disk.
@@ -129,7 +133,13 @@ If the user requested the raw JSON report, emit the complete, unabridged Draft-0
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Output Format
+
+The final report must strictly conform to the `references/report-schema.json` Draft-07 specification. Emit the JSON object inside a single ````json```` block.
+
+---
+
+## Gotchas & Error Handling
 
 - **Non-Destructive Execution & User Approval Gate:** All diagnostic audits are strictly read-only, non-destructive, and analytical. Never execute destructive operations such as HTTP POST, PUT, DELETE, data purging, or file removal. Any operation that modifies or deletes resources requires explicit user confirmation and approval before execution.
 - **SSRF Hard Boundary:** All fetches pass through `safe_fetch.py`. Never probe private RFC-1918 subnets, cloud metadata (169.254.169.254), or loopback interfaces.

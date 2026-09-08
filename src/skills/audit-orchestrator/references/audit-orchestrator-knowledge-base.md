@@ -681,7 +681,7 @@ Heuristics (like counting `<table>` tags or measuring keyword density) may be us
 ## 5. Output Delivery Mandate (Output Standard)
 The entrypoint skill is responsible for composing the specialist outputs into a single schema-valid audit report and emitting it directly as the final output:
 1. **Direct JSON Code Block:** The complete, unabridged Draft-07 schema-valid JSON report MUST be rendered directly in the response within a single ````json```` code block. Never truncate or substitute the JSON report with a vague summary pointing to disk.
-2. **Zero Conversational Preamble:** Do NOT output conversational preambles ("Here is the complete audit..."), execution traces, or scratch script dumps before the JSON report.
+2. **Zero Conversational Preamble:** Do NOT output conversational preambles ("Below is the complete audit..."), execution traces, or scratch script dumps before the JSON report.
 3. **Zero Duplicate Markdown Tables:** Do NOT render duplicate Markdown tables summarizing the findings before the JSON code block. Downstream consumers require clean, unpolluted output.
 4. **Clean String Formatting:** In all JSON string properties (such as `technical_fix`, `creative_fix`, `evidence.summary`, `proactive_actions[].summary`), strings MUST be concise, single-line or semicolon-delimited (` ; `). NEVER embed escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML `<table>` markup inside JSON strings.
 

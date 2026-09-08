@@ -30,6 +30,10 @@ Evaluates external entity authority by verifying that declared identity links (`
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - Diagnose why an AI model lacks confidence in an entity's existence or identity.
@@ -99,7 +103,7 @@ python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --si
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, evidence_classes{declared_identity_nodes, verified_candidate_backlinks}, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
@@ -107,7 +111,7 @@ All string fields in emitted findings and recommendations must be clean, single-
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **Declared Identity vs Inbound Backlinks:** Declared `sameAs` links are outbound entity assertions from the brand; candidate backlinks are inbound references from third-party sites. They are two distinct evidence classes and must never be conflated.
 - **Common Crawl CDX Limitation:** Common Crawl's CDX index is a URL index of crawled pages, not an inverted link graph index. It cannot truthfully discover arbitrary inbound linking pages across the web without multi-petabyte graph traversal. Backlink analysis is strictly bounded to supplied candidate ledgers.

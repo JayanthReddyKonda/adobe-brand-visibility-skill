@@ -31,6 +31,10 @@ Evaluates the above-the-fold visitor experience, heading information scent, dest
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - High bounce rates observed for visitors referred from AI search engines (SearchGPT, Claude, Perplexity).
@@ -113,7 +117,7 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, engagement_mode, analytics_summary, findings[], recommendations[], observations[], coverage{}, limitations[]}`.
@@ -121,7 +125,7 @@ All string fields in emitted findings and recommendations must be clean, single-
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **Static Proxies vs Observed Outcomes:** Static DOM indicators (missing H1, buried CTA) are structural friction proxies. Without first-party analytics, do not claim visitors are provably bouncing in the wild.
 - **Healthy Analytics Override:** Never escalate a missing H1 or layout warning to critical/high if first-party analytics prove 75% scroll depth and low bounce rates.

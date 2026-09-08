@@ -34,6 +34,10 @@ Performs bounded, SSRF-safe, single-pass website acquisition. Emits a canonical 
 
 ---
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - Crawl a target website to extract page representations, HTML, clean Markdown, and metadata.
@@ -162,7 +166,7 @@ The skill emits a structured JSON document conforming to the following shape:
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 The scraper emits strictly valid JSON to `--output` or stdout. No prose commentary precedes the JSON:
 `{site, crawled_at, robots{status, raw, sitemaps, matrix}, sitemaps[], pages[], infrastructure{}, stats{}}`.
@@ -173,7 +177,7 @@ The scraper emits strictly valid JSON to `--output` or stdout. No prose commenta
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **SPA False-Positive Risk:** Some server-side rendered frameworks emit minimal initial HTML followed by hydration. The sparse SPA flag is a signal, not a confirmed CSR gap. The `discoverability-audit` sensor performs authoritative CSR gap assessment.
 - **robots.txt 404 is NOT a defect:** An absent `robots.txt` means allow-all for all bots under RFC 9309. Do NOT flag this as a crawl barrier.

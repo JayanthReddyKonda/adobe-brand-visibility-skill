@@ -31,6 +31,10 @@ Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) 
 > [!TIP]
 > **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
+## Summary
+
+This skill executes diagnostic checks for its specific domain.
+
 ## When to use
 
 - Diagnose why an AI search assistant (ChatGPT Search, Perplexity, Claude) fails to cite or summarize a brand's product or service pages.
@@ -121,7 +125,7 @@ python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://exa
 
 ---
 
-## Output Format & Strict Mandate
+## Output Format
 
 Emits strictly valid JSON matching the schema with zero prose commentary:
 `{status, findings[], recommendations[], observations[], page_improvement_plans[], coverage{}, limitations[]}`.
@@ -129,7 +133,7 @@ All string fields in emitted findings, recommendations, and improvement plans mu
 
 ---
 
-## Gotchas & False-Positive Boundaries
+## Gotchas & Error Handling
 
 - **Static Heuristics vs Live Citations:** Citability scores and improvement plans are derived deterministically from empirical static text heuristics (Princeton KDD 2024, AutoGEO, C-SEO Bench). They evaluate linguistic and informational citability readiness, not live search engine citation logs or dynamic LLM inference results.
 - **Do NOT flag transactional pages** (login, cart, checkout, account settings) for lack of explanatory mechanisms or statistics.
