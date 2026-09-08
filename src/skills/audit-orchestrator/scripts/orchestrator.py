@@ -408,9 +408,8 @@ def synthesize_audit_report(
         if has_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
             continue
         # Layer 1 rendering gap only suppresses downstream if site-wide or on the specific unrendered page
-        if has_layer1_rendering_gap and cid in _SUPPRESSED_BY_LAYER1:
-            if is_site_wide_rendering_gap or f_scope in rendering_gap_pages:
-                continue
+        if has_layer1_rendering_gap and cid in _SUPPRESSED_BY_LAYER1 and (is_site_wide_rendering_gap or f_scope in rendering_gap_pages):
+            continue
 
         # P0-10: Scope-aware dedup key so defects with same root cause on different entities/pages survive
         dedup_key = f"{cid}::{f_scope}::{f.get('title', '')}" if f_scope else cid

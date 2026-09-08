@@ -392,7 +392,10 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
                             "evidence": f"The declared sameAs link {u} is reachable, but neither its title, og:site_name, nor body text explicitly state the brand name '{brand_name}'.",
                             "suggested_action": {
                                 "summary": f"Ensure the external authority page at {urlparse(u).hostname} explicitly claims the canonical brand name.",
+                                "technical_fix": "Update sameAs link target or add reciprocal Schema.org sameAs links pointing to canonical brand domain.",
+                                "creative_fix": "Ensure external profiles (Wikidata, LinkedIn, Wikipedia) explicitly mention the canonical brand name in title and bio.",
                                 "priority": "medium",
+                                "verification": "Re-fetch external profile and verify canonical brand name presence.",
                             },
                         }
                     )
@@ -412,6 +415,8 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
                 "evidence": f"Declared sameAs links returned error status: {'; '.join(broken)}.",
                 "suggested_action": {
                     "summary": "Update or remove broken sameAs URLs in Organization JSON-LD markup.",
+                    "technical_fix": "Update sameAs array in Organization Schema.org markup to remove dead or 4xx/5xx URLs.",
+                    "creative_fix": "Claim and maintain active brand presence on primary knowledge hubs (Wikidata, Crunchbase, LinkedIn).",
                     "priority": "medium",
                     "verification": "Confirm all declared sameAs URLs return HTTP 200.",
                 },
@@ -554,7 +559,10 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
                     "evidence": f"Candidate backlink sources failed with errors: {'; '.join(broken_backlinks[:3])}.",
                     "suggested_action": {
                         "summary": "Verify and update dead candidate backlink URLs in external PR or referral tracking ledgers.",
+                        "technical_fix": "Audit external referral inventory and update broken backlinks with canonical landing URLs.",
+                        "creative_fix": "Engage referring publisher partners to refresh outdated anchor links to current site architecture.",
                         "priority": "low",
+                        "verification": "Re-check referring URLs via HTTP GET to ensure 200 OK.",
                     },
                 }
             )

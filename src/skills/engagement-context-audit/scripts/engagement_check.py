@@ -711,12 +711,21 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
         return (
             [
                 {
+                    "id": "HTML_PARSING_FAILED",
+                    "cause_id": "HTML_PARSING_FAILED",
                     "title": "HTML parsing failed",
-                    "severity": "info",
+                    "severity": "low",
+                    "confidence": "high",
                     "category": "extraction",
-                    "root_cause": "Malformed HTML",
+                    "root_cause": "Malformed HTML payload prevented complete DOM tree parsing.",
                     "evidence": str(e),
-                    "suggested_action": {"summary": "Fix HTML syntax", "priority": "low"},
+                    "suggested_action": {
+                        "summary": "Fix HTML syntax and unclosed tags on the page.",
+                        "technical_fix": "Validate document with W3C HTML validator and fix unclosed tags or invalid nesting.",
+                        "creative_fix": "Ensure CMS layout templates produce valid HTML5 markup across all viewports.",
+                        "priority": "low",
+                        "verification": "Re-parse page HTML with standard parser without syntax errors.",
+                    },
                 }
             ],
             [],
@@ -750,7 +759,10 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                     "evidence": f"Page {url} provides explicit commercial facts (pricing for '{facts['scoped_prices'][0]['entity']}'), satisfying a bottom-funnel intent, but provides no clear transactional or sales-contact navigation.",
                     "suggested_action": {
                         "summary": "Add explicit CTA (e.g., 'Buy', 'Contact Sales') immediately following the pricing facts to preserve task continuity.",
+                        "technical_fix": "Render accessible transactional buttons (<a href='/checkout'> or <button>) immediately adjacent to pricing specifications.",
+                        "creative_fix": "Design prominent visual callouts emphasizing next steps, free trials, or consultation bookings.",
                         "priority": "medium",
+                        "verification": "Verify presence of transactional CTA links within first viewport of pricing section.",
                     },
                 }
             )
@@ -784,7 +796,10 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                     "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
                     "suggested_action": {
                         "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
+                        "technical_fix": "Update template <h1> element to explicitly mention canonical brand entity name.",
+                        "creative_fix": "Craft descriptive hero headline combining brand entity name with unique value proposition.",
                         "priority": "medium",
+                        "verification": "Inspect rendered HTML to ensure <h1> contains primary brand entity name.",
                     },
                 }
             )

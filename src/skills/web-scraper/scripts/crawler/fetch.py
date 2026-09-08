@@ -12,10 +12,10 @@ import http.client
 import socket
 import ssl
 import time
-from typing import Any, Dict, List, Optional
 import urllib.error
 import urllib.request
 import zlib
+from typing import Any, Dict, List, Optional
 
 from .budget import Budget, BudgetExhaustedError
 from .models import Resource
@@ -279,7 +279,7 @@ class SafeFetcher:
                 total_len = 0
                 chunk_len = 16384
                 for i in range(0, len(raw_data), chunk_len):
-                    chunk = dobj.decompress(raw_data[i : i + chunk_len])
+                    chunk = dobj.decompress(raw_data[i:i + chunk_len])
                     decompressed_chunks.append(chunk)
                     total_len += len(chunk)
                     if total_len >= limit:
@@ -297,4 +297,3 @@ class SafeFetcher:
                         return raw_data
                 return raw_data
         return raw_data
-

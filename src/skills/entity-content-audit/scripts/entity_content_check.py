@@ -408,6 +408,8 @@ def audit(base, domain, inv=None, state_file=None):
                 "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
                 "suggested_action": {
                     "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
+                    "technical_fix": "Deploy Organization JSON-LD with @type, name, url, logo, and sameAs links to official profiles.",
+                    "creative_fix": "Clarify official brand name, founding year, and corporate mission in footer and about page copy.",
                     "priority": "medium",
                     "verification": "Inspect homepage JSON-LD and confirm Organization schema parses validly.",
                 },
@@ -461,6 +463,8 @@ def audit(base, domain, inv=None, state_file=None):
                                             "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res.get('score', 0.0)}/1.0.",
                                             "suggested_action": {
                                                 "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
+                                                "technical_fix": f"Enrich Product JSON-LD with missing attributes ({', '.join(missing)}) under offers and specifications.",
+                                                "creative_fix": "Display visible pricing, availability, and product attributes in clear editorial tables adjacent to purchase CTAs.",
                                                 "priority": "medium",
                                                 "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
                                             },

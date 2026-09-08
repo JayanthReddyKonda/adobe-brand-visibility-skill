@@ -408,6 +408,8 @@ def audit(base, domain, inv=None, state_file=None):
                 "evidence": f"GET {base}/ returned HTTP {status}.",
                 "suggested_action": {
                     "summary": "Fix server configuration or routing so the root URL returns HTTP 200.",
+                    "technical_fix": "Configure web server routing, reverse proxy, and CDN origin mapping to return HTTP 200 for root URL.",
+                    "creative_fix": "Ensure homepage template renders branded fallbacks with accessible navigation if downstream services fail.",
                     "priority": "critical",
                     "verification": f"Send GET {base}/ and confirm HTTP 200 is returned.",
                 },
@@ -436,6 +438,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "evidence": f"GET / returned HTTP 200 for standard browsers but HTTP {bot_status} for OAI-SearchBot.",
                     "suggested_action": {
                         "summary": "Configure WAF/CDN security rules (Cloudflare, AWS WAF, Akamai) to allow verified AI search retrieval bots.",
+                        "technical_fix": "Update WAF security rules to whitelist verified AI retrieval User-Agents and autonomous search IP ranges.",
+                        "creative_fix": "Deploy targeted rate limits instead of outright IP/agent blockades for recognized search assistance bots.",
                         "priority": "critical",
                         "verification": "Probe the root URL with OAI-SearchBot User-Agent and confirm HTTP 200 is returned.",
                     },
@@ -469,6 +473,8 @@ def audit(base, domain, inv=None, state_file=None):
                 "evidence": f"Found direct exclusion directive in meta robots / X-Robots-Tag ({', '.join(sorted(robot_tokens & {'noindex', 'none'}))}).",
                 "suggested_action": {
                     "summary": "Remove the 'noindex' or 'none' directive from public landing pages.",
+                    "technical_fix": "Remove <meta name='robots' content='noindex'> tag and X-Robots-Tag: noindex header from public landing page responses.",
+                    "creative_fix": "Ensure brand marketing and product discovery copy is configured for full search indexing across CMS templates.",
                     "priority": "critical",
                     "verification": "Inspect response headers and HTML markup to ensure 'noindex' and 'none' are absent.",
                 },
@@ -498,6 +504,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(invalid_langs)}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
                     "suggested_action": {
                         "summary": "Fix hreflang codes to strictly follow ISO 639-1 (language) and ISO 3166-1 Alpha-2 (region).",
+                        "technical_fix": "Update all <link rel='alternate' hreflang='...'> tags to use valid two-letter ISO 639-1 language and ISO 3166-1 region codes.",
+                        "creative_fix": "Align localized page messaging with country-specific terminology, currency symbols, and cultural context.",
                         "priority": "medium",
                         "verification": "Verify all <link rel='alternate' hreflang='...'> tags use valid ISO codes.",
                     },
@@ -523,6 +531,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "evidence": f"Page on {domain} specifies canonical target '{dom.canonical}'.",
                     "suggested_action": {
                         "summary": "Set the canonical URL to point to the authoritative URL on the current domain.",
+                        "technical_fix": "Update <link rel='canonical'> href attribute to reference the authoritative absolute URL on the current domain.",
+                        "creative_fix": "Ensure cross-domain brand syndication includes reciprocal citations and original brand attribution.",
                         "priority": "medium",
                         "verification": f"Verify the <link rel='canonical'> href matches the current domain ({domain}).",
                     },
@@ -550,6 +560,8 @@ def audit(base, domain, inv=None, state_file=None):
                 "evidence": f"Initial HTML contains only {visible_words} visible words and an unrendered client-side shell ({marker}).",
                 "suggested_action": {
                     "summary": "Implement server-side rendering (SSR), static site generation (SSG), or dynamic pre-rendering for core text.",
+                    "technical_fix": "Configure Next.js, Nuxt, or edge pre-rendering to output semantic HTML tags for core copy on initial request.",
+                    "creative_fix": "Craft semantic hero titles, introductory paragraphs, and feature highlights that render without client execution.",
                     "priority": "high",
                     "verification": "Fetch raw HTML without executing JavaScript and confirm primary headings and body text are present.",
                 },
@@ -577,6 +589,8 @@ def audit(base, domain, inv=None, state_file=None):
                 "evidence": f"Initial HTML contains only {visible_words} visible words, no semantic headings/paragraphs, and {len(dom.app_script_srcs)} application script(s).",
                 "suggested_action": {
                     "summary": "Ensure critical landing copy is pre-rendered in the initial HTML payload.",
+                    "technical_fix": "Pre-render core page copy into the initial HTML document body before hydrating client-side bundles.",
+                    "creative_fix": "Provide meaningful brand summary copy in the static fallback shell for non-JS crawlers.",
                     "priority": "medium",
                     "verification": "Fetch raw HTML without JavaScript execution and verify primary content is present.",
                 },
@@ -749,6 +763,8 @@ def audit(base, domain, inv=None, state_file=None):
                     "evidence": f"robots.txt disallows {len(blocked_retrieval)} retrieval crawler(s): {rules_str}.",
                     "suggested_action": {
                         "summary": f"Allow AI search retrieval bots ({', '.join(names)}) on public routes in robots.txt.",
+                        "technical_fix": "Add 'User-agent: <bot>\\nAllow: /' blocks in robots.txt for all search retrieval bots.",
+                        "creative_fix": "Separate AI search retrieval bots from training harvesters to protect IP while preserving visibility.",
                         "priority": "critical",
                         "verification": "Re-fetch robots.txt and verify Allow: / is declared for retrieval crawlers.",
                     },
