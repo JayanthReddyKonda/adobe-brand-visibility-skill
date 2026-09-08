@@ -311,10 +311,10 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     # Intelligent Agent Scraper Integration (delegating to web-scraper skill)
     WebAuditEngine = None
     try:
-        from crawler.engine import WebAuditEngine
+        from crawler.engine import WebAuditEngine  # type: ignore
     except ImportError:
         try:
-            from .crawler.engine import WebAuditEngine
+            from .crawler.engine import WebAuditEngine  # type: ignore
         except ImportError:
             try:
                 import importlib.util

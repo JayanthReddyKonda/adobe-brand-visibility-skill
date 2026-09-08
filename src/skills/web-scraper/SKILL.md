@@ -83,26 +83,29 @@ python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --o
 The scraper performs the following deterministic steps internally:
 
 1. **Host Normalization & SSRF Pre-Flight:**
-   - Normalize target URL to canonical scheme and domain (`https://example.com/`).
+   - Normalize target URL to canonical scheme and domain (`https://example.com/`). Validate against public HTTP/HTTPS ports (80, 443).
    - Resolve DNS hostnames and validate against zero-trust SSRF constraints (blocking RFC 1918 private IPs, loopbacks `127.0.0.0/8`, link-local `169.254.0.0/16`, cloud metadata `169.254.169.254`, IPv6 equivalents).
+   - Filter out mutating/authenticated query routes using strict safe-path regex (`logout|login|signin|signout|checkout|cart|basket|purchase|buy|delete|remove|unsubscribe|subscribe|confirm|activate|reset|admin|account|oauth|token|session|password|payment|action|download`).
 
-2. **Robots.txt RFC 9309 Audit:**
+2. **Robots.txt RFC 9309 Audit & Octet Specificity:**
    - Fetch `robots.txt` using streaming chunked reads (bounded to 512 KiB).
-   - Evaluate longest-match precedence rules across all 16 AI crawler bots.
-   - Enforce fail-closed semantics for HTTP 5xx errors and fail-open for HTTP 404.
+   - Compare UTF-8 octets via `robot_octets()`: decode only percent-encoded ASCII unreserved bytes.
+   - Evaluate terminal wildcard matching (`/*$`), longest-match specificity, and tie-breaking (`Allow` preferred over `Disallow` on equal pattern length).
+   - Enforce conservative status handling: HTTP 404/410 permits crawling; unreachable or ambiguous HTTP (401, 403, 429, 5xx) blocks origin crawling.
 
-3. **XML Sitemap Traversal:**
+3. **XML Sitemap Traversal & DTD Protection:**
    - Probe `robots.txt` declared sitemaps and standard locations (`/sitemap.xml`, `/sitemap_index.xml`).
+   - Enforce safe XML subset parsing: reject DOCTYPE and ENTITY declarations to prevent XML External Entity (XXE) vulnerabilities.
    - Recursively parse child sitemaps (bounded to depth 3 and 1,000 URLs).
 
 4. **Commercial Priority Frontier Routing:**
    - Initialize frontier with the root homepage.
    - Score and prioritize high-value commercial routes (`/`, `/pricing`, `/products`, `/about`, `/contact`, `/docs`, `/faq`).
    - Strip URL tracking fragments and parameters (`utm_*`, `fbclid`, `gclid`).
-   - Filter out junk operational paths (`/cart`, `/checkout`, `/login`, `/admin`).
 
-5. **Streaming Single-Pass Extraction:**
-   - Fetch each page within monotonic deadline and byte ceilings (2 MB per page).
+5. **Streaming Single-Pass Extraction & Evidence Preservation:**
+   - Fetch each page within monotonic deadline and byte ceilings (2 MB per response).
+   - Preserve raw response bodies (`response-0001.body`) and emit `evidence-index.json` with SHA-256 digests, elapsed timing, and HTTP headers.
    - Extract title, meta description, canonical URL, OpenGraph, and Twitter tags.
    - Extract and flatten all Schema.org JSON-LD scripts, resolving `@graph` hierarchies.
    - Compute Signal-to-Noise Ratio (SNR) and extract Trafilatura-grade clean Markdown.

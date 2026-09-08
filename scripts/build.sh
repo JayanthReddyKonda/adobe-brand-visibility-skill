@@ -18,7 +18,9 @@ find build/brand-ai-readiness-audit -name "*.pyc" -type f -delete 2>/dev/null ||
 
 echo "Creating zip..."
 cd build
-rm -f brand-ai-readiness-audit.zip
+rm -f brand-ai-readiness-audit.zip brand-ai-readiness-audit.zip.sha256
 zip -r brand-ai-readiness-audit.zip brand-ai-readiness-audit > /dev/null
+sha256sum brand-ai-readiness-audit.zip > brand-ai-readiness-audit.zip.sha256
 cp brand-ai-readiness-audit.zip ../
+cp brand-ai-readiness-audit.zip.sha256 ../
 echo "Build complete."

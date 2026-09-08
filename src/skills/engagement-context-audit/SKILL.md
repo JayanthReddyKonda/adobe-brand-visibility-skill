@@ -53,12 +53,20 @@ This skill executes diagnostic checks for its specific domain.
 
 Load these resources as needed during engagement context checks:
 
-### Core Knowledge Base (Load First)
+### Core Knowledge Base & Check Catalogue (Load First)
+- [Bridge & Engagement Checks Reference](references/checks.md): Research specifications covering I1-I2 (deep-link stability and parameter probes) and J1-J10 (identity, navigability, prominence, conversion friction, and recovery).
+- [State and Validation Protocol](references/engagement-protocol.md): Protocol for deep-link continuity, parameter probes, and visual judgment boundaries.
 - [Engagement Context Knowledge Base](references/engagement-context-audit-knowledge-base.md): Entity-to-H1 information scent evaluation, commercial intent CTA reachability, first-party analytics ingestion, and post-referral bounce prevention.
 
 ### Reference Page Schemas
 - [Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
-- [Product Purchase Template](references/product-purchase.json): Standard conversion and purchase handoff structure.
+- [Product Purchase Template](references/product-purchase.json): Standard product purchase intent-handoff structure.
+
+### Mandatory Domain Invariants & Evidence Rules
+1. **Deep-Link Continuity (I1):** Deep links must preserve the same core content unit upon fresh, unauthenticated reload. Query URLs are valid candidates.
+2. **Inert Parameter Probes (I2):** Parameter probes must compare baseline/probe/baseline responses; dynamic variation or personalization is not a defect.
+3. **404 Recovery Affordances (J9):** 404 error pages must inventory navigation and recovery links in raw source HTML.
+4. **Single Band Precedence:** Issues providing dual benefits (e.g. discoverability and engagement) receive one highest justified severity band, never additive scores.
 
 ---
 

@@ -18,12 +18,14 @@ allowed-tools:
 | **Web Scraper (Single-Pass Acquisition)** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) |
 | **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements |
+| **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` |
 | **Deterministic Master Runner (Headless CI/CD)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json` | Baseline Draft-07 Validated Report JSON |
 | **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or 1 (fail) |
 
-> **Cognitive Multi-Skill Orchestration Protocol:**
-> 1. **Deterministic Telemetry Engine:** Outbound crawling and network measurements strictly use Python standard library tools under socket-level SSRF protection. Downstream sensors measure crawler matrices, HTML SNR, Schema.org coverage, and citability heuristics against `inv.json`.
-> 2. **Active Multi-Skill Reasoning:** As the AI Agent, you are the **Cognitive Diagnostic Brain**. You do NOT merely copy-paste script outputs. You actively read the specialist skill guides and domain knowledge bases, inspect the empirical site inventory, apply 5-Whys root cause analysis through the 6-Layer Causal DAG, eliminate bloat, and author bespoke, high-value dual-track remediations (tailored Schema.org JSON-LD code blocks and Princeton KDD 2024 copy rewrites).
+> **Cognitive Multi-Skill Orchestration Protocol & 134-Check Standard:**
+> 1. **Deterministic Telemetry Engine:** Outbound crawling and network measurements strictly use Python standard library tools under socket-level zero-trust SSRF protection. Downstream sensors measure crawler matrices, HTML SNR, Schema.org coverage, citability heuristics, and deep-link continuity against `inv.json`. Bounded collection finishes within 160s (worker hard limit), reserving at least 80s for semantic analysis before the 290s wall-clock ceiling.
+> 2. **134-Check Domain Catalogue & Evidence Invariants:** All 134 research checks (`checks.json`) are preserved with exact detection conditions, reference bands (S1–S4), feasibility rules, and V/C/E/X solution levels. Every emitted finding strictly cites immutable evidence (`artifact`, `locator`, `quote`). Unsubstantiated claims are rejected into `dropped_findings`.
+> 3. **Active Multi-Skill Reasoning & Prioritization:** As the AI Agent, you are the **Cognitive Diagnostic Brain**. You do NOT merely copy-paste script outputs. You actively consult the specialist skill runbooks and reference knowledge bases, apply 5-Whys causal root-cause analysis through the 6-Layer Causal DAG, eliminate bloat, and author bespoke dual-track remediations. Numeric task ranking strictly applies `priority_index = 5 * severity + (6 - difficulty)` for confirmed ready tasks. Severe defects with blocked repairs retain priority in the `investigation` queue.
 
 ---
 
@@ -56,6 +58,13 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 Read these before synthesizing findings. They define your cognitive reasoning rules.
 
 ### Core Knowledge Bases & Synthesis (Load First — MANDATORY)
+- [134-Check Domain Catalogue](references/checks.json): Canonical 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels.
+- [Marketplace Contract & Normalization Specification](references/contract.md): Normalized vocabulary (`confirmed_problem`, `advisory`, `investigation`), evidence locators, queue lanes, and priority formula contract.
+- [Engineering Decisions & Safety Refinements](references/decisions.md): Architectural decisions, RFC 9309 crawler standards, and boundary guidelines.
+- [Canonical Research Documents](references/):
+  - [Detection Review](references/source-website_checklist_detection_review.md): In-depth review of feasibility and detection limits across all 134 checks.
+  - [Priority Framework](references/source-website_checklist_priority_framework.md): Severity bands S1-S4 and justification criteria.
+  - [Solution Generation](references/source-website_checklist_solution_generation.md): Solution levels (V/C/E/X) and technical remediation templates.
 - [Core Synthesis Digest](references/core-synthesis-digest.md): Fast executive briefing (< 2,500 tokens) covering the 6-Layer Causal DAG, composite scoring weights, 9 Princeton GEO vectors, and keystone taxonomy.
 - [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks, and Archetype Dynamic Adaptation playbooks.
 - [Epistemic Reasoning & Evidence Policy](references/reasoning-policy.md): Evidence vs. truth standards, four-state epistemic model (observed/inferred/unknown/suppressed), falsification rules, and component responsibility boundaries.

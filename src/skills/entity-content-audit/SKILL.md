@@ -52,12 +52,19 @@ This skill executes diagnostic checks for its specific domain.
 
 Load these resources as needed during entity analysis:
 
-### Core Knowledge Base (Load First)
+### Core Knowledge Base & Check Catalogue (Load First)
+- [Content & Entity Checks Reference](references/checks.md): Research specifications covering N1-N15, entity definitions, and industry vertical checks.
 - [Entity Content Knowledge Base](references/entity-content-audit-knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, and the 7-attribute Answerability Index formula.
 
 ### Schema.org Reference Templates
 - [Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
 - [Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
+
+### Mandatory Domain Invariants & Evidence Rules
+1. **Channel Differences:** A fact present in Schema.org JSON-LD but absent in body text is a channel difference, not universal invisibility. Never classify a page as missing entity clarity when JSON-LD contains valid Schema.org entities.
+2. **Valid Multiple Entities:** Multiple valid entities (`Organization`, `WebSite`, `Product`, `FAQPage`) within a single `@graph` array are standard practice, not a defect.
+3. **Non-Fabrication:** Never fabricate missing fields from unparsed blocks or invent authoritative schema values (e.g. fake prices or credentials).
+4. **V/C/E/X Remedy Levels:** Level V allows mechanically tested JSON-LD; Level C requires owner commercial context; Level E is editorial. A syntax check does not prove business truth.
 
 ---
 

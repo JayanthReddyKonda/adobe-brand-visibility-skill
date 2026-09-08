@@ -104,26 +104,32 @@ Every report emitted by `audit-orchestrator` adheres strictly to the Production 
 
 ---
 
-## 5. Quick Start & Execution Guide
+## 5. Execution Interfaces
 
-### Option A: Complete End-to-End Audit (Single Command)
+### Interface 1: Autonomous Cognitive Pipeline (`orchestrator.py`)
 ```bash
 # Execute full multi-skill audit with automatic single-pass crawl & Causal DAG synthesis
 python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
 ```
 
-### Option B: Automated Knowledge Bundling
+### Interface 2: Contract-Driven Multi-Pass Audit (`audit.py`)
 ```bash
-# Compile tailored site context and archetype-specific playbooks in a single pass
-python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com
+# 1. Bounded single-pass collection & baseline report emission (bounded to 160s)
+python3 skills/audit-orchestrator/scripts/audit.py collect https://example.com --out output/audit
+
+# 2. Agent semantic finalization composing collected evidence with review.json
+python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review output/audit/review.json --out output/audit/final-report.json
+
+# 3. Validate final report against Draft-07 schema and consistency invariants
+python3 skills/audit-orchestrator/scripts/audit.py validate output/audit/final-report.json
 ```
 
-### Option C: Step-by-Step Specialist Invocations (Agentic Runbook)
+### Interface 3: Specialist Sensor Modular Invocations
 ```bash
-# 1. Acquire site inventory via single-pass web scraper
+# 1. Acquire site inventory via single-pass web scraper under zero-trust SSRF
 python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
 
-# 2. Execute specialist sensors against inv.json
+# 2. Execute specialist sensors against inv.json offline
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
@@ -137,11 +143,27 @@ python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 
 ---
 
-## 6. Verification & Quality Metrics
+## 6. Prioritization & Remedy Framework
 
-- **264 Automated Unit, Integration & System Tests:** 100% passing across 24 test modules in under 60 seconds.
+The marketplace incorporates the complete 134-check domain catalogue (`checks.json`) covering:
+- **37 Discoverability Checks**: Robots.txt crawler permissions, meta directives, canonical chains, sitemap XML parsing, and rendering.
+- **85 Content, Freshness & Entity Checks**: Schema.org JSON-LD entities, Answerability attributes, cross-page factual consistency, declared profile authority, and Princeton KDD 2024 / AutoGEO citation probability.
+- **12 Bridge & Engagement Checks**: Deep link stability (`I1`), inert parameter probes (`I2`), 404 recovery affordances (`J9`), and heading information scent.
+
+Numeric prioritization uses the formula:
+```
+priority_index = 5 * severity + (6 - difficulty)
+```
+Where severity bands map as S4=4 (critical), S3=3 (high), S2=2 (medium), S1=1 (low), and difficulty spans D1=1 (trivial) to D5=5 (major overhaul). Confirmed defects with missing repair context retain priority in the `investigation` queue.
+
+---
+
+## 7. Verification & Quality Metrics
+
+- **315 Automated Tests Passed (100% Pass Rate):** Across unit, integration, and compliance test suites in under 45 seconds.
+- **36 Marketplace Compliance Tests:** Verifying robots RFC 9309 rules, SSRF safety, detectors, DAG cycle rejection, and Draft-07 schema gating.
 - **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
 - **Static Type Safety:** 0 errors under MyPy across all 8 skills.
-- **Draft-07 JSON Schema Gate:** Validated against `report-schema.json` with support for flexible evidence typing and dual-track remediation.
-- **Clean Output Standard:** 0 unescaped newlines, 0 null clutter, and dual format rendering.
+- **Package Integrity:** Passes `tests/validate_package.py` on source and distribution zip (uncompressed size ~2.3 MB, well under the 50 MB ceiling).
+- **Pure Standard Library:** Zero third-party runtime pip dependencies inside `src/skills/`.
 - **SSRF Hardening:** Pure stdlib socket-level IP validation against RFC-1918, link-local, loopback, and IPv4-mapped IPv6 ranges.

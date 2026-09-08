@@ -52,8 +52,15 @@ This skill executes diagnostic checks for its specific domain.
 
 Load these resources as needed during factual consistency checks:
 
-### Core Knowledge Base (Load First)
+### Core Knowledge Base & Check Catalogue (Load First)
+- [Fact & Consistency Checks Reference](references/checks.md): Research specifications covering claim verification, date staleness, and cross-page consistency.
 - [Fact Consistency Knowledge Base](references/fact-consistency-audit-knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
+
+### Mandatory Domain Invariants & Evidence Rules
+1. **Two Incompatible Assertions Rule:** Every contradiction finding MUST cite two exact incompatible assertions from collected inventory, identifying both artifacts (`artifact`), locators (`locator`), and verbatim quotes (`quote`). Never hypothesize a conflict without dual proof.
+2. **Scope Binding:** Bind claims strictly to entity, variant, locale, currency, effective period, and source before comparison. Do NOT compare annual billing to monthly billing or different regional currencies.
+3. **Paraphrases Are Not Contradictions:** Semantic restatements, marketing variations, and differing detail levels are not factual contradictions.
+4. **Historical Truth Limits:** An older date alone does not establish staleness without verified historical evidence of an update.
 
 ---
 

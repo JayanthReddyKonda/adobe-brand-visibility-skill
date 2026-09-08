@@ -52,8 +52,15 @@ This skill executes diagnostic checks for its specific domain.
 
 Load these resources as needed during GEO content checks:
 
-### Core Knowledge Base (Load First — MANDATORY)
+### Core Knowledge Base & Check Catalogue (Load First — MANDATORY)
+- [GEO & Content Quality Checks Reference](references/checks.md): Research specifications covering N1-N15 (self-contained answers, answer-first positioning, numbers vs vague claims, attribution, quotations, and fluency).
 - [GEO Content Knowledge Base](references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO benchmarks, 134–167 word optimal chunk scoring, causal conjunction cheatsheets, comparison table patterns, and AI Writing Detection & Natural Content Patterns (Section 9).
+
+### Mandatory Domain Invariants & Non-Fabrication Rules
+1. **Zero Synthetic Fabrication:** Never invent numbers, metrics, statistics, customer testimonials, quotes, credentials, or third-party sources to satisfy a GEO recommendation.
+2. **Preserve Factual Qualifiers:** When restructuring answers or passages, preserve all caveats, scope limitations, pricing conditions, and geographic qualifiers.
+3. **Grounded Answer Extraction:** Extract actual answer gaps from observed content (e.g. replacing a vague marketing superlative with an existing supported specification).
+4. **No Guaranteed Uplift:** Empirical GEO vectors improve machine readability and selection probability, but cannot promise guaranteed ranking or citation.
 
 ---
 

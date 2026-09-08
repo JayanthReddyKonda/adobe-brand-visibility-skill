@@ -16,8 +16,18 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from plan import LABELS, plan
-from validate_report import validate_report_dict
+try:
+    from .plan import LABELS, plan  # type: ignore
+    from .validate_report import validate_report_dict  # type: ignore
+except (ImportError, ValueError):
+    try:
+        from plan import LABELS, plan  # type: ignore
+        from validate_report import validate_report_dict  # type: ignore
+    except ImportError:
+        if str(SCRIPT_DIR) not in sys.path:
+            sys.path.insert(0, str(SCRIPT_DIR))
+        from plan import LABELS, plan  # type: ignore
+        from validate_report import validate_report_dict  # type: ignore
 
 
 def now() -> str:
@@ -69,7 +79,7 @@ def sort_tasks(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Sort audit tasks topologically by dependency DAG, lane queues, severity, and difficulty."""
     queues = {"confirmed": 0, "advisory": 1, "investigation": 2}
 
-    def key(item: Dict[str, Any]) -> tuple:
+    def key(item: Dict[str, Any]) -> tuple[Any, ...]:
         band = item.get("actual_band", "S2")
         severity = int(band[1]) if band.startswith("S") and len(band) > 1 else -1
         d = item.get("difficulty")
@@ -169,8 +179,10 @@ def assemble(
                 prev = merged[dedup]
                 prev["related_check_ids"] = sorted(set(prev["related_check_ids"] + ids))
                 prev["evidence_refs"] += [e for e in item["evidence_refs"] if e not in prev["evidence_refs"]]
-                curr_band_num = int(item["actual_band"][1]) if item["actual_band"].startswith("S") else -1
-                prev_band_num = int(prev["actual_band"][1]) if prev["actual_band"].startswith("S") else -1
+                b_curr = str(item.get("actual_band", ""))
+                curr_band_num = int(b_curr[1]) if b_curr.startswith("S") and len(b_curr) > 1 and b_curr[1].isdigit() else -1
+                b_prev = str(prev.get("actual_band", ""))
+                prev_band_num = int(b_prev[1]) if b_prev.startswith("S") and len(b_prev) > 1 and b_prev[1].isdigit() else -1
                 if curr_band_num > prev_band_num:
                     prev["actual_band"] = item["actual_band"]
                 prev["depends_on"] = sorted(set(prev["depends_on"] + item["depends_on"]))
@@ -185,7 +197,19 @@ def assemble(
     for item in findings:
         item["severity"] = LABELS[item["actual_band"]]
         item["evidence"] = "; ".join(f"{e['artifact']} at {e['locator']}: {e['quote'][:500]}" for e in item["evidence_refs"])
-        item.setdefault("category", "crawlability" if item.get("check_id", "").startswith(("B", "D")) else "structured_data" if item.get("check_id", "").startswith("E") else "content_quality")
+        cid = str(item.get("check_id", ""))
+        cat = "discoverability"
+        if cid.startswith("E"):
+            cat = "entity_content"
+        elif cid.startswith("N"):
+            cat = "fact_consistency"
+        elif cid.startswith("P"):
+            cat = "corroboration"
+        elif cid.startswith("G"):
+            cat = "geo_content"
+        elif cid.startswith(("I", "J")):
+            cat = "engagement"
+        item.setdefault("category", cat)
         item.setdefault("root_cause", item.get("severity_reason") or item.get("observation", "Defect identified"))
         item.setdefault("confidence", "high")
         action = dict(item.get("suggested_action") or {})

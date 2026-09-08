@@ -52,8 +52,15 @@ This skill executes diagnostic checks for its specific domain.
 
 Load these resources as needed during authority corroboration checks:
 
-### Core Knowledge Base (Load First)
+### Core Knowledge Base & Check Catalogue (Load First)
+- [Authority & Corroboration Checks Reference](references/checks.md): Research specifications covering declared profile checks, identity anchors, and external corroboration.
 - [Corroboration Authority Knowledge Base](references/corroboration-authority-audit-knowledge-base.md): External sameAs probing protocols, bounded candidate backlink verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
+
+### Mandatory Domain Invariants & Evidence Rules
+1. **Candidate Identity Links:** A declared `sameAs` link is an identity candidate, not an automatic guarantee of identity. Require reciprocal domain confirmation or explicit identifier agreement.
+2. **Bounded External Inspection:** Probe at most two declared sameAs destinations through the zero-trust SSRF collector.
+3. **Finite Search Boundaries:** A finite crawl or web search cannot prove a profile does not exist. Record unverified profiles as limitations, not defects.
+4. **Distinguish Trading vs Legal Entities:** Different brand trading names, parent organizations, and role-specific contact numbers are not entity ambiguities.
 
 ---
 

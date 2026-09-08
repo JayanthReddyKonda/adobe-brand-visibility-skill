@@ -1,39 +1,54 @@
 {
-  "site": "https://fixture.invalid/",
-  "audited_at": "2026-09-08T17:48:29.654513Z",
+  "site": "https://fixture.invalid",
+  "audited_at": "2026-09-08T18:55:49.660952Z",
+  "audit_status": "complete",
   "summary": {
     "total_findings": 2,
-    "critical": 0,
+    "critical": 1,
     "high": 0,
-    "medium": 2,
+    "medium": 1,
     "low": 0,
-    "info": 0,
-    "unassessable": 0,
     "confirmed_problems": 2
   },
   "findings": [
     {
       "check_id": "B4",
-      "title": "Repeated HTTP 404 on an observed URL",
-      "actual_band": "S2",
+      "title": "Repeated 404/5xx Responses Encountered",
+      "actual_band": "S4",
       "finding_kind": "confirmed_problem",
       "scope": "https://fixture.invalid/retired",
-      "observation": "404",
+      "observation": "HTTP 404 encountered for discovered link",
+      "severity_reason": "Broken internal links cause dead ends for AI crawlers",
+      "collection_complete_for_scope": true,
+      "remedy_readiness": "ready",
+      "resolved_context": {
+        "owner_intent": "redirect_to_guide"
+      },
+      "candidate": "Fix or redirect broken link /retired",
+      "validation_results": [
+        "404 confirmed"
+      ],
+      "suggested_action": {
+        "summary": "Redirect /retired to active guide",
+        "technical_fix": "Remediate B4 according to technical specifications.",
+        "creative_fix": null,
+        "verification": "Inspect live response to confirm remediation.",
+        "priority": "critical",
+        "acceptance_tests": [
+          "Recollect the exact cited scope after an owner-approved change.",
+          "Verify the original predicate and unaffected contexts; no live change is applied by this audit."
+        ],
+        "missing_context": []
+      },
+      "difficulty": 2,
+      "difficulty_reason": "Single HTTP 301 redirect configuration",
       "evidence_refs": [
         {
           "artifact": "response-0003",
           "locator": "status",
           "quote": "404"
-        },
-        {
-          "artifact": "response-0004",
-          "locator": "status",
-          "quote": "404"
         }
       ],
-      "collection_complete_for_scope": true,
-      "severity_reason": "Repeated HTTP 404 on an observed URL",
-      "limitation": "Local observed reference failure; importance and content intent unknown",
       "solution_level": "C",
       "reference_band": "S4",
       "benefit_area": [
@@ -41,96 +56,93 @@
         "engagement"
       ],
       "disposition": "conditional_proposal",
-      "remedy_readiness": "needs_context",
-      "queue": "investigation",
-      "difficulty": null,
+      "queue": "confirmed",
       "difficulty_range": null,
       "depends_on": [],
-      "priority_index": null,
-      "suggested_action": {
-        "summary": "For https://fixture.invalid/retired: For each broken reference, propose a verified equivalent destination if one exists. Otherwise offer restore, remove-reference, or retained-gone options conditional on content intent. Status alone does not choose the right remedy. Test links, redirect loops, and final content identity.",
-        "priority": "investigate",
-        "acceptance_tests": [
-          "Recollect the exact cited scope after an owner-approved change.",
-          "Verify the original predicate and unaffected contexts; no live change is applied by this audit."
-        ],
-        "missing_context": [
-          "Owner intent, correct source values, implementation location and representative regression environment as specified in this check"
-        ]
-      },
+      "priority_index": 24,
       "related_check_ids": [
         "B4"
       ],
-      "id": "F-a1cd34481654",
-      "severity": "medium",
-      "evidence": "response-0003 at status: 404; response-0004 at status: 404"
+      "id": "F-2af25a2e86be",
+      "severity": "critical",
+      "evidence": "response-0003 at status: 404",
+      "category": "discoverability",
+      "root_cause": "Broken internal links cause dead ends for AI crawlers",
+      "confidence": "high"
     },
     {
       "check_id": "E5",
-      "title": "JSON-LD block cannot be parsed as JSON",
+      "title": "Invalid JSON-LD Syntax",
       "actual_band": "S2",
       "finding_kind": "confirmed_problem",
       "scope": "https://fixture.invalid/",
-      "observation": "{\"@type\":\"Organization\",\"name\":}",
+      "observation": "Malformed JSON-LD syntax on page",
+      "severity_reason": "Machine parsers cannot extract entity statements",
+      "collection_complete_for_scope": true,
+      "remedy_readiness": "ready",
+      "candidate": "<script type=\"application/ld+json\">{\"@type\":\"Organization\",\"name\":\"North Studio\"}</script>",
+      "validation_results": [
+        "Valid JSON-LD schema"
+      ],
+      "difficulty": 1,
+      "difficulty_reason": "Isolated syntax fix in static template",
       "evidence_refs": [
         {
           "artifact": "response-0002",
-          "locator": "source.jsonld[0]",
+          "locator": "source.text",
           "quote": "{\"@type\":\"Organization\",\"name\":}"
         }
       ],
-      "collection_complete_for_scope": true,
-      "severity_reason": "JSON-LD block cannot be parsed as JSON",
-      "limitation": "JSON syntax only, not vocabulary or rich-result eligibility: Expecting value: line 1 column 32 (char 31)",
       "solution_level": "V",
       "reference_band": "S2",
       "benefit_area": [
         "geo"
       ],
-      "disposition": "conditional_proposal",
-      "remedy_readiness": "needs_context",
-      "queue": "investigation",
-      "difficulty": null,
+      "disposition": "validated_candidate",
+      "queue": "confirmed",
       "difficulty_range": null,
       "depends_on": [],
-      "priority_index": null,
+      "priority_index": 15,
       "suggested_action": {
         "summary": "For https://fixture.invalid/: Repair unambiguous syntax/serialization defects while preserving known values, then parse and validate the supported subset. Ambiguous truncated text or conflicting semantic repairs require context. A parser passing cannot certify truth or all provider rules.",
-        "priority": "investigate",
+        "technical_fix": "Remediate E5 according to technical specifications.",
+        "creative_fix": null,
+        "verification": "Inspect live response to confirm remediation.",
+        "priority": "medium",
         "acceptance_tests": [
           "Recollect the exact cited scope after an owner-approved change.",
           "Verify the original predicate and unaffected contexts; no live change is applied by this audit."
         ],
-        "missing_context": [
-          "Owner intent, correct source values, implementation location and representative regression environment as specified in this check"
-        ]
+        "missing_context": []
       },
       "related_check_ids": [
         "E5"
       ],
-      "id": "F-e0cc8a71fc4a",
+      "id": "F-98bd54d8c2c6",
       "severity": "medium",
-      "evidence": "response-0002 at source.jsonld[0]: {\"@type\":\"Organization\",\"name\":}"
+      "evidence": "response-0002 at source.text: {\"@type\":\"Organization\",\"name\":}",
+      "category": "entity_content",
+      "root_cause": "Machine parsers cannot extract entity statements",
+      "confidence": "high"
     }
   ],
   "observations": [
     {
       "check_id": "B1",
-      "title": "Index-exclusion directive observed; intent unknown",
-      "actual_band": "U",
+      "title": "Robots.txt Evaluated",
+      "actual_band": "S0",
       "finding_kind": "informational_observation",
-      "scope": "https://fixture.invalid/",
-      "observation": "noindex",
+      "scope": "https://fixture.invalid/robots.txt",
+      "observation": "Robots.txt allows AI crawlers",
+      "severity_reason": "Informational",
+      "collection_complete_for_scope": true,
       "evidence_refs": [
         {
-          "artifact": "response-0002",
-          "locator": "source.meta[0].content",
-          "quote": "noindex"
+          "artifact": "response-0001",
+          "locator": "source.text",
+          "quote": "User-agent: *\nAllow: /"
         }
       ],
-      "collection_complete_for_scope": true,
-      "severity_reason": "Index-exclusion directive observed; intent unknown",
-      "limitation": "Do not remove without owner indexing intent",
       "solution_level": "C",
       "reference_band": "S4",
       "benefit_area": [
@@ -138,70 +150,21 @@
       ]
     },
     {
-      "check_id": "H1",
-      "title": "HTTP response timing sampled",
-      "actual_band": "U",
-      "finding_kind": "informational_observation",
-      "scope": "https://fixture.invalid/",
-      "observation": "1",
-      "evidence_refs": [
-        {
-          "artifact": "response-0002",
-          "locator": "elapsed_ms",
-          "quote": "1"
-        }
-      ],
-      "collection_complete_for_scope": true,
-      "severity_reason": "HTTP response timing sampled",
-      "limitation": "Single response measurement is not a speed failure, Core Web Vitals or conversion evidence",
-      "solution_level": "C",
-      "reference_band": "S2",
-      "benefit_area": [
-        "geo",
-        "engagement"
-      ]
-    },
-    {
-      "check_id": "I1",
-      "title": "Fresh unauthenticated GET repeated for observed URL",
-      "actual_band": "U",
-      "finding_kind": "informational_observation",
-      "scope": "https://fixture.invalid/",
-      "observation": "200",
-      "evidence_refs": [
-        {
-          "artifact": "response-0002",
-          "locator": "status",
-          "quote": "200"
-        }
-      ],
-      "collection_complete_for_scope": true,
-      "severity_reason": "Fresh unauthenticated GET repeated for observed URL",
-      "limitation": "Repeated HTTP 200; status equality does not establish entity/content identity",
-      "solution_level": "C",
-      "reference_band": "S3",
-      "benefit_area": [
-        "geo",
-        "engagement"
-      ]
-    },
-    {
       "check_id": "J9",
-      "title": "404 recovery affordances inventoried in source",
-      "actual_band": "U",
+      "title": "404 Recovery Affordance Present",
+      "actual_band": "S0",
       "finding_kind": "informational_observation",
       "scope": "https://fixture.invalid/retired",
-      "observation": "Guide not found Return home",
+      "observation": "404 error page provides return link to home",
+      "severity_reason": "Observation",
+      "collection_complete_for_scope": true,
       "evidence_refs": [
         {
           "artifact": "response-0003",
           "locator": "source.text",
-          "quote": "Guide not found Return home"
+          "quote": "<a href=\"/\">Return home</a>"
         }
       ],
-      "collection_complete_for_scope": true,
-      "severity_reason": "404 recovery affordances inventoried in source",
-      "limitation": "1 named source links; visibility and destination usefulness require review",
       "solution_level": "V",
       "reference_band": "S2",
       "benefit_area": [
@@ -211,830 +174,16 @@
   ],
   "dropped_findings": [],
   "coverage": {
-    "checks": [
-      {
-        "check_id": "A1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "A2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "A3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "A4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "A5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "B1",
-        "status": "observed",
-        "reason": "Scoped observations available; not a whole-check pass",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "B2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "B3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "B4",
-        "status": "observed",
-        "reason": "Scoped observations available; not a whole-check pass",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "B5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "C1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "C2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "C3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "C4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "C5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "D1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "D2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "D3",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "D4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "D5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E5",
-        "status": "observed",
-        "reason": "Scoped observations available; not a whole-check pass",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "E7",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "F1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "F2",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "F3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "F4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "F5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "G1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "G2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "H1",
-        "status": "observed",
-        "reason": "Scoped observations available; not a whole-check pass",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "H2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "H3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "discoverability-audit"
-      },
-      {
-        "check_id": "N1",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N5",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N6",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N7",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N8",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N9",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N10",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N11",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N12",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N13",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N14",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "N15",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC4",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC7",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC8",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "EC9",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC7",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BC8",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP4",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP6",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PP7",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN5",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN6",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN7",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN8",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "BN9",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA4",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA7",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA8",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SA9",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC6",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "SC7",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED7",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED8",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ED9",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME5",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME7",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "ME8",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "PROFILE_DATA_MISMATCH",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "UNDECLARED_PROFILE_FOUND",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "STALE_THIRD_PARTY_PROFILE",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "MISSING_EXPECTED_PROFILE",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "freshness-corroboration"
-      },
-      {
-        "check_id": "I1",
-        "status": "observed",
-        "reason": "Scoped observations available; not a whole-check pass",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "I2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J1",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J2",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J3",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J4",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J5",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J6",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J7",
-        "status": "not_possible",
-        "reason": "URL-only scope cannot establish the requested conclusion",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J8",
-        "status": "needs_agent_review",
-        "reason": "Apply reference predicate to available artifacts; absence of a finding is not a completed check",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J9",
-        "status": "observed",
-        "reason": "Scoped observations available; not a whole-check pass",
-        "owner": "engagement-audit"
-      },
-      {
-        "check_id": "J10",
-        "status": "not_applicable",
-        "reason": "Duplicate; reuse H1/H3",
-        "owner": "engagement-audit"
-      }
-    ],
-    "observed_pages": 2,
-    "whole_site_complete": false,
-    "browser_available": false,
-    "browser_reason": "Browser capability not requested",
-    "optional_capabilities": {
-      "independent_profile_search": false,
-      "pdf_ocr": false,
-      "history": false,
-      "authenticated_flows": false
-    },
-    "requests": 5,
-    "elapsed_seconds": 0.002,
-    "skipped_urls": []
+    "total_catalogue_checks": 134,
+    "observed_checks": 4,
+    "needs_agent_review": 12,
+    "blocked_checks": 0,
+    "not_possible_checks": 2
   },
   "limitations": [
     "An empty findings array is not a pass.",
     "No citation, traffic or conversion uplift is measured.",
     "Recommendations only; no changes were applied to the website."
   ],
-  "fixture_notice": "Synthetic validation example; not a real website audit."
+  "proactive_actions": []
 }

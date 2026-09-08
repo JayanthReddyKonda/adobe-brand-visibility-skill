@@ -206,7 +206,15 @@ def run_synthetic_audit(out_dir: Optional[Path] = None) -> Dict[str, Any]:
     )
 
     if out_dir is not None:
-        out_path = Path(out_dir) / "audit-report.json"
+        target = Path(out_dir)
+        out_path = target if target.suffix == ".json" else target / "audit-report.json"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     return report
+
+
+if __name__ == "__main__":
+    out_target = sys.argv[1] if len(sys.argv) > 1 else str(ROOT / "examples/synthetic-audit-report.json")
+    rep = run_synthetic_audit(Path(out_target))
+    print(f"Generated synthetic fixture report at: {out_target}")
