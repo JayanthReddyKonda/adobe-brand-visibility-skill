@@ -53,7 +53,7 @@ class TestCLIInterfaces(unittest.TestCase):
     # 2. acquire_inventory CLI
     def test_acquire_inventory_cli_arguments(self):
         """Verify acquire_inventory arguments: --site, --output, --format."""
-        res = run_skill_script("audit-orchestrator", "acquire_inventory.py", ["--help"])
+        res = run_skill_script("web-scraper", "acquire_inventory.py", ["--help"])
         self.assertEqual(res.returncode, 0)
         self.assertIn("--site", res.stdout)
         self.assertIn("--output", res.stdout)
@@ -61,7 +61,7 @@ class TestCLIInterfaces(unittest.TestCase):
 
     def test_acquire_inventory_missing_site_fails(self):
         """Verify acquire_inventory fails when required --site argument is omitted."""
-        res = run_skill_script("audit-orchestrator", "acquire_inventory.py", [])
+        res = run_skill_script("web-scraper", "acquire_inventory.py", [])
         self.assertNotEqual(res.returncode, 0)
 
     # 3. discoverability-audit CLI

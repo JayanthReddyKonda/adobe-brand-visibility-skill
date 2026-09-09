@@ -54,7 +54,7 @@ Load these resources as needed during authority corroboration checks:
 
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Authority & Corroboration Checks Reference](references/checks.md): Research specifications covering declared profile checks, identity anchors, and external corroboration.
-- [Corroboration Authority Knowledge Base](references/corroboration-authority-audit-knowledge-base.md): External sameAs probing protocols, bounded candidate backlink verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
+- [Corroboration Authority Knowledge Base](references/knowledge-base.md): External sameAs probing protocols, bounded candidate backlink verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Candidate Identity Links:** A declared `sameAs` link is an identity candidate, not an automatic guarantee of identity. Require reciprocal domain confirmation or explicit identifier agreement.
@@ -70,7 +70,7 @@ Load these resources as needed during authority corroboration checks:
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
 Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
-- `skills/corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md`
+- `skills/corroboration-authority-audit/references/knowledge-base.md`
 
 ### Step 2: Execution Command
 

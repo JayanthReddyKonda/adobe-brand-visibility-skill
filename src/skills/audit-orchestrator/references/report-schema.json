@@ -100,7 +100,7 @@
           },
           "cause_id": {
             "type": "string",
-            "description": "Root cause key matching audit-orchestrator-knowledge-base.md"
+            "description": "Root cause key matching knowledge-base.md"
           },
           "title": {
             "type": "string",

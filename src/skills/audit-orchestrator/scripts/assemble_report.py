@@ -219,24 +219,19 @@ def assemble(
         item["suggested_action"] = action
     summary = dict(
         total_findings=len(findings),
-        **{v: sum(i["severity"] == v for i in findings) for v in ("critical", "high", "medium", "low")}
+        **{v: sum(i["severity"] == v for i in findings) for v in ("critical", "high", "medium", "low")},
     )
     summary["confirmed_problems"] = sum(i["finding_kind"] == "confirmed_problem" for i in findings)
     report = dict(
+        schema_version="1.0.0",
         site=site,
         audited_at=now(),
         audit_status="complete",
         summary=summary,
         findings=findings,
+        proactive_actions=[],
         observations=observations,
         dropped_findings=dropped,
-        coverage=coverage,
-        limitations=[
-            "An empty findings array is not a pass.",
-            "No citation, traffic or conversion uplift is measured.",
-            "Recommendations only; no changes were applied to the website.",
-        ],
-        proactive_actions=[],
     )
     validate_report(report)
     return report

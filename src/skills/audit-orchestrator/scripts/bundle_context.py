@@ -118,7 +118,7 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
     # 2. Append triggered specialist rules
     if signals["is_multilingual"]:
         intl_content = extract_section(
-            os.path.join(SKILLS_DIR, "discoverability-audit", "references", "discoverability-audit-knowledge-base.md"),
+            os.path.join(SKILLS_DIR, "discoverability-audit", "references", "knowledge-base.md"),
             "## 7. International SEO",
         )
         if not intl_content:
@@ -129,7 +129,7 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
         if intl_content:
             output_lines.append("#### International SEO & Localization Checklist:")
             output_lines.append(intl_content)
-            output_lines.append("\n*(extracted from discoverability-audit-knowledge-base.md)*\n")
+            output_lines.append("\n*(extracted from discoverability-audit knowledge-base.md)*\n")
 
     if signals["archetype"] == "ecommerce":
         prod_schema = os.path.join(SKILLS_DIR, "entity-content-audit", "references", "product.json")
@@ -140,7 +140,7 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
 
     if signals["low_depth_pages"] > 0:
         ai_detect_content = extract_section(
-            os.path.join(SKILLS_DIR, "geo-content-audit", "references", "geo-content-audit-knowledge-base.md"),
+            os.path.join(SKILLS_DIR, "geo-content-audit", "references", "knowledge-base.md"),
             "## 9. AI Writing Detection",
         )
         if not ai_detect_content:
@@ -151,7 +151,7 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
         if ai_detect_content:
             output_lines.append("#### Content Quality & AI Writing Pattern Guardrails:")
             output_lines.append(ai_detect_content)
-            output_lines.append("\n*(extracted from geo-content-audit-knowledge-base.md)*\n")
+            output_lines.append("\n*(extracted from geo-content-audit knowledge-base.md)*\n")
 
     return "\n".join(output_lines)
 

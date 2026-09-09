@@ -61,7 +61,7 @@ This skill executes diagnostic checks for its specific domain.
 
 ## References & Documentation Library
 
-- [Web Scraper Knowledge Base](references/web-scraper-knowledge-base.md): Complete architecture reference, 16 AI retrieval crawler matrix, RFC 9309 longest-match precedence rules, Trafilatura-grade SNR extraction heuristics, and SSRF blocked network table.
+- [Web Scraper Knowledge Base](references/knowledge-base.md): Complete architecture reference, 16 AI retrieval crawler matrix, RFC 9309 longest-match precedence rules, Trafilatura-grade SNR extraction heuristics, and SSRF blocked network table.
 
 ---
 
@@ -71,7 +71,7 @@ This skill executes diagnostic checks for its specific domain.
 
 Read the knowledge base before execution to understand the 16-bot crawler matrix and SSRF constraints:
 Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
-- `skills/web-scraper/references/web-scraper-knowledge-base.md`
+- `skills/web-scraper/references/knowledge-base.md`
 
 ### Step 2: Execute Single-Pass Acquisition
 

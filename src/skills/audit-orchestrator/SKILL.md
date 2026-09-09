@@ -66,16 +66,16 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
   - [Priority Framework](references/source-website_checklist_priority_framework.md): Severity bands S1-S4 and justification criteria.
   - [Solution Generation](references/source-website_checklist_solution_generation.md): Solution levels (V/C/E/X) and technical remediation templates.
 - [Core Synthesis Digest](references/core-synthesis-digest.md): Fast executive briefing (< 2,500 tokens) covering the 6-Layer Causal DAG, composite scoring weights, 9 Princeton GEO vectors, and keystone taxonomy.
-- [Orchestrator Knowledge Base](references/audit-orchestrator-knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks, and Archetype Dynamic Adaptation playbooks.
+- [Orchestrator Knowledge Base](references/knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks, and Archetype Dynamic Adaptation playbooks.
 - [Epistemic Reasoning & Evidence Policy](references/reasoning-policy.md): Evidence vs. truth standards, four-state epistemic model (observed/inferred/unknown/suppressed), falsification rules, and component responsibility boundaries.
 
 ### Specialist Skill Guides & Domain References (Consult by Anomaly)
-- [Discoverability Audit](../discoverability-audit/SKILL.md) & [Discoverability KB](../discoverability-audit/references/discoverability-audit-knowledge-base.md): RFC 9309 crawler matrices, meta directives, canonical loops, and CSR unrendered shells.
-- [Entity Content Audit](../entity-content-audit/SKILL.md) & [Entity Content KB](../entity-content-audit/references/entity-content-audit-knowledge-base.md): Schema.org `@graph`, `Organization`, `Product`, `Offer`, priceCurrency, and answerability.
-- [Fact Consistency Audit](../fact-consistency-audit/SKILL.md) & [Fact Consistency KB](../fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md): Multi-page factual discrepancies, pricing conflicts, and stale terms.
-- [Corroboration Authority Audit](../corroboration-authority-audit/SKILL.md) & [Corroboration Authority KB](../corroboration-authority-audit/references/corroboration-authority-audit-knowledge-base.md): External `sameAs` identity links, Wikidata, Wikipedia, LinkedIn verification.
-- [GEO Content Audit](../geo-content-audit/SKILL.md) & [GEO Content KB](../geo-content-audit/references/geo-content-audit-knowledge-base.md): Princeton KDD 2024 / AutoGEO citability metrics, BLUF answers, statistical density, and FAQ penalty.
-- [Engagement Context Audit](../engagement-context-audit/SKILL.md) & [Engagement Context KB](../engagement-context-audit/references/engagement-context-audit-knowledge-base.md): Post-citation information scent, H1 alignment, above-the-fold CTA proximity.
+- [Discoverability Audit](../discoverability-audit/SKILL.md) & [Discoverability KB](../discoverability-audit/references/knowledge-base.md): RFC 9309 crawler matrices, meta directives, canonical loops, and CSR unrendered shells.
+- [Entity Content Audit](../entity-content-audit/SKILL.md) & [Entity Content KB](../entity-content-audit/references/knowledge-base.md): Schema.org `@graph`, `Organization`, `Product`, `Offer`, priceCurrency, and answerability.
+- [Fact Consistency Audit](../fact-consistency-audit/SKILL.md) & [Fact Consistency KB](../fact-consistency-audit/references/knowledge-base.md): Multi-page factual discrepancies, pricing conflicts, and stale terms.
+- [Corroboration Authority Audit](../corroboration-authority-audit/SKILL.md) & [Corroboration Authority KB](../corroboration-authority-audit/references/knowledge-base.md): External `sameAs` identity links, Wikidata, Wikipedia, LinkedIn verification.
+- [GEO Content Audit](../geo-content-audit/SKILL.md) & [GEO Content KB](../geo-content-audit/references/knowledge-base.md): Princeton KDD 2024 / AutoGEO citability metrics, BLUF answers, statistical density, and FAQ penalty.
+- [Engagement Context Audit](../engagement-context-audit/SKILL.md) & [Engagement Context KB](../engagement-context-audit/references/knowledge-base.md): Post-citation information scent, H1 alignment, above-the-fold CTA proximity.
 
 ### Schemas & Contracts (MANDATORY)
 - [Report Schema Draft-07](references/report-schema.json): Exact JSON schema your final report must validate against. Every required field, summary arithmetic, and enum value.

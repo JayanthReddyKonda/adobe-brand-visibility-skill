@@ -55,7 +55,7 @@ Load these resources as needed during discoverability checks:
 
 ### Core Knowledge Base & Check Catalogue (Load First — MANDATORY)
 - [37 Discoverability Checks Reference](references/checks.md): Full research specification covering A1-A5 (robots.txt matrix), B1-B5 (indexation & HTTP directives), C1-C6 (rendering & JS extractability), D1-D8 (XML sitemaps & DTD protection), and E1-E5 (encoding & syntax).
-- [Discoverability Knowledge Base](references/discoverability-audit-knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, raw HTML extractability thresholds, and International SEO & Localization architecture (Section 7).
+- [Discoverability Knowledge Base](references/knowledge-base.md): AI crawler user-agent rules (RFC 9309), meta robots directives, canonical tag logic, raw HTML extractability thresholds, and International SEO & Localization architecture (Section 7).
 
 ## Procedure
 
@@ -63,7 +63,7 @@ Load these resources as needed during discoverability checks:
 
 Read the specialist references before interpreting sensor findings:
 - `skills/discoverability-audit/references/checks.md`
-- `skills/discoverability-audit/references/discoverability-audit-knowledge-base.md`
+- `skills/discoverability-audit/references/knowledge-base.md`
 
 ### Step 2: Execution Command
 

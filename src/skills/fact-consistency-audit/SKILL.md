@@ -54,7 +54,7 @@ Load these resources as needed during factual consistency checks:
 
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Fact & Consistency Checks Reference](references/checks.md): Research specifications covering claim verification, date staleness, and cross-page consistency.
-- [Fact Consistency Knowledge Base](references/fact-consistency-audit-knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
+- [Fact Consistency Knowledge Base](references/knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Two Incompatible Assertions Rule:** Every contradiction finding MUST cite two exact incompatible assertions from collected inventory, identifying both artifacts (`artifact`), locators (`locator`), and verbatim quotes (`quote`). Never hypothesize a conflict without dual proof.
@@ -70,7 +70,7 @@ Load these resources as needed during factual consistency checks:
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
 Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
-- `skills/fact-consistency-audit/references/fact-consistency-audit-knowledge-base.md`
+- `skills/fact-consistency-audit/references/knowledge-base.md`
 
 ### Step 2: Execution Command
 

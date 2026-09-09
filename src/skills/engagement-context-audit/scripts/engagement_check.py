@@ -17,13 +17,13 @@ import sys
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-from fact_extractor import extract_scoped_facts  # type: ignore
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
+for _p in (SCRIPT_DIR, SCRAPER_DIR):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
-
+from fact_extractor import extract_scoped_facts  # type: ignore
 from safe_fetch import safe_fetch  # type: ignore
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}

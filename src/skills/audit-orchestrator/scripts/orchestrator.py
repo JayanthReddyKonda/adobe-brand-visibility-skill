@@ -24,7 +24,7 @@ RETRIEVAL_BOTS: Set[str] = {"OAI-SearchBot", "Claude-SearchBot", "PerplexityBot"
 
 # ---------------------------------------------------------------------------
 # Full 6-Layer Causal DAG — Keystone suppression tables
-# Source: audit-orchestrator-knowledge-base.md Section 12
+# Source: knowledge-base.md Section 12
 # Layer 0 defects preempt everything below. Layer 1 defects preempt Layers 2-4.
 # ---------------------------------------------------------------------------
 _LAYER0_CAUSE_IDS: Set[str] = {
@@ -81,7 +81,7 @@ _SUPPRESSED_BY_LAYER1: Set[str] = {
 # ---------------------------------------------------------------------------
 # Archetype-Specific Severity Reweighting
 # Scripts detect the archetype; AI contextualizes defect severity by business model.
-# Source: audit-orchestrator-knowledge-base.md Section 7 & 8
+# Source: knowledge-base.md Section 7 & 8
 # ---------------------------------------------------------------------------
 ARCHETYPE_SEVERITY_OVERRIDES: Dict[str, Dict[str, str]] = {
     "ecommerce": {
@@ -367,7 +367,7 @@ def synthesize_audit_report(
         audit_status = "failed"
 
     # 1. Full 6-Layer Causal DAG Precedence Analysis & Keystone Defect Identification
-    # (Source: audit-orchestrator-knowledge-base.md Section 12)
+    # (Source: knowledge-base.md Section 12)
     def _is_sitewide_l0(f: Dict[str, Any]) -> bool:
         c_id = f.get("cause_id") or f.get("id", "")
         if c_id not in _LAYER0_CAUSE_IDS:

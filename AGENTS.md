@@ -109,7 +109,7 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
 ### Finding Object Invariants
 Every finding emitted into `findings` must strictly provide:
 - `id` *(string)*: Unique defect identifier (e.g., `F-001`).
-- `cause_id` *(string)*: Root cause key matching `audit-orchestrator-knowledge-base.md`.
+- `cause_id` *(string)*: Root cause key matching `knowledge-base.md`.
 - `title` *(string)*: Clean descriptive defect title.
 - `category` *(string)*: Functional audit domain.
 - `severity` *(enum)*: Strictly `"critical" | "high" | "medium" | "low"`.

@@ -19,12 +19,8 @@ from typing import Any, Dict, List
 from urllib.parse import urljoin, urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, SCRIPT_DIR)
-
-# Discover peer web-scraper skill if present in marketplace
-WEB_SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
-if os.path.exists(WEB_SCRAPER_DIR) and WEB_SCRAPER_DIR not in sys.path:
-    sys.path.insert(0, WEB_SCRAPER_DIR)
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
 
 from safe_fetch import DEFAULT_USER_AGENT, safe_fetch  # type: ignore
 
@@ -308,7 +304,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     domain, base_url = normalize_target(site)
     target_netloc = urlparse(base_url).netloc.lower()
 
-    # Intelligent Agent Scraper Integration (delegating to web-scraper skill)
+    # Intelligent Agent Scraper Integration (using native crawler engine)
     WebAuditEngine = None
     try:
         from crawler.engine import WebAuditEngine  # type: ignore
@@ -316,24 +312,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         try:
             from .crawler.engine import WebAuditEngine  # type: ignore
         except ImportError:
-            try:
-                import importlib.util
-                candidate_paths = [
-                    os.path.join(WEB_SCRAPER_DIR, "crawler", "engine.py"),
-                    os.path.join(SCRIPT_DIR, "crawler", "engine.py"),
-                ]
-                for crawler_engine_path in candidate_paths:
-                    if os.path.exists(crawler_engine_path):
-                        spec = importlib.util.spec_from_file_location("crawler.engine", crawler_engine_path)
-                        if spec and spec.loader:
-                            mod = importlib.util.module_from_spec(spec)
-                            sys.modules["crawler.engine"] = mod
-                            spec.loader.exec_module(mod)
-                            WebAuditEngine = getattr(mod, "WebAuditEngine", None)
-                            if WebAuditEngine is not None:
-                                break
-            except Exception:
-                WebAuditEngine = None
+            pass
 
     if WebAuditEngine is not None:
         effective_timeout = max(5.0, (deadline - time.monotonic()) if deadline else timeout_seconds)
@@ -520,7 +499,6 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         by_template.setdefault((ptype, ptmpl), []).append(u)
 
     selected_urls = []
-    # Sample up to 3 per unique template across diverse page types
     priority_types = [
         "product_detail",
         "product_listing",

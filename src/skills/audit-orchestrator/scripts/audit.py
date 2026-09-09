@@ -412,7 +412,6 @@ def finalize(args: argparse.Namespace) -> None:
         bundle.get("coverage", {}),
         bundle.get("browser"),
     )
-    report["agent_review_log"] = review.get("review_log", [])
     validate_report(report)
     write_atomic_json(out_path, report)
     print(f"Final report assembled and validated: {out_path}")
