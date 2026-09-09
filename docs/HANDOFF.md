@@ -34,7 +34,7 @@ To maintain a 100/100 evaluation score, you MUST preserve these strict rules:
 The codebase exists in two synchronized representations:
 - `src/skills/`: The primary canonical source codebase.
 - `.agents/skills/`: The runtime agent marketplace environment.
-- **Rule:** Any change made in `src/skills/` MUST be mirrored to `.agents/skills/` (`./scripts/sync.sh`).
+- **Rule:** Any change made in `src/skills/` MUST be mirrored to `.agents/skills/` (`python scripts/sync.py` or `./scripts/sync.sh`).
 
 ```
 adobe-brand-visibility-skill/
@@ -61,8 +61,10 @@ adobe-brand-visibility-skill/
 ├── resources/                       # Unabridged research papers, PDFs, cloned repos, and specs
 └── scripts/
     ├── qa_check.sh                  # Full production pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
-    ├── sync.sh                      # Synchronizes src/skills/ to .agents/skills/
-    └── build.sh                     # Cleans, strips pycache, packages brand-ai-readiness-audit.zip
+    ├── build.py                     # Cross-platform package builder (pure Python)
+    ├── sync.py                      # Cross-platform src/ to .agents/ mirror (pure Python)
+    ├── build.sh                     # POSIX shell forwarder to build.py
+    └── sync.sh                      # POSIX shell forwarder to sync.py
 ```
 
 ---
@@ -78,6 +80,7 @@ adobe-brand-visibility-skill/
   - `causal_gate.py`: Graph clustering engine mapping findings to keystone root causes and suppressing symptomatic duplicates.
   - `validate_report.py`: Strict Draft-07 JSON schema validator enforcing required fields and locked enums.
 - **Cognitive Responsibility:** The agent synthesizes specialist telemetry, deduplicates overlapping findings, calculates the 6 Orthogonal Scores, maps root causes to the 16-Defect Matrix, and outputs the final report.
+- **Sensor-Brain Architecture:** The Python scripts are deterministic telemetry sensors providing empirical measurements. The AI agent is the Cognitive Reasoning Brain that reasons over telemetry, applies the 6-Layer Causal DAG, classifies business archetypes, and synthesizes bespoke dual-track remediation. The agent must NEVER simply run orchestrator.py --format json and forward the output.
 
 ### 2. `web-scraper` (Single-Pass Crawler & Content Extractor)
 - **Role:** Autonomous, zero-dependency web crawler and AI content extractor.
@@ -110,10 +113,21 @@ adobe-brand-visibility-skill/
 
 ## 4. Execution Interfaces & Operational Runbooks
 
-### Interface 1: Autonomous Cognitive Pipeline (`orchestrator.py`)
-Master end-to-end entrypoint executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions:
+### Interface 1: AI Agent Cognitive Pipeline (`orchestrator.py --telemetry`)
+Primary entrypoint for AI agents. Acquires inventory and collects empirical telemetry for cognitive synthesis:
 ```bash
-python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
+# 1. Acquire site inventory (single-pass, SSRF-safe)
+python3 src/skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
+
+# 2. Collect aggregated sensor telemetry for AI agent reasoning
+python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry
+```
+The AI agent then reasons over the telemetry, applies the 6-Layer Causal DAG, classifies the business archetype, and synthesizes bespoke dual-track remediation.
+
+### Interface 1b: Headless CI/CD Baseline Runner (Automated Testing ONLY)
+```bash
+# NOT for AI agent use — reserved for automated test suites
+python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json --baseline-only
 ```
 
 ### Interface 2: Contract-Driven Multi-Pass Audit Engine (`audit.py`)
@@ -178,7 +192,7 @@ Every emitted finding must strictly provide:
 
 1. **The Twin Directory Invariant:**
    - `src/skills/` is the canonical source of truth; `.agents/skills/` is the generated runtime mirror.
-   - Always run `./scripts/build.sh && ./scripts/sync.sh` after any modification.
+   - Always run `python scripts/build.py && python scripts/sync.py` after any modification.
 2. **Canonical Import Resolution:**
    - `safe_fetch.py` and `acquire_inventory.py` reside canonically in `src/skills/web-scraper/scripts/`.
    - Never re-create duplicate shims in specialist skills; sensors resolve `SCRAPER_DIR` dynamically.
@@ -198,12 +212,15 @@ All modifications must pass the complete QA suite before declaring work complete
 # 1. Full Production QA Pipeline (Ruff, Flake8, MyPy, Draft-07 Schema, Pytest)
 ./scripts/qa_check.sh
 
-# 2. Package Build & Marketplace Compliance Validation
-./scripts/build.sh
-python3 tests/validate_package.py
+# 2. Package Build & Marketplace Compliance Validation (cross-platform)
+python scripts/build.py
+python tests/validate_package.py brand-ai-readiness-audit.zip
 
-# 3. Synchronize Runtime Mirror
-./scripts/sync.sh
+# 3. Synchronize Runtime Mirror (cross-platform)
+python scripts/sync.py
+
+# 4. Full Test Suite
+pytest tests/ -q
 ```
 
 ---

@@ -90,12 +90,12 @@ python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site h
 ### Step 3: Decision Protocol & Check Logic
 
 1. **Scoped Price Contradictions (`FACT.CONSISTENCY.FIRST_PARTY_FACT_CONFLICT`):**
-   - Flag a defect ONLY when two or more first-party pages state conflicting prices for the **same scoped entity** (e.g. "Velocity X9" is $5,499 on `/product/x9` but $4,999 on `/promo`).
-   - **Do NOT compare distinct tiers:** A $10 Starter Plan and $50 Pro Plan share the attribute `price` but possess different entity scopes.
+   - Flag a defect ONLY when two or more first-party pages state conflicting prices for the **same scoped entity** (e.g. "Velocity X9" is USD 5,499 on `/product/x9` but USD 4,999 on `/promo`).
+   - **Do NOT compare distinct tiers:** A USD 10 Starter Plan and USD 50 Pro Plan share the attribute `price` but possess different entity scopes.
 2. **Product Lifecycle Conflicts (`FACT.LIFECYCLE.DISCONTINUED_VS_CURRENT_CONFLICT`):**
    - Flag when a product is marked as `discontinued` or `out of production` on one page but listed as `in_stock` or `current` on another (Severity: `high`).
 3. **Legacy Fact Propagation (`FACT.FRESHNESS.LEGACY_FACT_PROPAGATION`):**
-   - Flag when copyright years differ by ≥ 2 years across active pages (e.g. 2022 on one route vs 2026 on another), indicating unmaintained legacy templates.
+   - Flag when copyright years differ by >= 2 years across active pages (e.g. 2022 on one route vs 2026 on another), indicating unmaintained legacy templates.
 
 ---
 
@@ -110,9 +110,9 @@ All string fields in emitted findings and recommendations must be clean, single-
 ## Gotchas & Error Handling
 
 - **Strict Entity & Scope Matching:** Only flag price conflicts when facts share the identical entity, currency, billing interval, and product variant.
-- **Tiered Pricing Tables:** Do not flag multiple distinct price tiers (e.g. Starter $49 vs Pro $99) on the same page as a factual conflict.
+- **Tiered Pricing Tables:** Do not flag multiple distinct price tiers (e.g. Starter USD 49 vs Pro USD 99) on the same page as a factual conflict.
 - **Footer Copyright Drift:** Varying copyright years across page templates should be emitted as a freshness recommendation, not a critical defect.
-- **Currency & Billing Cycle Matching:** A price of $49/mo and $490/yr for the same tier is NOT a conflict; they represent different billing intervals. Only flag when currency, tier scope, and billing interval are identical but values differ.
+- **Currency & Billing Cycle Matching:** A price of USD 49/mo and USD 490/yr for the same tier is NOT a conflict; they represent different billing intervals. Only flag when currency, tier scope, and billing interval are identical but values differ.
 - **Single-Page Evidence:** A contradiction must be observed across at least two distinct page URLs; a single page cannot contradict itself in this audit's scope.
 
 ---

@@ -121,33 +121,31 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
             os.path.join(SKILLS_DIR, "discoverability-audit", "references", "knowledge-base.md"),
             "## 7. International SEO",
         )
-        if not intl_content:
-            intl_path = os.path.join(SKILLS_DIR, "discoverability-audit", "references", "international-seo.md")
-            if os.path.exists(intl_path):
-                with open(intl_path, "r", encoding="utf-8") as f:
-                    intl_content = f.read()[:2000]
         if intl_content:
             output_lines.append("#### International SEO & Localization Checklist:")
             output_lines.append(intl_content)
             output_lines.append("\n*(extracted from discoverability-audit knowledge-base.md)*\n")
 
     if signals["archetype"] == "ecommerce":
-        prod_schema = os.path.join(SKILLS_DIR, "entity-content-audit", "references", "product.json")
-        if os.path.exists(prod_schema):
+        prod_content = extract_section(
+            os.path.join(SKILLS_DIR, "entity-content-audit", "references", "knowledge-base.md"),
+            "## 2. Product & Offer Schema with Full Answerability",
+        )
+        if not prod_content:
+            prod_content = extract_section(
+                os.path.join(SKILLS_DIR, "entity-content-audit", "references", "knowledge-base.md"),
+                "## 3. Product & Offer Schema",
+            )
+        if prod_content:
             output_lines.append("#### E-Commerce Schema.org Product Template (Required Fields):")
-            with open(prod_schema, "r", encoding="utf-8") as f:
-                output_lines.append(f"```json\n{f.read()}\n```\n")
+            output_lines.append(prod_content)
+            output_lines.append("\n*(extracted from entity-content-audit knowledge-base.md)*\n")
 
     if signals["low_depth_pages"] > 0:
         ai_detect_content = extract_section(
             os.path.join(SKILLS_DIR, "geo-content-audit", "references", "knowledge-base.md"),
             "## 9. AI Writing Detection",
         )
-        if not ai_detect_content:
-            ai_path = os.path.join(SKILLS_DIR, "geo-content-audit", "references", "ai-writing-detection.md")
-            if os.path.exists(ai_path):
-                with open(ai_path, "r", encoding="utf-8") as f:
-                    ai_detect_content = f.read()[:2000]
         if ai_detect_content:
             output_lines.append("#### Content Quality & AI Writing Pattern Guardrails:")
             output_lines.append(ai_detect_content)
@@ -157,6 +155,10 @@ def build_bundle(site: str, inv: Optional[Dict[str, Any]] = None) -> str:
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Bundle and compile relevant knowledge base context for a given target site."
     )

@@ -43,15 +43,20 @@ Strict directory boundaries must be maintained to prevent build contamination an
 | :--- | :--- | :--- | :--- |
 | **`src/skills/`** | **Canonical Source of Truth** | All runtime code, skill manifests (`SKILL.md`), schemas, and references must be authored here. | Never import third-party pip packages here. Python stdlib only. |
 | **`tests/`** | **Test Suite & Fixtures** | Unit (`tests/unit/`), integration (`tests/integration/`), system (`tests/system/`), fixtures (`tests/fixtures/`), and helpers (`tests/helpers/`). | Do not put runtime production logic in test helpers. Do not place re-export forwarders in root `tests/`. |
-| **`.agents/skills/`** | **Runtime Agent Mirror** | **READ-ONLY / GENERATED**. Synced from `src/skills/` via `scripts/sync.sh`. | **NEVER edit directly.** Direct edits will be overwritten on sync. |
+| **`.agents/skills/`** | **Runtime Agent Mirror** | **READ-ONLY / GENERATED**. Synced from `src/skills/` via `python scripts/sync.py`. | **NEVER edit directly.** Direct edits will be overwritten on sync. |
 | **`resources/`** | **External Vendor References** | **FROZEN / READ-ONLY**. Reference repos and research papers. | **NEVER edit, format, or lint files here.** |
 | **`docs/`** | **Architecture & Documentation** | System architecture, research syntheses, runbooks, and handoff guides. | Must remain zero-emoji and zero-LaTeX. |
-| **`scripts/`** | **Automation & Tooling** | Build packaging (`build.sh`), runtime sync (`sync.sh`), and QA verification (`qa_check.sh`). | Keep executable and POSIX-compliant. |
-| **`build/`** | **Packaging Staging** | **GENERATED**. Managed by `scripts/build.sh`. | Never commit manual files to `build/`. |
+| **`scripts/`** | **Automation & Tooling** | Build packaging (`build.py` / `build.sh`), runtime sync (`sync.py` / `sync.sh`), and QA verification (`qa_check.sh`). | Keep cross-platform compatible. |
+| **`build/`** | **Packaging Staging** | **GENERATED**. Managed by `python scripts/build.py`. | Never commit manual files to `build/`. |
 
 ### Build & Repository Synchronization
 Always build the distribution package and mirror `src/` to `.agents/` after any edit:
 ```bash
+# Cross-platform (recommended)
+python scripts/build.py
+python scripts/sync.py
+
+# POSIX shell (Linux/macOS only)
 ./scripts/build.sh
 ./scripts/sync.sh
 ```
@@ -92,14 +97,18 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
    - Package size must remain <= 50 MB (current build is ~0.5 MB).
 8. **Zero-Emoji & Zero-LaTeX Documentation Standard:**
    - Absolute zero emojis across all skill manifests, knowledge bases, docstrings, and markdown documentation.
-   - Zero raw LaTeX mathematical syntax (no `$`, `$$`, `\frac{}{}`, `\sum`). Format all math and formulas as clean plain text or unicode.
+   - Zero raw LaTeX mathematical syntax (no `\$`, `\$\$`, `\frac{}{}`, `\sum`). Format all math and formulas as clean plain text or unicode.
+9. **Sensor-Brain Architecture & Anti-Shortcut Directive:**
+   - Diagnostic scripts inside `src/skills/` are deterministic telemetry sensors providing raw empirical measurements.
+   - The AI agent is the Cognitive Reasoning Brain: it must ingest empirical telemetry via `orchestrator.py --telemetry`, apply the 6-Layer Causal DAG, contextualize by business archetype, and author bespoke dual-track remediations.
+   - The baseline runner (`orchestrator.py --format json` / `--baseline-only`) is strictly reserved for headless CI/CD automated test suites and must never be blindly forwarded to the user.
 
 ---
 
 ## 4. Skills Portfolio & Sensor Interface Contract
 
 The suite consists of 8 modular skills coordinated by `audit-orchestrator`:
-- **`audit-orchestrator`**: Master coordinator, causal synthesis, and Draft-07 report emission (`orchestrator.py`, `audit.py`, `assemble_report.py`, `causal_gate.py`, `validate_report.py`).
+- **`audit-orchestrator`**: Master coordinator, causal synthesis, and Draft-07 report emission (`orchestrator.py`, `audit.py`, `assemble_report.py`, `causal_gate.py`, `validate_report.py`). Supports `--telemetry` mode for AI agent cognitive synthesis and `--baseline-only` for automated CI/CD.
 - **`web-scraper`**: Single-pass acquisition and zero-trust SSRF fetcher (`safe_fetch.py`, `acquire_inventory.py`, `crawler/`).
 - **Specialist Diagnostic Sensors (6)**: `discoverability-audit`, `entity-content-audit`, `fact-consistency-audit`, `corroboration-authority-audit`, `geo-content-audit`, `engagement-context-audit`.
 
@@ -125,8 +134,9 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
 
 | Defect Class | Root Cause | Mandatory Guardrail / Resolution |
 | :--- | :--- | :--- |
+| **Agent Copy-Paste Anti-Pattern** | Blindly executing baseline runner (`orchestrator.py --format json`) and forwarding raw output to user. | **Enforce Anti-Shortcut Directive**. The agent is the diagnostic brain. Acquire inventory, collect telemetry via `--telemetry`, apply the 6-Layer Causal DAG, contextualize by business archetype, and author bespoke dual-track remediations. |
 | **Dirty git diff in `resources/`** | Running formatters across repository root (`ruff check --fix .`). | **Target strictly `src/` and `tests/`**. `resources/` contains immutable third-party repos. If touched, revert immediately: `git checkout -- resources/`. |
-| **Manual drift in `.agents/`** | Editing files directly under `.agents/skills/`. | **Edit `src/skills/` exclusively**. Run `./scripts/build.sh` then `./scripts/sync.sh` to mirror changes. |
+| **Manual drift in `.agents/`** | Editing files directly under `.agents/skills/`. | **Edit `src/skills/` exclusively**. Run `python scripts/build.py` then `python scripts/sync.py` to mirror changes. |
 | **Missing `safe_fetch` in sensors** | Direct execution without scraper on `sys.path`. | Sensor scripts must include `SCRAPER_DIR` in `sys.path` via dynamic relative path resolution. Never re-introduce duplicate shims. |
 | **`TypeError: stat: path should be string...`** | Sensor `audit(base, domain, inv)` called with dict in legacy `responses_file` positional slot. | Guard sensor signatures: if `isinstance(responses_file, dict)`, assign `inv = responses_file; responses_file = None`. Use `isinstance(arg, (str, bytes, os.PathLike))` before `os.path.exists()`. |
 | **Schema validation error on `proactive_actions`** | Missing required fields in action dictionary or test fixtures. | Every action item MUST provide all 4 fields: `"id"`, `"title"`, `"summary"`, and `"priority"`. |
@@ -152,11 +162,15 @@ flake8 src/ tests/ --max-line-length=140 --ignore=E402,E501,W503
 MYPYPATH=src/skills:src/skills/audit-orchestrator/scripts:src/skills/web-scraper/scripts:src/skills/discoverability-audit/scripts:src/skills/entity-content-audit/scripts:src/skills/fact-consistency-audit/scripts:src/skills/corroboration-authority-audit/scripts:src/skills/geo-content-audit/scripts:src/skills/engagement-context-audit/scripts mypy --ignore-missing-imports src/
 pytest tests/ -q
 
-# 3. Build Marketplace Distribution Zip & Validate Package
-./scripts/build.sh
-python3 tests/validate_package.py
+# 3. Build Marketplace Distribution Zip & Validate Package (cross-platform)
+python scripts/build.py
+python tests/validate_package.py brand-ai-readiness-audit.zip
 
-# 4. Synchronize Runtime Mirror
+# 4. Synchronize Runtime Mirror (cross-platform)
+python scripts/sync.py
+
+# POSIX shell alternatives (Linux/macOS)
+./scripts/build.sh
 ./scripts/sync.sh
 ```
 
@@ -166,10 +180,10 @@ python3 tests/validate_package.py
 
 ### Mandatory Workflow:
 - Author code strictly under `src/skills/` and tests under `tests/`.
-- Immediately run `./scripts/build.sh` followed by `./scripts/sync.sh` after altering skill logic or manifests.
+- Immediately run `python scripts/build.py` followed by `python scripts/sync.py` (or `./scripts/build.sh` and `./scripts/sync.sh`) after altering skill logic or manifests.
 - Keep `SKILL.md` documents concise and structured according to the 14-section Production Standard Order. Extended reference material belongs in `references/`.
 - Maintain unified knowledge bases per skill: avoid fragmented satellite files that cause context fatigue.
-- Zero-LaTeX Markdown Standard: format all math, algorithms, and logic relations as clean plain text or unicode (no `$`, `$$`, `\frac{}{}`, `\sum`, `\text{}`).
+- Zero-LaTeX Markdown Standard: format all math, algorithms, and logic relations as clean plain text or unicode (no `\$`, `\$\$`, `\frac{}{}`, `\sum`, `\text{}`).
 - Zero-Emoji Documentation Standard: never introduce emojis into manifests, knowledge bases, docstrings, or markdown files.
 - Tool-Agnostic File Reading: In skill runbooks, instruct agents to use native file-reading tools; never embed shell `cat` commands.
 - Transparent Pair Programming: Communicate directly, clearly, and concisely with the user as a senior software engineer. State assumptions, surface tradeoffs, and verify implementations with automated tests.

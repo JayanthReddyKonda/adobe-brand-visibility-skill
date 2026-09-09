@@ -757,6 +757,18 @@ def synthesize_audit_report(
             "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
         })
         proactive_counter += 1
+    elif archetype == "local_business" and "MISSING_POSTAL_ADDRESS" not in finding_cids:
+        proactive_actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {_brand_guess}",
+            "category": "entity",
+            "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
+            "priority": "low",
+            "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
+            "creative_fix": f"Harmonize exact brand name '{_brand_guess}', street address, and phone number formatting across local directory listings.",
+            "verification": f"Inspect location page markup on https://{domain}/ with Google Rich Results Test.",
+        })
+        proactive_counter += 1
     elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids:
         corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
         corrob_cov_p = corrob_res_p.get("coverage", {})
@@ -1097,6 +1109,10 @@ def audit(
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Master Orchestrator for Brand AI-Readiness & Visibility Audit."
     )
@@ -1107,6 +1123,11 @@ def main():
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
     parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
+    parser.add_argument(
+        "--baseline-only",
+        action="store_true",
+        help="Emit automated baseline report directly (reserved for CI/headless verification). AI agents should use --telemetry for cognitive synthesis.",
+    )
 
     args = parser.parse_args()
 
@@ -1120,6 +1141,11 @@ def main():
             )
             formatted_output = json.dumps(payload, indent=2)
         else:
+            if not args.baseline_only:
+                sys.stderr.write(
+                    "Notice: Emitting automated baseline report. For AI Agent cognitive reasoning workflows, "
+                    "use '--telemetry' to extract empirical measurements for agent synthesis.\n"
+                )
             report = audit(
                 site=args.site,
                 inventory=args.inventory,

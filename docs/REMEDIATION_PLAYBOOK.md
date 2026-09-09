@@ -87,7 +87,7 @@ Every brand AI-readiness defect has two complementary remediation vectors:
 ### D. Multi-Page Fact Consistency
 
 #### 4. Cross-Page Pricing / Plan Contradictions
-- **Defect:** Homepage mentions *"Starts at $19/mo"* while Pricing page says *"Starts at $49/mo"*.
+- **Defect:** Homepage mentions *"Starts at USD 19/mo"* while Pricing page says *"Starts at USD 49/mo"*.
 - **Technical Fix:** Consolidate pricing variables into a single source-of-truth database or CMS token rendered synchronously across all templates.
 - **Creative Fix:** Audit all landing page copy to synchronize promotional rates, legacy tiers, and annual discount calculations.
 - **Verification:** Run `python3 src/skills/fact-consistency-audit/scripts/fact_consistency_check.py` and confirm 0 fact contradictions.

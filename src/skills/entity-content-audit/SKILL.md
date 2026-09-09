@@ -54,11 +54,7 @@ Load these resources as needed during entity analysis:
 
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Content & Entity Checks Reference](references/checks.md): Research specifications covering N1-N15, entity definitions, and industry vertical checks.
-- [Entity Content Knowledge Base](references/knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, and the 7-attribute Answerability Index formula.
-
-### Schema.org Reference Templates
-- [Organization Template](references/organization.json): Master JSON-LD structure for Organization and WebSite nodes.
-- [Product Template](references/product.json): Master JSON-LD structure for Product, Offer, and AggregateRating nodes.
+- [Entity Content Knowledge Base](references/knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, master JSON-LD templates, and the 7-attribute Answerability Index formula.
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Channel Differences:** A fact present in Schema.org JSON-LD but absent in body text is a channel difference, not universal invisibility. Never classify a page as missing entity clarity when JSON-LD contains valid Schema.org entities.
@@ -74,9 +70,8 @@ Load these resources as needed during entity analysis:
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
 Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
-- `skills/entity-content-audit/references/knowledge-base.md`
-- `skills/entity-content-audit/references/organization.json`
-- `skills/entity-content-audit/references/product.json`
+- `skills/entity-content-audit/references/knowledge-base.md` (Sections 1–4, Linked Graph & Product Templates)
+- `skills/entity-content-audit/references/checks.md`
 
 ### Step 2: Execution Command
 

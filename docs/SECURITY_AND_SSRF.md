@@ -10,7 +10,7 @@
 ## 1. Canonical SSRF Defense Architecture
 
 Every network interaction in this marketplace strictly adheres to zero-trust SSRF protection:
-- The canonical single source of truth for all network egress is [`src/skills/web-scraper/scripts/safe_fetch.py`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/src/skills/web-scraper/scripts/safe_fetch.py), which is also leveraged natively by `acquire_inventory.py` and the `crawler/` subpackage.
+- The canonical single source of truth for all network egress is `src/skills/web-scraper/scripts/safe_fetch.py`, which is also leveraged natively by `acquire_inventory.py` and the `crawler/` subpackage.
 - Specialist sensors that require live verification probes (such as external `sameAs` identity anchor validation in `corroboration-authority-audit`) import `safe_fetch` directly from this canonical location via dynamic self-resolving path discovery (`SCRAPER_DIR`).
 
 This architecture enforces key guarantees:

@@ -213,7 +213,7 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                 if not isinstance(f, dict):
                     continue
                 candidates.append({
-                    "check_id": "P1",
+                    "check_id": "BC6",
                     "title": str(f.get("title", "Authority anchor observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",
@@ -234,7 +234,38 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
     except Exception:
         pass
 
-    # 5. Engagement & Bridge sensor
+    # 5. GEO Content sensor
+    try:
+        import geo_content_check  # type: ignore
+        geo_res = geo_content_check.audit(base, domain, inv=inv)
+        findings_list = geo_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                candidates.append({
+                    "check_id": "G1",
+                    "title": str(f.get("title", "GEO citability observation")),
+                    "actual_band": "S2",
+                    "finding_kind": "advisory",
+                    "scope": base,
+                    "observation": str(f.get("evidence", "")),
+                    "evidence_refs": [{
+                        "artifact": "response-0001",
+                        "locator": "source.text",
+                        "quote": str(f.get("evidence", ""))[:120],
+                    }],
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Optimize text structure and statistical density for generative engine extraction",
+                        "priority": "medium",
+                    }),
+                })
+    except Exception:
+        pass
+
+    # 6. Engagement & Bridge sensor
     try:
         import engagement_check  # type: ignore
         eng_res = engagement_check.audit(base, domain, inv=inv)
@@ -290,7 +321,13 @@ def worker_collect(site: str, out_dir: Path, max_pages: int, seconds: int, probe
             builder = None
 
     if builder is not None:
-        inv = builder(site, max_pages=max_pages, timeout_seconds=int(min(float(seconds), 60.0)))
+        inv_res = builder(site, max_pages=max_pages, timeout_seconds=int(min(float(seconds), 60.0)))
+        if isinstance(inv_res, tuple):
+            inv = inv_res[0]
+        elif isinstance(inv_res, dict):
+            inv = inv_res
+        else:
+            inv = {"site": site, "pages": []}
     else:
         inv = {"site": site, "pages": []}
 
@@ -426,6 +463,10 @@ def validate_cli(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 

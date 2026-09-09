@@ -62,6 +62,7 @@ This skill executes diagnostic checks for its specific domain.
 ## References & Documentation Library
 
 - [Web Scraper Knowledge Base](references/knowledge-base.md): Complete architecture reference, 16 AI retrieval crawler matrix, RFC 9309 longest-match precedence rules, Trafilatura-grade SNR extraction heuristics, and SSRF blocked network table.
+- [AI Bot Registry](references/bot-registry.json): Authoritative registry of AI crawler user agents, provider roles, and crawler capabilities.
 
 ---
 

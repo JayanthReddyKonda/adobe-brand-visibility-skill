@@ -13,14 +13,14 @@ Conflict(Fa, Fb) <==> (Entity_a == Entity_b) and (Attribute_a == Attribute_b) an
 ```
 
 ### False Positive Prevention (What NOT to Compare):
-- **Distinct Pricing Tiers:** A $10/mo "Starter Tier" and $50/mo "Pro Tier" share the attribute `price` but possess different entity scopes. Comparing them as a contradiction is a defect evaluation failure.
-- **Volume & Billing Cycles:** Annual billing ($8/mo billed annually) vs monthly billing ($10/mo billed monthly) represent distinct billing scopes.
-- **Regional Currencies:** $100 USD vs €95 EUR represent distinct currency scopes.
+- **Distinct Pricing Tiers:** A USD 10/mo "Starter Tier" and USD 50/mo "Pro Tier" share the attribute `price` but possess different entity scopes. Comparing them as a contradiction is a defect evaluation failure.
+- **Volume & Billing Cycles:** Annual billing (USD 8/mo billed annually) vs monthly billing (USD 10/mo billed monthly) represent distinct billing scopes.
+- **Regional Currencies:** USD 100 vs EUR 95 represent distinct currency scopes.
 - **Catalog Listings:** Different products listed on an overview or category page.
 
 ### Report As Defect ONLY When:
-- **Verified Cross-Page Contradiction:** The exact same product/tier (e.g. "Velocity X9 Drone") is stated at one price on the main product landing page (e.g. "$5,499") and a different contradictory price on a secondary/legacy page (e.g. "$4,999") without qualifying scope.
-- **Markup Discrepancy:** The visible on-page text states "$49", but JSON-LD `offers.price` states `"99"`.
+- **Verified Cross-Page Contradiction:** The exact same product/tier (e.g. "Velocity X9 Drone") is stated at one price on the main product landing page (e.g. "USD 5,499") and a different contradictory price on a secondary/legacy page (e.g. "USD 4,999") without qualifying scope.
+- **Markup Discrepancy:** The visible on-page text states "USD 49", but JSON-LD `offers.price` states `"99"`.
 
 ---
 
@@ -62,7 +62,7 @@ A major failure mode in AI-generated answers is recommending discontinued or out
 ### C1. Scoped Price Contradictions
 - **Measures:** Numeric prices, plan tier figures, and currency symbols across sampled first-party pages for the identical named entity.
 - **Defect:** Two or more pages publishing different active prices for the same product without qualifying scope (`FIRST_PARTY_FACT_CONFLICT`, Severity: `high`, Confidence: `high`).
-- **Not a defect:** Distinct commercial plan tiers (e.g. Basic $10 vs Pro $50) or seasonal promotions clearly scoped with temporal qualifiers.
+- **Not a defect:** Distinct commercial plan tiers (e.g. Basic USD 10 vs Pro USD 50) or seasonal promotions clearly scoped with temporal qualifiers.
 
 ### C2. Product Lifecycle & Stock State Synchronization
 - **Measures:** Commercial lifecycle status (active, in_stock, out_of_stock, discontinued, retired) declared across product pages and listings.

@@ -5,16 +5,12 @@
 - [1. First-Visit Orientation Heuristics (Above-the-Fold)](#1-first-visit-orientation-heuristics-above-the-fold)
 - [2. Heading Hierarchy & Information Scent](#2-heading-hierarchy-information-scent)
 - [3. Navigational Integrity & Journey Continuity](#3-navigational-integrity-journey-continuity)
-- [1. Conclusion-First Writing Architecture](#1-conclusion-first-writing-architecture)
-- [2. Heading Hierarchy & Information Scent](#2-heading-hierarchy-information-scent)
-- [3. Snippet Visibility Controls](#3-snippet-visibility-controls)
-- [C1. 5-Second Orientation & Heading Information Scent](#c1-5-second-orientation-heading-information-scent)
-- [C2. Destination Discoverability & Navigation Friction](#c2-destination-discoverability-navigation-friction)
-- [C3. Intent-to-Landing Alignment](#c3-intent-to-landing-alignment)
-- [1. The 4-Question First-Visit Orientation Test](#1-the-4-question-first-visit-orientation-test)
-- [2. Heading Information Scent Matrix](#2-heading-information-scent-matrix)
-- [3. Destination Reachability & Navigation Friction](#3-destination-reachability-navigation-friction)
-- [4. Intent-to-Landing Match (Specialized Routes)](#4-intent-to-landing-match-specialized-routes)
+- [4. AI Snippet & Information Scent Guidelines](#ai-snippet--information-scent-guidelines)
+- [5. The 4-Question First-Visit Orientation Test](#1-the-4-question-first-visit-orientation-test)
+- [6. Heading Information Scent Matrix & Value-Driven CTAs](#heading-information-scent-matrix)
+- [7. Autonomous AI Buying Agent Readiness (/pricing.md)](#7-autonomous-ai-buying-agent-readiness-pricingmd)
+- [8. First-Party Analytics Ingestion & Dual-Track Evaluation](#8-first-party-analytics-ingestion--dual-track-evaluation-static-proxies-vs-observed-outcomes)
+- [9. Engagement Evidence, Counterexamples, and Remedy Tests (Checks I1-I2, J1-J10)](#9-engagement-evidence-counterexamples-and-remedy-tests-checks-i1-i2-j1-j10)
 
 ---
 
@@ -165,12 +161,35 @@ AI-referred visitors often land on deep sub-pages (e.g. a specific product or do
 
 ---
 
-## 4. Intent-to-Landing Match (Specialized Routes)
+## 4. Intent-to-Landing Match (Specialized Routes & Intent Handoff Specifications)
 
-Specialized landing routes must immediately satisfy the intent implied by their URL and title:
+Specialized landing routes must immediately satisfy the intent implied by their URL and title. The audit evaluates two primary commercial intent families:
 
-- **Pricing Route (`/pricing`, `/plans`):** Must display transparent numerical prices, starting price figures, tier names, or plan breakdown tables above the fold. Omitting price figures triggers `INTENT_TO_LANDING_MISMATCH` (Severity: `medium`).
-- **Product Route (`/product/*`, `/shop/*`):** Must present the product name, primary specification, availability state, and purchase/inquiry CTA.
+### 4.1 Pricing Comparison Intent (`/pricing`, `/plans`)
+- **Intent Family:** `pricing_comparison`
+- **Page Type:** `pricing`
+- **Visitor Context:** Visitor arriving from an AI assistant seeking pricing clarity, tier comparisons, and commercial terms.
+- **Required On-Page Facts:**
+  - `tier_names`: Explicit plan names (e.g. Free, Starter, Pro, Enterprise).
+  - `price_points`: Numerical price figures and currencies (e.g. $29/month).
+  - `billing_interval`: Billing frequencies (monthly, annually, per-seat).
+  - `feature_matrix`: Structured breakdown of features included in each tier.
+  - `commercial_cta`: Actionable conversion trigger per tier (e.g. "Start Free Trial", "Contact Sales").
+- **Expected Visitor Actions:** `signup`, `free_trial`, `contact_sales`, `get_started`, `subscribe`.
+- **Bounce Risk Signals:** `hidden_pricing` (opaque pricing walls), `missing_cta_above_the_fold`, `unclear_feature_differences`. Omitting visible price figures triggers `INTENT_TO_LANDING_MISMATCH` (Severity: `medium`).
+
+### 4.2 Product Purchase Intent (`/product/*`, `/shop/*`)
+- **Intent Family:** `product_purchase`
+- **Page Type:** `product_detail`
+- **Visitor Context:** Visitor arriving with direct purchase intent seeking product specifications, stock availability, and checkout handoff.
+- **Required On-Page Facts:**
+  - `product_name`: Explicit official item title matching cited entity.
+  - `price`: Visible purchase price with currency.
+  - `availability`: Real-time stock status (InStock, OutOfStock, PreOrder).
+  - `specifications`: Technical specs, dimensions, or platform requirements.
+  - `purchase_cta`: Direct purchase button (e.g. "Add to Cart", "Buy Now").
+- **Expected Visitor Actions:** `add_to_cart`, `buy_now`, `checkout`, `order`, `request_quote`.
+- **Bounce Risk Signals:** `missing_specifications`, `no_clear_buy_button`, `broken_checkout_handoff`.
 
 ---
 
@@ -240,3 +259,28 @@ Supported page-level metrics via `--analytics <file.json|file.csv>` or `inventor
 2. **Heuristic Mitigation:** When a static heuristic flags an issue (e.g. absent H1 tag or low word count), but first-party analytics prove healthy visitor retention (bounce rate <= 35%, dwell time >= 60s), the finding is downgraded to `low` or informational, noting that real-world users are not abandoning the page.
 3. **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds the organic baseline by >= 25%, the skill emits an `AI_REFERRAL_DISCONTINUITY` finding, diagnosing that post-citation visitors suffer orientation disconnect because cited claims are not immediately anchored in the viewport.
 4. **Heuristic-Only Operation (Clear Limitations):** When no analytics dataset is provided, the skill operates in heuristic-only mode with explicit disclaimers: static proxies highlight potential UX friction, but do not represent observed user drop-off in production.
+
+---
+
+## 9. Engagement Evidence, Counterexamples, and Remedy Tests (Checks I1-I2, J1-J10)
+
+Evaluation must use desktop 1365x768 and mobile 390x844 viewports, locale en-US and UTC, recording any deviations. Capture initial and bounded settled states in fresh unauthenticated contexts. Never infer universal visitor behavior from these states alone. Each candidate requires URL, viewport, state, exact text, coordinates, and screenshot where visual evidence is material. Distinguish source, visible DOM, accessible naming, offscreen, clipped, and covered content.
+
+| Check | Minimum Evidence / Counterexample | Recommendation and Acceptance |
+| :--- | :--- | :--- |
+| **I1** | Observed content unit at a genuine URL; repeat fresh entry and reload, matching identity. Working fragment anchors and query product URLs are legitimate. Status alone is insufficient. | Preserve route identity and legacy links; test clean entry, reload, sharing, source, and rendered identity in a representative environment. Solution Level: C; S3 only on demonstrated lost content unit, S4 only on established access blocker. |
+| **I2** | Safe baseline/probe/baseline plus repeated regression with same entity and controlled variation. Ignore benign stripping redirects. Unknown experiments or meaningful/signed query parameters block probing. | Handle only the demonstrated inert parameter without stripping meaningful queries; repeat controls. Solution Level: C; S2 local loss, S3 material essential fact failure; otherwise U. |
+| **J1** | Quote actual identity statement with viewport coordinates. Missing H1 and generic greeting alone are not failures. | Optional rewrite using existing name, audience, and offering; preserve facts, inspect both layouts, recommend comprehension research. Solution Level: E; S1 advice. |
+| **J2** | Visible navigation link and repeat destination failure; source-only links cannot prove visibility. Alternative navigation and single-page sites are valid. | Repair to a verified equivalent or restore intended destination; test keyboard, mobile, and return route. Solution Level: C; S2 local broken path, S3 only on material navigation blocker. |
+| **J3** | Owner-established important fact, exact bounding box, viewport intersection, clipping, and hit test. Below-fold placement is not necessarily bad. | Optional placement revision; test factual parity and accessible presentation across viewports. Solution Level: E; S1 advice, no invented conversion impact. |
+| **J4** | Observed safe CTA path and explicit blocking state. Do not submit forms or infer total checkout steps from controls. Required login/consent may be legitimate. | Conditional workflow proposal only with task requirements; test an owner-supplied staging flow, never a transaction in this audit. Solution Level: C; severity only on supported observed blockage. |
+| **J5** | Actual review/credential/case-study text and cited source. Presence does not establish authenticity; absence does not establish distrust. | Present genuine supplied proof appropriate to the page, with permission and context. Solution Level: C; optional S1 unless a separate factual contradiction is demonstrated. |
+| **J6** | Essential content named; screenshot and hit-test show it physically covered in repeated comparable states, with dismissal affordance recorded. z-index, fixed position, and dialog role alone do not establish obstruction. Constrained-render artifacts remain U. | Reduce obstruction while preserving consent/access purpose; test keyboard focus, dismissal, and no regression. Solution Level: C; S2 local obstruction, S3 substantial task obstruction, S4 only on demonstrated essential access blocker. |
+| **J7** | Actual post-completion state is outside URL-only read-only scope. A mock confirmation page is not a completed flow. | Solution Level: X/U; log not_possible. Do not invent a follow-up experience or exercise the flow. |
+| **J8** | Naturally encountered explicit unavailable state and visible safe alternatives, with destinations checked. Do not force stock changes or assume relevance from similar names. | Use verified category/support routes or genuinely available compatible inventory. Solution Level: C; S2 only on demonstrated recovery gap under known intent; otherwise inventory/advice. |
+| **J9** | Naturally encountered HTTP 404, actual error text, and observed recovery links. A source inventory is not proof of visible absence. Soft 404 requires content review, not status alone. | Generate a narrow 404 body only from verified usable links. Parse markup and test keyboard/mobile; server integration must preserve 404. Solution Level: V; S2 when recovery failure is established; otherwise observation. |
+| **J10** | Duplicate of H1 timing and H3 viewport parity. Timing has no automatic defect without an established budget. | Solution Level: X/S0; link to the single supported H1/H3 task. |
+
+### Operational Boundaries:
+No new engagement checks are invented: the existing bridge and engagement items cover observable continuity and recovery. Personalization, email summaries, and completed-flow outcomes require unavailable inputs and are excluded from unauthenticated baseline audits.
+

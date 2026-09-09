@@ -77,10 +77,10 @@ pytest tests/unit/ -q
 pytest tests/integration/ -q
 pytest tests/system/ -q
 
-# 3. Rebuild submission package and validate marketplace zip
-./scripts/build.sh
-python3 tests/validate_package.py
+# 3. Rebuild submission package and validate (cross-platform)
+python scripts/build.py
+python tests/validate_package.py brand-ai-readiness-audit.zip
 
-# 4. Synchronize runtime mirror
-./scripts/sync.sh
+# 4. Synchronize runtime mirror (cross-platform)
+python scripts/sync.py
 ```

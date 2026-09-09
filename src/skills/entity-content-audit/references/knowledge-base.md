@@ -126,13 +126,19 @@ Implementation rules for JSON-LD structured data to ensure unambiguous entity re
 
 Explicit organization metadata enables knowledge graph recognition and entity disambiguation.
 
-| Property | Type | Requirement | Description |
-| :--- | :--- | :--- | :--- |
-| `name` | Text | Required | Official brand name |
-| `url` | URL | Required | Canonical homepage URL |
-| `logo` | ImageURL / ImageObject | Recommended | Direct link to high-res logo |
-| `sameAs` | Array of URLs | Recommended | Authoritative profile URLs (Wikidata, Crunchbase, official social) |
-| `contactPoint` | ContactPoint | Optional | Support phone and email details |
+- **Primary Surfaces:** `/`, `/about`, `/contact`
+- **Schema.org Type:** `Organization`
+
+| Property | Type | Requirement | High Representation Risk | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `name` | Text | Required | Yes | Official brand name |
+| `url` | URL | Required | Yes | Canonical homepage URL |
+| `logo` | ImageURL / ImageObject | Recommended | No | Direct link to high-res logo |
+| `sameAs` | Array of URLs | Recommended | Yes | Authoritative profile URLs (Wikidata, Crunchbase, official social) |
+| `contactPoint` | ContactPoint | Optional | Yes | Support phone and email details |
+
+- **Verification Conditions:**
+  - `identity_corroboration`: Declared `sameAs` URLs return HTTP 200 and contain the brand name claim without redirecting to unrelated domains.
 
 ---
 
@@ -140,15 +146,22 @@ Explicit organization metadata enables knowledge graph recognition and entity di
 
 Ensures commercial terms (pricing, availability, variants) are extracted deterministically by AI assistants.
 
-| Property | Type | Requirement | Description |
-| :--- | :--- | :--- | :--- |
-| `name` | Text | Required | Official product title |
-| `offers.price` | Number / Text | Required | Numerical price without currency symbols |
-| `offers.priceCurrency` | ISO 4217 Text | Required | Currency code (e.g. `USD`, `INR`, `EUR`) |
-| `offers.availability` | ItemAvailability URL | Required | `https://schema.org/InStock`, `OutOfStock`, `PreOrder` |
-| `brand` | Brand / Organization | Recommended | Producing brand entity |
-| `description` | Text | Recommended | Accurate product summary |
-| `sku` | Text | Optional | Stock keeping unit |
+- **Primary Surfaces:** `/products/*`, `/item/*`, `/p/*`, `/shop/*`
+- **Schema.org Type:** `Product`
+
+| Property | Type | Requirement | Volatile | High Representation Risk | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `name` | Text | Required | No | Yes | Official product title |
+| `offers.price` | Number / Text | Required | Yes | Yes | Numerical price without currency symbols |
+| `offers.priceCurrency` | ISO 4217 Text | Required | No | Yes | Currency code (e.g. `USD`, `INR`, `EUR`) |
+| `offers.availability` | ItemAvailability URL | Required | Yes | Yes | `https://schema.org/InStock`, `OutOfStock`, `PreOrder` |
+| `brand` | Brand / Organization | Recommended | No | Yes | Producing brand entity |
+| `description` | Text | Recommended | No | No | Accurate product summary |
+| `sku` | Text | Optional | No | No | Stock keeping unit |
+
+- **Verification Conditions:**
+  - `price_consistency`: Product page HTML price == JSON-LD `offers.price` == Catalog list price.
+  - `availability_consistency`: JSON-LD `availability` state == Add to Cart button enabled state.
 
 ---
 

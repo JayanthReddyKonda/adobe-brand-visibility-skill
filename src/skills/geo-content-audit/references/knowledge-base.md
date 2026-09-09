@@ -61,7 +61,7 @@ Empirical research on 10,000 queries (Aggarwal et al., Princeton University / KD
 - **Skill:** `geo-content-audit`
 - **Family:** `CONTENT.RETRIEVAL_OPTIMIZATION`
 - **Purpose:** Encourage empirical substantiation of marketing statements with concrete figures.
-- **Input:** Regular expression extraction of numerical metrics (`\b\d+(\.\d+)?(%|\$|€|£|x|ms|s|min|hr|gb|tb|k|m|b)\b`).
+- **Input:** Regular expression extraction of numerical metrics (`\b\d+(\.\d+)?(%|USD|€|£|x|ms|s|min|hr|gb|tb|k|m|b)\b`).
 - **Decision:** Proactive recommendation emitted IF a substantive page contains zero numerical or statistical evidence.
 - **Severity:** `low` (proactive action, never an error defect).
 - **Remediation:** Add concrete benchmark numbers, performance metrics, SLA percentages, or pricing figures.

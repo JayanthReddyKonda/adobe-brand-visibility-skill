@@ -55,12 +55,7 @@ Load these resources as needed during engagement context checks:
 
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Bridge & Engagement Checks Reference](references/checks.md): Research specifications covering I1-I2 (deep-link stability and parameter probes) and J1-J10 (identity, navigability, prominence, conversion friction, and recovery).
-- [State and Validation Protocol](references/engagement-protocol.md): Protocol for deep-link continuity, parameter probes, and visual judgment boundaries.
-- [Engagement Context Knowledge Base](references/knowledge-base.md): Entity-to-H1 information scent evaluation, commercial intent CTA reachability, first-party analytics ingestion, and post-referral bounce prevention.
-
-### Reference Page Schemas
-- [Pricing Comparison Template](references/pricing-comparison.json): Standard commercial pricing layout structure.
-- [Product Purchase Template](references/product-purchase.json): Standard product purchase intent-handoff structure.
+- [Engagement Context Knowledge Base](references/knowledge-base.md): Master knowledge base covering state and validation protocols (Checks I1-I2, J1-J10), Section 4 intent-handoff structure specifications, entity-to-H1 information scent evaluation, commercial intent CTA reachability, first-party analytics ingestion, and post-referral bounce prevention.
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Deep-Link Continuity (I1):** Deep links must preserve the same core content unit upon fresh, unauthenticated reload. Query URLs are valid candidates.
@@ -76,9 +71,8 @@ Load these resources as needed during engagement context checks:
 
 Read all specialist knowledge bases, domain guides, and reference schemas before executing checks:
 Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
-- `skills/engagement-context-audit/references/knowledge-base.md`
-- `skills/engagement-context-audit/references/pricing-comparison.json`
-- `skills/engagement-context-audit/references/product-purchase.json`
+- `skills/engagement-context-audit/references/knowledge-base.md` (Sections 1–9, Intent Handoff & SXO Rubrics)
+- `skills/engagement-context-audit/references/checks.md`
 
 ### Step 2: Execution Command
 

@@ -6,12 +6,12 @@
 
 ---
 
-## 1. Core Architecture & Two-Layer Separation of Concerns
+## 1. Sensor-Brain Cognitive Orchestration Architecture
 
 The suite implements a modular, specification-compliant architecture operating under two complementary execution modalities:
 
-1. **Cognitive Agent Mode:** An autonomous AI agent acts as the reasoning engine, reading skill manifests (`SKILL.md`) and domain knowledge bases, invoking deterministic sensors, applying multi-signal cognitive reasoning, and synthesizing findings.
-2. **Automated Pipeline Mode:** Deterministic CLI utilities in `audit-orchestrator` (`orchestrator.py`, `audit.py`) provide automated single-pass crawling, sensor fan-out, causal DAG clustering (`causal_gate.py`), and schema validation (`validate_report.py`).
+1. **Brain (Cognitive Agent):** An autonomous AI agent acts as the diagnostic reasoning engine, reading skill manifests (`SKILL.md`) and domain knowledge bases, ingesting empirical sensor telemetry via `orchestrator.py --telemetry`, applying the 6-Layer Causal DAG to isolate root causes and suppress downstream symptoms, classifying the business archetype (e-commerce, SaaS, publisher, local business), and synthesizing bespoke dual-track remediation.
+2. **Sensors (Deterministic Scripts):** Pure Python 3.9+ standard library CLI utilities provide raw empirical measurements: RFC 9309 crawler matrices, Schema.org entity extraction, cross-page fact ledgers, external identity probing, Princeton KDD 2024 citability heuristics, and post-citation orientation scoring. Sensors output structured JSON telemetry with zero qualitative judgment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -37,9 +37,9 @@ The suite implements a modular, specification-compliant architecture operating u
                               engagement-context
 ```
 
-### Two-Layer Separation of Concerns
-- **Cognitive Reasoning Layer (`SKILL.md`, Knowledge Bases, `causal_gate.py`):** Responsible for qualitative judgment, causal inference, root-cause clustering, and dual-track remediation synthesis. Never executes unvalidated HTTP requests directly.
-- **Deterministic Sensor Layer (`_check.py`, `safe_fetch.py`):** Responsible for raw data extraction, RFC parsing, DOM evaluation, and mathematical scoring. Completely isolated, testable with unit tests, and 100% pure Python standard library.
+### The Anti-Shortcut Directive
+- **The AI Agent is the Brain:** It MUST ingest sensor telemetry via `orchestrator.py --telemetry`, reason over the measurements, apply 5-Whys causal analysis, classify business archetype, and author bespoke dual-track remediation customized to the brand's actual domain, products, and entity anchors.
+- **The Scripts are Sensors:** They provide raw deterministic measurements. The headless baseline mode (`orchestrator.py --format json --baseline-only`) is strictly reserved for CI/CD automated test suites, NEVER for agent-to-user delivery.
 
 ---
 

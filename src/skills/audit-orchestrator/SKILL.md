@@ -13,14 +13,25 @@ allowed-tools:
 
 # Audit Orchestrator (Entrypoint Skill)
 
-| Component | Execution Command | Output Contract |
-|---|---|---|
-| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) |
-| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics |
-| **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements |
-| **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` |
-| **Deterministic Master Runner (Headless CI/CD)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json` | Baseline Draft-07 Validated Report JSON |
-| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or 1 (fail) |
+| Component | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) | Acquisition |
+| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Mode** |
+| **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements | Deep Inspection |
+| **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` | Modular Pipeline |
+| **Headless CI Runner (Automated Testing ONLY)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json --baseline-only` | Baseline Draft-07 Validated Report JSON | **CI/CD Only (No Agent Shortcut)** |
+| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or 1 (fail) | Verification Gate |
+
+> [!IMPORTANT]
+> **ANTI-SHORTCUT DIRECTIVE: AGENT REASONING SUPREMACY**
+> Under NO circumstances should the AI Agent run the script in headless baseline mode (`orchestrator.py --site ... --format json` or `--baseline-only`) and blindly forward its output to the user.
+> The Python tools are deterministic telemetry sensors, NOT the cognitive diagnostic brain. The baseline runner without `--telemetry` is strictly reserved for headless CI/CD automated test suites.
+> As a senior enterprise AI consultant, you MUST execute the 5-Step Cognitive Reasoning Protocol:
+> 1. **Acquire Telemetry**: Run `acquire_inventory.py` followed by `orchestrator.py --telemetry`.
+> 2. **Reason over Telemetry**: Read the measurements, identify anomalies, and apply the 6-Layer Causal DAG to isolate true root causes and suppress secondary symptoms.
+> 3. **Contextualize by Archetype**: Classify the business archetype (e-commerce, SaaS, publisher, local business) and reweight defect priorities accordingly.
+> 4. **Author Bespoke Dual-Track Solutions**: Write exact, copy-pasteable code/config diffs (`technical_fix`) and brand copy/editorial guidance (`creative_fix`), plus forward-looking proactive opportunities (e.g. UCP, `/pricing.md`, `/llms.txt`, E-E-A-T).
+> 5. **Validate & Present**: Verify your report against `report-schema.json` using `validate_report.py` and deliver both an executive presentation and the validated Draft-07 JSON deliverable.
 
 > **Cognitive Multi-Skill Orchestration Protocol & 134-Check Standard:**
 > 1. **Deterministic Telemetry Engine:** Outbound crawling and network measurements strictly use Python standard library tools under socket-level zero-trust SSRF protection. Downstream sensors measure crawler matrices, HTML SNR, Schema.org coverage, citability heuristics, and deep-link continuity against `inv.json`. Bounded collection finishes within 160s (worker hard limit), reserving at least 80s for semantic analysis before the 290s wall-clock ceiling.
@@ -58,16 +69,10 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 Read these before synthesizing findings. They define your cognitive reasoning rules.
 
 ### Core Knowledge Bases & Synthesis (Load First — MANDATORY)
-- [134-Check Domain Catalogue](references/checks.json): Canonical 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels.
-- [Marketplace Contract & Normalization Specification](references/contract.md): Normalized vocabulary (`confirmed_problem`, `advisory`, `investigation`), evidence locators, queue lanes, and priority formula contract.
-- [Engineering Decisions & Safety Refinements](references/decisions.md): Architectural decisions, RFC 9309 crawler standards, and boundary guidelines.
-- [Canonical Research Documents](references/):
-  - [Detection Review](references/source-website_checklist_detection_review.md): In-depth review of feasibility and detection limits across all 134 checks.
-  - [Priority Framework](references/source-website_checklist_priority_framework.md): Severity bands S1-S4 and justification criteria.
-  - [Solution Generation](references/source-website_checklist_solution_generation.md): Solution levels (V/C/E/X) and technical remediation templates.
+- [134-Check Domain Catalogue (JSON)](references/checks.json): Canonical 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels.
+- [134-Check Domain Catalogue (Markdown)](references/checks.md): Human-readable master diagnostic check procedures across all 8 AI visibility domains.
 - [Core Synthesis Digest](references/core-synthesis-digest.md): Fast executive briefing (< 2,500 tokens) covering the 6-Layer Causal DAG, composite scoring weights, 9 Princeton GEO vectors, and keystone taxonomy.
-- [Orchestrator Knowledge Base](references/knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, SOTA GEO benchmarks, and Archetype Dynamic Adaptation playbooks.
-- [Epistemic Reasoning & Evidence Policy](references/reasoning-policy.md): Evidence vs. truth standards, four-state epistemic model (observed/inferred/unknown/suppressed), falsification rules, and component responsibility boundaries.
+- [Orchestrator Knowledge Base](references/knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, epistemic reasoning policy, shared zero-trust SSRF standards, normalized vocabulary, severity scales (S0-S4/U), solution levels (V/C/E/X), and SOTA GEO benchmarks.
 
 ### Specialist Skill Guides & Domain References (Consult by Anomaly)
 - [Discoverability Audit](../discoverability-audit/SKILL.md) & [Discoverability KB](../discoverability-audit/references/knowledge-base.md): RFC 9309 crawler matrices, meta directives, canonical loops, and CSR unrendered shells.
@@ -108,10 +113,10 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 
 ### Stage 2 — Specialist Knowledge & Domain Ingestion
 
-**Step 3: Read Core Synthesis & Evidence Policy**
+**Step 3: Read Core Synthesis & Master Knowledge Base**
 Read the foundational synthesis rules using your native file-reading tools:
 - Read `skills/audit-orchestrator/references/core-synthesis-digest.md`
-- Read `skills/audit-orchestrator/references/reasoning-policy.md`
+- Read `skills/audit-orchestrator/references/knowledge-base.md`
 
 **Step 4: Consult Domain Knowledge Bases for Observed Signals**
 Inspect `telemetry.json` and read the corresponding specialist skill documents:
@@ -133,12 +138,18 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
    - **Layer 1 (`RENDERED_CONTENT_GAP`)**: If initial raw HTML contains only an unrendered client-side JS shell (< 25 words), suppress downstream body-text depth and fact consistency findings on that route. Report the client rendering gap as the keystone cause.
    - **Consolidate Multi-Route Findings**: When the same defect occurs across multiple language or catalog routes (e.g. `/en/products`, `/fr/products`, `/es/products` all missing Product schema), consolidate them into a single finding with comprehensive scope and evidence. Never emit duplicate finding objects.
 
-2. **Author Bespoke Dual-Track Remediations (No Generic Canned Text):**
+2. **Contextualize by Business Archetype:**
+   - **E-Commerce:** Prioritize Product schema, PriceSpecification, Offer availability, and specification tables. Suggest Universal Commerce Protocol (UCP) / machine-purchasing readiness.
+   - **SaaS:** Prioritize SoftwareApplication schema, pricing tier transparency, and API docs. Deploy un-gated machine-readable `/pricing.md` manifests.
+   - **Publisher / Media:** Prioritize NewsArticle, Person authorship, and verified source citations. Deploy E-E-A-T credentials and 40-60w BLUF answer blocks (+40.9% quotation lift).
+   - **Local Business:** Prioritize LocalBusiness schema, GeoCoordinates, openingHours, and NAP consistency across branch locations.
+
+3. **Author Bespoke Dual-Track Remediations (No Generic Canned Text):**
    - **`technical_fix`**: Craft precise, copy-pasteable code, config, or Schema.org JSON-LD `@graph` snippets customized to the brand's actual domain name, real product names, currency, and entity anchors.
    - **`creative_fix`**: Provide concrete, actionable copywriting and architecture guidance grounded in Princeton KDD 2024 / AutoGEO research (+40.9% quotation lift, +40.0% statistics lift, +28.2% causal conjunction lift, 40-60 word BLUF answers).
    - **`verification`**: Provide a deterministic test command or validation step to verify remediation.
 
-3. **Eliminate Report Bloat:**
+4. **Eliminate Report Bloat:**
    - Ensure `proactive_actions` contains strictly forward-looking, value-add enhancements (e.g. authoritative `/llms.txt` manifest, edge markdown content negotiation `Accept: text/markdown`) where no explicit defect exists. Never duplicate findings in proactive actions.
    - Ensure all JSON string fields are clean prose or semicolon-delimited (` ; `). Never embed literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML tags inside JSON strings.
 
