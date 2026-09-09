@@ -1,8 +1,8 @@
 # Benchmarks, Evals, and Quality Assurance Guide
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.0.0  
-**Status:** 188 Automated Tests + 29 Subtests Passing · 100% Green QA Pipeline  
+**Version:** 3.1.0  
+**Status:** 219 Automated Tests + 29 Subtests Passing · 100% Green QA Pipeline  
 
 ---
 
@@ -62,7 +62,7 @@ Every build and commit must cleanly pass all five automated stages:
 2. **Flake8 Style Checker:** Zero unused imports, clean indentation (`0 errors`).
 3. **MyPy Static Typing:** Strict type-checking across all 8 skills (`0 errors`).
 4. **JSON Schema Gate:** Draft-07 JSON Schema gate validating `report-schema.json` and all sample manifests (`0 errors`).
-5. **Pytest Test Suite:** **188 automated tests and 29 subtests** across unit, integration, and system suites running in under 50 seconds (`100% passing`).
+5. **Pytest Test Suite:** **219 automated tests and 29 subtests** across unit, integration, and system suites running in under 50 seconds (`100% passing`).
 
 ---
 
@@ -84,3 +84,20 @@ python tests/validate_package.py brand-ai-readiness-audit.zip
 # 4. Synchronize runtime mirror (cross-platform)
 python scripts/sync.py
 ```
+
+---
+
+## 5. Enriched Crawler & Diagnostic Sensor Benchmarks
+
+The suite includes dedicated unit suites in `tests/unit/test_crawler_components.py` verifying high-fidelity acquisition:
+
+| Module Under Test | Test Case | Assertion Criteria |
+| :--- | :--- | :--- |
+| `crawler/parser.py` | Streaming HTML Extraction | Parses titles, meta descriptions, headings (H1-H6), paragraphs, code blocks, tables, and lists in single pass. |
+| `crawler/parser.py` | Commercial CTA Detection | Captures `<button>`, `<input type="submit">`, `<a role="button">`, and `<div class="cta">` with commercial intent categorization (`is_commercial_cta`). |
+| `crawler/parser.py` | Internationalization (`hreflang`) | Extracts `<link rel="alternate" hreflang="...">` language-region mappings without lost routes. |
+| `crawler/parser.py` | Edge Header Directives | Parses `X-Robots-Tag` (`noindex`, `nofollow`, `noarchive`) and RFC 5988 `Link: rel="canonical"` from HTTP headers. |
+| `crawler/evidence.py` | Structured Contact Channels | Extracts RFC 5322 compliant emails and E.164 formatted phone numbers with zero false positives from prose. |
+| `crawler/evidence.py` | Social Authority Links | Matches DOM links against Tier-1 authority platforms (`LinkedIn`, `X/Twitter`, `GitHub`, `YouTube`, `Facebook`, `Instagram`). |
+| `crawler/engine.py` | AI Manifest Probing | Concurrently probes `/llms.txt`, `/llms-full.txt`, `/pricing.md`, `/.well-known/ai-plugin.json`, and `/.well-known/security.txt`. |
+| `crawler/models.py` | Serialization Completeness | `to_dict()` and `to_inventory_dict()` preserve all enriched fields for offline sensor execution. |

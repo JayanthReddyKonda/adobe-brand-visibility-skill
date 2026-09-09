@@ -67,6 +67,8 @@ LAYER1_CAUSE_IDS: Set[str] = {
 SUPPRESSED_BY_LAYER0: Set[str] = {
     # Layer 2 — Entity Resolution
     "MATERIAL_ENTITY_AMBIGUITY",
+    "MISSING_SAMEAS_VERIFICATION",
+    "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
     "SCHEMA_MISSING",
     "SCHEMA_INVALID",
     "BROKEN_AUTHORITY_ANCHOR",
@@ -76,6 +78,8 @@ SUPPRESSED_BY_LAYER0: Set[str] = {
     # Layer 3 — Fact Ledger
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "STALE_AUTHORITATIVE_FACT",
     "ATTRIBUTE_INCOMPLETENESS",
@@ -86,6 +90,7 @@ SUPPRESSED_BY_LAYER0: Set[str] = {
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
     "MISSING_BLUF_PRIMACY",
     "LOW_INFORMATION_SCENT",
@@ -111,11 +116,14 @@ SUPPRESSED_BY_LAYER1: Set[str] = {
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "ATTRIBUTE_INCOMPLETENESS",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
     "CONTENT_RECENCY_DEFICIT",
     "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — cannot evaluate citation quality of an empty/unhydrated page
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
     "MISSING_BLUF_PRIMACY",
     "LOW_CITABILITY_SCORE",
@@ -604,7 +612,7 @@ def main():
 
     epistemic_state = evaluate_epistemic_state(inv, specialist_results)
     causal_nodes = evaluate_causal_nodes(inv, specialist_results)
-    surviving_findings, suppressed = apply_causal_suppression(findings_list)
+    surviving_findings, suppressed, dag_metadata = apply_causal_suppression(findings_list)
 
     result = {
         "epistemic_state": epistemic_state,

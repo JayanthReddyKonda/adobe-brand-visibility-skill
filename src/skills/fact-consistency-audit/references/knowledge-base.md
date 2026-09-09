@@ -77,6 +77,10 @@ A major failure mode in AI-generated answers is recommending discontinued or out
 - **Measures:** Copyright year notices and dateModified timestamps.
 - **Defect:** Multi-year outdated copyright notices across core routes suggesting stale site maintenance (`TEMPORAL_FRESHNESS_DRIFT`, Severity: `low`).
 
+### C5. Commercial Terms & Trial Duration Consistency
+- **Measures:** Advertised trial lengths (e.g. 7-day, 14-day, 30-day free trial), money-back guarantee windows, and commercial return policies across pages.
+- **Defect:** Conflicting trial periods or commercial terms advertised for the same product across different pages (`CONFLICTING_COMMERCIAL_TERMS`, Severity: `high`). AI search engines synthesizing product summaries detect and report the discrepancy, eroding purchase trust.
+
 ---
 
 ## 5. Mathematical Normalization Algorithms
@@ -88,7 +92,7 @@ To eliminate false-positive contradictions caused by locale or formatting discre
 | Raw String | Locale / Format | Normalized Value | Notes |
 |---|---|---|---|
 | `₹5,499.00` | INR with decimal | `5499` | Strip currency symbol, comma, and trailing `.00`. |
-| `$49.99` | USD standard | `49` | Normalized to base integer unit. |
+| `\$49.99` | USD standard | `49` | Normalized to base integer unit. |
 | `€1.250,50` | European (dot thousands, comma decimal) | `1250` | Strip dot group separator, discard decimal comma. |
 | `£99 / month` | GBP subscription | `99` | Strip cadence suffix and whitespace. |
 

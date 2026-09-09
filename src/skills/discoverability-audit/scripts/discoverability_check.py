@@ -497,10 +497,61 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
-    # Hreflang Validation Check
-    if dom.hreflangs:
+    # Check crawled pages for noindex directives if inventory is present
+    if inv and inv.get("pages"):
+        sub_noindex = []
+        for p in inv.get("pages", []):
+            pu = p.get("url") or ""
+            if pu.rstrip("/") in (base.rstrip("/"), (base + "/").rstrip("/")):
+                continue
+            p_meta = p.get("robots_meta") or []
+            if isinstance(p_meta, str):
+                p_meta = [p_meta]
+            p_x = p.get("x_robots_tag") or []
+            if isinstance(p_x, str):
+                p_x = [p_x]
+            p_tokens = set()
+            for d in list(p_meta) + list(p_x):
+                for tok in re.split(r"[,;\s]+", str(d).lower()):
+                    if tok:
+                        p_tokens.add(tok)
+            if p.get("noindex") or ("noindex" in p_tokens or "none" in p_tokens):
+                sub_noindex.append(pu)
+        if sub_noindex and not any(f.get("cause_id") == "NOINDEX_EXCLUSION" for f in findings):
+            findings.append(
+                {
+                    "category": "indexability",
+                    "title": "Sub-pages explicitly exclude indexers (noindex/none directive)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": "Sub-pages contain noindex or none directives in robots meta tag or X-Robots-Tag header.",
+                    "cause_family": "DISCOVERY.ACCESS",
+                    "id": "NOINDEX_EXCLUSION",
+                    "cause_id": "NOINDEX_EXCLUSION",
+                    "impact": "AI retrieval searchbots cannot index these sub-pages, preventing specific product or content citation.",
+                    "evidence": f"Found noindex directive on: {', '.join(sub_noindex[:5])}",
+                    "suggested_action": {
+                        "summary": "Remove noindex from public pages intended for AI retrieval.",
+                        "technical_fix": "Remove <meta name='robots' content='noindex'> tag and X-Robots-Tag: noindex header from public sub-pages.",
+                        "creative_fix": "Verify CMS robots configuration for sub-page templates.",
+                        "priority": "high",
+                        "verification": "Inspect response headers and HTML markup to ensure noindex is absent.",
+                    },
+                }
+            )
+
+    # Hreflang Validation Check across homepage and inventory
+    all_hreflangs = list(dom.hreflangs)
+    if inv and inv.get("pages"):
+        for p in inv.get("pages", []):
+            for hl in p.get("hreflangs", []):
+                hl_dict = hl if isinstance(hl, dict) else {"lang": getattr(hl, "lang", ""), "href": getattr(hl, "href", "")}
+                if hl_dict not in all_hreflangs:
+                    all_hreflangs.append(hl_dict)
+
+    if all_hreflangs:
         invalid_langs = []
-        for hl in dom.hreflangs:
+        for hl in all_hreflangs:
             code = str(hl.get("lang", "")).lower().strip()
             if code and not is_valid_hreflang(code):
                 invalid_langs.append(code)
@@ -517,7 +568,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "id": "LOCALE_MISCONFIGURATION",
                     "cause_id": "LOCALE_MISCONFIGURATION",
                     "impact": "Search engines and AI indexers may misinterpret the language or regional targeting, surfacing the wrong locale.",
-                    "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(invalid_langs)}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
+                    "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(sorted(set(invalid_langs)))}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
                     "suggested_action": {
                         "summary": "Fix hreflang codes to strictly follow ISO 639-1 (language) and ISO 3166-1 Alpha-2 (region).",
                         "technical_fix": "Update all <link rel='alternate' hreflang='...'> tags to use valid two-letter ISO 639-1 language and ISO 3166-1 region codes.",
@@ -525,6 +576,31 @@ def audit(base, domain, inv=None, state_file=None):
                         "priority": "medium",
                         "verification": "Verify all <link rel='alternate' hreflang='...'> tags use valid ISO codes.",
                     },
+                }
+            )
+
+    # AI Discovery & Machine Manifests Observation
+    infra = inv.get("infrastructure", {}) if inv else {}
+    if infra:
+        missing_manifests = []
+        if not infra.get("llms_txt", {}).get("present"):
+            missing_manifests.append("/llms.txt")
+        if not infra.get("pricing_md", {}).get("present"):
+            missing_manifests.append("/pricing.md")
+        if not infra.get("ai_plugin", {}).get("present"):
+            missing_manifests.append("/.well-known/ai-plugin.json")
+        if not infra.get("security_txt", {}).get("present"):
+            missing_manifests.append("/.well-known/security.txt")
+        if missing_manifests:
+            observations.append(
+                {
+                    "check_id": "G1",
+                    "title": "Machine discoverability manifests absent",
+                    "scope": base + "/",
+                    "observation": f"Site does not declare AI discoverability manifests: {', '.join(missing_manifests)}.",
+                    "actual_band": "U",
+                    "finding_kind": "informational_observation",
+                    "limitation": "Optional machine discoverability standard; improves direct AI agent citation and retrieval precision when present.",
                 }
             )
 
@@ -1146,11 +1222,19 @@ def audit(base, domain, inv=None, state_file=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Access & discovery audit layer.")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Discoverability & Crawler Access Diagnostic Sensor.\n"
+            "Deterministically evaluates 37 research checks across RFC 9309 crawler matrices "
+            "(16 AI retrieval & training bots), HTTP response headers, meta robots directives, "
+            "canonical loops, XML sitemaps, and raw unrendered HTML extractability thresholds (< 25 words)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     base, domain = parse_domain(args.site)
     inv = None

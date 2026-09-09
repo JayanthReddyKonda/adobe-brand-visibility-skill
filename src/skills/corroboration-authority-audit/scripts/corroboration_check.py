@@ -299,6 +299,38 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
         elif u_clean != base_netloc and not u_clean.endswith("." + base_netloc):
             external_authorities.append(u)
 
+    discovered_social = set()
+    if inv and inv.get("pages"):
+        for p in inv.get("pages", []):
+            for sl in p.get("social_links", []):
+                discovered_social.add(str(sl).strip())
+
+    unlinked_social = [
+        s for s in sorted(discovered_social)
+        if not any(s.lower().rstrip("/") == sa.lower().rstrip("/") for sa in sameas_urls)
+    ]
+    if unlinked_social:
+        findings.append(
+            {
+                "title": f"Unlinked high-authority social profiles ({len(unlinked_social)} profile(s))",
+                "severity": "medium",
+                "category": "corroboration",
+                "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+                "id": "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
+                "cause_id": "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
+                "root_cause": "The brand links to external social/code profiles in HTML but omits them from Schema.org sameAs declarations.",
+                "confidence": "high",
+                "evidence": f"Found on-page social profiles missing from Schema.org sameAs: {', '.join(unlinked_social[:4])}.",
+                "suggested_action": {
+                    "summary": "Add discovered official social profiles to the Organization sameAs array in JSON-LD.",
+                    "technical_fix": f"Deploy updated sameAs array in Organization JSON-LD including {unlinked_social[:4]}.",
+                    "creative_fix": "Ensure official corporate profiles maintain consistent branding and verify reciprocity.",
+                    "priority": "medium",
+                    "verification": "Inspect homepage JSON-LD to confirm all profiles are declared in sameAs.",
+                },
+            }
+        )
+
     # If sameAs contains 2+ self-referential mirror domains, flag CIRCULAR_SAMEAS_SELF_REFERENCE
     if len(mirror_domains) >= 2:
         findings.append(
@@ -705,16 +737,24 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Cross-Web Authority & Identity Corroboration Diagnostic Sensor.\n"
+            "Deterministically extracts Schema.org sameAs links, probes external authority anchors "
+            "(Wikidata, Wikipedia, Crunchbase, LinkedIn) under zero-trust SSRF sandboxing, "
+            "evaluates knowledge graph identity substantiation, and verifies candidate inbound backlinks."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument(
         "--candidate-backlinks",
         dest="candidate_backlinks",
-        help="Path to candidate backlinks JSON/CSV or raw JSON string",
+        help="Path to candidate backlinks JSON/CSV or raw JSON string for bounded authority verification",
     )
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):

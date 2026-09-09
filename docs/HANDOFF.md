@@ -1,10 +1,10 @@
 # Master Agent Handover & Project Knowledge Base
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.0.0 (Production SOTA Release)  
+**Version:** 3.1.0 (Production SOTA Release)  
 **Project:** Brand AI-Readiness & Generative Engine Optimization (GEO/AEO) Audit Suite  
 **Target Audience:** Incoming Autonomous AI Agent taking over project stewardship  
-**Status:** 100% OPERATIONAL — 188/188 TESTS + 29 SUBTESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
+**Status:** 100% OPERATIONAL — 219/219 TESTS + 29 SUBTESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
 
 ---
 
@@ -74,10 +74,10 @@ adobe-brand-visibility-skill/
 ### 1. `audit-orchestrator` (The Master Coordinator)
 - **Role:** Coordinates the audit runbook and synthesizes diagnostic reports.
 - **Key Tools:**
-  - `orchestrator.py`: Master CLI pipeline executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions.
+  - `orchestrator.py`: Master CLI pipeline executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions. Supports `--telemetry` mode for AI agent cognitive reasoning.
   - `audit.py`: Multi-pass execution engine coordinating collection, agent review finalization, and validation.
   - `assemble_report.py`: Assembles candidate finding objects into Draft-07 schema compliance with dual-track remediation.
-  - `causal_gate.py`: Graph clustering engine mapping findings to keystone root causes and suppressing symptomatic duplicates.
+  - `causal_gate.py`: 6-Layer Causal DAG enforcing deterministic suppression of downstream symptoms when upstream blockers exist. Supports bidirectional taxonomy aliases.
   - `validate_report.py`: Strict Draft-07 JSON schema validator enforcing required fields and locked enums.
 - **Cognitive Responsibility:** The agent synthesizes specialist telemetry, deduplicates overlapping findings, calculates the 6 Orthogonal Scores, maps root causes to the 16-Defect Matrix, and outputs the final report.
 - **Sensor-Brain Architecture:** The Python scripts are deterministic telemetry sensors providing empirical measurements. The AI agent is the Cognitive Reasoning Brain that reasons over telemetry, applies the 6-Layer Causal DAG, classifies business archetypes, and synthesizes bespoke dual-track remediation. The agent must NEVER simply run orchestrator.py --format json and forward the output.
@@ -88,26 +88,27 @@ adobe-brand-visibility-skill/
   - `safe_fetch.py`: Canonical zero-trust SSRF protection blocking private RFC-1918, link-local, and loopback IP addresses.
   - `acquire_inventory.py`: Canonical crawler generating `inv.json` with page classifications, HTML, clean text, and robots directives.
   - `run_scraper.py`: Production CLI with JSON output (`inv.json`) and clean terminal Markdown tables.
-  - `crawler/`: 16 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval & training bots, recursive sitemap parsing, clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, and zero-trust SSRF defense.
+  - `crawler/`: 16 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval and training bots, recursive sitemap parsing, clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, and zero-trust SSRF defense.
+- **Enriched Acquisition Signals:** Streaming parser extracts interactive CTAs (`ctas`), internationalization (`hreflangs`), publication and modification dates (`dates`), edge HTTP directives (`x_robots_tag`, HTTP `Link` canonicals), structured contact channels (`contact_info`), social authority profiles (`social_links`), author attribution (`authors`), and AI discovery manifests (`/llms.txt`, `/pricing.md`, `/.well-known/ai-plugin.json`, `/.well-known/security.txt`).
 
 ### 3. `discoverability-audit` (Crawl & Index Eligibility)
-- **Evaluates:** RFC 9309 rules (500 KiB cap `CR04`, 5xx fail-closed `CR05`), AI search indexers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) vs. training bots (`GPTBot`, `ClaudeBot`), Signal-to-Noise Ratio (`RD02`, `SNR >= 0.12`), and nosnippet restrictions (`HF-05`).
+- **Evaluates:** RFC 9309 rules (500 KiB cap `CR04`, 5xx fail-closed `CR05`), AI search indexers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) vs. training bots (`GPTBot`, `ClaudeBot`), Signal-to-Noise Ratio (`RD02`, `SNR >= 0.12`), edge-level `X-Robots-Tag` headers, HTTP canonical conflicts, hreflang tag validation, and machine discoverability manifests.
 
 ### 4. `entity-content-audit` (Machine-Explicit Identity & Commerce)
-- **Evaluates:** Schema.org JSON-LD `@graph` structures (`Organization`, `Product`, `Offer`), authoritative `sameAs` density (>= 2 nodes `SC01`), clean float pricing without currency symbols, 3-letter ISO 4217 currencies (`SC02`), 60-day freshness (`SC03`), HTML vs. JSON-LD product consistency (`HF-06`), and Universal Commerce Protocol (UCP) readiness.
+- **Evaluates:** Schema.org JSON-LD `@graph` structures (`Organization`, `Product`, `Offer`), authoritative `sameAs` density (>= 2 nodes `SC01`), sameAs social authority corroboration (`MISSING_SAMEAS_VERIFICATION`), clean float pricing without currency symbols, 3-letter ISO 4217 currencies (`SC02`), 60-day freshness (`SC03`), HTML vs. JSON-LD product consistency (`HF-06`), structured contact channel verification, and multi-archetype answerability (SaaS, E-commerce, Services, Content).
 
 ### 5. `fact-consistency-audit` (Truth & Grounding Ledger)
-- **Evaluates:** Multi-page numerical and factual drift. Scrapes pricing, phone numbers, addresses, and copyright dates across all routes to detect self-contradictory claims (`W-03`) that trigger LLM hallucination and mistrust.
+- **Evaluates:** Multi-page numerical and factual drift. Constructs cross-page fact ledgers (prices, emails, phone numbers, copyright dates) and detects conflicting commercial terms and trial durations (`CONFLICTING_COMMERCIAL_TERMS`) that trigger LLM hallucination and purchase distrust.
 
 ### 6. `corroboration-authority-audit` (External Identity & Third-Party Footprint)
-- **Evaluates:** Zero-trust HTTP linkback verification. Confirms that external `sameAs` targets (Wikidata, Wikipedia, LinkedIn, GitHub) actually point back to the brand.
-- **57% Off-Site Footprint Sensor:** Probes for brand footprint across the top third-party citation hubs (Reddit, Wikipedia, YouTube, LinkedIn, Trustpilot, G2), acknowledging that 57% of branded AI search citations derive from third-party sources.
+- **Evaluates:** Zero-trust HTTP linkback verification. Confirms that external `sameAs` targets (Wikidata, Wikipedia, LinkedIn, GitHub) resolve to verified brand entities. Detects `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR` when official channels exist on-site but are omitted from structured data. Enforces an 8.0s hard cumulative deadline on external probes.
+- **57% Off-Site Footprint Sensor:** Probes for brand footprint across top third-party citation hubs (Reddit, Wikipedia, YouTube, LinkedIn, Trustpilot, G2).
 
 ### 7. `geo-content-audit` (Generative Citability & Absorption)
-- **Evaluates:** Evidence genre detection (Code +76.9%, Stats +61.6%, Definitions +57.3%, Comparisons +55.3%), Hyland hedge lexicon density (<= 1.2%), Atomic Fact-to-Token Ratio (FTR >= 0.080), BLUF top-30% positioning, Exophoric pronoun RAG grounding, Q&A alone penalty warning (-5.7%), and Wilson 95% Confidence Intervals.
+- **Evaluates:** Evidence genre detection (Code +76.9%, Stats +61.6%, Definitions +57.3%, Comparisons +55.3%), Hyland hedge lexicon density (<= 1.2%), Atomic Fact-to-Token Ratio (FTR >= 0.080), BLUF top-30% positioning, credentialed author attribution (`PROACTIVE.GEO.CREDENTIALED_AUTHOR_ATTRIBUTION.001`), commercial CTA intrusion detection (`COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`), and Wilson 95% Confidence Intervals.
 
 ### 8. `engagement-context-audit` (Intent Handoff & Autonomous Buying)
-- **Evaluates:** Post-citation user orientation, first-3-elements CTA reachability, value-driven CTA text analysis (`[Action] + [Specific Value]`), and machine-readable pricing manifests (`/pricing.md` or `/pricing.txt`) for autonomous purchasing agents.
+- **Evaluates:** Post-citation user orientation, first-3-elements CTA reachability from structured inventory CTAs, viewport answer anchoring, ARI cognitive readability, and machine-readable pricing manifests (`/pricing.md` or `/pricing.txt`) for autonomous purchasing agents.
 
 ---
 

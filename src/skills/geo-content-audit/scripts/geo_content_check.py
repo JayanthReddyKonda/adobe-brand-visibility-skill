@@ -837,6 +837,53 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
+        # Author Attribution & Credential Check (Princeton KDD 2024 / E-E-A-T)
+        has_author_signal = bool(p.get("authors")) or has_credentials or _CREDENTIAL_RE.search(full_text)
+        if ptype in ("article", "guide", "documentation") and total_words >= 200 and not has_author_signal:
+            recommendations.append(
+                {
+                    "id": "PROACTIVE.GEO.CREDENTIALED_AUTHOR_ATTRIBUTION.001",
+                    "title": "Publish credentialed author bylines on informational assets",
+                    "category": "content",
+                    "summary": f"Page {url} lacks explicit author attribution or professional credentials. AI models heavily favor verifiable human expertise and credentialed bylines when selecting authoritative citation sources.",
+                    "priority": "medium",
+                    "technical_fix": "Add <meta name='author' content='...'> and Schema.org Author markup with Person credentials (e.g. jobTitle, worksFor).",
+                    "creative_fix": "Include author bylines with relevant domain expertise, degrees, or industry experience in article headers.",
+                    "verification": "Confirm page publishes visible author name and Schema.org Person markup.",
+                }
+            )
+
+        # Commercial CTA Intrusion on Informational Routes
+        if ptype in ("article", "documentation", "guide", "faq"):
+            comm_ctas = [
+                c for c in p.get("ctas", [])
+                if (c.get("is_commercial_cta") if isinstance(c, dict) else getattr(c, "is_commercial_cta", False))
+            ]
+            if len(comm_ctas) >= 4:
+                findings.append(
+                    {
+                        "category": "content",
+                        "title": "Excessive commercial CTA intrusion inside informational content",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": f"COMMERCIAL_INTRUSION: Page contains {len(comm_ctas)} commercial call-to-action elements within informational prose, reducing factual authority scores.",
+                        "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                        "id": "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
+                        "cause_id": "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
+                        "url": url,
+                        "scope": url,
+                        "evidence": f"Informational route {url} contains {len(comm_ctas)} commercial CTAs ({', '.join(str(c.get('text') if isinstance(c, dict) else getattr(c, 'text', '')) for c in comm_ctas[:3])}).",
+                        "impact": "Generative search engines (Perplexity, Claude) penalize heavily promotional passages, reducing citation likelihood.",
+                        "suggested_action": {
+                            "summary": "Limit transactional promotional callouts on informational and educational pages to 1 primary CTA.",
+                            "technical_fix": "Relocate aggressive promotional popups and inline buttons to a subtle footer or sidebar module.",
+                            "creative_fix": "Maintain objective, educational tone throughout informational and technical guides.",
+                            "priority": "medium",
+                            "verification": "Verify informational passages maintain focus on answers with at most 1 conversion link.",
+                        },
+                    }
+                )
+
         # TX03: Atomic Fact-to-Token Ratio (FTR) (FActScore Benchmark)
         atomic_facts = count_atomic_facts(full_text)
         ftr = round(atomic_facts / max(total_words, 1), 3)
@@ -1295,11 +1342,20 @@ def audit(base, domain, inv=None, state_file=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generative Engine Optimization (GEO) audit layer.")
-    parser.add_argument("--site", required=True, help="Target website URL")
-    parser.add_argument("--inventory", required=False, help="Path to pre-acquired site inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument("--format", required=False, help="Output format (json)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generative Engine Optimization (GEO) & Citability Diagnostic Sensor.\n"
+            "Deterministically scores web content against the 9 empirical Princeton KDD 2024 / AutoGEO vectors: "
+            "causal mechanisms (+28% preference), statistical evidence density (+40% lift), attributed expert quotations "
+            "(+40.9% lift), BLUF top-30% placement, standalone FAQ penalties (-5.7%), keyword stuffing perplexity degradation, "
+            "and synthesizes deterministic 120-180 word passage improvement plans."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", required=False, help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):

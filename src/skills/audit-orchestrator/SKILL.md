@@ -192,9 +192,10 @@ When `telemetry.json` flags domain-specific anomalies, invoke the specialist sen
 Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated diagnosis:
 
 1. **Apply 6-Layer Causal DAG & Keystone Deduplication:**
-   - **Layer 0 (`AI_RETRIEVAL_BLOCKED`)**: If robots.txt or HTTP 403 blocks live AI retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), suppress downstream text citability and entity ambiguity findings on blocked routes.
-   - **Layer 1 (`RENDERED_CONTENT_GAP`)**: If initial raw HTML contains only an unrendered client-side JS shell (< 25 words), suppress downstream body-text depth and fact consistency findings on that route. Report the client rendering gap as the keystone cause.
+   - **Layer 0 (`AI_RETRIEVAL_BLOCKED`, `NOINDEX_EXCLUSION`)**: If robots.txt, edge `X-Robots-Tag: noindex`, or HTTP 403 blocks live AI retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), suppress downstream text citability, entity ambiguity, and authority findings on blocked routes (`MATERIAL_ENTITY_AMBIGUITY`, `MISSING_SAMEAS_VERIFICATION`, `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR`, `MISSING_IN_DEPTH_MECHANISMS`, `LACK_OF_SPECIFIC_EVIDENCE`, `COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`).
+   - **Layer 1 (`RENDERED_CONTENT_GAP`)**: If initial raw HTML contains only an unrendered client-side JS shell (< 25 words or SNR < 0.08), suppress downstream body-text depth, fact consistency, and schema completeness findings on that route (`MISSING_MATERIAL_FACT`, `FIRST_PARTY_FACT_CONFLICT`, `CONFLICTING_COMMERCIAL_TERMS`, `DISCONTINUED_VS_CURRENT_CONFLICT`). Report the client rendering gap as the keystone cause.
    - **Consolidate Multi-Route Findings**: When the same defect occurs across multiple language or catalog routes (e.g. `/en/products`, `/fr/products`, `/es/products` all missing Product schema), consolidate them into a single finding with comprehensive scope and evidence. Never emit duplicate finding objects.
+
 
 2. **Contextualize by Business Archetype:**
    - **E-Commerce:** Prioritize Product schema, PriceSpecification, Offer availability, and specification tables. Suggest Universal Commerce Protocol (UCP) / machine-purchasing readiness.

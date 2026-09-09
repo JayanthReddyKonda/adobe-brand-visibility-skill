@@ -155,3 +155,66 @@ Every brand AI-readiness defect has two complementary remediation vectors:
 - **Technical Fix:** Place a prominent primary action `<button>` or `<a href>` directly in the hero block above the fold before the navigation bar in DOM tab order, or provide a skip-to-action anchor.
 - **Creative Fix:** Pair the primary value headline with an instant value-driven CTA button ('Start Free Trial', 'Explore Live Demo') to eliminate user hesitation.
 - **Verification:** Confirm that the commercial continuation CTA appears within the first 3 interactive DOM elements on the page.
+
+---
+
+### I. Knowledge Graph & Social Corroboration
+
+#### 13. Remedying Missing SameAs Social Verification (`MISSING_SAMEAS_VERIFICATION` / `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR`)
+- **Defect:** Verified brand social profiles (LinkedIn, X/Twitter, GitHub, YouTube) are linked in the website's HTML header/footer navigation but omitted from Schema.org `Organization.sameAs`.
+- **Technical Fix:** Update the homepage `Organization` JSON-LD schema to include all discovered official social and authority URLs in the `sameAs` array:
+  ```json
+  "sameAs": [
+    "https://www.linkedin.com/company/brand",
+    "https://twitter.com/brand",
+    "https://github.com/brand",
+    "https://www.wikidata.org/wiki/Q12345"
+  ]
+  ```
+- **Creative Fix:** Audit all external corporate profiles to ensure canonical brand naming, logo consistency, and back-links to the primary website domain.
+- **Verification:** Run `python3 src/skills/entity-content-audit/scripts/entity_content_check.py` and confirm 0 unlinked social anchor warnings.
+
+---
+
+### J. Commercial Terms & Trial Consistency
+
+#### 14. Remedying Conflicting Commercial Terms & Trial Durations (`CONFLICTING_COMMERCIAL_TERMS`)
+- **Defect:** Inconsistent free trial lengths (e.g. 14-day on homepage vs 30-day on pricing) or money-back guarantee terms advertised across different site routes.
+- **Technical Fix:** Define commercial trial variables centrally in the application configuration or headless CMS; bind all landing page templates and structured pricing tables to the single source of truth.
+- **Creative Fix:** Audit marketing funnels, PPC landing pages, and promotional banners to retire legacy campaign copy and synchronize trial durations across all customer touchpoints.
+- **Verification:** Run `python3 src/skills/fact-consistency-audit/scripts/fact_consistency_check.py` and confirm `conflicts: 0` in commercial terms ledger.
+
+---
+
+### K. Authorship & Content Intent Boundaries
+
+#### 15. Remedying Commercial CTA Intrusion in Informational Content (`COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`)
+- **Defect:** Informational guides, documentation, or research articles contain dense commercial sales pitches (>= 4 high-friction CTAs), causing query routers to classify the page as promotional advertising rather than objective reference material.
+- **Technical Fix:** Replace intrusive modal popups, sticky conversion banners, and repeated "Buy Now" buttons on informational routes with subtle, contextual text hyperlinks.
+- **Creative Fix:** Maintain editorial integrity on informational pages: lead with unbiased technical or industry analysis and confine commercial calls-to-action to a single resource recommendation at the conclusion.
+- **Verification:** Confirm that informational pages contain fewer than 4 commercial conversion CTAs.
+
+#### 16. Deploying Credentialed Author Attribution (`PROACTIVE.GEO.CREDENTIALED_AUTHOR_ATTRIBUTION.001`)
+- **Defect:** High-value technical, medical, or scientific content published anonymously or with generic company bylines, missing E-E-A-T citation preference.
+- **Technical Fix:** Embed Schema.org `Person` markup within `Article.author` declaring `name`, `jobTitle`, and `sameAs` links to verified academic or professional profiles (LinkedIn, Google Scholar, ORCID):
+  ```json
+  "author": {
+    "@type": "Person",
+    "name": "Dr. Jane Doe",
+    "jobTitle": "Chief AI Scientist",
+    "sameAs": "https://www.linkedin.com/in/janedoe"
+  }
+  ```
+- **Creative Fix:** Add a concise 2-line author biographical box beneath the article title highlighting relevant academic degrees, industry certifications, and domain expertise.
+- **Verification:** Inspect article markup and verify `author` resolves to a typed `Person` node with credentialed properties.
+
+---
+
+### L. Edge Directives & Machine Manifests
+
+#### 17. Deploying Machine Discoverability Manifests (`/llms.txt`, `/pricing.md`)
+- **Defect:** Site does not expose machine-readable manifests, requiring generative AI crawlers to parse complex HTML chrome.
+- **Technical Fix:** Deploy a static `/llms.txt` file at the domain root adhering to the Jeremy Howard / Answer.AI specification, and a `/pricing.md` table mapping all public plans, tiers, and limits.
+- **Creative Fix:** Author clear, 60-word BLUF summaries for each core product and documentation guide referenced in `/llms.txt`.
+- **Verification:** Request `curl -I https://example.com/llms.txt` and `curl -I https://example.com/pricing.md` and verify HTTP 200 with `text/plain` or `text/markdown` MIME types.
+

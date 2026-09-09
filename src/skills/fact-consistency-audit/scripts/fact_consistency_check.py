@@ -332,7 +332,7 @@ def resolve_json_ld_graph(raw_json_list):
     return resolved
 
 
-def extract_scoped_facts(html_str, url):
+def extract_scoped_facts(html_str, url, page_dict=None):
     """Extract first-party facts with contextual scope, status, and lifecycle."""
     parser = FreshnessAnalyzer()
     try:
@@ -352,6 +352,7 @@ def extract_scoped_facts(html_str, url):
         "contact_phones": [],
         "modification_dates": [],
         "products_with_status": [],
+        "trial_periods": [],
     }
 
     # 1. Copyright years
@@ -521,6 +522,39 @@ def extract_scoped_facts(html_str, url):
         if 8 <= len(digits) <= 15:
             facts["contact_phones"].append({"scope": "telephone", "phone": digits})
 
+    # Ingest structured pre-extracted contact_info, dates, and ctas from page_dict if provided
+    if page_dict and isinstance(page_dict.get("contact_info"), dict):
+        c_info = page_dict["contact_info"]
+        for em in c_info.get("emails", []):
+            clean_em = str(em).lower().strip()
+            if clean_em.startswith("mailto:"):
+                clean_em = clean_em[7:]
+            if clean_em and not any(e.get("email") == clean_em for e in facts["contact_emails"]):
+                scope = "sales" if "sales" in clean_em else ("support" if "support" in clean_em else "general")
+                facts["contact_emails"].append({"scope": scope, "email": clean_em})
+        for ph in c_info.get("phones", []):
+            digits = re.sub(r"\D", "", str(ph))
+            if 8 <= len(digits) <= 15 and not any(p.get("phone") == digits for p in facts["contact_phones"]):
+                facts["contact_phones"].append({"scope": "telephone", "phone": digits})
+
+    if page_dict and isinstance(page_dict.get("dates"), dict):
+        d_info = page_dict["dates"]
+        for dt_key in ("modified", "published"):
+            val = d_info.get(dt_key)
+            if val and isinstance(val, str) and val not in facts["modification_dates"]:
+                facts["modification_dates"].append(val)
+
+    if page_dict and page_dict.get("ctas"):
+        for cta in page_dict["ctas"]:
+            cta_text = cta.get("text", "") if isinstance(cta, dict) else getattr(cta, "text", "")
+            m_trial = re.search(r"(\d+)[-\s]day\s+(?:free\s+)?trial", cta_text, re.I)
+            if m_trial:
+                facts["trial_periods"].append({
+                    "days": int(m_trial.group(1)),
+                    "raw": cta_text,
+                    "url": url,
+                })
+
     # Deduplicate facts lists
     facts["brand_names"] = sorted(set(facts["brand_names"]))
     facts["taglines"] = sorted(set(facts["taglines"]))
@@ -653,6 +687,37 @@ def evaluate_fact_consistency(page_fact_list, base_url):
                 }
             )
 
+    # 4. Conflicting Commercial Trial Terms
+    trials_by_days: dict = {}
+    for pf in page_fact_list:
+        for tr in pf.get("trial_periods", []):
+            d = tr["days"]
+            trials_by_days.setdefault(d, []).append(tr["url"])
+
+    if len(trials_by_days) > 1:
+        details = ", ".join(f"{days}-day on {', '.join(sorted(set(urls))[:2])}" for days, urls in sorted(trials_by_days.items()))
+        findings.append(
+            {
+                "category": "commercial_terms",
+                "title": "Conflicting free trial durations advertised across pages",
+                "severity": "high",
+                "confidence": "high",
+                "root_cause": "Different pages publish contradictory trial periods, creating commercial ambiguity for AI shopping engines.",
+                "cause_family": "FACT.CONSISTENCY",
+                "id": "CONFLICTING_COMMERCIAL_TERMS",
+                "cause_id": "CONFLICTING_COMMERCIAL_TERMS",
+                "impact": "AI assistants quote inconsistent trial durations to prospective customers.",
+                "evidence": f"Contradictory trial terms detected: {details}.",
+                "suggested_action": {
+                    "summary": "Align free trial duration uniformly across all landing pages and CTA copy.",
+                    "technical_fix": "Standardize CTA copy and pricing tables to state identical trial terms.",
+                    "creative_fix": "Audit marketing funnels and update legacy promotional copy.",
+                    "priority": "high",
+                    "verification": "Confirm all pages declare identical trial durations.",
+                },
+            }
+        )
+
     return findings, recommendations
 
 
@@ -752,7 +817,7 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
                 or "<sitemapindex" in raw_html.lower()
             ):
                 continue
-            page_fact_list.append(extract_scoped_facts(raw_html, u))
+            page_fact_list.append(extract_scoped_facts(raw_html, u, page_dict=p))
     else:
         _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
@@ -809,14 +874,23 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Audit fact freshness and consistency.")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument(
-        "--responses", "--observations", dest="responses", help="JSON file of observed assistant outputs to cross-check"
+    parser = argparse.ArgumentParser(
+        description=(
+            "Fact Freshness & Lifecycle Consistency Diagnostic Sensor.\n"
+            "Deterministically constructs a normalized multi-attribute first-party fact ledger across crawled pages. "
+            "Detects cross-page pricing contradictions, interval cadence mismatches (annual vs monthly), "
+            "product lifecycle conflicts (discontinued vs active), and optionally cross-references observed AI assistant "
+            "responses to identify citation hallucination risks."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument(
+        "--responses", "--observations", dest="responses", help="JSON file of observed AI assistant outputs to cross-check against site facts"
+    )
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):

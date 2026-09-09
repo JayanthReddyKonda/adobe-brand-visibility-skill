@@ -130,8 +130,8 @@ LLM parsers extract tabular data with near-100% precision compared to narrative 
     </tr>
     <tr>
       <th scope="row">Pricing</th>
-      <td>$49 / month</td>
-      <td>$499 / month</td>
+      <td>\$49 / month</td>
+      <td>\$499 / month</td>
     </tr>
   </tbody>
 </table>
@@ -358,4 +358,19 @@ Generative AI search engines employ distinct retrieval architectures, ranking cr
 - **Multi-Source Consensus**: Synthesizes passages corroborated across multiple independent third-party domains. Claims contradictory to consensus knowledge graph nodes are filtered out.
 - **LocalBusiness / Product Schema Attributes**: Requires complete commercial structured data including ISO 4217 priceCurrency, price, availability, aggregateRating, and openingHoursSpecification.
 - **Information Gain**: Evaluates whether the content provides net-new facts, proprietary data, first-party customer benchmarks, or original research beyond what existing ranking pages already contain.
+
+---
+
+## 11. Authorship Attribution & Commercial Intent Boundaries
+
+Generative search engines evaluate the commercial intent and domain authority of content before selecting passages for informational citations:
+
+### 1. Credentialed Author Attribution (`PROACTIVE.GEO.CREDENTIALED_AUTHOR_ATTRIBUTION.001`)
+- **Significance**: Claude Search and Perplexity heavily weight E-E-A-T credentials when evaluating competitive answers. Articles authored by recognized subject-matter experts (e.g. PhD, MD, Lead Architect, Chief Scientist, Senior Director) receive citation preference over anonymous or uncredentialed content.
+- **Guidance**: Include verified author names, professional roles, and linked `Person` Schema with `sameAs` links to authoritative profiles (LinkedIn, Google Scholar, ORCID).
+
+### 2. Commercial CTA Intrusion in Informational Content (`COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`)
+- **Significance**: When informational guides, technical documentation, or educational articles contain dense commercial sales pitches (>= 4 high-friction CTAs like "Buy Now", "Request Demo", "Start Free Trial"), LLM query routers classify the page as promotional advertising rather than objective reference material.
+- **Guidance**: Keep informational content cleanly separated from aggressive sales funnels. Restrict conversion points on research and educational pages to subtle, contextually relevant resource links.
+
 

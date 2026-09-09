@@ -14,7 +14,8 @@ This reference defines the strict boundary between identity link verification (`
 
 Identity link verification tests whether external authority anchors declared by the brand in its Schema.org `Organization` markup actually exist and resolve cleanly without HTTP errors.
 
-### The Verification Contract:
+### The Verification Contract
+
 1. **Target URLs:** Declared `sameAs` links pointing to external registries (Wikidata, Wikipedia, Crunchbase, official GitHub, LinkedIn, X/Twitter).
 2. **Deterministic Probing:** Probe up to 5 declared links using SSRF-safe HTTP HEAD/GET requests with a bounded 5-second timeout.
 3. **Defect Condition:** If a declared `sameAs` link returns HTTP `4xx` (404 Not Found, 410 Gone) or `5xx` server error:
@@ -43,7 +44,8 @@ A critical architectural principle of this skill is the strict separation betwee
    - **Purpose:** Validates external editorial citations, press mentions, reviews, and community references that AI search engines retrieve during query fan-out.
    - **Verification Input Contract:** Ingests user-supplied candidate backlink URLs via `--candidate-backlinks` or `inventory.json`. Probes each candidate page (capped at 10, 5s timeout, 512 KiB limit, SSRF-safe) to verify the actual presence of the inbound hyperlink, anchor text, and `rel` attributes (`nofollow`, `ugc`, `sponsored`, `dofollow`).
 
-### The Common Crawl CDX Limitation (Why Web-Wide Discovery Cannot Be Claimed):
+### The Common Crawl CDX Limitation (Why Web-Wide Discovery Cannot Be Claimed)
+
 - **The Myth:** Some tools claim to perform "instant web-wide backlink discovery" using the public Common Crawl CDX API.
 - **The Technical Reality:** The Common Crawl CDX index is an index of **crawled URLs**, capturing page URLs, timestamps, MIME types, and WARC offsets. It is **NOT** an inverted index of web links/hyperlinks pointing to arbitrary target domains. To discover all pages linking to a brand from Common Crawl, one would need to download and parse petabytes of WARC/WAT files across billions of pages.
 - **Engineering Boundary:** The skill operates honestly: it does NOT claim web-wide backlink discovery from URL-only indexes. Instead, it provides a bounded, SSRF-safe verification engine for user-supplied candidate backlink ledgers.
@@ -54,7 +56,8 @@ A critical architectural principle of this skill is the strict separation betwee
 
 External claim corroboration refers to searching the open web to independently verify factual claims made by the brand (e.g. "Founded in 2018", "#1 Coffee Roaster in California").
 
-### Boundary Rules:
+### Boundary Rules
+
 - **No Unbounded Web Crawling:** Performing open-ended web searches during an audit introduces non-deterministic latency, third-party API dependencies, and rate limits that violate the 5-minute wall-clock execution ceiling.
 - **First-Party Grounding:** The audit evaluates first-party machine-explicitness, structured schema integrity, and declared anchor validity.
 - **Inconclusive Handling:** If a third-party registry times out, rate-limits (HTTP 429), or requires Cloudflare bot verification, the probe is recorded as `inconclusive` and NEVER reported as a broken link defect.
@@ -100,13 +103,15 @@ first-party). Level 6 (heuristic inference) never produces high severity.
 
 AI search engines (Perplexity, ChatGPT Search, Claude Search) do not rely solely on internal HTML markup; they cross-validate entity claims against authoritative external web nodes.
 
-## Top Authority Node Archetypes:
+## Top Authority Node Archetypes
+
 1. Wikidata & Wikipedia (QID Linking): Primary source of truth for entity disambiguation in Google Knowledge Graph and open foundation models.
 2. Official YouTube & Social Hubs: Highly weighted multi-modal citation anchors (~0.737 correlation with AI search answers).
 3. LinkedIn Corporate Directory: Verifies operational legitimacy, employee size, and headquarters locale.
 4. SEC / Crunchbase / Official Registries: Provides authoritative fiscal and corporate founding facts.
 
-## Audit Rule:
+## Audit Rule
+
 Declaring sameAs links to 4xx/5xx dead profiles damages the brand entity trust score. Probing declared links in real time ensures only live, authoritative anchors enter the Stateful Knowledge Graph.
 
 ---
@@ -126,7 +131,7 @@ Declaring sameAs links to 4xx/5xx dead profiles damages the brand entity trust s
 ## Three-Tier Authority Classification Matrix
 
 | Tier | Category | Target Examples | Knowledge Graph Value |
-|---|---|---|:---:|
+| --- | --- | --- | :---: |
 | **Tier 1** | **Global Knowledge Graph Nodes** | `wikidata.org`, `wikipedia.org`, `crunchbase.com` | **Highest (+100% Trust)**: Anchors entity in pre-training corpora |
 | **Tier 2** | **Verified Social / Code Footprints** | `x.com`, `linkedin.com/company`, `github.com` | **High (+70% Trust)**: Validates continuous operational activity |
 | **Tier 3** | **Internal Mirror Domains (Defect)** | Same SLD across `.to`, `.bz`, `.ru`, `.com` | **Negative (Domain Spoofing / Entity Fragmentation)** |
@@ -138,9 +143,21 @@ Declaring sameAs links to 4xx/5xx dead profiles damages the brand entity trust s
 Brand mentions correlate 3x more strongly with AI visibility than traditional backlinks:
 
 | Platform | Correlation Coefficient | AI Search Weight | Strategic Mechanism |
-|---|:---:|:---:|---|
+| --- | :---: | :---: | --- |
 | **YouTube** | **0.737** | **Highest (25%)** | Video titles, chapters, and auto-transcripts are indexed by multimodal search (Perplexity, Google AI Overviews). |
 | **Reddit** | **High** | **High (25%)** | Conversational forums provide experiential, unvarnished peer consensus queried during intent fan-out. |
 | **Wikipedia** | **High** | **High (20%)** | Foundation model pre-training corpora establish base entity identity from Wikipedia. |
 | **LinkedIn** | **Moderate** | **Moderate (15%)** | Validates corporate founding, employee count, and B2B operational scale. |
 | **Backlinks (DR)** | **0.266** | **Low (15%)** | Traditional PageRank signals have weak correlation with generative citation selection. |
+
+---
+
+## CHECK 4: Unlinked Knowledge Graph Anchors (`UNLINKED_KNOWLEDGE_GRAPH_ANCHOR`)
+
+- **Measures**: Whether official third-party social profiles (LinkedIn, X/Twitter, GitHub, YouTube) present in visible HTML navigation/footer are omitted from declared Schema.org `sameAs` assertions.
+- **Defect**: When official external brand profiles are linked in DOM but not declared in `sameAs`, depriving Knowledge Graph models of explicit corroboration anchors.
+- **Classification**: `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR` (Family: `AUTHORITY.IDENTITY_CORROBORATION`).
+- **Severity**: `medium`.
+- **Confidence**: `high`.
+- **Impact**: Without explicit `sameAs` declarations linking the website to official corporate profiles, search assistants (Claude, ChatGPT, Perplexity) cannot corroborate brand identity across independent authority nodes.
+- **Remediation**: Add all discovered official profile URLs to the `sameAs` array in Schema.org `Organization` JSON-LD.

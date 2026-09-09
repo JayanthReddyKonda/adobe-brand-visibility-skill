@@ -279,3 +279,48 @@ class EvidenceExtractor:
                 )
 
         return facts, claims
+
+    SOCIAL_DOMAINS = (
+        "linkedin.com",
+        "github.com",
+        "twitter.com",
+        "x.com",
+        "youtube.com",
+        "facebook.com",
+        "instagram.com",
+        "discord.gg",
+        "discord.com",
+        "medium.com",
+    )
+
+    @classmethod
+    def extract_contact_and_social_info(
+        cls, clean_text: str, links: List[Any]
+    ) -> Tuple[Dict[str, List[str]], List[str]]:
+        """Extracts structured contact facts and third-party social authority links."""
+        contact_info: Dict[str, List[str]] = {"emails": [], "phones": []}
+        social_links: List[str] = []
+
+        if clean_text:
+            for match in cls.EMAIL_REGEX.finditer(clean_text):
+                em = match.group(0).lower()
+                if em not in contact_info["emails"]:
+                    contact_info["emails"].append(em)
+
+            for match in cls.PHONE_REGEX.finditer(clean_text):
+                ph = match.group(0).strip()
+                digits = re.sub(r"\D", "", ph)
+                if 7 <= len(digits) <= 15 and ph not in contact_info["phones"]:
+                    contact_info["phones"].append(ph)
+
+        if links:
+            seen_social = set()
+            for link in links:
+                href = link.href if hasattr(link, "href") else (link.get("href") if isinstance(link, dict) else str(link))
+                href_lower = (href or "").lower()
+                if any(dom in href_lower for dom in cls.SOCIAL_DOMAINS):
+                    if href not in seen_social:
+                        seen_social.add(href)
+                        social_links.append(href)
+
+        return contact_info, social_links

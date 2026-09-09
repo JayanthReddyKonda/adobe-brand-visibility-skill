@@ -3,7 +3,7 @@
 **Author:** Jayanth Reddy Konda
 **Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 **Branch:** `rewiring-architecture`
-**Status:** 188 Automated Tests + 29 Subtests Passing -- 100% Green QA Pipeline -- Pure Python Standard Library
+**Status:** 215 Automated Tests + 29 Subtests Passing -- 100% Green QA Pipeline -- Pure Python Standard Library
 
 ---
 
@@ -57,7 +57,7 @@ The AI agent is the **Cognitive Diagnostic Brain**, NOT a copy-paster. Under NO 
 The marketplace is decomposed into **7 specialized domain sensors** composed under **1 central entrypoint skill** (8 skills total):
 
 | Skill ID | Domain Responsibility | Key Failure Modes & Signals Detected |
-|---|---|---|
+| --- | --- | --- |
 | **`audit-orchestrator`** *(Entrypoint)* | Master coordinator. Directs single-pass acquisition, runs sensor fan-out, aggregates telemetry, gates findings through the 6-Layer Causal DAG, and validates the final report against Draft-07 schema. | Cross-domain multi-signal root causes, priority conflicts, schema non-compliance. |
 | **`web-scraper`** | Autonomous, zero-dependency, SSRF-hardened web crawler and AI content extractor. Crawls websites within strict monotonic budgets, parses RFC 9309 robots.txt permissions across 16 AI retrieval and training bots, extracts clean markdown with SNR scoring, and emits canonical site inventories (`inv.json`). | Crawl budget exhaustion, robots disallow matrices, missing XML sitemaps, low SNR text density, sparse SPA shells. |
 | **`discoverability-audit`** | Evaluates retrieval access and indexation barriers across AI retrieval bots (OAI-SearchBot, PerplexityBot, Claude-SearchBot). | Robots.txt crawler blocks (`AI_RETRIEVAL_BLOCKED`), meta `noindex` exclusions, canonical fragmentation, blank CSR shells. |
@@ -141,6 +141,7 @@ Every report emitted adheres strictly to the Production Draft-07 schema specific
 ## 5. Execution Interfaces
 
 ### Interface 1: AI Agent Cognitive Pipeline (`--telemetry` mode)
+
 ```bash
 # 1. Acquire site inventory (single-pass, SSRF-safe)
 python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
@@ -148,9 +149,11 @@ python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.c
 # 2. Collect empirical telemetry from all sensors
 python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry > telemetry.json
 ```
+
 The AI agent then reasons over telemetry, applies the Causal DAG, and synthesizes the final report.
 
 ### Interface 2: Contract-Driven Multi-Pass Audit (`audit.py`)
+
 ```bash
 # 1. Bounded single-pass collection & baseline report emission (bounded to 160s)
 python3 skills/audit-orchestrator/scripts/audit.py collect https://example.com --out output/audit
@@ -163,6 +166,7 @@ python3 skills/audit-orchestrator/scripts/audit.py validate output/audit/final-r
 ```
 
 ### Interface 3: Modular Specialist Sensor Invocations
+
 ```bash
 # 1. Acquire site inventory via single-pass web scraper under zero-trust SSRF
 python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
@@ -180,6 +184,7 @@ python3 skills/audit-orchestrator/scripts/validate_report.py final_report.json
 ```
 
 ### Interface 4: Headless CI/CD Baseline Runner (Automated Testing ONLY)
+
 ```bash
 # NOT for AI agent use -- reserved for automated test suites
 python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json --baseline-only
@@ -190,14 +195,17 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 ## 6. Prioritization & Remedy Framework
 
 The marketplace incorporates the complete 134-check domain catalogue (`checks.json`) covering:
+
 - **37 Discoverability Checks**: Robots.txt crawler permissions, meta directives, canonical chains, sitemap XML parsing, and rendering.
 - **85 Content, Freshness & Entity Checks**: Schema.org JSON-LD entities, answerability attributes, cross-page factual consistency, declared profile authority, and Princeton KDD 2024 / AutoGEO citation probability.
 - **12 Bridge & Engagement Checks**: Deep link stability (`I1`), inert parameter probes (`I2`), 404 recovery affordances (`J9`), and heading information scent.
 
 Numeric prioritization uses the formula:
+
 ```
 priority_index = 5 * severity + (6 - difficulty)
 ```
+
 Where severity bands map as S4=4 (critical), S3=3 (high), S2=2 (medium), S1=1 (low), and difficulty spans D1=1 (trivial) to D5=5 (major overhaul). Confirmed defects with missing repair context retain priority in the `investigation` queue.
 
 ---
@@ -205,6 +213,7 @@ Where severity bands map as S4=4 (critical), S3=3 (high), S2=2 (medium), S1=1 (l
 ## 7. Development & Build
 
 ### Build & Sync Commands (Cross-Platform)
+
 ```bash
 # Build marketplace distribution zip (works on Windows and Linux)
 python scripts/build.py
@@ -218,6 +227,7 @@ python scripts/sync.py
 ```
 
 ### Full QA Pipeline
+
 ```bash
 # 1. Complete Quality Assurance Suite
 ./scripts/qa_check.sh
@@ -237,6 +247,7 @@ python scripts/sync.py
 ```
 
 ### Directory Structure
+
 ```
 adobe-brand-visibility-skill/
 ├── src/                             # Canonical source of truth

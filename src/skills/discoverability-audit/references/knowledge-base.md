@@ -295,3 +295,25 @@ Common errors flagged by `discoverability_check.py`:
 ### Canonicalization & i18n
 - **Self-Referencing Canonicals:** Each locale page must canonicalize to itself. Never use cross-locale canonicals (e.g., French page canonicalizing to English page)—this suppresses the non-canonical locale entirely from indexation.
 - **Canonical Overrides Hreflang:** If canonical points to a different host or URL outside the hreflang cluster, search engines ignore the hreflang annotation.
+
+---
+
+## 8. Machine Discoverability Manifests & Edge Directives
+
+In addition to traditional crawler directives, modern AI search engines and autonomous agents leverage explicit machine-readable discoverability manifests:
+
+1. **`/llms.txt` and `/llms-full.txt`**:
+   - Proposed standard providing concise markdown indexes tailored for LLM context windows.
+   - Summarizes site architecture, authoritative entity descriptions, and key route links without HTML noise.
+   - Recommended as a proactive discoverability enhancement.
+
+2. **`/pricing.md`**:
+   - Standard markdown pricing sheet allowing LLM search engines (Perplexity, ChatGPT) to extract accurate pricing tiers and currency without scraping JavaScript tables.
+
+3. **`/.well-known/ai-plugin.json` and `/.well-known/security.txt`**:
+   - Manifest endpoints providing machine-readable API and security contacts, reinforcing domain credibility and autonomous integration readiness.
+
+4. **Edge `X-Robots-Tag` HTTP Directives**:
+   - Directives emitted via HTTP response headers (`X-Robots-Tag: noindex, nofollow`) supersede on-page HTML meta tags.
+   - Multi-page audits evaluate both HTML meta tags and HTTP response headers across all crawled routes to prevent silent edge-level exclusion.
+

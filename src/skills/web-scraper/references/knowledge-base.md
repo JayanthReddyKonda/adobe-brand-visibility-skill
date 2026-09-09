@@ -99,3 +99,20 @@ All outgoing HTTP socket connections are pre-resolved and validated against proh
 | Link-Local | `169.254.0.0/16` | Auto-IP / Cloud Metadata | Block |
 | Cloud Metadata | `169.254.169.254` | AWS/GCP/Azure Metadata | Block |
 | IPv4-mapped IPv6 | `::ffff:0:0/96` | Mapped Private IPs | Block |
+
+---
+
+## 6. Enriched Acquisition Signals & Telemetry Contracts
+
+The extraction pipeline captures high-signal structural, temporal, and authority metadata during the single-pass crawl:
+
+1. **Interactive Calls-to-Action (`ctas`)**: Discovered `<a role="button">`, `<button>`, and high-intent anchor links with their text, target `href`, and classification as commercial conversion points (`trial`, `demo`, `buy`, `pricing`, `contact`).
+2. **Internationalization (`hreflangs`)**: Alternate language and regional declarations extracted from `<link rel="alternate" hreflang="...">` tags, mapping language codes to target URLs.
+3. **Temporal Freshness (`dates`)**: Publication and modification timestamps extracted from `<meta>` tags (`article:published_time`, `article:modified_time`, `og:updated_time`, `datePublished`) and HTTP headers (`Last-Modified`) to evaluate recency and staleness.
+4. **HTTP Header Directives**: Edge-level `X-Robots-Tag` headers (`noindex`, `nofollow`, `noarchive`) and HTTP `Link: <...>; rel="canonical"` headers that operate independently of HTML body markup.
+5. **Contact and Channel Verification (`contact_info`)**: Discovered RFC-compliant email addresses and international phone numbers extracted from visible text and `mailto:`/`tel:` protocols.
+6. **Social Authority Anchors (`social_links`)**: Profile URLs across key platforms (LinkedIn, X/Twitter, GitHub, YouTube, Facebook, Instagram) extracted from DOM links for cross-referencing with Schema.org `sameAs` arrays.
+7. **Authorship & Credentials (`authors`)**: Declared author names from `<meta name="author">` and `rel="author"` attributes for E-E-A-T attribution analysis.
+8. **Infrastructure Discoverability Manifests (`infrastructure`)**: Probed endpoints for `/llms.txt`, `/llms-full.txt`, `/pricing.md`, `/.well-known/ai-plugin.json`, and `/.well-known/security.txt`.
+9. **Crawl & Network Telemetry (`fetch`)**: Per-resource connection latency (`latency_ms`), server IP address, byte length, and redirect chains.
+

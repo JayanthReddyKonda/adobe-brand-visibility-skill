@@ -446,6 +446,24 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         "snippet": (pricing_md[:400] if pm_status == 200 and pricing_md else None),
     }
 
+    # 2.4 AI Plugin Manifest Discovery (/.well-known/ai-plugin.json)
+    aip_status, aip_json, _, _ = safe_fetch(base_url + "/.well-known/ai-plugin.json", timeout=4, max_bytes=512 * 1024)
+    inv["infrastructure"]["ai_plugin"] = {
+        "status": aip_status,
+        "present": (aip_status == 200 and bool(aip_json)),
+        "snippet": (aip_json[:400] if aip_status == 200 and aip_json else None),
+    }
+
+    # 2.5 Security.txt Discovery (RFC 9116)
+    sec_status, sec_txt, _, _ = safe_fetch(base_url + "/.well-known/security.txt", timeout=4, max_bytes=512 * 1024)
+    if sec_status != 200 or not sec_txt:
+        sec_status, sec_txt, _, _ = safe_fetch(base_url + "/security.txt", timeout=4, max_bytes=512 * 1024)
+    inv["infrastructure"]["security_txt"] = {
+        "status": sec_status,
+        "present": (sec_status == 200 and bool(sec_txt)),
+        "snippet": (sec_txt[:400] if sec_status == 200 and sec_txt else None),
+    }
+
     sitemap_candidates = []
     if robots_txt and r_status == 200:
         sitemap_candidates = [
@@ -623,10 +641,18 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Shared site inventory acquisition utility.")
-    parser.add_argument("--site", required=True, help="Target website URL or domain")
-    parser.add_argument("--output", "-o", help="Path to save inventory JSON")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Single-Pass Site Inventory Acquisition Utility.\n"
+            "Crawls target homepage, robots.txt, XML sitemaps, and content routes under strict socket-level "
+            "zero-trust SSRF sandboxing (safe_fetch.py). Emits canonical inv.json consumed offline by all "
+            "downstream specialist diagnostic sensors, ensuring single-pass efficiency."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--output", "-o", help="Destination path to write acquired inventory JSON (e.g. inv.json)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
 
     s = args.site.strip()

@@ -22,9 +22,10 @@ Diagnostic findings must be processed through the strictly ordered 6-layer depen
 [Layer 5: Post-Citation Orientation & Transactional Handoff]
 ```
 
-### Keystone Suppression Rules:
-1. **Layer 0 Block (`AI_RETRIEVAL_BLOCKED`)**: If `/robots.txt` or HTTP 403 blocks live AI retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), suppress downstream text citability and entity ambiguity findings on blocked routes.
-2. **Layer 1 Shell (`RENDERED_CONTENT_GAP`)**: If initial HTML is a blank SPA shell (SSR vs CSR text parity ratio < 0.40 or SNR < 0.08), suppress downstream passage depth and schema completeness findings on unrendered containers.
+### Keystone Suppression Rules
+
+1. **Layer 0 Block (`AI_RETRIEVAL_BLOCKED`, `NOINDEX_EXCLUSION`)**: If `/robots.txt`, edge headers (`X-Robots-Tag: noindex`), or HTTP 403 blocks live AI retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), suppress downstream text citability, entity ambiguity, and authority findings on blocked routes (`MATERIAL_ENTITY_AMBIGUITY`, `MISSING_SAMEAS_VERIFICATION`, `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR`, `MISSING_IN_DEPTH_MECHANISMS`, `LACK_OF_SPECIFIC_EVIDENCE`, `COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`).
+2. **Layer 1 Shell (`RENDERED_CONTENT_GAP`)**: If initial HTML is a blank SPA shell (SSR vs CSR text parity ratio < 0.40 or SNR < 0.08), suppress downstream passage depth, fact consistency, and schema completeness findings on unrendered containers (`MISSING_MATERIAL_FACT`, `FIRST_PARTY_FACT_CONFLICT`, `CONFLICTING_COMMERCIAL_TERMS`, `DISCONTINUED_VS_CURRENT_CONFLICT`).
 
 ---
 
@@ -33,7 +34,7 @@ Diagnostic findings must be processed through the strictly ordered 6-layer depen
 Audits compute 6 orthogonal dimensions normalized to [0, 100]:
 
 | Dimension | Weight | Primary Diagnostic Focus | Healthy Threshold |
-|---|:---:|---|:---:|
+| --- | :---: | --- | :---: |
 | **Crawlability** | 20% | RFC 9309 permissions across 16 AI bots, sitemap integrity, HTTP 200 | >= 85.0 |
 | **Retrieval Readiness** | 15% | Text-to-HTML SNR (>0.08), semantic landmark coverage, raw HTML readability | >= 80.0 |
 | **Citation Readiness** | 25% | Princeton KDD 2024 vectors: causal conjunctions, statistics, tables, BLUF | >= 70.0 |
@@ -70,7 +71,7 @@ Empirical benchmarks governing generative engine source selection:
 Every finding MUST bind to one of the 17 standardized cause keys. Runtime sensors emit empirical telemetry mapped to these canonical synthesis keys:
 
 | Cause ID (Synthesis Key) | Runtime Sensor Mapping | Functional Domain | Detection Condition |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **`AI_RETRIEVAL_BLOCKED`** | `AI_RETRIEVAL_BLOCKED` | Discoverability | Disallow on live retrieval bots (`OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot`). |
 | **`META_DIRECTIVE_CONFLICT`** | `NOINDEX_EXCLUSION` | Discoverability | `noindex` or `none` in HTML meta tags or `X-Robots-Tag` HTTP header. |
 | **`CANONICAL_TARGET_MISMATCH`** | `CANONICAL_FRAGMENTATION` | Discoverability | Canonical link points to external domain, 404 URL, or redirect chain. |
@@ -89,8 +90,10 @@ Every finding MUST bind to one of the 17 standardized cause keys. Runtime sensor
 | **`COMMERCIAL_HANDOFF_DISCONTINUITY`** | `INTENT_TO_LANDING_MISMATCH` | Engagement | Commercial pricing displayed without an actionable transactional purchase link. |
 | **`ABOVE_FOLD_ACTION_DELAY`** | `CTA_REACHABILITY_FRICTION` | Engagement | Primary CTA buried beyond top 600px viewport or omitted from hero DOM. |
 
-### Taxonomy & Alias Synchronization:
+### Taxonomy & Alias Synchronization
+
 The causal DAG and orchestrator recognize bidirectional aliases between synthesis keys and sensor output keys:
+
 - `META_DIRECTIVE_CONFLICT` <-> `NOINDEX_EXCLUSION`
 - `CANONICAL_TARGET_MISMATCH` <-> `CANONICAL_FRAGMENTATION`
 - `UNVERIFIED_AUTHORITY_GAP` <-> `WEAK_IDENTITY_SIGNALS`
@@ -106,7 +109,7 @@ The causal DAG and orchestrator recognize bidirectional aliases between synthesi
 ## 5. Business Archetype Diagnostic Playbooks
 
 | Archetype | Essential Schema Markup | Critical Proactive Requirements | Primary Conversion Vector |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **`ecommerce`** | `Product`, `Offer`, `AggregateRating` | `/pricing.md`, spec tables, ISO 4217 | Primary purchase action in top 3 DOM elements |
 | **`saas`** | `SoftwareApplication`, `Offer` | `/pricing.md`, un-gated tier matrix | Self-serve onboarding / free trial CTA in hero |
 | **`publisher`** | `NewsArticle`, `Person` (E-E-A-T) | Author credentials, `/llms.txt`, BLUF leads | Related reading depth, newsletter subscription |
@@ -128,7 +131,7 @@ Autonomous agents evaluate websites via clean plain-text endpoints:
 Each major AI retrieval engine and generative search system utilizes distinct retrieval criteria, ranking weights, and citation synthesis heuristics:
 
 | Engine | Primary Retrieval Vector | Critical Architectural Requirements | Key Citability Trigger |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **ChatGPT Search** | Semantic HTML & Graph Linked Data | Clean HTML structure, Schema.org `@id` graph linked data, zero wrapper bloat | Top-30% BLUF placement directly beneath question headings |
 | **Perplexity Pro** | Empirical Metrics & Academic Anchors | Numerical benchmark statistics density, verified real-time facts | Academic and institutional authority anchors (Wikidata, DOI, arXiv) |
 | **Claude Search** | Mechanistic Explanatory Depth | Causal conjunction density (`how`, `why`, `because`, `therefore`), depth of explanation | Credentialed author attribution and substantive procedural detail |

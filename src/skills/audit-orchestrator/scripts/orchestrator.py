@@ -67,6 +67,8 @@ _LAYER1_CAUSE_IDS: Set[str] = {
 _SUPPRESSED_BY_LAYER0: Set[str] = {
     # Layer 2 — Entity Resolution
     "MATERIAL_ENTITY_AMBIGUITY",
+    "MISSING_SAMEAS_VERIFICATION",
+    "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
     "BROKEN_AUTHORITY_ANCHOR",
     "CIRCULAR_SAMEAS_SELF_REFERENCE",
     "WEAK_IDENTITY_SIGNALS",
@@ -74,6 +76,8 @@ _SUPPRESSED_BY_LAYER0: Set[str] = {
     # Layer 3 — Fact Ledger
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "STALE_AUTHORITATIVE_FACT",
     "ATTRIBUTE_INCOMPLETENESS",
@@ -84,6 +88,7 @@ _SUPPRESSED_BY_LAYER0: Set[str] = {
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
     "MISSING_BLUF_PRIMACY",
     "LOW_INFORMATION_SCENT",
@@ -106,11 +111,14 @@ _SUPPRESSED_BY_LAYER1: Set[str] = {
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "ATTRIBUTE_INCOMPLETENESS",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
     "CONTENT_RECENCY_DEFICIT",
     "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — cannot evaluate citation quality of an empty page
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
     "MISSING_BLUF_PRIMACY",
     "LOW_CITABILITY_SCORE",
@@ -1098,13 +1106,19 @@ def get_telemetry_payload(
             "snr": round(float(p.get("snr", 0.0)), 3) if p.get("snr") is not None else None,
             "canonical": p.get("canonical"),
             "has_jsonld": has_jld,
+            "ctas_count": len(p.get("ctas", [])),
+            "has_hreflang": bool(p.get("hreflangs")),
+            "dates": p.get("dates", {}),
         })
 
     sitemaps_list = inv.get("sitemaps", []) if inv else []
     status_counts: Dict[str, int] = {}
+    pages_by_type: Dict[str, int] = {}
     for p in pages_list:
         code_str = str(p.get("status_code") or p.get("status", 200))
         status_counts[code_str] = status_counts.get(code_str, 0) + 1
+        pt = str(p.get("page_type") or "other")
+        pages_by_type[pt] = pages_by_type.get(pt, 0) + 1
 
     avg_wc = round(sum(p.get("word_count", 0) or 0 for p in pages_list) / max(len(pages_list), 1), 1)
     avg_snr = round(sum(float(p.get("snr", 0.0) or 0.0) for p in pages_list) / max(len(pages_list), 1), 3)
@@ -1123,12 +1137,25 @@ def get_telemetry_payload(
             "sitemaps": [s if isinstance(s, str) else s.get("loc", "") for s in sitemaps_list[:10]],
             "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
         },
+        "crawl_telemetry": {
+            "pages_crawled": len(pages_list),
+            "average_latency_ms": inv.get("performance", {}).get("average_latency_ms"),
+            "total_facts_extracted": inv.get("performance", {}).get("total_facts", 0),
+            "total_claims_extracted": inv.get("performance", {}).get("total_claims", 0),
+            "pages_by_type": pages_by_type,
+            "total_ctas_extracted": sum(len(p.get("ctas", [])) for p in pages_list),
+            "pages_with_hreflang": sum(1 for p in pages_list if p.get("hreflangs")),
+        },
         "retrieval": {
             "robots_txt_found": bool(inv.get("robots")),
             "bot_matrix": disc_res.get("ai_agent_scrapeability_summary", {}).get("retrieval_bot_matrix", {}),
             "retrieval_bots_allowed": disc_res.get("coverage", {}).get("retrieval_bots_allowed"),
             "retrieval_bots_total": disc_res.get("coverage", {}).get("retrieval_bots_total"),
             "noindex_pages": [p.get("url") for p in pages_list if p.get("noindex")],
+            "has_ai_plugin": bool(inv.get("infrastructure", {}).get("ai_plugin", {}).get("present")),
+            "has_security_txt": bool(inv.get("infrastructure", {}).get("security_txt", {}).get("present")),
+            "has_llms_txt": bool(inv.get("infrastructure", {}).get("llms_txt", {}).get("present")) or any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
+            "has_pricing_md": bool(inv.get("infrastructure", {}).get("pricing_md", {}).get("present")),
             "sitemaps_found": len(sitemaps_list),
             "status_distribution": status_counts,
         },

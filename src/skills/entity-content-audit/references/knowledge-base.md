@@ -59,14 +59,10 @@ must not fabricate entity verdicts from an empty page.
 - **Severity:** `low` to `medium` depending on how much a summarizing AI
   would have to guess.
 
-## C4. sameAs corroboration (recommendation only)
-- **Measures:** Presence of `sameAs` links on the Organization entity.
-- **Never a defect by itself.** Missing `sameAs` without evidence of actual
-  entity confusion is emitted as a **recommendation**, not a finding —
-  absence of one optional property is not proof of disambiguation failure.
-  Genuine ambiguity (competing entities sharing the name) would require
-  corroborating evidence, which is the `corroboration-authority-audit`
-  skill's job.
+## C4. sameAs corroboration & social authority linking
+- **Measures:** Presence of `sameAs` links on the Organization entity and consistency with discovered DOM social anchors.
+- **Defect (`MISSING_SAMEAS_VERIFICATION`):** When authoritative social profile links (LinkedIn, X/Twitter, GitHub, YouTube, etc.) are present in the website's HTML DOM (header/footer) but completely omitted from Schema.org `Organization.sameAs` → `MISSING_SAMEAS_VERIFICATION` (severity `medium`, confidence `high`). AI search engines and knowledge graph extractors rely on bidirectional `sameAs` links to corroborate corporate identity.
+- **Recommendation:** When no external social anchors are detected on-site, absence of `sameAs` is emitted as an informational recommendation rather than a confirmed defect.
 
 ## Evidence standards
 - Every finding quotes the observed state (which signals were present/absent).

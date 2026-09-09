@@ -293,7 +293,7 @@ def _kw_in_text(kw: str, text: str) -> bool:
     return kw_clean in text
 
 
-def evaluate_page_answerability(page_type, html_content, dom, url, structured_entities):
+def evaluate_page_answerability(page_type, html_content, dom, url, structured_entities, page_dict=None):
     if page_type not in MATERIAL_ATTRIBUTE_WEIGHTS:
         return None
 
@@ -452,7 +452,8 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
                         re.I,
                     )
                 )
-                facts[attr_name] = bool(has_btn or has_action_elem)
+                has_pre_cta = bool(page_dict and any(c.get("is_commercial_cta") for c in page_dict.get("ctas", [])))
+                facts[attr_name] = bool(has_btn or has_action_elem or has_pre_cta)
             else:
                 facts[attr_name] = bool(kw_match)
 
@@ -491,7 +492,8 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
                 has_email_text = bool(re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", visible_text))
                 has_mailto = "mailto:" in html_lower
                 has_email_addr = bool(re.search(r"\b(?:support|sales|contact|help|info)@[a-zA-Z0-9.-]+\b", visible_text, re.I))
-                facts[attr_name] = bool(has_email_entity or has_email_text or has_mailto or has_email_addr)
+                has_pre_email = bool(page_dict and page_dict.get("contact_info", {}).get("emails"))
+                facts[attr_name] = bool(has_email_entity or has_email_text or has_mailto or has_email_addr or has_pre_email)
             elif attr_name == "phone_channel":
                 has_phone_entity = any(bool(e.get("telephone")) for e in (structured_entities or []))
                 has_phone_text = bool(
@@ -500,7 +502,8 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
                 )
                 has_tel = "tel:" in html_lower
                 has_phone_digits = bool(re.search(r"\b(?:call|phone|hotline)\b[^\d\n\r]{0,20}\d{3,}", visible_text, re.I))
-                facts[attr_name] = bool(has_phone_entity or has_phone_text or has_tel or has_phone_digits)
+                has_pre_phone = bool(page_dict and page_dict.get("contact_info", {}).get("phones"))
+                facts[attr_name] = bool(has_phone_entity or has_phone_text or has_tel or has_phone_digits or has_pre_phone)
             elif attr_name == "location_or_form":
                 has_loc_entity = any(
                     matches_schema_type(e, ["PostalAddress", "LocalBusiness", "Place", "ContactPoint"])
@@ -636,6 +639,47 @@ def audit(base, domain, inv=None, state_file=None):
                 "suggested_action": "Add an Organization JSON-LD block linking canonical brand name, logo, and authoritative sameAs profiles.",
             }
         )
+    else:
+        # Check for authoritative social profiles present in DOM but omitted from sameAs
+        discovered_social = set()
+        if inv and inv.get("pages"):
+            for p in inv.get("pages", []):
+                for sl in p.get("social_links", []):
+                    discovered_social.add(str(sl).strip())
+
+        declared_sameas = set()
+        s_raw = org_entity.get("sameAs") or []
+        if isinstance(s_raw, str):
+            s_raw = [s_raw]
+        for s in s_raw:
+            declared_sameas.add(str(s).strip().lower())
+
+        unlinked_social = [
+            sl for sl in sorted(discovered_social)
+            if not any(sl.lower().rstrip("/") == ds.rstrip("/") for ds in declared_sameas)
+        ]
+        if unlinked_social and not any(f.get("cause_id") == "MISSING_SAMEAS_VERIFICATION" for f in findings):
+            findings.append(
+                {
+                    "category": "entity-identity",
+                    "title": "Authoritative social profiles present in DOM but omitted from Organization sameAs",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": "The site links to verified third-party social profiles in HTML but omits them from Schema.org Organization sameAs declarations.",
+                    "cause_family": "ENTITY.IDENTITY",
+                    "id": "MISSING_SAMEAS_VERIFICATION",
+                    "cause_id": "MISSING_SAMEAS_VERIFICATION",
+                    "impact": "AI models cannot establish bidirectional Knowledge Graph corroboration between the domain and official external entities.",
+                    "evidence": f"Found on-page social profiles omitted from Organization sameAs: {', '.join(unlinked_social[:5])}",
+                    "suggested_action": {
+                        "summary": "Add discovered social profile URLs to the Organization sameAs array in JSON-LD.",
+                        "technical_fix": f"Update Organization JSON-LD on homepage to include 'sameAs': {json.dumps(unlinked_social[:5])}.",
+                        "creative_fix": "Ensure corporate marketing social profiles are maintained and aligned across all platforms.",
+                        "priority": "medium",
+                        "verification": "Inspect homepage JSON-LD and verify sameAs links match external brand profiles.",
+                    },
+                }
+            )
 
     # 3. Answerability Evaluation Across Sampled HTML Pages (Excluding Homepage)
     answerability_evaluations = []
@@ -651,7 +695,7 @@ def audit(base, domain, inv=None, state_file=None):
             except Exception:
                 pass
             typed_objects = parse_json_ld(pdom.json_ld_contents, phtml)
-            ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects)
+            ans = evaluate_page_answerability(ptype, phtml, pdom, purl, typed_objects, page_dict=p)
             if isinstance(ans, dict) and ans.get("status") == "missing_entity":
                 # Commercial product/catalog route completely missing Product schema
                 if not any(f.get("cause_id") == "ATTRIBUTE_INCOMPLETENESS" and purl in str(f.get("evidence", "")) for f in findings):
@@ -1043,11 +1087,19 @@ def audit(base, domain, inv=None, state_file=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Entity & content understanding audit layer.")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Entity & Commercial Content Understanding Diagnostic Sensor.\n"
+            "Deterministically parses DOM trees, extracts Schema.org JSON-LD (@graph, Organization, "
+            "Product, Offer, Service), evaluates multi-archetype answerability (pricing, subscription, "
+            "services, contact), validates ISO 4217 priceCurrency codes, and computes the 7-attribute Answerability Index."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):

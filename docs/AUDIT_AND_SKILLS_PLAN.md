@@ -94,8 +94,14 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 - **Scripts:**
   - `safe_fetch.py`: Socket-level pre-connect DNS TOCTOU resolution, subnet blocklists, bounded redirects (max 5), and hard size caps.
   - `acquire_inventory.py`: Single-pass crawler orchestrating RFC 9309 robots.txt evaluation, sitemap discovery, page fetching, Trafilatura-grade HTML extraction, and JSON-LD parsing.
-  - `run_scraper.py`: Legacy compatibility runner.
-  - `crawler/`: Modular subcomponents for robots parsing, sitemap extraction, frontier management, HTML parsing, metadata extraction, and canonical resolution.
+  - `run_scraper.py`: Production CLI with JSON output (`inv.json`) and clean terminal Markdown tables.
+  - `crawler/`: 16 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval and training bots, recursive sitemap parsing, clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, streaming HTML parsing, and zero-trust SSRF defense.
+- **Enriched Acquisition Contract:**
+  - Extracts interactive CTAs (`ctas`) with commercial intent classification (`is_commercial_cta`).
+  - Captures internationalization tags (`hreflangs`) and edge HTTP headers (`x_robots_tag`, HTTP `Link` canonicals).
+  - Extracts temporal freshness timestamps (`dates`: published, modified, Last-Modified) and author metadata.
+  - Harvests RFC-compliant emails and phone numbers (`contact_info`) and external social links (`social_links`).
+  - Probes machine discoverability endpoints: `/llms.txt`, `/pricing.md`, `/.well-known/ai-plugin.json`, `/.well-known/security.txt`.
 - **References:**
   - `bot-registry.json`: Authoritative registry of 16 AI crawler user agents, provider roles (retrieval vs training), and capabilities.
   - `knowledge-base.md`: Complete crawler matrix rules, RFC 9309 longest-match semantics, Trafilatura-grade SNR extraction, and SSRF subnet tables.
@@ -106,7 +112,7 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.3 `discoverability-audit` (Crawlability & Rendering Sensor)
 - **Role:** Evaluates whether AI retrieval engines can access, parse, and index target web pages.
 - **Scripts:**
-  - `discoverability_check.py`: Evaluates RFC 9309 crawler permissions across 16 AI bots, meta robots noindex directives, canonical tag validity, and raw HTML rendering completeness (Client-Side Rendering detection).
+  - `discoverability_check.py`: Evaluates RFC 9309 crawler permissions across 16 AI bots, meta robots noindex directives, edge `X-Robots-Tag` headers, canonical tag validity (HTML vs HTTP headers), hreflang consistency, machine discoverability manifests, and raw HTML rendering completeness (Client-Side Rendering detection).
 - **References:**
   - `checks.md`: Domain checks A1 through H4 covering crawler access, headers, canonicals, and rendering.
   - `knowledge-base.md`: Comprehensive discoverability rules, bot distinction matrices, and rendering gap thresholds.
@@ -117,9 +123,9 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.4 `entity-content-audit` (Structured Data & Answerability Sensor)
 - **Role:** Audits machine-explicit Schema.org structured data, entity disambiguation, and commercial answerability.
 - **Scripts:**
-  - `entity_content_check.py`: Extracts and validates Schema.org JSON-LD graphs (`Organization`, `Product`, `Offer`, `WebSite`), detects attribute omission, and evaluates commercial answerability.
+  - `entity_content_check.py`: Extracts and validates Schema.org JSON-LD graphs (`Organization`, `Product`, `Offer`, `WebSite`), cross-references on-page social links against `sameAs` arrays to detect `MISSING_SAMEAS_VERIFICATION`, verifies structured contact channels, and evaluates commercial answerability across SaaS, e-commerce, services, and content archetypes.
 - **References:**
-  - `checks.md`: Domain checks N1 through N15 covering entity definitions, pricing transparency, and schema completeness.
+  - `checks.md`: Domain checks E1 through E7 covering entity definitions, pricing transparency, and schema completeness.
   - `knowledge-base.md`: Unified knowledge base incorporating Organization and Product schema specifications, primary surfaces, volatility indicators, verification conditions, and master linked graph templates.
 - **Evals (`evals/evals.json`):**
   - Eval 1: Identification of missing machine-explicit `Organization` structured data on homepage.
@@ -128,7 +134,7 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.5 `fact-consistency-audit` (Cross-Page Fact Ledger Sensor)
 - **Role:** Detects cross-page factual contradictions, pricing discrepancies, and stale content drift.
 - **Scripts:**
-  - `fact_consistency_check.py`: Builds a multi-page fact ledger (scoped prices, contact emails, phone numbers, copyright dates) and diffs first-party claims to isolate verified internal contradictions.
+  - `fact_consistency_check.py`: Builds a multi-page fact ledger (scoped prices, contact emails, phone numbers, copyright dates, trial durations), detects `CONFLICTING_COMMERCIAL_TERMS`, and diffs first-party claims to isolate verified internal contradictions.
 - **References:**
   - `checks.md`: Domain checks covering factual accuracy, price consistency, and temporal freshness.
   - `knowledge-base.md`: Scoped fact extraction rules, price normalization algorithms, and tolerance thresholds.
@@ -139,7 +145,7 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.6 `corroboration-authority-audit` (External Identity Corroboration Sensor)
 - **Role:** Verifies declared external identity links (`sameAs`) and independent third-party knowledge graph anchors.
 - **Scripts:**
-  - `corroboration_check.py`: Probes declared `sameAs` URLs (Wikidata, Wikipedia, LinkedIn, Crunchbase) under zero-trust SSRF sandboxing to confirm identity substantiation and verifies candidate backlinks.
+  - `corroboration_check.py`: Probes declared `sameAs` URLs (Wikidata, Wikipedia, LinkedIn, Crunchbase) under zero-trust SSRF sandboxing with an 8.0s hard cumulative deadline, flags `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR` when verified brand assets exist on-site but are omitted from structured data, and verifies candidate backlinks.
 - **References:**
   - `checks.md`: Domain checks BC1 through PP7 covering brand corroboration and portfolio proof.
   - `knowledge-base.md`: Tier-1 authority node evaluation criteria, anchor reachability rules, and backlink verification bounds.
@@ -150,9 +156,9 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.7 `geo-content-audit` (Generative Engine Optimization Sensor)
 - **Role:** Audits web content against Princeton KDD 2024 and AutoGEO generative engine optimization research to maximize AI citation probability.
 - **Scripts:**
-  - `geo_content_check.py`: Evaluates content citability heuristics: Bottom Line Up Front (BLUF) lead paragraphs, statistical evidence density, quotation ratios, causal conjunction frequency, and passage chunking.
+  - `geo_content_check.py`: Evaluates content citability heuristics: Bottom Line Up Front (BLUF) lead paragraphs, statistical evidence density, quotation ratios, causal conjunction frequency, passage chunking, credentialed author attribution (`PROACTIVE.GEO.CREDENTIALED_AUTHOR_ATTRIBUTION.001`), and commercial CTA intrusion (`COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`).
 - **References:**
-  - `checks.md`: Domain checks G1 through G10 covering Princeton GEO dimensions.
+  - `checks.md`: Domain checks N1 through N15 covering Princeton GEO dimensions.
   - `knowledge-base.md`: Research synthesis, 9 GEO optimization vectors, PAWC visibility formulas, and AI writing pattern guardrails.
 - **Evals (`evals/evals.json`):**
   - Eval 1: Detection of low statistical density and absent BLUF lead answers in informational content.
@@ -161,7 +167,7 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.8 `engagement-context-audit` (Post-Citation Visitor Continuity Sensor)
 - **Role:** Evaluates visitor orientation, information scent, and intent-handoff continuity for traffic arriving from AI search engine citations.
 - **Scripts:**
-  - `engagement_check.py`: Evaluates 5-second orientation, heading information scent, CTA reachability, navigation friction, and optional first-party analytics cross-correlation.
+  - `engagement_check.py`: Evaluates 5-second orientation, heading information scent, viewport answer anchoring, ARI cognitive readability, CTA reachability from structured inventory CTAs, navigation friction, and optional first-party analytics cross-correlation.
 - **References:**
   - `checks.md`: Domain checks I1-I2 (deep-link stability) and J1-J10 (identity, navigability, prominence, conversion friction, recovery).
   - `knowledge-base.md`: Unified knowledge base incorporating Section 4 intent-handoff specifications (pricing comparison and product purchase), heading scent matrix, and dual-track analytics evaluation.

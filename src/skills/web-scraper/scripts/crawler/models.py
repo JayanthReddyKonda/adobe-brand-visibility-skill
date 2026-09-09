@@ -70,6 +70,35 @@ class Link:
 
 
 @dataclass
+class CTA:
+    """Represents a call-to-action or interactive action element."""
+
+    text: str
+    href: str = ""
+    tag: str = "a"
+    is_commercial_cta: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "text": self.text,
+            "href": self.href,
+            "tag": self.tag,
+            "is_commercial_cta": self.is_commercial_cta,
+        }
+
+
+@dataclass
+class HreflangLink:
+    """Represents an internationalization hreflang alternate declaration."""
+
+    lang: str
+    href: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"lang": self.lang, "href": self.href}
+
+
+@dataclass
 class TableData:
     """Represents a structured HTML table."""
 
@@ -162,6 +191,13 @@ class PageModel:
     language: Optional[str] = None
     headings: List[Heading] = field(default_factory=list)
     links: List[Link] = field(default_factory=list)
+    ctas: List[CTA] = field(default_factory=list)
+    hreflangs: List[HreflangLink] = field(default_factory=list)
+    social_links: List[str] = field(default_factory=list)
+    contact_info: Dict[str, List[str]] = field(default_factory=dict)
+    dates: Dict[str, Optional[str]] = field(default_factory=dict)
+    x_robots_tag: List[str] = field(default_factory=list)
+    redirect_chain: List[str] = field(default_factory=list)
     jsonld: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     clean_text: str = ""
@@ -185,6 +221,7 @@ class PageModel:
         data = {
             "url": self.url,
             "final_url": self.final_url,
+            "redirect_chain": self.redirect_chain,
             "status": self.status,
             "content_type": self.content_type,
             "title": self.title,
@@ -192,9 +229,15 @@ class PageModel:
             "canonical": self.canonical,
             "canonicals": self.canonicals,
             "robots_meta": self.robots_meta,
+            "x_robots_tag": self.x_robots_tag,
             "language": self.language,
+            "hreflangs": [h.to_dict() for h in self.hreflangs],
             "headings": [h.to_dict() for h in self.headings],
             "links": [link.to_dict() for link in self.links],
+            "ctas": [c.to_dict() for c in self.ctas],
+            "social_links": self.social_links,
+            "contact_info": self.contact_info,
+            "dates": self.dates,
             "jsonld": self.jsonld,
             "metadata": self.metadata,
             "clean_text": self.clean_text,

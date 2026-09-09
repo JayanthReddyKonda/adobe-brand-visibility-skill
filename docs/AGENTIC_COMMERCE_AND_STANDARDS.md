@@ -53,7 +53,7 @@ ProductConsistency = 1 - (conflicting fields / checked fields)
 ```
 
 ### Required Machine-Readable Properties
-- `price`: Clean numeric string without currency symbols (`49.00`, not `"$49.00"`).
+- `price`: Clean numeric string without currency symbols (`49.00`, not `\$49.00`).
 - `priceCurrency`: Valid uppercase 3-letter ISO 4217 code (`USD`, `EUR`, `GBP`).
 - `availability`: Schema.org enumeration (`https://schema.org/InStock`).
 - `hasMerchantReturnPolicy`: Mandatory return policy node.
@@ -70,3 +70,22 @@ ProductConsistency = 1 - (conflicting fields / checked fields)
    - Optional `/llms-full.txt` embedding full site context for single-fetch ingestion.
 2. **Machine-Readable Pricing Manifest (`/pricing.md` or `/pricing.txt`):**
    - Clean tabular breakdown of tier names, monthly/annual rates, user minimums, and included feature sets for zero-scraping purchasing agent evaluation.
+
+---
+
+## 5. Machine Discoverability Endpoints & Edge Directives
+
+Modern autonomous agents probe specialized infrastructure manifests to negotiate machine context:
+
+1. **AI Plugin Manifest (`/.well-known/ai-plugin.json`):**
+   - Declares API authentication schemes, OpenAPI schema endpoints, legal URLs, and plugin capabilities for retrieval agent tool-calling.
+2. **Security & Vulnerability Reporting (`/.well-known/security.txt` / `/security.txt`):**
+   - RFC 9116 security disclosures providing direct contact channels (`Contact: mailto:...`) and canonical encryption keys.
+3. **Edge Markdown Content Negotiation (`Accept: text/markdown`):**
+   - CDN edge workers (Cloudflare Workers, Fastly Compute, AWS CloudFront Functions) inspecting inbound HTTP `Accept` headers.
+   - When requests declare `Accept: text/markdown`, the edge serves clean, pre-rendered Markdown stripped of navigation chrome and DOM scripts, reducing token ingestion costs by up to 80%.
+4. **Multi-Archetype Commercial Verification:**
+   - **SaaS:** Validates trial duration consistency (e.g. 14-day vs 30-day) and guarantee periods across landing pages and pricing tables.
+   - **E-Commerce:** Verifies complete `Offer` attributes and shipping specifications.
+   - **B2B Services:** Confirms verifiable contact channels (`telephone`, `email`) and defined engagement models.
+

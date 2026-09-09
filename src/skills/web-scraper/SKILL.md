@@ -89,6 +89,20 @@ Every script and reference in this skill serves a distinct, critical role:
 
 ---
 
+## Cognitive Integration with Suite Skills
+
+| Skill | Relationship & Flow Direction |
+|---|---|
+| **`audit-orchestrator`** | Master consumer. Coordinates single-pass crawl via `acquire_inventory.py` to produce canonical `inv.json`, running all specialist sensors offline. |
+| **`discoverability-audit`** | Downstream consumer. Consumes robots.txt rules, HTTP status codes, and sitemaps from `inv.json` to audit crawler permissions and render gaps. |
+| **`entity-content-audit`** | Downstream consumer. Consumes Schema.org JSON-LD scripts and DOM structures from `inv.json` for entity resolution and answerability scoring. |
+| **`fact-consistency-audit`** | Downstream consumer. Consumes multi-page text bodies and structured offer data from `inv.json` to detect cross-page factual contradictions. |
+| **`corroboration-authority-audit`** | Network core provider. Uses `safe_fetch.py` for pre-socket zero-trust SSRF sandboxing when probing external identity anchors. |
+| **`geo-content-audit`** | Downstream consumer. Consumes clean Trafilatura-grade markdown from `inv.json` for Princeton KDD 2024 passage citability scoring. |
+| **`engagement-context-audit`** | Downstream consumer. Consumes interactive DOM elements, H1/H2 tags, and hero copy from `inv.json` to evaluate post-citation orientation. |
+
+---
+
 ## References & Documentation Library
 
 - [Web Scraper Knowledge Base](references/knowledge-base.md): Complete architecture reference, 16 AI retrieval crawler matrix, RFC 9309 longest-match precedence rules, Trafilatura-grade SNR extraction heuristics, and SSRF blocked network table.
@@ -101,7 +115,6 @@ Every script and reference in this skill serves a distinct, critical role:
 
 ### Step 1: Read Domain Knowledge Base (MANDATORY)
 
-Read the knowledge base before execution to understand the 16-bot crawler matrix and SSRF constraints:
 Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
 - `skills/web-scraper/references/knowledge-base.md`
 
@@ -138,8 +151,11 @@ The scraper performs the following deterministic steps internally:
 5. **Streaming Single-Pass Extraction & Evidence Preservation:**
    - Fetch each page within monotonic deadline and byte ceilings (2 MB per response).
    - Preserve raw response bodies (`response-0001.body`) and emit `evidence-index.json` with SHA-256 digests, elapsed timing, and HTTP headers.
-   - Extract title, meta description, canonical URL, OpenGraph, and Twitter tags.
+   - Extract title, meta description, canonical URL, OpenGraph, Twitter tags, and edge `X-Robots-Tag` / `Link: rel="canonical"` headers.
    - Extract and flatten all Schema.org JSON-LD scripts, resolving `@graph` hierarchies.
+   - Extract interactive CTAs (`ctas`), internationalization declarations (`hreflangs`), and temporal metadata (`dates` published/modified).
+   - Extract discovered contact endpoints (`contact_info`: emails/phones), social anchors (`social_links`), and credentialed authors (`authors`).
+   - Probe machine-discoverability infrastructure manifests (`/llms.txt`, `/llms-full.txt`, `/pricing.md`, `ai-plugin.json`, `security.txt`).
    - Compute Signal-to-Noise Ratio (SNR) and extract Trafilatura-grade clean Markdown.
    - Flag sparse SPA shells if initial HTML contains `< 25` words inside mounting `div` containers.
 
@@ -180,15 +196,24 @@ The skill emits a structured JSON document conforming to the following shape:
       "word_count": 850,
       "snr_ratio": 0.42,
       "is_sparse_spa": false,
+      "x_robots_tag": [],
+      "dates": {"published": "2025-01-15T00:00:00Z", "modified": "2026-02-01T00:00:00Z"},
+      "authors": ["Dr. Jane Smith"],
+      "hreflangs": [{"lang": "en", "href": "https://example.com/"}],
+      "contact_info": {"emails": ["support@example.com"], "phones": ["+1-800-555-0199"]},
+      "social_links": ["https://twitter.com/example", "https://linkedin.com/company/example"],
       "jsonld": [{"@type": "Organization", "name": "Example Brand", "url": "https://example.com"}],
       "text": "Extracted Trafilatura-grade clean text...",
       "headings": {"h1": ["Empowering Innovation"], "h2": ["Features", "Pricing"]},
-      "ctas": [{"text": "Get Started", "href": "/signup"}]
+      "ctas": [{"text": "Start Free 14-Day Trial", "href": "/signup", "tag": "a", "is_commercial_cta": true}]
     }
   ],
   "infrastructure": {
-    "llms_txt": {"present": false, "status": 404},
-    "llms_full_txt": {"present": false, "status": 404}
+    "llms_txt": {"present": true, "status": 200},
+    "llms_full_txt": {"present": false, "status": 404},
+    "pricing_md": {"present": true, "status": 200},
+    "ai_plugin_json": {"present": false, "status": 404},
+    "security_txt": {"present": true, "status": 200}
   },
   "stats": {
     "pages_crawled": 1,

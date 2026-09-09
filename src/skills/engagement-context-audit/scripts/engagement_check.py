@@ -714,7 +714,7 @@ def parse_analytics_data(arg_val, inv=None):
     return page_metrics_map
 
 
-def audit_page_engagement(html_content, url, page_type="other", state=None):
+def audit_page_engagement(html_content, url, page_type="other", state=None, page_dict=None):
     state = state or {}
     findings = []
     recommendations = []
@@ -751,6 +751,12 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     facts = extract_scoped_facts(html_content, url)
 
     nav_text_lower = " ".join(dom.nav_link_texts).lower()
+    cta_text_lower = " ".join(dom.cta_texts).lower()
+    page_ctas_text = " ".join(
+        str(c.get("text", "") if isinstance(c, dict) else getattr(c, "text", ""))
+        for c in (page_dict.get("ctas", []) if page_dict else [])
+    ).lower()
+    all_action_text = f"{nav_text_lower} {cta_text_lower} {page_ctas_text}".strip()
 
     # 1. Product Pricing Intent Graph
     # Intent: "How much does Product X cost?"
@@ -759,7 +765,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     if facts.get("scoped_prices"):
         # The page successfully satisfied the information requirement for the pricing intent.
         # Now evaluate continuity: Does it offer the next logical step?
-        action_found = any(cta in nav_text_lower for cta in ["buy", "cart", "subscribe", "contact", "order", "get"])
+        action_found = any(cta in all_action_text for cta in ["buy", "cart", "subscribe", "contact", "order", "get", "trial", "demo", "pricing", "sign up"])
         if not action_found:
             findings.append(
                 {
@@ -1068,6 +1074,7 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
             p["html"],
             p["url"],
             page_type=p.get("page_type", "other"),
+            page_dict=p,
         )
 
         p_url = p.get("url", "")
@@ -1331,16 +1338,23 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Audit on-site visitor orientation, heading hierarchies, and navigation."
+        description=(
+            "Visitor Engagement & Post-Citation Intent Continuity Diagnostic Sensor.\n"
+            "Deterministically evaluates visitor orientation, the 4-question above-the-fold test, "
+            "H1 information scent purity, viewport answer anchoring (top 600px / 150w), "
+            "CTA reachability index (commercial continuation proximity), cognitive readability (ARI), "
+            "and correlates static UX friction with first-party route-level web analytics."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument(
         "--analytics",
-        help="Path to first-party analytics JSON/CSV file or JSON string",
+        help="Path to first-party analytics JSON/CSV file or JSON string for empirical bounce/dwell correlation",
     )
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
