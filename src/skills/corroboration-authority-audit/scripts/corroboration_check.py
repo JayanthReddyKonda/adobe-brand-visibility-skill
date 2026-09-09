@@ -492,8 +492,12 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
     intact_backlinks = []
 
     if candidate_list:
+        probe_deadline = time.monotonic() + 8.0
         # Bounded execution: max 10 candidates to respect latency budget
         for item in candidate_list[:10]:
+            if time.monotonic() >= probe_deadline:
+                observations.append({"observation": "External backlink probing halted at 8.0s cumulative deadline."})
+                break
             source_url = item.get("source_url") if isinstance(item, dict) else str(item)
             if not source_url or not source_url.startswith("http"):
                 continue
@@ -501,8 +505,11 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
             expected_target = item.get("expected_target") if isinstance(item, dict) else None
             domain_archetype = classify_referring_domain(source_url)
 
-            # SSRF-safe probe with 5s timeout and 512 KiB limit
-            s_status, s_html, _, s_err = safe_fetch(source_url, timeout=5, max_bytes=512 * 1024, method="GET")
+            # SSRF-safe probe with bounded timeout and deadline
+            rem_t = max(0.5, min(3.0, probe_deadline - time.monotonic()))
+            s_status, s_html, _, s_err = safe_fetch(
+                source_url, timeout=rem_t, max_bytes=512 * 1024, method="GET", deadline=probe_deadline
+            )
 
             if s_status != 200 or not s_html:
                 backlink_results.append(

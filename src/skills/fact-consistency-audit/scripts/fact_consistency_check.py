@@ -394,6 +394,24 @@ def extract_scoped_facts(html_str, url):
                     if "discontinued" in avail
                     else ("in_stock" if "instock" in avail else ("preorder" if "preorder" in avail else "unknown"))
                 )
+
+                # Extract interval from priceSpecification, unitCode, or billingIncrement
+                p_interval = "one_time"
+                p_spec = offer_obj.get("priceSpecification")
+                if isinstance(p_spec, dict):
+                    unit_code = str(p_spec.get("unitCode") or "").upper()
+                    if unit_code in ("MON", "MONTH", "P1M"):
+                        p_interval = "month"
+                    elif unit_code in ("ANN", "YEAR", "P1Y"):
+                        p_interval = "year"
+                    elif unit_code in ("WEE", "WEEK", "P1W"):
+                        p_interval = "week"
+                if p_interval == "one_time":
+                    offer_desc = f"{offer_obj.get('name', '')} {offer_obj.get('description', '')} {o.get('description', '')}"
+                    inferred_inv = extract_interval(offer_desc)
+                    if inferred_inv != "one_time":
+                        p_interval = inferred_inv
+
                 if pname and is_valid_product_entity(pname):
                     facts["products_with_status"].append({"name": pname, "status": status, "url": url})
                     if p_val:
@@ -404,7 +422,7 @@ def extract_scoped_facts(html_str, url):
                                     "entity": pname,
                                     "price": norm_p,
                                     "currency": p_curr,
-                                    "interval": "one_time",
+                                    "interval": p_interval,
                                     "variant": p_variant,
                                     "price_type": price_type,
                                     "raw": f"{p_curr} {p_val}",

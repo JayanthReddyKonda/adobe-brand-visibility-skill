@@ -283,40 +283,252 @@ def parse_json_ld(raw_json_list, raw_html=""):
     return resolved_entities
 
 
+def _kw_in_text(kw: str, text: str) -> bool:
+    """Helper to check if a keyword is present in text, using word boundaries for alphanumeric terms."""
+    kw_clean = kw.lower().strip()
+    if not kw_clean or not text:
+        return False
+    if re.match(r"^[a-zA-Z0-9_\-]+$", kw_clean):
+        return bool(re.search(r"\b" + re.escape(kw_clean) + r"\b", text))
+    return kw_clean in text
+
+
 def evaluate_page_answerability(page_type, html_content, dom, url, structured_entities):
-    if page_type not in ("product_detail", "product", "product_listing"):
+    if page_type not in MATERIAL_ATTRIBUTE_WEIGHTS:
         return None
 
-    products = [e for e in structured_entities if matches_schema_type(e, ["Product"])]
-    if not products:
-        return {"status": "missing_entity"}
+    # Text corpus preparation from DOM
+    dom_text_list = dom.text_content if dom and hasattr(dom, "text_content") else []
+    dom_text = " ".join(dom_text_list).lower()
+    headings_text = " ".join(h[1] for h in dom.headings).lower() if dom and hasattr(dom, "headings") else ""
+    title_text = (dom.title if dom and hasattr(dom, "title") else "").lower()
+    visible_text = f"{title_text} {headings_text} {dom_text}".strip()
+    html_lower = (html_content or "").lower()
 
-    results = []
-    for p in products:
-        facts = {
-            "price": False,
-            "availability": False,
-            "specifications": bool(p.get("sku") or p.get("model") or p.get("weight")),
-            "description": bool(p.get("description")),
-        }
+    # 1. Product Detail and Single Product Pages
+    if page_type in ("product_detail", "product"):
+        products = [e for e in (structured_entities or []) if matches_schema_type(e, ["Product"])]
+        if not products:
+            return {"status": "missing_entity"}
 
-        offers = p.get("offers", {})
-        if isinstance(offers, dict):
-            if offers.get("price"):
-                facts["price"] = True
-            if offers.get("availability"):
-                facts["availability"] = True
-        elif isinstance(offers, list):
-            if any(isinstance(o, dict) and o.get("price") for o in offers):
-                facts["price"] = True
-            if any(isinstance(o, dict) and o.get("availability") for o in offers):
-                facts["availability"] = True
+        weights_cfg = MATERIAL_ATTRIBUTE_WEIGHTS.get(page_type, MATERIAL_ATTRIBUTE_WEIGHTS["product_detail"])
+        results = []
+        for p in products:
+            offers = p.get("offers", {})
+            offers_list = offers if isinstance(offers, list) else [offers] if isinstance(offers, dict) else []
 
-        weights = {"price": 0.25, "availability": 0.25, "specifications": 0.20, "description": 0.30}
-        score = sum(weights[k] for k, v in facts.items() if v)
+            facts = {}
+            for attr_name, (weight, kws) in weights_cfg.items():
+                kw_match = any(_kw_in_text(kw, visible_text) for kw in kws)
+                if attr_name in ("product_name", "product_identity"):
+                    has_entity_name = bool(
+                        (p.get("name") and str(p.get("name")).strip())
+                        or (p.get("title") and str(p.get("title")).strip())
+                        or p.get("sku")
+                        or p.get("mpn")
+                        or p.get("gtin")
+                        or p.get("model")
+                        or (attr_name == "product_identity" and p.get("brand"))
+                    )
+                    has_dom_name = bool(
+                        (headings_text.strip() or title_text.strip())
+                        and any(_kw_in_text(kw, visible_text) for kw in kws if kw != "product")
+                    )
+                    facts[attr_name] = bool(has_entity_name or has_dom_name)
+                elif attr_name == "price":
+                    has_price = any(
+                        isinstance(o, dict)
+                        and (
+                            (o.get("price") is not None and str(o.get("price")).strip() != "")
+                            or (o.get("lowPrice") is not None and str(o.get("lowPrice")).strip() != "")
+                        )
+                        for o in offers_list
+                    )
+                    has_dom_price = bool(
+                        re.search(
+                            r"([$€£₹]|\bUSD\b|\bEUR\b|\bINR\b|\bGBP\b)\s*\d+(\.\d{2})?|\d+(\.\d{2})?\s*([$€£₹]|\bUSD\b|\bEUR\b|\bINR\b|\bGBP\b)",
+                            visible_text,
+                            re.I,
+                        )
+                    )
+                    has_price_kw = any(_kw_in_text(kw, visible_text) for kw in ("price", "starts at", "/mo"))
+                    facts[attr_name] = bool(has_price or has_dom_price or has_price_kw)
+                elif attr_name == "availability":
+                    has_avail = any(
+                        isinstance(o, dict)
+                        and any(
+                            term in str(o.get("availability", "")).lower()
+                            for term in ("instock", "in stock", "preorder", "outofstock", "out of stock", "discontinued")
+                        )
+                        for o in offers_list
+                    )
+                    has_dom_avail = any(
+                        term in visible_text
+                        for term in ("instock", "in stock", "preorder", "pre-order", "out of stock", "outofstock")
+                    )
+                    facts[attr_name] = bool(has_avail or has_dom_avail)
+                elif attr_name == "specifications":
+                    has_specs = bool(
+                        p.get("sku")
+                        or p.get("model")
+                        or p.get("weight")
+                        or p.get("description")
+                        or p.get("additionalProperty")
+                    )
+                    facts[attr_name] = bool(has_specs or kw_match)
+                else:
+                    facts[attr_name] = bool(kw_match)
 
-        results.append({"status": "present", "facts": facts, "score": round(score, 2)})
+            score = sum(weights_cfg[k][0] for k, v in facts.items() if v and k in weights_cfg)
+            results.append({"status": "present", "facts": facts, "score": round(score, 2)})
 
+        return {"status": "present", "results": results}
+
+    # 2. Non-Product Pages (pricing, subscription_flow, service, contact, product_listing, category)
+    weights_cfg = MATERIAL_ATTRIBUTE_WEIGHTS[page_type]
+    facts = {}
+    for attr_name, (weight, kws) in weights_cfg.items():
+        kw_match = any(_kw_in_text(kw, visible_text) for kw in kws)
+        if page_type == "pricing":
+            if attr_name == "tier_names":
+                has_entity_name = any(
+                    matches_schema_type(e, ["Offer", "Product", "PriceSpecification", "Service"])
+                    and bool(e.get("name"))
+                    for e in (structured_entities or [])
+                )
+                facts[attr_name] = bool(has_entity_name or kw_match)
+            elif attr_name == "price_figures":
+                has_entity_price = any(
+                    matches_schema_type(e, ["Offer", "PriceSpecification", "Product"])
+                    and (
+                        (e.get("price") is not None and str(e.get("price")).strip() != "")
+                        or (e.get("lowPrice") is not None and str(e.get("lowPrice")).strip() != "")
+                    )
+                    for e in (structured_entities or [])
+                )
+                has_regex_price = bool(
+                    re.search(
+                        r"([$€£₹]|\bUSD\b|\bEUR\b|\bINR\b|\bGBP\b)\s*\d+(\.\d{2})?|\d+(\.\d{2})?\s*([$€£₹]|\bUSD\b|\bEUR\b|\bINR\b|\bGBP\b|\/mo|\/month|\/year)",
+                        visible_text,
+                        re.I,
+                    )
+                )
+                has_price_kw = any(_kw_in_text(kw, visible_text) for kw in ("free", "contact sales", "/mo", "/month", "/year"))
+                facts[attr_name] = bool(has_entity_price or has_regex_price or has_price_kw)
+            elif attr_name == "feature_comparison":
+                has_entity_features = any(
+                    matches_schema_type(e, ["Product", "Offer", "Service"])
+                    and (e.get("description") or e.get("additionalProperty") or e.get("hasOfferCatalog"))
+                    for e in (structured_entities or [])
+                )
+                has_html_table = "<table" in html_lower or "<tr" in html_lower
+                facts[attr_name] = bool(has_entity_features or has_html_table or kw_match)
+            else:
+                facts[attr_name] = bool(kw_match)
+
+        elif page_type == "subscription_flow":
+            if attr_name == "plan_description":
+                has_desc = any(
+                    matches_schema_type(e, ["Product", "Offer", "Service"])
+                    and bool(e.get("description") or e.get("name"))
+                    for e in (structured_entities or [])
+                )
+                facts[attr_name] = bool(has_desc or kw_match)
+            elif attr_name == "selection_options":
+                has_options_markup = "<select" in html_lower or 'type="radio"' in html_lower or 'type="checkbox"' in html_lower
+                has_entity_options = any(
+                    matches_schema_type(e, ["OfferCatalog", "ItemList"])
+                    or bool(e.get("additionalProperty"))
+                    for e in (structured_entities or [])
+                )
+                facts[attr_name] = bool(has_options_markup or has_entity_options or kw_match)
+            elif attr_name == "cta_action":
+                has_btn = "<button" in html_lower or 'type="submit"' in html_lower or 'type="button"' in html_lower
+                cta_kws = r"|".join(re.escape(k) for k in weights_cfg["cta_action"][1])
+                has_action_elem = bool(
+                    re.search(
+                        r"<(?:a|button)\s+[^>]*>(?:[^<]*(?:" + cta_kws + r")[^<]*)<\/(?:a|button)>",
+                        html_lower,
+                        re.I,
+                    )
+                )
+                facts[attr_name] = bool(has_btn or has_action_elem)
+            else:
+                facts[attr_name] = bool(kw_match)
+
+        elif page_type == "service":
+            if attr_name == "service_name":
+                has_svc_name = any(
+                    matches_schema_type(e, ["Service", "ProfessionalService", "Product"])
+                    and bool(e.get("name") or e.get("serviceType"))
+                    for e in (structured_entities or [])
+                )
+                has_dom_svc = bool(
+                    (headings_text.strip() or title_text.strip())
+                    and any(_kw_in_text(kw, visible_text) for kw in kws)
+                )
+                facts[attr_name] = bool(has_svc_name or has_dom_svc or kw_match)
+            elif attr_name == "deliverables":
+                has_deliverables = any(
+                    matches_schema_type(e, ["Service", "ProfessionalService"])
+                    and (e.get("description") or e.get("offers") or e.get("hasOfferCatalog"))
+                    for e in (structured_entities or [])
+                )
+                facts[attr_name] = bool(has_deliverables or kw_match)
+            elif attr_name == "engagement_model":
+                has_model = any(
+                    matches_schema_type(e, ["Service", "ProfessionalService"])
+                    and (e.get("termsOfService") or e.get("hoursAvailable") or e.get("offers"))
+                    for e in (structured_entities or [])
+                )
+                facts[attr_name] = bool(has_model or kw_match)
+            else:
+                facts[attr_name] = bool(kw_match)
+
+        elif page_type == "contact":
+            if attr_name == "email_channel":
+                has_email_entity = any(bool(e.get("email")) for e in (structured_entities or []))
+                has_email_text = bool(re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", visible_text))
+                has_mailto = "mailto:" in html_lower
+                has_email_addr = bool(re.search(r"\b(?:support|sales|contact|help|info)@[a-zA-Z0-9.-]+\b", visible_text, re.I))
+                facts[attr_name] = bool(has_email_entity or has_email_text or has_mailto or has_email_addr)
+            elif attr_name == "phone_channel":
+                has_phone_entity = any(bool(e.get("telephone")) for e in (structured_entities or []))
+                has_phone_text = bool(
+                    re.search(r"(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", visible_text)
+                    or re.search(r"\+\d{1,3}[-.\s]?\d{4,}", visible_text)
+                )
+                has_tel = "tel:" in html_lower
+                has_phone_digits = bool(re.search(r"\b(?:call|phone|hotline)\b[^\d\n\r]{0,20}\d{3,}", visible_text, re.I))
+                facts[attr_name] = bool(has_phone_entity or has_phone_text or has_tel or has_phone_digits)
+            elif attr_name == "location_or_form":
+                has_loc_entity = any(
+                    matches_schema_type(e, ["PostalAddress", "LocalBusiness", "Place", "ContactPoint"])
+                    and (e.get("address") or e.get("contactPoint"))
+                    for e in (structured_entities or [])
+                )
+                has_form = "<form" in html_lower
+                facts[attr_name] = bool(has_loc_entity or has_form or kw_match)
+            else:
+                facts[attr_name] = bool(kw_match)
+
+        elif page_type in ("product_listing", "category"):
+            if attr_name == "catalog_items":
+                has_catalog = any(matches_schema_type(e, ["ItemList", "Product", "OfferCatalog"]) for e in (structured_entities or []))
+                facts[attr_name] = bool(has_catalog or kw_match)
+            elif attr_name == "category_title":
+                has_cat_title = any(matches_schema_type(e, ["CollectionPage", "ItemList"]) and bool(e.get("name")) for e in (structured_entities or []))
+                facts[attr_name] = bool(has_cat_title or bool(title_text) or kw_match)
+            elif attr_name == "action_path":
+                has_links = bool(re.search(r"<(?:a|button)\s+[^>]*>(?:[^<]*(?:view|buy|detail|cart|shop|order)[^<]*)<\/(?:a|button)>", html_lower))
+                facts[attr_name] = bool(has_links or kw_match)
+            else:
+                facts[attr_name] = bool(kw_match)
+        else:
+            facts[attr_name] = bool(kw_match)
+
+    score = sum(weights_cfg[k][0] for k, v in facts.items() if v and k in weights_cfg)
+    results = [{"status": "present", "facts": facts, "score": round(score, 2)}]
     return {"status": "present", "results": results}
 
 
@@ -476,24 +688,62 @@ def audit(base, domain, inv=None, state_file=None):
                             if isinstance(res_facts, dict):
                                 missing = [k for k, v in res_facts.items() if not v]
                                 if missing:
+                                    is_prod = ptype in ("product_detail", "product")
+                                    cat_name = "product-answerability" if is_prod else f"{ptype.replace('_', '-')}-answerability"
+                                    ptype_disp = ptype.replace('_', ' ')
+                                    t_title = (
+                                        f"Product Schema missing critical Answerability attributes ({', '.join(missing)})"
+                                        if is_prod
+                                        else f"{ptype_disp.title()} page missing critical Answerability attributes ({', '.join(missing)})"
+                                    )
                                     findings.append(
                                         {
-                                            "category": "product-answerability",
-                                            "title": f"Product Schema missing critical Answerability attributes ({', '.join(missing)})",
+                                            "category": cat_name,
+                                            "title": t_title,
                                             "severity": "medium",
                                             "confidence": "high",
-                                            "root_cause": f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants.",
+                                            "root_cause": (
+                                                f"The Product JSON-LD block on {purl} omits facts required by AI shopping assistants."
+                                                if is_prod
+                                                else f"The {ptype_disp} page on {purl} omits material attributes required by AI search engines: {', '.join(missing)}."
+                                            ),
                                             "cause_family": "ENTITY.ATTRIBUTE_INCOMPLETENESS",
                                             "id": "ATTRIBUTE_INCOMPLETENESS",
                                             "cause_id": "ATTRIBUTE_INCOMPLETENESS",
-                                            "impact": "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status.",
-                                            "evidence": f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res.get('score', 0.0)}/1.0.",
+                                            "url": purl,
+                                            "scope": purl,
+                                            "impact": (
+                                                "AI assistants (e.g. ChatGPT Search, Perplexity Shopping) may refuse to recommend the product due to missing pricing or stock status."
+                                                if is_prod
+                                                else f"AI retrieval engines cannot reliably answer user queries regarding {ptype_disp} due to missing {', '.join(missing)}."
+                                            ),
+                                            "evidence": (
+                                                f"Product JSON-LD on {purl} lacks: {', '.join(missing)}. Current score: {res.get('score', 0.0)}/1.0."
+                                                if is_prod
+                                                else f"{ptype_disp.title()} on {purl} lacks material facts: {', '.join(missing)}. Current answerability score: {res.get('score', 0.0)}/1.0."
+                                            ),
                                             "suggested_action": {
-                                                "summary": f"Add {', '.join(missing)} to the Product JSON-LD schema.",
-                                                "technical_fix": f"Enrich Product JSON-LD with missing attributes ({', '.join(missing)}) under offers and specifications.",
-                                                "creative_fix": "Display visible pricing, availability, and product attributes in clear editorial tables adjacent to purchase CTAs.",
+                                                "summary": (
+                                                    f"Add {', '.join(missing)} to the Product JSON-LD schema."
+                                                    if is_prod
+                                                    else f"Add missing material attributes ({', '.join(missing)}) to {purl}."
+                                                ),
+                                                "technical_fix": (
+                                                    f"Enrich Product JSON-LD with missing attributes ({', '.join(missing)}) under offers and specifications."
+                                                    if is_prod
+                                                    else f"Enrich {ptype_disp} markup and JSON-LD with missing attributes: {', '.join(missing)}."
+                                                ),
+                                                "creative_fix": (
+                                                    "Display visible pricing, availability, and product attributes in clear editorial tables adjacent to purchase CTAs."
+                                                    if is_prod
+                                                    else f"Display clear editorial and structured information for {', '.join(missing)} on the {ptype_disp} page."
+                                                ),
                                                 "priority": "medium",
-                                                "verification": "Check the Google Rich Results Test to confirm the properties are populated.",
+                                                "verification": (
+                                                    "Check the Google Rich Results Test to confirm the properties are populated."
+                                                    if is_prod
+                                                    else f"Validate {purl} with Schema.org Validator to confirm structured data and material facts are correctly declared."
+                                                ),
                                             },
                                         }
                                     )
@@ -599,7 +849,7 @@ def audit(base, domain, inv=None, state_file=None):
                         if isinstance(off, dict):
                             schema_price_raw = str(off.get("price", ""))
                             # Extract visible price from HTML text
-                            html_prices = re.findall(r"\$\s*(\d+(?:\.\d{2})?)", phtml)
+                            html_prices = re.findall(r"[$]\s*(\d+(?:\.\d{2})?)", phtml)
                             if html_prices and schema_price_raw:
                                 # Clean schema price
                                 clean_schema_price = re.sub(r"[^0-9.]", "", schema_price_raw)

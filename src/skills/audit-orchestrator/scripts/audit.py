@@ -181,8 +181,20 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
             for f in findings_list:
                 if not isinstance(f, dict):
                     continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3) and raw_cid[0].isalpha() and raw_cid[1:].isdigit()):
+                    fact_map = {
+                        "COMMERCIAL_PRODUCT_DATA_CONTRADICTION": "N1",
+                        "LEGACY_FACT_PROPAGATION": "N2",
+                        "STALE_AUTHORITATIVE_FACT": "N2",
+                        "DISCONTINUED_VS_CURRENT_CONFLICT": "N3",
+                        "FIRST_PARTY_FACT_CONFLICT": "N4",
+                        "CONFLICTING_COMMERCIAL_TERMS": "N4",
+                    }
+                    raw_cid = fact_map.get(cause, "N4")
                 candidates.append({
-                    "check_id": "N4",
+                    "check_id": raw_cid,
                     "title": str(f.get("title", "Fact consistency observation")),
                     "actual_band": "S3" if f.get("severity") in ("critical", "high") else "S2",
                     "finding_kind": "confirmed_problem",
@@ -212,8 +224,19 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
             for f in findings_list:
                 if not isinstance(f, dict):
                     continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3, 4) and raw_cid[:2].isalpha()):
+                    corrob_map = {
+                        "CIRCULAR_SAMEAS_SELF_REFERENCE": "BC1",
+                        "WEAK_IDENTITY_SIGNALS": "BC2",
+                        "CANDIDATE_BACKLINK_UNREACHABLE": "BC3",
+                        "BROKEN_AUTHORITY_ANCHOR": "BC6",
+                        "CLAIM_CORROBORATION_GAP": "PP1",
+                    }
+                    raw_cid = corrob_map.get(cause, "BC6")
                 candidates.append({
-                    "check_id": "BC6",
+                    "check_id": raw_cid,
                     "title": str(f.get("title", "Authority anchor observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",
@@ -243,8 +266,22 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
             for f in findings_list:
                 if not isinstance(f, dict):
                     continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3) and raw_cid[0] == "G" and raw_cid[1:].isdigit()):
+                    geo_map = {
+                        "MISSING_IN_DEPTH_MECHANISMS": "G1",
+                        "LACK_OF_SPECIFIC_EVIDENCE": "G2",
+                        "STANDALONE_FAQ_DEFICIT": "G3",
+                        "EXCESSIVE_KEYWORD_DENSITY": "G4",
+                        "LOW_FACT_TO_TOKEN_RATIO": "G5",
+                        "CONTEXT_PLACEMENT_DEGRADATION": "G6",
+                        "EXCESSIVE_HEDGE_LANGUAGE": "G7",
+                        "CONTENT_RECENCY_DEFICIT": "G8",
+                    }
+                    raw_cid = geo_map.get(cause, "G1")
                 candidates.append({
-                    "check_id": "G1",
+                    "check_id": raw_cid,
                     "title": str(f.get("title", "GEO citability observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",
@@ -274,8 +311,18 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
             for f in findings_list:
                 if not isinstance(f, dict):
                     continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3) and raw_cid[0] in ("I", "J") and raw_cid[1:].isdigit()):
+                    eng_map = {
+                        "LOW_INFORMATION_SCENT": "J1",
+                        "INTENT_TO_LANDING_MISMATCH": "J2",
+                        "DESTINATION_NAVIGATION_FRICTION": "J3",
+                        "GENERIC_H1": "J4",
+                    }
+                    raw_cid = eng_map.get(cause, "J1")
                 candidates.append({
-                    "check_id": "J1",
+                    "check_id": raw_cid,
                     "title": str(f.get("title", "Visitor engagement observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",

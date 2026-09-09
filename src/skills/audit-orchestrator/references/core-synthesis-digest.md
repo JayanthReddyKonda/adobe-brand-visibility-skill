@@ -67,27 +67,39 @@ Empirical benchmarks governing generative engine source selection:
 
 ## 4. The 17 Keystone Root-Cause Taxonomy Keys
 
-Every finding MUST bind to one of the 17 standardized cause keys:
+Every finding MUST bind to one of the 17 standardized cause keys. Runtime sensors emit empirical telemetry mapped to these canonical synthesis keys:
 
-| Cause ID | Functional Domain | Detection Condition |
-|---|---|---|
-| **`AI_RETRIEVAL_BLOCKED`** | Discoverability | Disallow on live retrieval bots (`OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot`). |
-| **`META_DIRECTIVE_CONFLICT`** | Discoverability | `noindex` or `none` in HTML meta tags or `X-Robots-Tag` HTTP header. |
-| **`CANONICAL_TARGET_MISMATCH`** | Discoverability | Canonical link points to external domain, 404 URL, or redirect chain. |
-| **`RENDERED_CONTENT_GAP`** | Discoverability | Client-side CSR rendering gap; initial unrendered HTML is a blank shell. |
-| **`MATERIAL_ENTITY_AMBIGUITY`** | Entity Identity | Zero Schema.org `Organization` JSON-LD markup or missing brand identity anchor. |
-| **`ATTRIBUTE_INCOMPLETENESS`** | Entity Identity | Product or Offer schema missing required priceCurrency, price, or availability. |
-| **`FIRST_PARTY_FACT_CONFLICT`** | Fact Consistency | Numerical contradiction across first-party routes (e.g. price divergence). |
-| **`TEMPORAL_DRIFT_DETECTED`** | Fact Consistency | Copyright year or corporate contact terms stale (>2 years out of date). |
-| **`UNVERIFIED_AUTHORITY_GAP`** | Corroboration | Zero declared `sameAs` links to third-party knowledge bases (Wikidata, LinkedIn). |
-| **`BROKEN_AUTHORITY_ANCHOR`** | Corroboration | Declared `sameAs` link returns HTTP 404 or points to an unrelated entity. |
-| **`SUB_THRESHOLD_CITABILITY`** | GEO Content | Explanatory depth score < 3/10; body text lacks causal connectors and stats. |
-| **`PRONOUN_AMBIGUITY_DENSITY`** | GEO Content | High ratio of unresolved pronouns ("it", "they") in lead descriptive sections. |
-| **`MISSING_BLUF_PRIMACY`** | GEO Content | Core factual answer buried beneath decorative hero text (>150 words to first fact). |
-| **`HEADING_HIERARCHY_VACUUM`** | Engagement | Page completely omits semantic `<h1>` tag or skips levels (`<h1>` -> `<h3>`). |
-| **`INTENT_SCENT_DILUTION`** | Engagement | Landing `<h1>` fails to confirm referred entity and intent within 5-second test. |
-| **`COMMERCIAL_HANDOFF_DISCONTINUITY`** | Engagement | Commercial pricing displayed without an actionable transactional purchase link. |
-| **`ABOVE_FOLD_ACTION_DELAY`** | Engagement | Primary CTA buried beyond top 600px viewport or omitted from hero DOM. |
+| Cause ID (Synthesis Key) | Runtime Sensor Mapping | Functional Domain | Detection Condition |
+|---|---|---|---|
+| **`AI_RETRIEVAL_BLOCKED`** | `AI_RETRIEVAL_BLOCKED` | Discoverability | Disallow on live retrieval bots (`OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot`). |
+| **`META_DIRECTIVE_CONFLICT`** | `NOINDEX_EXCLUSION` | Discoverability | `noindex` or `none` in HTML meta tags or `X-Robots-Tag` HTTP header. |
+| **`CANONICAL_TARGET_MISMATCH`** | `CANONICAL_FRAGMENTATION` | Discoverability | Canonical link points to external domain, 404 URL, or redirect chain. |
+| **`RENDERED_CONTENT_GAP`** | `RENDERED_CONTENT_GAP` | Discoverability | Client-side CSR rendering gap; initial unrendered HTML is a blank shell. |
+| **`MATERIAL_ENTITY_AMBIGUITY`** | `MATERIAL_ENTITY_AMBIGUITY` | Entity Identity | Zero Schema.org `Organization` JSON-LD markup or missing brand identity anchor. |
+| **`ATTRIBUTE_INCOMPLETENESS`** | `ATTRIBUTE_INCOMPLETENESS` | Entity Identity | Product or Offer schema missing required priceCurrency, price, or availability. |
+| **`FIRST_PARTY_FACT_CONFLICT`** | `FIRST_PARTY_FACT_CONFLICT` | Fact Consistency | Numerical contradiction across first-party routes (e.g. price divergence). |
+| **`TEMPORAL_DRIFT_DETECTED`** | `CONTENT_RECENCY_DEFICIT` | Fact Consistency | Copyright year or corporate contact terms stale (>2 years out of date). |
+| **`UNVERIFIED_AUTHORITY_GAP`** | `WEAK_IDENTITY_SIGNALS` | Corroboration | Zero declared `sameAs` links to third-party knowledge bases (Wikidata, LinkedIn). |
+| **`BROKEN_AUTHORITY_ANCHOR`** | `BROKEN_AUTHORITY_ANCHOR` | Corroboration | Declared `sameAs` link returns HTTP 404 or points to an unrelated entity. |
+| **`SUB_THRESHOLD_CITABILITY`** | `LOW_CITABILITY_SCORE` | GEO Content | Explanatory depth score < 3/10; body text lacks causal connectors and stats. |
+| **`PRONOUN_AMBIGUITY_DENSITY`** | `PRONOUN_AMBIGUITY_DENSITY` | GEO Content | High ratio of unresolved pronouns ("it", "they") in lead descriptive sections. |
+| **`MISSING_BLUF_PRIMACY`** | `CONTEXT_PLACEMENT_DEGRADATION` | GEO Content | Core factual answer buried beneath decorative hero text (>150 words to first fact). |
+| **`HEADING_HIERARCHY_VACUUM`** | `GENERIC_H1` | Engagement | Page completely omits semantic `<h1>` tag or skips levels (`<h1>` -> `<h3>`). |
+| **`INTENT_SCENT_DILUTION`** | `LOW_INFORMATION_SCENT` | Engagement | Landing `<h1>` fails to confirm referred entity and intent within 5-second test. |
+| **`COMMERCIAL_HANDOFF_DISCONTINUITY`** | `INTENT_TO_LANDING_MISMATCH` | Engagement | Commercial pricing displayed without an actionable transactional purchase link. |
+| **`ABOVE_FOLD_ACTION_DELAY`** | `CTA_REACHABILITY_FRICTION` | Engagement | Primary CTA buried beyond top 600px viewport or omitted from hero DOM. |
+
+### Taxonomy & Alias Synchronization:
+The causal DAG and orchestrator recognize bidirectional aliases between synthesis keys and sensor output keys:
+- `META_DIRECTIVE_CONFLICT` <-> `NOINDEX_EXCLUSION`
+- `CANONICAL_TARGET_MISMATCH` <-> `CANONICAL_FRAGMENTATION`
+- `UNVERIFIED_AUTHORITY_GAP` <-> `WEAK_IDENTITY_SIGNALS`
+- `SUB_THRESHOLD_CITABILITY` <-> `LOW_CITABILITY_SCORE`
+- `MISSING_BLUF_PRIMACY` <-> `CONTEXT_PLACEMENT_DEGRADATION`
+- `INTENT_SCENT_DILUTION` <-> `LOW_INFORMATION_SCENT`
+- `COMMERCIAL_HANDOFF_DISCONTINUITY` <-> `INTENT_TO_LANDING_MISMATCH`
+- `ABOVE_FOLD_ACTION_DELAY` <-> `CTA_REACHABILITY_FRICTION`
+- `TEMPORAL_DRIFT_DETECTED` <-> `CONTENT_RECENCY_DEFICIT`
 
 ---
 
@@ -111,7 +123,20 @@ Autonomous agents evaluate websites via clean plain-text endpoints:
 
 ---
 
-## 7. Execution Invariants & Clean Output Delivery Standard
+## 7. Engine-Specific Citability Profiles
+
+Each major AI retrieval engine and generative search system utilizes distinct retrieval criteria, ranking weights, and citation synthesis heuristics:
+
+| Engine | Primary Retrieval Vector | Critical Architectural Requirements | Key Citability Trigger |
+|---|---|---|---|
+| **ChatGPT Search** | Semantic HTML & Graph Linked Data | Clean HTML structure, Schema.org `@id` graph linked data, zero wrapper bloat | Top-30% BLUF placement directly beneath question headings |
+| **Perplexity Pro** | Empirical Metrics & Academic Anchors | Numerical benchmark statistics density, verified real-time facts | Academic and institutional authority anchors (Wikidata, DOI, arXiv) |
+| **Claude Search** | Mechanistic Explanatory Depth | Causal conjunction density (`how`, `why`, `because`, `therefore`), depth of explanation | Credentialed author attribution and substantive procedural detail |
+| **Google AI Overviews** | Consensus & Information Gain | Multi-source consensus, complete `LocalBusiness` / `Product` schema attributes | First-party proprietary data providing net-new Information Gain |
+
+---
+
+## 8. Execution Invariants & Clean Output Delivery Standard
 
 1. **Single-Pass Acquisition Mandate:** Web crawling is strictly performed once via `acquire_inventory.py` / `web-scraper` emitting `inv.json`. All downstream diagnostic sensors analyze `inv.json` offline.
 2. **Strictly Banned Agent Tools:** Never use agent built-in URL reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget`. Direct agent reading bypasses socket-level zero-trust SSRF validation and corrupts multi-skill analysis.

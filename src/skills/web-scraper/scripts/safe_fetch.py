@@ -312,6 +312,82 @@ __all__ = [
     "SafeHTTPHandler",
     "SafeHTTPSHandler",
     "SafeRedirectHandler",
-    "_is_safe_host",
-    "_decompress_bounded",
 ]
+
+
+def main():
+    import argparse
+    import json
+    import time
+
+    parser = argparse.ArgumentParser(
+        description="SSRF-safe zero-trust web fetcher and probe utility."
+    )
+    parser.add_argument("--url", required=True, help="Target URL to fetch or probe under zero-trust SSRF validation")
+    parser.add_argument("--method", choices=["GET", "HEAD"], default="GET", help="HTTP method (default: GET)")
+    parser.add_argument("--timeout", type=float, default=10.0, help="Socket timeout in seconds (default: 10.0)")
+    parser.add_argument("--max-bytes", type=int, default=MAX_HTML_BYTES, help="Maximum bytes to read (default: 2097152)")
+    parser.add_argument("--check-only", action="store_true", help="Only check status code without outputting full HTML")
+    parser.add_argument("--output", help="Path to write output HTML or JSON (optional, defaults to stdout)")
+    args = parser.parse_args()
+
+    t0 = time.monotonic()
+    if args.check_only:
+        status, _, _, err = safe_fetch(
+            args.url,
+            timeout=args.timeout,
+            max_bytes=1024,
+            method="HEAD",
+        )
+        if status in (403, 405, 501):
+            status, _, _, err = safe_fetch(
+                args.url,
+                timeout=args.timeout,
+                max_bytes=1024,
+                method="GET",
+            )
+        duration_ms = round((time.monotonic() - t0) * 1000, 2)
+        is_ssrf = bool(err and "SSRF" in str(err))
+        out_obj = {
+            "url": args.url,
+            "status": status,
+            "latency_ms": duration_ms,
+            "ssrf_safe": not is_ssrf,
+            "error": err if err else None,
+        }
+        print(json.dumps(out_obj, indent=2))
+        return
+
+    status, body, headers, err = safe_fetch(
+        args.url,
+        timeout=args.timeout,
+        max_bytes=args.max_bytes,
+        method=args.method,
+    )
+    duration_ms = round((time.monotonic() - t0) * 1000, 2)
+
+    result = {
+        "url": args.url,
+        "status": status,
+        "latency_ms": duration_ms,
+        "content_length": len(body),
+        "headers": headers,
+        "error": err if err else None,
+        "ssrf_safe": True if "SSRF" not in str(err) else False,
+    }
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            if args.output.endswith(".json"):
+                result["body_preview"] = body[:2000]
+                json.dump(result, f, indent=2)
+            else:
+                f.write(body)
+        print(f"Response written to {args.output}")
+    else:
+        result["body_preview"] = body[:500] if len(body) > 500 else body
+        print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()

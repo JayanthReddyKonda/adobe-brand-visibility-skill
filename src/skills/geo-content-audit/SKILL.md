@@ -14,12 +14,14 @@ allowed-tools:
 
 # Generative Engine Optimization (GEO) Audit Skill (Sensor-Brain Protocol)
 
-| Task | Execution Command | Output Contract |
-|---|---|---|
-| **Generative Engine Optimization (GEO) Scorer** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+| Component / Task | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Offline GEO & Citability Sensor (Standard)** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, page_improvement_plans}` | Primary Offline Inspection |
+| **State-Augmented GEO Audit** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, page_improvement_plans}` | Multi-Turn Stateful Evaluation |
+| **Direct Standalone GEO Probe** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --format json` | `{status, findings, recommendations, page_improvement_plans}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `geo_content_check.py` measures text quotability, answer density, heading/chunk alignment, statistical metrics, attributed quotes, and causal conjunction density across the 9 empirical Princeton KDD 2024 / AutoGEO vectors. It does not claim that any metric guarantees ranking or citation.
+> - **Deterministic Read-Only Sensor:** `geo_content_check.py` measures text quotability, answer density, heading/chunk alignment, statistical metrics, attributed quotes, and causal conjunction density across the 9 empirical Princeton KDD 2024 / AutoGEO vectors. It generates deterministic `page_improvement_plans` with 120–180 word passage chunking models without calling LLMs.
 > - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests citability metrics, executes simulated assistant query strategies, and synthesizes bespoke, information-dense passage chunking and explanatory rewrites.
 
@@ -28,25 +30,44 @@ Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) 
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Audits website content against empirical Generative Engine Optimization (GEO) and retrieval-augmented generation (RAG) extractability benchmarks. Scores 9 empirical vectors (Princeton KDD 2024 and AutoGEO): in-depth causal mechanisms (+28% preference), statistical evidence density (+40% lift), attributed expert quotations (+40.9% lift), BLUF top-30% placement, standalone FAQ penalties (-5.7%), keyword stuffing perplexity degradation, and generates actionable page improvement plans.
 
 ## When to use
 
-- Diagnose why an AI search assistant (ChatGPT Search, Perplexity, Claude) fails to cite or summarize a brand's product or service pages.
-- Evaluate whether marketing copy relies on superficial assertions rather than in-depth mechanistic explanations ("how" and "why").
-- Identify opportunities to structure unstructured prose into machine-citable tables, definition lists, and direct Q&A answer blocks.
+- AI search assistants (ChatGPT Search, Perplexity Pro, Claude) fail to cite, quote, or summarize a brand's product, feature, or service pages.
+- Marketing copy relies on superficial superlative assertions rather than mechanistic explanations ("how" and "why" causal conjunctions).
+- Content is buried or structured poorly for retrieval-augmented generation chunking windows (120–180 words).
+- Detect standalone FAQ penalties where questions are answered without supporting empirical evidence (code, stats, comparison tables).
+- Identify excessive keyword density (> 4.5%) degrading neural embedding perplexity in generative models.
+- Deep-dive into citability scores and retrieve deterministic `page_improvement_plans` for specific key landing pages.
 
 ---
 
 ## Inputs
-- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
-- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
-- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
-- `--format json`: Machine-readable JSON output mode
+
+- `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
+- `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
+- `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
+
+---
+
+## Component Architecture & File Inventory
+
+Every script and reference in this skill serves a distinct diagnostic role:
+
+| Path | Type | Purpose & Agent Calling Role |
+|---|---|---|
+| `scripts/geo_content_check.py` | Sensor Script | Core measurement sensor evaluating 9 Princeton KDD 2024 / AutoGEO vectors, calculating citability scores, and synthesizing deterministic `page_improvement_plans`. |
+| `references/checks.md` | Reference Catalogue | Research specifications covering checks N1-N15 (self-contained answers, answer-first positioning, numbers vs vague claims, attribution, quotations, and fluency). |
+| `references/knowledge-base.md` | Reference KB | Benchmark reference covering Princeton KDD 2024 lifts, 134-167 word chunking math, causal conjunction cheatsheets, comparison table patterns, and AI writing detection. |
+| `evals/evals.json` | Verification Fixtures | Test scenarios validating causal conjunction scoring, statistical density detection, standalone FAQ penalties, and page improvement plan generation. |
+
+---
 
 ## References & Documentation Library
 
@@ -55,6 +76,7 @@ Load these resources as needed during GEO content checks:
 ### Core Knowledge Base & Check Catalogue (Load First — MANDATORY)
 - [GEO & Content Quality Checks Reference](references/checks.md): Research specifications covering N1-N15 (self-contained answers, answer-first positioning, numbers vs vague claims, attribution, quotations, and fluency).
 - [GEO Content Knowledge Base](references/knowledge-base.md): Princeton KDD 2024 / AutoGEO benchmarks, 134–167 word optimal chunk scoring, causal conjunction cheatsheets, comparison table patterns, and AI Writing Detection & Natural Content Patterns (Section 9).
+
 
 ### Mandatory Domain Invariants & Non-Fabrication Rules
 1. **Zero Synthetic Fabrication:** Never invent numbers, metrics, statistics, customer testimonials, quotes, credentials, or third-party sources to satisfy a GEO recommendation.

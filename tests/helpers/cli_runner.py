@@ -64,14 +64,19 @@ def run_skill_script(
     return CLIResult(returncode=res.returncode, stdout=res.stdout, stderr=res.stderr)
 
 
-def run_validator(report_dict_or_json: Any, filepath: Optional[str] = None) -> CLIResult:
+def run_validator(
+    report_dict_or_json: Any,
+    filepath: Optional[str] = None,
+    schema_path: Optional[str] = None,
+) -> CLIResult:
     """Invokes validate_report.py either via stdin or with a file path."""
     val_script = os.path.join(SKILLS_DIR, "audit-orchestrator", "scripts", "validate_report.py")
+    schema_args = ["--schema", schema_path] if schema_path else []
     if filepath:
-        cmd = [sys.executable, val_script, filepath]
+        cmd = [sys.executable, val_script, filepath] + schema_args
         res = subprocess.run(cmd, capture_output=True, text=True, check=False)
     else:
-        cmd = [sys.executable, val_script, "-"]
+        cmd = [sys.executable, val_script, "-"] + schema_args
         data = report_dict_or_json if isinstance(report_dict_or_json, str) else json.dumps(report_dict_or_json)
         res = subprocess.run(cmd, input=data, capture_output=True, text=True, check=False)
     return CLIResult(returncode=res.returncode, stdout=res.stdout, stderr=res.stderr)

@@ -14,6 +14,7 @@
 - [1. The Two-Stage Funnel of Generative Search (C-SEO Bench Insight)](#1-the-two-stage-funnel-of-generative-search-c-seo-bench-insight)
 - [2. Passage-Level Citability Scorer (Optimal Chunk Parameters)](#2-passage-level-citability-scorer-optimal-chunk-parameters)
 - [3. External Signal Correlation with AI Citations](#3-external-signal-correlation-with-ai-citations)
+- [10. Engine-Specific Citability Profiles](#10-engine-specific-citability-profiles)
 
 ---
 
@@ -331,3 +332,30 @@ Remove filler words that add no substantive information:
 ### 4. Princeton KDD 2024 Alternative: Causal Depth
 Instead of superficial prose, structure sentences around verifiable causal mechanisms:
 - *"The algorithm reduces sync latency by 45% because in-memory event buffers replace disk I/O."*
+
+---
+
+## 10. Engine-Specific Citability Profiles
+
+Generative AI search engines employ distinct retrieval architectures, ranking criteria, and citation synthesis heuristics. Content must be tailored to satisfy the specialized evaluation profiles of each major engine:
+
+### 1. ChatGPT Search (OpenAI)
+- **HTML Structure & Semantic Hierarchy**: Prioritizes clean HTML5 semantic hierarchy (`main`, `article`, `section`, `h1`-`h3`, `table`, `dl`). Avoids decorative visual wrappers that fragment clean text extraction.
+- **`@id` Graph Linked Data**: Relies heavily on Schema.org JSON-LD structured with explicit `@graph` and `@id` URIs to resolve entity relationships, product offerings, and corporate parentage without disambiguation friction.
+- **Top-30% BLUF Placement**: Extracts direct answers located in the initial 30% of a passage or document. The core conclusion, definition, or answer must precede historical narrative or background framing.
+
+### 2. Perplexity Pro
+- **Numerical Benchmark Statistics Density**: Highest citation preference for passages containing specific quantitative figures, percentages, benchmark ratios, latency measurements, and dated empirical metrics.
+- **Real-Time Facts**: Strongly favors verified real-time facts, current-year operational status, and recently validated pricing or availability data.
+- **Academic Authority Anchors**: Values citations linking to primary empirical research, whitepapers, academic literature, standards specifications, and institutional knowledge bases (Wikidata, DOI, arXiv).
+
+### 3. Claude Search (Anthropic)
+- **Causal Conjunction Density**: Evaluates reasoning depth by measuring the frequency of explanatory causal conjunctions (`how`, `why`, `because`, `therefore`, `enables`, `results in`, `mechanism`).
+- **Explanatory Depth**: Demands comprehensive mechanical explanations of processes, trade-offs, architecture decisions, and operational failure modes over concise promotional claims.
+- **Credentialed Author Attribution**: Requires explicit author identity and qualifications (byline with professional title, verifiable experience, and Person schema) to establish domain competence.
+
+### 4. Google AI Overviews
+- **Multi-Source Consensus**: Synthesizes passages corroborated across multiple independent third-party domains. Claims contradictory to consensus knowledge graph nodes are filtered out.
+- **LocalBusiness / Product Schema Attributes**: Requires complete commercial structured data including ISO 4217 priceCurrency, price, availability, aggregateRating, and openingHoursSpecification.
+- **Information Gain**: Evaluates whether the content provides net-new facts, proprietary data, first-party customer benchmarks, or original research beyond what existing ranking pages already contain.
+

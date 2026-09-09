@@ -292,7 +292,51 @@ Embed this on product detail pages to satisfy all commercial AI shopping agents:
 
 ---
 
-## 3. Google 2025/2026 Merchant Listing & Schema Deprecation Rules
+## 3. LocalBusiness Schema Template (Physical Store / Regional Service)
+
+Embed this on local business / branch landing pages to enable local AI search grounding:
+
+```html
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "@id": "https://example.com/#localbusiness",
+  "name": "Acme Regional Store",
+  "url": "https://example.com/locations/downtown",
+  "telephone": "+1-800-555-0199",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "123 Market Street",
+    "addressLocality": "San Francisco",
+    "addressRegion": "CA",
+    "postalCode": "94105",
+    "addressCountry": "US"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 37.7749,
+    "longitude": -122.4194
+  },
+  "openingHoursSpecification": [
+    {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      "opens": "09:00",
+      "closes": "18:00"
+    }
+  ],
+  "sameAs": [
+    "https://maps.google.com/?cid=1234567890",
+    "https://www.yelp.com/biz/acme-store"
+  ]
+}
+</script>
+```
+
+---
+
+## 4. Google 2025/2026 Merchant Listing & Schema Deprecation Rules
 
 Derived from Google Search Merchant Listing documentation and `schema_ecommerce_validate.py`:
 

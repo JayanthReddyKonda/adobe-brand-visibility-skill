@@ -235,3 +235,55 @@ def assemble(
     )
     validate_report(report)
     return report
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Evidence gate, cause-scoped deduplication, queue ordering and report assembly CLI."
+    )
+    parser.add_argument("--site", required=True, help="Audited site URL or domain")
+    parser.add_argument("--candidates", required=True, help="Path to candidate findings JSON file")
+    parser.add_argument("--artifacts", required=True, help="Path to evidence artifacts JSON file")
+    parser.add_argument("--rules", help="Path to checks/rules JSON file (optional)")
+    parser.add_argument("--output", help="Path to write assembled report JSON (optional, defaults to stdout)")
+    args = parser.parse_args()
+
+    with open(args.candidates, "r", encoding="utf-8") as f:
+        candidates = json.load(f)
+    if isinstance(candidates, dict) and "findings" in candidates:
+        candidates = candidates["findings"]
+
+    with open(args.artifacts, "r", encoding="utf-8") as f:
+        artifacts = json.load(f)
+
+    rules_list: List[Dict[str, Any]] = []
+    if args.rules and Path(args.rules).exists():
+        with open(args.rules, "r", encoding="utf-8") as f:
+            rules_data = json.load(f)
+            rules_list = rules_data if isinstance(rules_data, list) else list(rules_data.values())
+    else:
+        checks_path = Path(__file__).resolve().parents[1] / "references" / "checks.json"
+        if checks_path.exists():
+            with open(checks_path, "r", encoding="utf-8") as f:
+                rules_list = json.load(f)
+
+    records = artifacts if isinstance(artifacts, list) else list(artifacts.values())
+    report = assemble(args.site, candidates, records, rules_list, {})
+    formatted = json.dumps(report, indent=2)
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(formatted)
+            f.write("\n")
+        print(f"Report assembled and written to {args.output}")
+    else:
+        print(formatted)
+
+
+assemble_report = assemble
+
+if __name__ == "__main__":
+    main()
+

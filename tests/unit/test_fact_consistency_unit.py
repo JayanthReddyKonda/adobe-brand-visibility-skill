@@ -86,6 +86,40 @@ class TestFactConsistencyUnit(unittest.TestCase):
         self.assertIn("status", res)
         self.assertIsInstance(res.get("findings"), list)
 
+    def test_schema_recurring_interval_extraction(self):
+        """Elevation test: Schema.org offers with unitCode MON extract interval as month."""
+        html = """
+        <html>
+            <head>
+                <script type="application/ld+json">
+                {
+                    "@context": "https://schema.org",
+                    "@type": "Product",
+                    "name": "Cloud Pro SaaS",
+                    "offers": {
+                        "@type": "Offer",
+                        "price": "99.00",
+                        "priceCurrency": "USD",
+                        "priceSpecification": {
+                            "@type": "UnitPriceSpecification",
+                            "price": "99.00",
+                            "priceCurrency": "USD",
+                            "unitCode": "MON"
+                        }
+                    }
+                }
+                </script>
+            </head>
+            <body><h1>Cloud Pro SaaS</h1></body>
+        </html>
+        """
+        facts = fact_consistency_check.extract_scoped_facts(html, "https://example.com/pricing")
+        scoped_prices = facts.get("scoped_prices", [])
+        self.assertEqual(len(scoped_prices), 1)
+        self.assertEqual(scoped_prices[0]["interval"], "month")
+        self.assertEqual(scoped_prices[0]["currency"], "USD")
+        self.assertEqual(scoped_prices[0]["price"], "99.00")
+
 
 if __name__ == "__main__":
     unittest.main()

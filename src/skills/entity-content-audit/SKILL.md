@@ -14,9 +14,11 @@ allowed-tools:
 
 # Entity & Content Audit Skill (Sensor-Brain Protocol)
 
-| Task | Execution Command | Output Contract |
-|---|---|---|
-| **Schema.org & Entity Answerability Check** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+| Component / Task | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Offline Entity & Schema Sensor (Standard)** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Primary Offline Inspection |
+| **State-Augmented Entity Audit** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Multi-Turn Stateful Evaluation |
+| **Direct Standalone Entity Probe** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `entity_content_check.py` deterministically parses initial HTML DOM trees, extracts Schema.org JSON-LD nodes, resolves nested `@graph` hierarchies, and scores the 7-attribute Answerability Index. It reports empirical observations without generating boilerplate schema snippets.
@@ -28,25 +30,43 @@ Evaluates whether an AI search system can resolve the brand's entity identity (`
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Evaluates machine-explicit entity identity, Schema.org structured data, and commercial answerability attributes across web pages. Evaluates whether AI search engines resolve brand identity and offerings with complete pricing, availability, and entity anchors. Computes the mathematically reproducible 7-attribute Answerability Index across sampled user-facing HTML pages.
 
 ## When to use
 
-- A brand is described vaguely or misattributed by AI assistants.
-- Key products, services, or pricing tiers exist on the website but are omitted from AI search answers.
-- Assess machine-explicit JSON-LD structured data and material attribute completeness.
+- A brand is described vaguely, omitted, or misattributed in AI search assistant outputs (ChatGPT Search, Claude, Perplexity).
+- Key offerings, services, or pricing tiers exist on the website but are missing from machine-readable Schema.org JSON-LD.
+- Inspect Schema.org `@graph` completeness, Organization identity, Product attributes, and Offer availability.
+- Evaluate the 7-attribute Answerability Index on routes flagged by orchestrator telemetry as lacking structured data.
+- Validate vertical-specific schema appropriateness (suppressing ecommerce requirements on SaaS or corporate sites).
 
 ---
 
 ## Inputs
-- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
-- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
-- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
-- `--format json`: Machine-readable JSON output mode
+
+- `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
+- `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
+- `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
+
+---
+
+## Component Architecture & File Inventory
+
+Every script and reference in this skill serves a distinct diagnostic role:
+
+| Path | Type | Purpose & Agent Calling Role |
+|---|---|---|
+| `scripts/entity_content_check.py` | Sensor Script | Core measurement sensor parsing DOM trees, extracting JSON-LD `@graph` structures, evaluating Organization/Product/Offer schemas, and computing the 7-attribute Answerability Index. |
+| `references/checks.md` | Reference Catalogue | Research specifications covering checks N1-N15, entity definitions, and industry vertical schemas. |
+| `references/knowledge-base.md` | Reference KB | Comprehensive guide covering `@graph` parsing, Organization/Product extraction rules, master JSON-LD templates, and the 7-attribute Answerability Index formula. |
+| `evals/evals.json` | Verification Fixtures | Test scenarios validating Organization detection, Offer attribute completeness, and Answerability calculation. |
+
+---
 
 ## References & Documentation Library
 
@@ -55,6 +75,7 @@ Load these resources as needed during entity analysis:
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Content & Entity Checks Reference](references/checks.md): Research specifications covering N1-N15, entity definitions, and industry vertical checks.
 - [Entity Content Knowledge Base](references/knowledge-base.md): Schema.org `@graph` parsing, Organization/Product extraction rules, master JSON-LD templates, and the 7-attribute Answerability Index formula.
+
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Channel Differences:** A fact present in Schema.org JSON-LD but absent in body text is a channel difference, not universal invisibility. Never classify a page as missing entity clarity when JSON-LD contains valid Schema.org entities.

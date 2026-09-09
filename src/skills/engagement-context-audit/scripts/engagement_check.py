@@ -264,6 +264,19 @@ class EngagementDOMParser(HTMLParser):
         elif tag_lower == "button":
             self.in_button = True
             self.current_button_text = []
+        elif tag_lower == "input":
+            itype = attr_dict.get("type", "").lower()
+            if itype in ("submit", "button"):
+                val = attr_dict.get("value", "").strip() or attr_dict.get("aria-label", "").strip()
+                if val:
+                    self.cta_texts.append(val)
+                    is_comm = bool(COMMERCIAL_ACTION_PATTERNS.search(val))
+                    self.interactive_elements.append(
+                        {"tag": "input", "text": val, "href": "", "is_commercial_cta": is_comm}
+                    )
+        elif tag_lower in ("div", "span") and attr_dict.get("role", "").lower() == "button":
+            self.in_button = True
+            self.current_button_text = []
         elif tag_lower == "a":
             self.in_anchor = True
             self.current_anchor_text = []
@@ -273,7 +286,7 @@ class EngagementDOMParser(HTMLParser):
                 self.nav_links.append(self.current_href)
                 cls = attr_dict.get("class", "").lower()
                 role = attr_dict.get("role", "").lower()
-                if "btn" in cls or "button" in cls or "cta" in cls or role == "button":
+                if "btn" in cls or "button" in cls or "cta" in cls or "action" in cls or role == "button":
                     self.ctas.append(self.current_href)
                     self.current_is_cta = True
 
@@ -297,16 +310,17 @@ class EngagementDOMParser(HTMLParser):
             if ptxt:
                 self.paragraphs.append(ptxt)
             self.current_p_text = []
-        elif tag_lower == "button":
-            if self.current_button_text:
+        elif tag_lower in ("button", "div", "span"):
+            if self.in_button and self.current_button_text:
                 b_text = " ".join(self.current_button_text).strip()
                 if b_text:
                     self.cta_texts.append(b_text)
                     is_comm = bool(COMMERCIAL_ACTION_PATTERNS.search(b_text))
                     self.interactive_elements.append(
-                        {"tag": "button", "text": b_text, "href": "", "is_commercial_cta": is_comm}
+                        {"tag": tag_lower, "text": b_text, "href": "", "is_commercial_cta": is_comm}
                     )
-            self.in_button = False
+            if tag_lower == "button" or self.in_button:
+                self.in_button = False
         elif tag_lower == "a":
             if self.in_anchor and self.current_anchor_text:
                 a_text = " ".join(self.current_anchor_text).strip()

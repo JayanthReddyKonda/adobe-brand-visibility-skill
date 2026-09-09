@@ -370,6 +370,14 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
 
     ptype, pconf, ptmpl, ploc = classify_page(base_url + "/", _extract_title(html))
     clean_info = extract_clean_content(html)
+    landmarks_dict = {
+        "has_main": clean_info["has_main"],
+        "has_article": clean_info["has_article"],
+        "has_header": clean_info["has_header"],
+        "has_nav": clean_info["has_nav"],
+        "has_footer": clean_info["has_footer"],
+    }
+    landmarks_list = [k.replace("has_", "") for k, v in landmarks_dict.items() if v]
     inv["pages"].append(
         {
             "url": base_url + "/",
@@ -384,13 +392,11 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
             "word_count": clean_info["clean_word_count"] or _visible_words(html),
             "clean_text": clean_info["clean_text"],
             "snr": clean_info["snr"],
-            "semantic_landmarks": {
-                "has_main": clean_info["has_main"],
-                "has_article": clean_info["has_article"],
-                "has_header": clean_info["has_header"],
-                "has_nav": clean_info["has_nav"],
-                "has_footer": clean_info["has_footer"],
-            },
+            "text_density_ratio": clean_info["snr"],
+            "semantic_landmarks": landmarks_dict,
+            "semantic_landmarks_list": landmarks_list,
+            "images": [],
+            "canonicals": [],
             "html": html,
             "headers": headers,
         }
@@ -415,6 +421,7 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
     inv["infrastructure"]["llms_txt"] = {
         "status": ll_status,
         "present": (ll_status == 200 and bool(llms_txt)),
+        "is_spec_compliant": bool(re.search(r"^#\s+[^\n]+", llms_txt or "", re.MULTILINE)) if (ll_status == 200 and llms_txt) else False,
         "snippet": (llms_txt[:400] if ll_status == 200 and llms_txt else None),
     }
 
@@ -542,6 +549,14 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
         if p_html and is_html_response(p_headers, p_html):
             pt, pconf, ptmpl, ploc = classify_page(u, _extract_title(p_html))
             c_info = extract_clean_content(p_html)
+            c_landmarks_dict = {
+                "has_main": c_info["has_main"],
+                "has_article": c_info["has_article"],
+                "has_header": c_info["has_header"],
+                "has_nav": c_info["has_nav"],
+                "has_footer": c_info["has_footer"],
+            }
+            c_landmarks_list = [k.replace("has_", "") for k, v in c_landmarks_dict.items() if v]
             return {
                 "url": u,
                 "status": p_status,
@@ -555,13 +570,11 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
                 "word_count": c_info["clean_word_count"] or _visible_words(p_html),
                 "clean_text": c_info["clean_text"],
                 "snr": c_info["snr"],
-                "semantic_landmarks": {
-                    "has_main": c_info["has_main"],
-                    "has_article": c_info["has_article"],
-                    "has_header": c_info["has_header"],
-                    "has_nav": c_info["has_nav"],
-                    "has_footer": c_info["has_footer"],
-                },
+                "text_density_ratio": c_info["snr"],
+                "semantic_landmarks": c_landmarks_dict,
+                "semantic_landmarks_list": c_landmarks_list,
+                "images": [],
+                "canonicals": [],
                 "html": p_html,
                 "headers": p_headers,
             }

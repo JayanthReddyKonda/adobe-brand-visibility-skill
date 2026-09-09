@@ -56,6 +56,41 @@ _CREDENTIAL_TITLE_RE = re.compile(
     r"\b(?:Dr\.|PhD|MD|Professor|Prof\.|Chief Scientist|VP of|Director of|Lead Researcher|Principal Scientist)\b",
     re.IGNORECASE,
 )
+_ABBR_MAP = {
+    "e.g.": "__ABBR_EG__",
+    "i.e.": "__ABBR_IE__",
+    "Dr.": "__ABBR_DR__",
+    "Prof.": "__ABBR_PROF__",
+    "Mr.": "__ABBR_MR__",
+    "Ms.": "__ABBR_MS__",
+    "Mrs.": "__ABBR_MRS__",
+    "Ph.D.": "__ABBR_PHD__",
+    "vs.": "__ABBR_VS__",
+    "Inc.": "__ABBR_INC__",
+    "Ltd.": "__ABBR_LTD__",
+}
+
+
+def split_sentences_abbr(text: str) -> list:
+    """Split sentences protecting common abbreviations with periods."""
+    if not text:
+        return []
+    t = text
+    for abbr, token in _ABBR_MAP.items():
+        if abbr in t:
+            t = t.replace(abbr, token)
+    raw_sents = re.split(r"[.!?]+(?:\s+|$)", t)
+    sents = []
+    for s in raw_sents:
+        for abbr, token in _ABBR_MAP.items():
+            if token in s:
+                s = s.replace(token, abbr)
+        s_clean = s.strip()
+        if s_clean:
+            sents.append(s_clean)
+    return sents if sents else [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
+
+
 _COMMON_STOPWORDS = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
     "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
@@ -495,7 +530,7 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
 
     # 3. Structural Readability (max 20 pts)
     sr = 0
-    sentences = re.split(r"[.!?]+", text)
+    sentences = split_sentences_abbr(text)
     clear_sentences = sum(1 for s in sentences if 5 <= len(s.split()) <= 25)
     if sentences and (clear_sentences / max(len(sentences), 1)) >= 0.6:
         sr += 10
@@ -537,6 +572,19 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
         else 0
     )
 
+    causal_connectors = [
+        "because",
+        "due to",
+        "as a result of",
+        "which leads to",
+        "which enables",
+        "consequently",
+        "therefore",
+        "resulting in",
+    ]
+    causal_count = sum(text.lower().count(c) for c in causal_connectors)
+    causal_density = round(causal_count / max(len(sentences), 1), 2)
+
     total = min(abq + sc + sr + sd + uq, 100)
     return {
         "total": total,
@@ -548,6 +596,8 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
         "evidence_genres_score": min(evidence_score, 20),
         "attributed_quotations_score": quotes_score,
         "bluf_primacy_score": bluf_score,
+        "causal_conjunction_count": causal_count,
+        "causal_density_ratio": causal_density,
     }
 
 

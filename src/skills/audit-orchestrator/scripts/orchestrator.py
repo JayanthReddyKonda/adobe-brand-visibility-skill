@@ -12,7 +12,7 @@ import json
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
@@ -22,6 +22,28 @@ from urllib.parse import urlparse
 # ---------------------------------------------------------------------------
 RETRIEVAL_BOTS: Set[str] = {"OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai"}
 
+# Bidirectional Taxonomy Alias Mapping between Synthesis Keys and Sensor Output Keys
+TAXONOMY_ALIASES: Dict[str, str] = {
+    "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
+    "NOINDEX_EXCLUSION": "META_DIRECTIVE_CONFLICT",
+    "CANONICAL_TARGET_MISMATCH": "CANONICAL_FRAGMENTATION",
+    "CANONICAL_FRAGMENTATION": "CANONICAL_TARGET_MISMATCH",
+    "UNVERIFIED_AUTHORITY_GAP": "WEAK_IDENTITY_SIGNALS",
+    "WEAK_IDENTITY_SIGNALS": "UNVERIFIED_AUTHORITY_GAP",
+    "SUB_THRESHOLD_CITABILITY": "LOW_CITABILITY_SCORE",
+    "LOW_CITABILITY_SCORE": "SUB_THRESHOLD_CITABILITY",
+    "MISSING_BLUF_PRIMACY": "CONTEXT_PLACEMENT_DEGRADATION",
+    "CONTEXT_PLACEMENT_DEGRADATION": "MISSING_BLUF_PRIMACY",
+    "INTENT_SCENT_DILUTION": "LOW_INFORMATION_SCENT",
+    "LOW_INFORMATION_SCENT": "INTENT_SCENT_DILUTION",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY": "INTENT_TO_LANDING_MISMATCH",
+    "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
+    "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
+    "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
+    "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
+}
+
 # ---------------------------------------------------------------------------
 # Full 6-Layer Causal DAG — Keystone suppression tables
 # Source: knowledge-base.md Section 12
@@ -30,6 +52,7 @@ RETRIEVAL_BOTS: Set[str] = {"OAI-SearchBot", "Claude-SearchBot", "PerplexityBot"
 _LAYER0_CAUSE_IDS: Set[str] = {
     "AI_RETRIEVAL_BLOCKED",
     "NOINDEX_EXCLUSION",
+    "META_DIRECTIVE_CONFLICT",
     "ROBOTS_5XX_FAIL_CLOSED",
     "ROBOTS_TXT_OVERSIZED",
 }
@@ -38,6 +61,7 @@ _LAYER1_CAUSE_IDS: Set[str] = {
     "NOSNIPPET_ON_CORE_CONTENT",
     "WAF_BOT_CHALLENGE",
     "CANONICAL_FRAGMENTATION",
+    "CANONICAL_TARGET_MISMATCH",
 }
 # Findings at Layers 2-5 that are symptoms of Layer 0 (access block)
 _SUPPRESSED_BY_LAYER0: Set[str] = {
@@ -46,23 +70,34 @@ _SUPPRESSED_BY_LAYER0: Set[str] = {
     "BROKEN_AUTHORITY_ANCHOR",
     "CIRCULAR_SAMEAS_SELF_REFERENCE",
     "WEAK_IDENTITY_SIGNALS",
+    "UNVERIFIED_AUTHORITY_GAP",
     # Layer 3 — Fact Ledger
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "STALE_AUTHORITATIVE_FACT",
+    "ATTRIBUTE_INCOMPLETENESS",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — Citability
     "MISSING_IN_DEPTH_MECHANISMS",
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
+    "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     # Layer 5 — Engine selection (full suppression only when entire domain is blocked)
     "AI_CITATION_GAP",
     "AI_FACT_CONFLICT",
     "AI_REFERRAL_DISCONTINUITY",
     "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
 }
 # Findings at Layers 3-4 that are symptoms of Layer 1 (rendering gap)
 _SUPPRESSED_BY_LAYER1: Set[str] = {
@@ -70,12 +105,19 @@ _SUPPRESSED_BY_LAYER1: Set[str] = {
     "FIRST_PARTY_FACT_CONFLICT",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "ATTRIBUTE_INCOMPLETENESS",
+    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — cannot evaluate citation quality of an empty page
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
+    "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
 }
 
 # ---------------------------------------------------------------------------
@@ -267,32 +309,52 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
     local_score = 0
 
     for p in pages:
-        ptype = (p.get("page_type") or "").lower()
+        ptype = (p.get("page_type") or "")
+        if isinstance(ptype, dict):
+            ptype = str(ptype.get("value", "")).lower()
+        else:
+            ptype = str(ptype).lower()
+
         url = (p.get("url") or "").lower()
         html = (p.get("html") or "").lower()
+        text = (p.get("clean_text") or p.get("clean_markdown") or "").lower()
+        title_val = p.get("title")
+        if isinstance(title_val, list):
+            title = (title_val[0] if title_val else "").lower()
+        else:
+            title = (title_val or "").lower()
+
+        h1_val = p.get("h1")
+        if isinstance(h1_val, list):
+            h1 = (h1_val[0] if h1_val else "").lower()
+        else:
+            h1 = (h1_val or "").lower()
+
+        jld_str = json.dumps(p.get("jsonld", []) or p.get("json_ld_contents", []) or []).lower()
+        content = f"{html} {text} {title} {h1} {jld_str}"
 
         if ptype in ("product_detail", "product", "product_listing", "category") or any(
             k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog")
         ):
             ecomm_score += 2
-        if "schema.org/product" in html or "schema.org/offer" in html or '"@type": "product"' in html:
+        if "schema.org/product" in content or "schema.org/offer" in content or '"@type": "product"' in content or "add to cart" in content:
             ecomm_score += 3
 
         if ptype in ("pricing", "subscription_flow", "documentation") or any(
             k in url for k in ("/pricing", "/plans", "/docs", "/api", "/billing", "/features")
         ):
             saas_score += 2
-        if "softwareapplication" in html or '"@type": "softwareapplication"' in html:
+        if "softwareapplication" in content or '"@type": "softwareapplication"' in content or "per user" in content or "api docs" in content:
             saas_score += 3
 
-        if ptype == "article" or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
+        if ptype in ("article", "blog") or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
             publisher_score += 2
-        if "newsarticle" in html or "blogposting" in html or '"@type": "article"' in html:
+        if "newsarticle" in content or "blogposting" in content or '"@type": "article"' in content:
             publisher_score += 3
 
-        if ptype == "location" or any(k in url for k in ("/location", "/store-locator", "/contact", "/branches")):
+        if ptype in ("location", "contact") or any(k in url for k in ("/location", "/store-locator", "/contact", "/branches")):
             local_score += 1
-        if "localbusiness" in html or "postaladdress" in html:
+        if "localbusiness" in content or "postaladdress" in content or "openinghours" in content:
             local_score += 3
 
     candidates = [
@@ -370,13 +432,13 @@ def synthesize_audit_report(
     # (Source: knowledge-base.md Section 12)
     def _is_sitewide_l0(f: Dict[str, Any]) -> bool:
         c_id = f.get("cause_id") or f.get("id", "")
-        if c_id not in _LAYER0_CAUSE_IDS:
+        if c_id not in _LAYER0_CAUSE_IDS and TAXONOMY_ALIASES.get(c_id, "") not in _LAYER0_CAUSE_IDS:
             return False
         if c_id in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO"):
             return True
         ev = str(f.get("evidence", "")).lower()
         root = str(f.get("root_cause", "")).lower()
-        if c_id == "NOINDEX_EXCLUSION" and ("sitewide" in ev or "homepage" in ev or f.get("scope") in ("/", base, domain)):
+        if c_id in ("NOINDEX_EXCLUSION", "META_DIRECTIVE_CONFLICT") and ("sitewide" in ev or "homepage" in ev or f.get("scope") in ("/", base, domain)):
             return True
         if c_id == "AI_RETRIEVAL_BLOCKED":
             if "disallows all" in root or "disallow: / " in ev or "disallow: /\n" in ev:
@@ -389,22 +451,21 @@ def synthesize_audit_report(
     layer0_blocked_pages = {
         str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
         for f in all_raw_findings
-        if (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
+        if (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER0_CAUSE_IDS
     }
     layer0_blocked_pages = {p for p in layer0_blocked_pages if p}
-    rendering_gap_findings = [
-        f for f in all_raw_findings
-        if (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
-    ]
-    has_layer1_rendering_gap = bool(rendering_gap_findings)
+    has_layer1_rendering_gap = any(
+        (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER1_CAUSE_IDS
+        for f in all_raw_findings
+    )
     rendering_gap_pages = {
         str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
-        for f in rendering_gap_findings
+        for f in all_raw_findings
+        if (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER1_CAUSE_IDS
     }
     rendering_gap_pages = {p for p in rendering_gap_pages if p}
-    # Site-wide only if all pages have low word count or single homepage crawl is a shell
-    home_page_obj = next((p for p in pages if (p.get("url") or "").rstrip("/") == base.rstrip("/")), pages[0] if pages else {})
-    home_wc = home_page_obj.get("word_count", 0)
+    home_page = next((p for p in pages if p.get("page_type") == "homepage" or p.get("url") in (base, f"{base}/")), pages[0] if pages else {})
+    home_wc = home_page.get("word_count", 0)
     is_site_wide_rendering_gap = (
         has_layer1_rendering_gap and (
             (home_wc < 30 and home_wc > 0)
@@ -423,20 +484,21 @@ def synthesize_audit_report(
 
     for f in all_raw_findings:
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
+        cid_alias = TAXONOMY_ALIASES.get(cid, "")
         f_scope = str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
         if isinstance(f.get("evidence"), dict):
             f_scope = f_scope or str(f["evidence"].get("scope", "")).lower()
 
         # Full 6-Layer Causal DAG Keystone Suppression (P0-11):
         # Layer 0 access block preempts downstream symptoms if site-wide or on the specific blocked page
-        if has_sitewide_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
+        if has_sitewide_layer0_block and (cid in _SUPPRESSED_BY_LAYER0 or cid_alias in _SUPPRESSED_BY_LAYER0):
             continue
-        if f_scope and any(blk in f_scope or f_scope in blk for blk in layer0_blocked_pages) and cid in _SUPPRESSED_BY_LAYER0:
+        if f_scope and any(blk in f_scope or f_scope in blk for blk in layer0_blocked_pages) and (cid in _SUPPRESSED_BY_LAYER0 or cid_alias in _SUPPRESSED_BY_LAYER0):
             continue
         # Layer 1 rendering gap only suppresses downstream if site-wide or on the specific unrendered page
-        if is_site_wide_rendering_gap and cid in _SUPPRESSED_BY_LAYER1:
+        if is_site_wide_rendering_gap and (cid in _SUPPRESSED_BY_LAYER1 or cid_alias in _SUPPRESSED_BY_LAYER1):
             continue
-        if f_scope and any(gap in f_scope or f_scope in gap for gap in rendering_gap_pages) and cid in _SUPPRESSED_BY_LAYER1:
+        if f_scope and any(gap in f_scope or f_scope in gap for gap in rendering_gap_pages) and (cid in _SUPPRESSED_BY_LAYER1 or cid_alias in _SUPPRESSED_BY_LAYER1):
             continue
 
         # P0-10: Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
@@ -832,7 +894,8 @@ def collect_telemetry(
     inventory: Optional[str] = None,
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
-) -> tuple:
+    responses: Optional[str] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
     """Acquire inventory and execute all 6 specialist sensors, returning (inv, specialist_results)."""
     base, domain = parse_target_domain(site)
 
@@ -882,11 +945,10 @@ def collect_telemetry(
                 "sitemaps": [],
             }
 
-    # 2. Execute all 6 specialist sensors
     specialist_results: Dict[str, Dict[str, Any]] = {}
 
-    if inv.get("status") == "failed":
-        # Epistemic invariant (P0-1): Never synthesize evidence when acquisition fails.
+    # Guard: If inventory failed (network down / site blocked), emit inconclusive
+    if inv.get("status") == "failed" or not inv.get("pages"):
         for skill_id in [
             "discoverability-audit",
             "entity-content-audit",
@@ -917,7 +979,8 @@ def collect_telemetry(
 
     try:
         from fact_consistency_check import audit as audit_fact
-        specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv)
+        extra = {"responses_file": responses} if responses else None
+        specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv, extra)
     except Exception:
         specialist_results["fact-consistency-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
 
@@ -949,10 +1012,11 @@ def get_telemetry_payload(
     inventory: Optional[str] = None,
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
+    responses: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return raw empirical telemetry across all 6 sensors for AI cognitive orchestration."""
     base, domain = parse_target_domain(site)
-    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks)
+    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks, responses=responses)
 
     # Precompute Causal DAG state and suppression boundaries
     all_raw_findings: List[Dict[str, Any]] = []
@@ -961,10 +1025,12 @@ def get_telemetry_payload(
 
     has_layer0_block = any(
         (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
+        or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER0_CAUSE_IDS
         for f in all_raw_findings
     )
     has_layer1_rendering_gap = any(
         (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
+        or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER1_CAUSE_IDS
         for f in all_raw_findings
     )
 
@@ -997,54 +1063,136 @@ def get_telemetry_payload(
     geo_res = specialist_results.get("geo-content-audit", {})
     eng_res = specialist_results.get("engagement-context-audit", {})
 
+    pages_list = inv.get("pages", []) if inv else []
+    enriched_pages = []
+    for p in pages_list:
+        p_html = p.get("html") or ""
+        p_title = p.get("title")
+        if isinstance(p_title, list):
+            p_title = clean_text_string(p_title[0]) if p_title else None
+        elif p_title:
+            p_title = clean_text_string(p_title)
+        elif p_html:
+            m_t = re.search(r"<title[^>]*>([^<]+)</title>", p_html, re.I)
+            if m_t:
+                p_title = clean_text_string(m_t.group(1))
+
+        p_h1 = p.get("h1")
+        if isinstance(p_h1, list):
+            p_h1 = clean_text_string(p_h1[0]) if p_h1 else None
+        elif p_h1:
+            p_h1 = clean_text_string(p_h1)
+        elif p_html:
+            m_h = re.search(r"<h1[^>]*>([^<]+)</h1>", p_html, re.I)
+            if m_h:
+                p_h1 = clean_text_string(m_h.group(1))
+
+        has_jld = bool(p.get("json_ld_contents")) or ("application/ld+json" in p_html)
+        enriched_pages.append({
+            "url": p.get("url"),
+            "status": p.get("status_code") or p.get("status", 200),
+            "page_type": p.get("page_type"),
+            "title": p_title,
+            "h1": p_h1,
+            "word_count": p.get("word_count"),
+            "snr": round(float(p.get("snr", 0.0)), 3) if p.get("snr") is not None else None,
+            "canonical": p.get("canonical"),
+            "has_jsonld": has_jld,
+        })
+
+    sitemaps_list = inv.get("sitemaps", []) if inv else []
+    status_counts: Dict[str, int] = {}
+    for p in pages_list:
+        code_str = str(p.get("status_code") or p.get("status", 200))
+        status_counts[code_str] = status_counts.get(code_str, 0) + 1
+
+    avg_wc = round(sum(p.get("word_count", 0) or 0 for p in pages_list) / max(len(pages_list), 1), 1)
+    avg_snr = round(sum(float(p.get("snr", 0.0) or 0.0) for p in pages_list) / max(len(pages_list), 1), 3)
+    thin_pages = [p.get("url") for p in pages_list if (p.get("word_count", 0) or 0) < 50 and p.get("url")]
+
     return {
         "site": site,
         "domain": domain,
         "crawled_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "archetype": detect_business_archetype(inv),
         "inventory": {
-            "page_count": len(inv.get("pages", [])),
-            "pages": [
-                {
-                    "url": p.get("url"),
-                    "page_type": p.get("page_type"),
-                    "word_count": p.get("word_count"),
-                    "snr": p.get("snr"),
-                }
-                for p in inv.get("pages", [])
-            ],
+            "page_count": len(pages_list),
+            "pages": enriched_pages,
             "robots_summary": inv.get("robots", {}).get("summary", {}),
-            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in inv.get("pages", [])),
+            "sitemaps_count": len(sitemaps_list),
+            "sitemaps": [s if isinstance(s, str) else s.get("loc", "") for s in sitemaps_list[:10]],
+            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
         },
         "retrieval": {
             "robots_txt_found": bool(inv.get("robots")),
             "bot_matrix": disc_res.get("ai_agent_scrapeability_summary", {}).get("retrieval_bot_matrix", {}),
             "retrieval_bots_allowed": disc_res.get("coverage", {}).get("retrieval_bots_allowed"),
             "retrieval_bots_total": disc_res.get("coverage", {}).get("retrieval_bots_total"),
-            "noindex_pages": [p.get("url") for p in inv.get("pages", []) if p.get("noindex")],
+            "noindex_pages": [p.get("url") for p in pages_list if p.get("noindex")],
+            "sitemaps_found": len(sitemaps_list),
+            "status_distribution": status_counts,
         },
         "rendering": {
             "visible_words_initial_html": disc_res.get("coverage", {}).get("visible_words_initial_html"),
-            "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in inv.get("pages", [])),
+            "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in pages_list),
+            "average_word_count": avg_wc,
+            "average_snr": avg_snr,
+            "thin_content_pages": thin_pages,
         },
         "entity": {
             "jsonld_present": entity_res.get("coverage", {}).get("jsonld_present", False),
             "types_declared": entity_res.get("coverage", {}).get("types_declared", []),
             "sameas_declared": corrob_res.get("coverage", {}).get("sameas_declared", 0),
+            "organization_detected": entity_res.get("entity_snapshot", {}).get("brand_name"),
+            "org_schema_present": bool(entity_res.get("entity_snapshot", {}).get("organization")),
+            "product_schema_pages": entity_res.get("coverage", {}).get("product_schema_pages", 0),
+            "answerability_evaluations": entity_res.get("coverage", {}).get("answerability_evaluations", []),
         },
         "facts": {
             "facts_checked": fact_res.get("coverage", {}).get("facts_checked", 0),
             "fact_conflicts": fact_res.get("coverage", {}).get("fact_conflicts", 0),
+            "scoped_facts_recorded": fact_res.get("coverage", {}).get("scoped_facts_recorded", 0),
+            "conflicts_detected": [
+                f.get("title") for f in fact_res.get("findings", [])
+                if f.get("cause_id") in (
+                    "FIRST_PARTY_FACT_CONFLICT",
+                    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+                    "DISCONTINUED_VS_CURRENT_CONFLICT",
+                    "CONFLICTING_COMMERCIAL_TERMS",
+                )
+            ],
         },
         "corroboration": {
             "sameas_declared": corrob_res.get("coverage", {}).get("sameas_declared", 0),
             "sameas_resolvable": corrob_res.get("coverage", {}).get("sameas_resolvable", 0),
+            "candidate_backlinks_provided": corrob_res.get("coverage", {}).get("candidate_backlinks_provided", 0),
+            "candidate_backlinks_verified": corrob_res.get("coverage", {}).get("candidate_backlinks_verified", 0),
+            "broken_authority_anchors": [
+                f.get("title") for f in corrob_res.get("findings", [])
+                if f.get("cause_id") == "BROKEN_AUTHORITY_ANCHOR"
+            ],
         },
         "geo": {
             "average_citability_score": geo_res.get("coverage", {}).get("average_citability_score"),
+            "pages_evaluated": len(geo_res.get("page_improvement_plans", [])) or geo_res.get("coverage", {}).get("target_pages_evaluated", 0),
+            "target_citability_score": 80,
+            "evidence_genres_distribution": geo_res.get("geo_citability_summary", {}).get("evidence_genres_distribution", {}),
+            "lowest_scoring_pages": [
+                {
+                    "url": pip.get("url") or pip.get("page_url") or "",
+                    "citability_score": pip.get("citability_score", 0),
+                }
+                for pip in sorted(geo_res.get("page_improvement_plans", []), key=lambda x: x.get("citability_score", 0))[:5]
+            ],
         },
         "engagement": {
             "pages_evaluated": eng_res.get("coverage", {}).get("pages_evaluated", 0),
+            "h1_aligned_pages": eng_res.get("coverage", {}).get("h1_aligned_pages", 0),
+            "cta_above_fold_pages": eng_res.get("coverage", {}).get("cta_above_fold_pages", 0),
+            "generic_h1_pages": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") in ("LOW_INFORMATION_SCENT", "GENERIC_H1")
+            ],
         },
         "dag": {
             "has_layer0_block": has_layer0_block,
@@ -1090,9 +1238,12 @@ def audit(
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
     state_file: Optional[str] = None,
+    responses: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute end-to-end multi-skill brand AI-readiness audit."""
-    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks)
+    inv, specialist_results = collect_telemetry(
+        site, inventory=inventory, analytics=analytics, candidate_backlinks=candidate_backlinks, responses=responses
+    )
 
     # Cognitive Synthesis
     report = synthesize_audit_report(site, inv, specialist_results)
@@ -1120,6 +1271,9 @@ def main():
     parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (optional)")
     parser.add_argument("--candidate-backlinks", help="Path to candidate backlinks JSON (optional)")
     parser.add_argument("--analytics", help="Path to first-party analytics JSON (optional)")
+    parser.add_argument(
+        "--responses", "--observations", dest="responses", help="Path to observed AI assistant outputs JSON to cross-check with fact ledger (optional)"
+    )
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
     parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
@@ -1138,6 +1292,7 @@ def main():
                 inventory=args.inventory,
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
+                responses=args.responses,
             )
             formatted_output = json.dumps(payload, indent=2)
         else:
@@ -1151,6 +1306,7 @@ def main():
                 inventory=args.inventory,
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
+                responses=args.responses,
             )
             formatted_output = json.dumps(report, indent=2)
     except Exception as e:

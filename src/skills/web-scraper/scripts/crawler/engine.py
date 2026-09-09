@@ -570,6 +570,7 @@ class WebAuditEngine:
             "llms_txt": {
                 "status": 200 if self.llms_txt_content else 404,
                 "present": self.llms_txt_content is not None,
+                "is_spec_compliant": bool(re.search(r"^#\s+[^\n]+", self.llms_txt_content or "", re.MULTILINE)),
                 "snippet": (self.llms_txt_content[:400] if self.llms_txt_content else None),
             },
             "llms_full_txt": {

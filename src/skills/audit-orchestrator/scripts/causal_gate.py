@@ -18,12 +18,35 @@ upstream preconditions fail, ensuring zero false positives.
 
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+# Bidirectional Taxonomy Alias Mapping between Synthesis Keys and Sensor Output Keys
+TAXONOMY_ALIASES: Dict[str, str] = {
+    "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
+    "NOINDEX_EXCLUSION": "META_DIRECTIVE_CONFLICT",
+    "CANONICAL_TARGET_MISMATCH": "CANONICAL_FRAGMENTATION",
+    "CANONICAL_FRAGMENTATION": "CANONICAL_TARGET_MISMATCH",
+    "UNVERIFIED_AUTHORITY_GAP": "WEAK_IDENTITY_SIGNALS",
+    "WEAK_IDENTITY_SIGNALS": "UNVERIFIED_AUTHORITY_GAP",
+    "SUB_THRESHOLD_CITABILITY": "LOW_CITABILITY_SCORE",
+    "LOW_CITABILITY_SCORE": "SUB_THRESHOLD_CITABILITY",
+    "MISSING_BLUF_PRIMACY": "CONTEXT_PLACEMENT_DEGRADATION",
+    "CONTEXT_PLACEMENT_DEGRADATION": "MISSING_BLUF_PRIMACY",
+    "INTENT_SCENT_DILUTION": "LOW_INFORMATION_SCENT",
+    "LOW_INFORMATION_SCENT": "INTENT_SCENT_DILUTION",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY": "INTENT_TO_LANDING_MISMATCH",
+    "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
+    "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
+    "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
+    "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
+}
+
 # ---------------------------------------------------------------------------
 # Layer-Specific Root Cause Sets
 # ---------------------------------------------------------------------------
 LAYER0_CAUSE_IDS: Set[str] = {
     "AI_RETRIEVAL_BLOCKED",
     "NOINDEX_EXCLUSION",
+    "META_DIRECTIVE_CONFLICT",
     "ROBOTS_5XX_FAIL_CLOSED",
     "ROBOTS_TXT_OVERSIZED",
     "DNS_UNREACHABLE",
@@ -35,6 +58,7 @@ LAYER1_CAUSE_IDS: Set[str] = {
     "NOSNIPPET_ON_CORE_CONTENT",
     "WAF_BOT_CHALLENGE",
     "CANONICAL_FRAGMENTATION",
+    "CANONICAL_TARGET_MISMATCH",
     "HTML_EMPTY",
     "JS_REQUIRED",
 }
@@ -48,26 +72,35 @@ SUPPRESSED_BY_LAYER0: Set[str] = {
     "BROKEN_AUTHORITY_ANCHOR",
     "CIRCULAR_SAMEAS_SELF_REFERENCE",
     "WEAK_IDENTITY_SIGNALS",
+    "UNVERIFIED_AUTHORITY_GAP",
     # Layer 3 — Fact Ledger
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "STALE_AUTHORITATIVE_FACT",
     "ATTRIBUTE_INCOMPLETENESS",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — Citability & Text Structure
     "MISSING_IN_DEPTH_MECHANISMS",
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
     "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
     # Layer 5 — Engine Selection & Referral Continuity
     "AI_CITATION_GAP",
     "AI_FACT_CONFLICT",
     "AI_REFERRAL_DISCONTINUITY",
     "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
     "DESTINATION_NAVIGATION_FRICTION",
 }
 
@@ -78,13 +111,18 @@ SUPPRESSED_BY_LAYER1: Set[str] = {
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "ATTRIBUTE_INCOMPLETENESS",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — cannot evaluate citation quality of an empty/unhydrated page
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
     "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
 }
 
 
@@ -255,12 +293,17 @@ def apply_causal_suppression(
     Returns:
         (allowed_findings, suppressed_findings, dag_metadata)
     """
+    def _extract_cids(f: Dict[str, Any]) -> Set[str]:
+        cids = {f.get(k) for k in ("cause_id", "id", "code") if f.get(k)}
+        cids.update({TAXONOMY_ALIASES[c] for c in list(cids) if c in TAXONOMY_ALIASES})
+        return cids
+
     has_layer0_block = any(
-        (f.get("cause_id") or f.get("id", "")) in LAYER0_CAUSE_IDS
+        bool(_extract_cids(f).intersection(LAYER0_CAUSE_IDS))
         for f in all_raw_findings
     )
     has_layer1_rendering_gap = any(
-        (f.get("cause_id") or f.get("id", "")) in LAYER1_CAUSE_IDS
+        bool(_extract_cids(f).intersection(LAYER1_CAUSE_IDS))
         for f in all_raw_findings
     )
 
@@ -288,12 +331,14 @@ def apply_causal_suppression(
         suppressed_categories.update(SUPPRESSED_BY_LAYER1)
 
     for f in all_raw_findings:
-        cid = f.get("cause_id") or f.get("id") or f.get("title", "")
+        cids = _extract_cids(f)
+        if not cids and f.get("title"):
+            cids.add(f["title"])
 
-        if has_layer0_block and cid in SUPPRESSED_BY_LAYER0:
+        if has_layer0_block and bool(cids.intersection(SUPPRESSED_BY_LAYER0)):
             suppressed.append(f)
             continue
-        if has_layer1_rendering_gap and cid in SUPPRESSED_BY_LAYER1:
+        if has_layer1_rendering_gap and bool(cids.intersection(SUPPRESSED_BY_LAYER1)):
             suppressed.append(f)
             continue
 
@@ -459,13 +504,127 @@ def evaluate_causal_nodes(
         nodes["citability"] = "unknown"
 
     # Orientation & Engagement
-    eng_cov = (specialist_results or {}).get("engagement-context-audit", {}).get("coverage", {})
+    eng_res = (specialist_results or {}).get("engagement-context-audit", {})
+    eng_cov = eng_res.get("coverage", {})
     pages_eval = eng_cov.get("pages_evaluated", 0)
     if pages_eval > 0:
-        nodes["on_site_orientation"] = "confirmed_pass"
-        nodes["engagement_handoff"] = "confirmed_pass"
+        eng_findings = eng_res.get("findings", [])
+        finding_ids = set()
+        for f in eng_findings:
+            if isinstance(f, dict):
+                for key in ("cause_id", "id"):
+                    cid = f.get(key)
+                    if cid and isinstance(cid, str):
+                        finding_ids.add(cid)
+                        if cid in TAXONOMY_ALIASES:
+                            finding_ids.add(TAXONOMY_ALIASES[cid])
+            elif isinstance(f, str):
+                finding_ids.add(f)
+                if f in TAXONOMY_ALIASES:
+                    finding_ids.add(TAXONOMY_ALIASES[f])
+
+        orientation_fail_triggers = {
+            "LOW_INFORMATION_SCENT",
+            "GENERIC_H1",
+            "INTENT_SCENT_DILUTION",
+            "HEADING_HIERARCHY_VACUUM",
+        }
+        handoff_fail_triggers = {
+            "INTENT_TO_LANDING_MISMATCH",
+            "CTA_REACHABILITY_FRICTION",
+            "VIEWPORT_ANSWER_ABSENCE",
+            "AGENT_INTERACTION_BARRIER",
+            "AI_REFERRAL_DISCONTINUITY",
+            "COMMERCIAL_HANDOFF_DISCONTINUITY",
+            "ABOVE_FOLD_ACTION_DELAY",
+        }
+
+        if finding_ids.intersection(orientation_fail_triggers):
+            nodes["on_site_orientation"] = "confirmed_fail"
+        else:
+            nodes["on_site_orientation"] = "confirmed_pass"
+
+        if finding_ids.intersection(handoff_fail_triggers):
+            nodes["engagement_handoff"] = "confirmed_fail"
+        else:
+            nodes["engagement_handoff"] = "confirmed_pass"
     else:
         nodes["on_site_orientation"] = "unknown"
         nodes["engagement_handoff"] = "unknown"
 
     return nodes
+
+
+def main():
+    import argparse
+    import json
+    import os
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description="Deterministic Causal DAG & Epistemic Falsification Engine CLI."
+    )
+    parser.add_argument("--telemetry", help="Path to telemetry JSON file")
+    parser.add_argument("--findings", help="Path to findings JSON file (applies causal suppression)")
+    parser.add_argument("--inventory", help="Path to site inventory JSON file")
+    parser.add_argument("--output", help="Path to write output JSON (optional, defaults to stdout)")
+    args = parser.parse_args()
+
+    inv = {}
+    specialist_results = {}
+    findings_list = []
+
+    if args.telemetry:
+        if not os.path.exists(args.telemetry):
+            sys.stderr.write(f"Error: Telemetry file {args.telemetry} not found\n")
+            sys.exit(1)
+        with open(args.telemetry, "r", encoding="utf-8") as f:
+            t_data = json.load(f)
+        inv = t_data.get("inventory", {})
+        specialist_results = t_data.get("sensor_telemetry", {})
+        for res in specialist_results.values():
+            if isinstance(res, dict):
+                findings_list.extend(res.get("findings", []))
+
+    if args.inventory and os.path.exists(args.inventory):
+        with open(args.inventory, "r", encoding="utf-8") as f:
+            inv = json.load(f)
+
+    if args.findings:
+        if not os.path.exists(args.findings):
+            sys.stderr.write(f"Error: Findings file {args.findings} not found\n")
+            sys.exit(1)
+        with open(args.findings, "r", encoding="utf-8") as f:
+            f_data = json.load(f)
+        findings_list = f_data.get("findings", f_data) if isinstance(f_data, dict) else f_data
+
+    if not args.telemetry and not args.findings and not args.inventory:
+        parser.print_help()
+        return
+
+    epistemic_state = evaluate_epistemic_state(inv, specialist_results)
+    causal_nodes = evaluate_causal_nodes(inv, specialist_results)
+    surviving_findings, suppressed = apply_causal_suppression(findings_list)
+
+    result = {
+        "epistemic_state": epistemic_state,
+        "causal_nodes": causal_nodes,
+        "total_findings_evaluated": len(findings_list),
+        "surviving_findings_count": len(surviving_findings),
+        "suppressed_findings_count": len(suppressed),
+        "suppressed_findings": suppressed,
+        "surviving_findings": surviving_findings,
+    }
+
+    formatted = json.dumps(result, indent=2)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(formatted)
+            f.write("\n")
+        print(f"Causal analysis written to {args.output}")
+    else:
+        print(formatted)
+
+
+if __name__ == "__main__":
+    main()

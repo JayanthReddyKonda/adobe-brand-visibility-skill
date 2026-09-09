@@ -14,9 +14,12 @@ allowed-tools:
 
 # Corroboration & Authority Audit Skill (Sensor-Brain Protocol)
 
-| Task | Execution Command | Output Contract |
-|---|---|---|
-| **External sameAs Authority Prober** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+| Component / Task | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Offline Authority Prober (Standard)** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json` | `{status, evidence_classes, findings, recommendations}` | Primary Offline Inspection |
+| **Candidate Inbound Backlink Verification** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks backlinks.json --format json` | `{status, evidence_classes, findings, recommendations}` | Targeted Backlink Audit |
+| **State-Augmented Authority Audit** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, evidence_classes, findings, recommendations}` | Multi-Turn Stateful Evaluation |
+| **Direct Standalone Authority Probe** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json` | `{status, evidence_classes, findings, recommendations}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Deterministic Read-Only Sensor:** `corroboration_check.py` parses declared `sameAs` links from `inv.json` offline, and only probes external authority links (Wikidata, LinkedIn) and candidate backlinks under strict socket-level SSRF sandboxing (`safe_fetch.py`). You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) on the audited target.
@@ -27,26 +30,44 @@ Evaluates external entity authority by verifying that declared identity links (`
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Verifies external identity-link authority, knowledge graph nodes, and entity corroboration. Probes declared external identity anchors (`sameAs`) under zero-trust SSRF protection to confirm third-party identity substantiation across Wikidata, Crunchbase, Wikipedia, and official corporate channels. Evaluates candidate inbound backlinks to confirm backlink integrity without web-wide crawling assumptions.
 
 ## When to use
 
-- Diagnose why an AI model lacks confidence in an entity's existence or identity.
-- Verify that third-party authority links declared by the brand are live, canonical, and functional.
-- Identify broken authority anchors that degrade AI entity resolution trust.
+- AI models lack confidence in a brand's existence, identity, or official knowledge graph entity.
+- Verify that third-party authority links declared by the brand are live, canonical, and functional (no HTTP 404, 403, 500, or redirect loops).
+- Identify broken authority anchors that degrade AI entity resolution and answer engine trust.
+- Ingest and verify candidate inbound backlink lists (`--candidate-backlinks`) under bounded SSRF security to check anchor text and `rel` attributes.
+- Deep-dive into external corroboration channels flagged by orchestrator telemetry as broken or missing.
 
 ---
 
 ## Inputs
-- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
-- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
-- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
-- `--candidate-backlinks <path_or_json>`: (Optional) File path or JSON string containing candidate inbound backlink URLs for bounded verification
-- `--format json`: Machine-readable JSON output mode
+
+- `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
+- `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
+- `--candidate-backlinks <path_or_json>` (string, optional): Path to JSON/CSV file or raw JSON string of candidate inbound backlink URLs to verify.
+- `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
+
+---
+
+## Component Architecture & File Inventory
+
+Every script and reference in this skill serves a distinct diagnostic role:
+
+| Path | Type | Purpose & Agent Calling Role |
+|---|---|---|
+| `scripts/corroboration_check.py` | Sensor Script | Core measurement sensor extracting `sameAs` links, probing external authority nodes, and verifying candidate inbound backlinks under zero-trust SSRF protection. |
+| `references/checks.md` | Reference Catalogue | Research specifications covering declared profile checks, identity anchors, and external corroboration. |
+| `references/knowledge-base.md` | Reference KB | Comprehensive technical guide covering sameAs probing bounds, backlink verification rules, and external entity channel correlation matrices. |
+| `evals/evals.json` | Verification Fixtures | Test scenarios validating broken authority anchors, redirect loops, and candidate backlink classifications. |
+
+---
 
 ## References & Documentation Library
 
@@ -55,6 +76,7 @@ Load these resources as needed during authority corroboration checks:
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Authority & Corroboration Checks Reference](references/checks.md): Research specifications covering declared profile checks, identity anchors, and external corroboration.
 - [Corroboration Authority Knowledge Base](references/knowledge-base.md): External sameAs probing protocols, bounded candidate backlink verification, and external entity authority channel correlation matrix (Wikidata, YouTube, LinkedIn).
+
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Candidate Identity Links:** A declared `sameAs` link is an identity candidate, not an automatic guarantee of identity. Require reciprocal domain confirmation or explicit identifier agreement.

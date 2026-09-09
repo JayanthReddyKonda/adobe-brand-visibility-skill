@@ -175,62 +175,74 @@ def validate_report_dict(report, schema_path=None):
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
-        print("Usage: python3 validate_report.py [report.json | - < report.json]")
-        sys.exit(0)
-    if len(sys.argv) > 1 and sys.argv[1] != "-":
-        filepath = sys.argv[1]
-        if not os.path.exists(filepath):
-            print(f"File not found: {filepath}", file=sys.stderr)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Draft-07 JSON Schema validator for brand AI audit reports and telemetry."
+    )
+    parser.add_argument(
+        "input_file",
+        nargs="?",
+        default="-",
+        help="Path to report/payload JSON file or '-' for stdin (default: '-')",
+    )
+    parser.add_argument(
+        "--schema",
+        help="Path to Draft-07 schema JSON file (defaults to references/report-schema.json)",
+    )
+    args = parser.parse_args()
+
+    if args.input_file != "-":
+        if not os.path.exists(args.input_file):
+            print(f"File not found: {args.input_file}", file=sys.stderr)
             sys.exit(2)
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(args.input_file, "r", encoding="utf-8") as f:
             data = f.read()
     else:
         if sys.stdin.isatty():
-            print(
-                "Usage: python3 validate_report.py [report.json | - < report.json]",
-                file=sys.stderr,
-            )
+            parser.print_help(sys.stderr)
             sys.exit(2)
         data = sys.stdin.read()
 
     if not data.strip():
-        print(
-            "Usage: python3 validate_report.py [report.json | - < report.json]",
-            file=sys.stderr,
-        )
+        print("Error: Empty JSON input received.", file=sys.stderr)
         sys.exit(2)
 
     def _reject_constant(c):
         raise ValueError(f"Disallowed JSON constant '{c}' (NaN and Infinity are not valid JSON)")
 
     try:
-        report = json.loads(data, parse_constant=_reject_constant)
+        instance = json.loads(data, parse_constant=_reject_constant)
     except (json.JSONDecodeError, ValueError) as e:
         print(f"Invalid JSON input: {e}", file=sys.stderr)
         sys.exit(2)
 
-    schema_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
-    )
+    if args.schema:
+        schema_path = os.path.abspath(args.schema)
+    else:
+        schema_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
+        )
+
     if not os.path.exists(schema_path):
         print(f"Schema not found at {schema_path}", file=sys.stderr)
         sys.exit(2)
 
-    with open(schema_path, "r") as f:
+    with open(schema_path, "r", encoding="utf-8") as f:
         schema = json.load(f)
 
-    err = validate_type(report, schema)
+    err = validate_type(instance, schema)
     if err:
         print(f"Schema validation failed: {err}", file=sys.stderr)
         sys.exit(2)
 
-    summary_errs = verify_summary_counts(report)
-    if summary_errs:
-        print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
-        sys.exit(2)
+    if schema_path.endswith("report-schema.json") and isinstance(instance, dict) and "summary" in instance:
+        summary_errs = verify_summary_counts(instance)
+        if summary_errs:
+            print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
+            sys.exit(2)
 
-    print(json.dumps(report, indent=2))
+    print(json.dumps(instance, indent=2))
     sys.exit(0)
 
 

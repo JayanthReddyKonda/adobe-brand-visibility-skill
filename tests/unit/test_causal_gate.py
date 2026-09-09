@@ -193,6 +193,112 @@ class TestCausalGate(unittest.TestCase):
         self.assertEqual(nodes["on_site_orientation"], "confirmed_pass")
         self.assertEqual(nodes["engagement_handoff"], "confirmed_pass")
 
+    def test_evaluate_causal_nodes_orientation_and_handoff_failures(self):
+        """Verify on_site_orientation and engagement_handoff set to confirmed_fail when defect findings present."""
+        inv = {
+            "pages": [{"url": "https://example.com/", "status": 200, "word_count": 500, "snr": 0.5}],
+        }
+        # 1. Orientation failure via LOW_INFORMATION_SCENT
+        spec_orientation_fail = {
+            "engagement-context-audit": {
+                "coverage": {"pages_evaluated": 1},
+                "findings": [{"cause_id": "LOW_INFORMATION_SCENT", "title": "Low Scent"}],
+            }
+        }
+        nodes1 = evaluate_causal_nodes(inv, spec_orientation_fail)
+        self.assertEqual(nodes1["on_site_orientation"], "confirmed_fail")
+        self.assertEqual(nodes1["engagement_handoff"], "confirmed_pass")
+
+        # 2. Handoff failure via CTA_REACHABILITY_FRICTION
+        spec_handoff_fail = {
+            "engagement-context-audit": {
+                "coverage": {"pages_evaluated": 1},
+                "findings": [{"cause_id": "CTA_REACHABILITY_FRICTION", "title": "Hidden CTA"}],
+            }
+        }
+        nodes2 = evaluate_causal_nodes(inv, spec_handoff_fail)
+        self.assertEqual(nodes2["on_site_orientation"], "confirmed_pass")
+        self.assertEqual(nodes2["engagement_handoff"], "confirmed_fail")
+
+        # 3. Both failures via GENERIC_H1 and INTENT_TO_LANDING_MISMATCH
+        spec_both_fail = {
+            "engagement-context-audit": {
+                "coverage": {"pages_evaluated": 2},
+                "findings": [
+                    {"cause_id": "GENERIC_H1", "title": "Generic H1"},
+                    {"cause_id": "INTENT_TO_LANDING_MISMATCH", "title": "Intent Mismatch"},
+                ],
+            }
+        }
+        nodes3 = evaluate_causal_nodes(inv, spec_both_fail)
+        self.assertEqual(nodes3["on_site_orientation"], "confirmed_fail")
+        self.assertEqual(nodes3["engagement_handoff"], "confirmed_fail")
+
+    def test_taxonomy_alias_synchronization_in_suppression(self):
+        """Verify causal suppression recognizes both canonical and alias names."""
+        raw_findings = [
+            {"id": "F-001", "cause_id": "META_DIRECTIVE_CONFLICT", "severity": "critical", "title": "Meta Directive Conflict"},
+            {"id": "F-002", "cause_id": "UNVERIFIED_AUTHORITY_GAP", "severity": "high", "title": "No sameAs"},
+            {"id": "F-003", "cause_id": "SUB_THRESHOLD_CITABILITY", "severity": "medium", "title": "Sub threshold citability"},
+            {"id": "F-004", "cause_id": "TEMPORAL_DRIFT_DETECTED", "severity": "low", "title": "Stale copyright"},
+            {"id": "F-005", "cause_id": "COMMERCIAL_HANDOFF_DISCONTINUITY", "severity": "medium", "title": "Handoff gap"},
+            {"id": "F-006", "cause_id": "ABOVE_FOLD_ACTION_DELAY", "severity": "medium", "title": "Action delay"},
+        ]
+
+        allowed, suppressed, dag_metadata = apply_causal_suppression(raw_findings)
+        self.assertTrue(dag_metadata["has_layer0_block"])
+        self.assertEqual(len(allowed), 1)
+        self.assertEqual(allowed[0]["cause_id"], "META_DIRECTIVE_CONFLICT")
+        self.assertEqual(len(suppressed), 5)
+        suppressed_cids = {f["cause_id"] for f in suppressed}
+        self.assertIn("UNVERIFIED_AUTHORITY_GAP", suppressed_cids)
+        self.assertIn("SUB_THRESHOLD_CITABILITY", suppressed_cids)
+        self.assertIn("TEMPORAL_DRIFT_DETECTED", suppressed_cids)
+        self.assertIn("COMMERCIAL_HANDOFF_DISCONTINUITY", suppressed_cids)
+        self.assertIn("ABOVE_FOLD_ACTION_DELAY", suppressed_cids)
+
+    def test_bidirectional_alias_suppression(self):
+        """Verify canonical blockers suppress alias symptoms and alias blockers suppress canonical symptoms."""
+        # 1. Canonical blocker (NOINDEX_EXCLUSION) suppressing alias symptoms
+        findings1 = [
+            {"id": "NOINDEX_EXCLUSION", "severity": "critical"},
+            {"id": "WEAK_IDENTITY_SIGNALS", "severity": "high"},
+            {"id": "LOW_CITABILITY_SCORE", "severity": "medium"},
+            {"id": "CONTENT_RECENCY_DEFICIT", "severity": "low"},
+        ]
+        allowed1, suppressed1, _ = apply_causal_suppression(findings1)
+        self.assertEqual(len(allowed1), 1)
+        self.assertEqual(len(suppressed1), 3)
+
+        # 2. Alias blocker (META_DIRECTIVE_CONFLICT) suppressing canonical symptoms
+        findings2 = [
+            {"cause_id": "META_DIRECTIVE_CONFLICT", "severity": "critical"},
+            {"cause_id": "UNVERIFIED_AUTHORITY_GAP", "severity": "high"},
+            {"cause_id": "SUB_THRESHOLD_CITABILITY", "severity": "medium"},
+            {"cause_id": "TEMPORAL_DRIFT_DETECTED", "severity": "low"},
+        ]
+        allowed2, suppressed2, _ = apply_causal_suppression(findings2)
+        self.assertEqual(len(allowed2), 1)
+        self.assertEqual(len(suppressed2), 3)
+
+    def test_orientation_and_handoff_with_id_field(self):
+        """Verify orientation and handoff fail triggers work when trigger code is stored in 'id' field instead of 'cause_id'."""
+        inv = {"pages": [{"url": "https://example.com/", "status": 200, "word_count": 500, "snr": 0.5}]}
+        spec = {
+            "engagement-context-audit": {
+                "coverage": {"pages_evaluated": 1},
+                "findings": [
+                    {"id": "LOW_INFORMATION_SCENT", "title": "Low Scent"},
+                    {"id": "VIEWPORT_ANSWER_ABSENCE", "title": "No answer in viewport"},
+                ],
+            }
+        }
+        nodes = evaluate_causal_nodes(inv, spec)
+        self.assertEqual(nodes["on_site_orientation"], "confirmed_fail")
+        self.assertEqual(nodes["engagement_handoff"], "confirmed_fail")
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

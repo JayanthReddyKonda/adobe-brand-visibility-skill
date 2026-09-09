@@ -14,12 +14,15 @@ allowed-tools:
 
 # Fact Consistency & Lifecycle Audit Skill (Sensor-Brain Protocol)
 
-| Task | Execution Command | Output Contract |
-|---|---|---|
-| **Cross-Page Factual Consistency Ledger** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory <inv> --state <state>` | `status`, `findings`, `recommendations` |
+| Component / Task | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Offline Fact Ledger Sensor (Standard)** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, coverage}` | Primary Offline Inspection |
+| **Observed Assistant Hallucination Cross-Check** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --responses assistant_outputs.json --format json` | `{status, findings, recommendations, coverage}` | AI Search Hallucination Verification |
+| **State-Augmented Fact Audit** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, coverage}` | Multi-Turn Stateful Evaluation |
+| **Direct Standalone Fact Probe** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json` | `{status, findings, recommendations, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `fact_consistency_check.py` constructs a normalized first-party fact ledger across all crawled routes, isolating strictly scoped commercial and operational attributes (prices, specs, contact info). It does not guess which conflicting fact is true.
+> - **Deterministic Read-Only Sensor:** `fact_consistency_check.py` constructs a normalized first-party fact ledger across all crawled routes, isolating strictly scoped commercial and operational attributes (prices, specs, contact info). When provided with observed AI assistant outputs (`--responses`), it detects discrepancies between first-party truth and AI hallucinated answers. It does not guess which conflicting first-party fact is true.
 > - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected contradictions, applies epistemic falsification (ruling out billing cycles or feature tiering), and synthesizes a single-source-of-truth factual reconciliation runbook.
 
@@ -28,25 +31,44 @@ Constructs a multi-attribute first-party fact ledger across sampled website page
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Constructs a multi-attribute first-party fact ledger across website pages to detect cross-page factual contradictions, pricing discrepancies, outdated contact information, and legacy content drift. Isolates strictly scoped commercial attributes (entity, variant, currency, billing cycle) and optionally cross-references target facts against observed generative AI assistant outputs to identify citation hallucination risks.
 
 ## When to use
 
-- Verify that prices, specifications, and commercial terms are consistent across all brand pages.
-- Detect when obsolete or discontinued products are erroneously advertised as active or in-stock.
-- Identify legacy brand slogans or multi-year outdated copyright notices across secondary routes.
+- AI search assistants (ChatGPT Search, Claude, Perplexity) hallucinate incorrect prices, features, or discontinued status for brand offerings.
+- Verify that prices, specifications, and commercial terms are consistent across all first-party brand pages (e.g. `/pricing` vs `/features` vs product landing pages).
+- Detect when obsolete or discontinued products are erroneously advertised as active or in-stock on secondary routes.
+- Identify legacy brand slogans, obsolete contact details, or multi-year outdated copyright notices across unmaintained templates.
+- Cross-check observed AI assistant responses (`--responses`) against first-party site inventory to isolate factual hallucinations.
 
 ---
 
 ## Inputs
-- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
-- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
-- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
-- `--format json`: Machine-readable JSON output mode
+
+- `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
+- `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
+- `--responses <path>` / `--observations <path>` (string, optional): Path to JSON file of observed AI assistant outputs to cross-check against site facts.
+- `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
+
+---
+
+## Component Architecture & File Inventory
+
+Every script and reference in this skill serves a distinct diagnostic role:
+
+| Path | Type | Purpose & Agent Calling Role |
+|---|---|---|
+| `scripts/fact_consistency_check.py` | Sensor Script | Core measurement sensor extracting scoped facts, matching price intervals, isolating lifecycle conflicts, and cross-checking AI assistant responses. |
+| `references/checks.md` | Reference Catalogue | Research specifications covering claim verification, date staleness, price consistency, and lifecycle contradictions. |
+| `references/knowledge-base.md` | Reference KB | Comprehensive guide covering scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction. |
+| `evals/evals.json` | Verification Fixtures | Test scenarios validating scoped price conflicts, discontinued vs current lifecycle detection, and copyright drift. |
+
+---
 
 ## References & Documentation Library
 
@@ -55,6 +77,7 @@ Load these resources as needed during factual consistency checks:
 ### Core Knowledge Base & Check Catalogue (Load First)
 - [Fact & Consistency Checks Reference](references/checks.md): Research specifications covering claim verification, date staleness, and cross-page consistency.
 - [Fact Consistency Knowledge Base](references/knowledge-base.md): Scoped entity extraction rules, price interval matching, product lifecycle drift detection, and first-party ledger construction.
+
 
 ### Mandatory Domain Invariants & Evidence Rules
 1. **Two Incompatible Assertions Rule:** Every contradiction finding MUST cite two exact incompatible assertions from collected inventory, identifying both artifacts (`artifact`), locators (`locator`), and verbatim quotes (`quote`). Never hypothesize a conflict without dual proof.

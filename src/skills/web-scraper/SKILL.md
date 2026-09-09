@@ -14,37 +14,39 @@ allowed-tools:
 
 # Web Scraper Skill (Sensor-Brain Acquisition Protocol)
 
-| Task | Execution Command | Output Contract |
-|---|---|---|
-| **Standard Crawl (JSON inventory)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical `inv.json` site inventory |
-| **Fast Snapshot (5 pages)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 5 --timeout 10.0 --output inv.json` | Bounded `inv.json` inventory |
-| **Deep Traversal (depth 2)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 20 --max-depth 2 --output inv.json` | Deep `inv.json` inventory |
+| Component / Task | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Canonical Single-Pass Acquisition** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Canonical `inv.json` site inventory | Orchestrator Pipeline Entrypoint |
+| **Autonomous Crawler (Standard Crawl)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical `inv.json` site inventory | Standalone Acquisition |
+| **Fast Snapshot Inspection (5 pages)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 5 --timeout 10.0 --output inv.json` | Bounded `inv.json` snapshot | Quick Health Check |
+| **Deep Link Traversal (depth 3)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 25 --max-depth 3 --output inv.json` | Deep `inv.json` inventory | Catalog & Documentation Traversal |
+| **Strict Compliance Acquisition** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --strict-robots --output inv.json` | Bounded `inv.json` (aborts if entrypoint disallowed) | Policy Compliance Audit |
+| **Dual Serialization (JSON + Markdown)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --format both --output inv.json` | JSON inventory + extracted `.md` pages | Full Text Extraction |
+| **Zero-Trust URL & SSRF Probe** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com --check-only` | Status code, latency, and SSRF safety verdict | Direct URL & Network Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Acquisition:** `web-scraper` executes bounded, single-pass website acquisition (`run_scraper.py` emitting `inv.json`). It enforces pre-connect zero-trust SSRF validation, parses RFC 9309 crawler matrices across 16 AI bots, traverses XML sitemaps, and extracts Trafilatura-grade clean Markdown. It **must not** recommend fixes, assign severities, or call LLMs.
-> - **Cognitive Orchestrator:** All downstream diagnostic sensors and the Master Orchestrator run offline against `inv.json`, eliminating redundant crawls.
+> - **Deterministic Read-Only Acquisition:** `web-scraper` executes bounded, single-pass website acquisition (`run_scraper.py` and `acquire_inventory.py` emitting `inv.json`). It enforces pre-connect zero-trust SSRF validation, parses RFC 9309 crawler matrices across 16 AI bots, traverses XML sitemaps, and extracts Trafilatura-grade clean Markdown. It **must not** recommend fixes, assign severities, or call LLMs.
+> - **Cognitive Orchestrator:** All downstream diagnostic sensors and the Master Orchestrator run offline against `inv.json`, eliminating redundant crawls and ensuring single-pass efficiency.
 
 > [!CAUTION]
 > **ZERO DIRECT AGENT URL READING MANDATE:**
 > You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to inspect websites or robots.txt.
-> All acquisition must flow through `python3 skills/web-scraper/scripts/run_scraper.py` (or `acquire_inventory.py`) to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
-
-Performs bounded, SSRF-safe, single-pass website acquisition. Emits a canonical `inv.json` site inventory consumed by all 6 downstream specialist diagnostic sensors. Never repeats network calls.
+> All acquisition must flow through `python3 skills/web-scraper/scripts/acquire_inventory.py` or `run_scraper.py` to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
 
 ---
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Performs bounded, zero-trust SSRF-safe, single-pass website acquisition and content extraction. Emits a canonical `inv.json` site inventory consumed offline by all 6 downstream specialist diagnostic sensors. Enforces RFC 9309 crawler matrices across 16 AI retrieval and training bots, parses nested XML sitemaps, flattens Schema.org JSON-LD graphs, and extracts Trafilatura-grade clean Markdown with SNR scoring.
 
 ## When to use
 
-- Crawl a target website to extract page representations, HTML, clean Markdown, and metadata.
+- Acquire the authoritative `inv.json` site inventory required for the full multi-skill brand audit.
 - Audit AI retrieval permissions across 16 crawler bots (`OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot`, `Google-Extended`, etc.) under RFC 9309 rules.
 - Traverse XML sitemaps and nested sitemap indexes with recursive fallbacks.
-- Extract Trafilatura-grade clean readable text without navigation boilerplate, headers, or footers.
+- Extract Trafilatura-grade clean readable text without navigation boilerplate, headers, or footers for GEO analysis.
 - Flatten Schema.org `@graph` JSON-LD structures and validate Answerability attributes.
-- Acquire a unified, authoritative `inv.json` site inventory for downstream audit skills without repeating network calls.
+- Execute targeted re-crawls with custom parameters (`--max-pages`, `--max-depth`, `--strict-robots`) when evaluating large enterprise catalogs or specific subpaths.
 
 ---
 
@@ -55,7 +57,35 @@ This skill executes diagnostic checks for its specific domain.
 - `--max-pages <int>` (integer, optional, default: `15`): Maximum pages to acquire within the target origin.
 - `--timeout <float>` (float, optional, default: `30.0`): Monotonic deadline budget in seconds.
 - `--max-depth <int>` (integer, optional, default: `3`): Maximum link traversal hops from homepage.
-- `--format <json|markdown|both>` (enum, optional, default: `json`): Output format.
+- `--format <json|markdown|both>` (enum, optional, default: `json`): Output serialization format.
+- `--strict-robots` (flag, optional): Abort crawling immediately if `robots.txt` disallows the entrypoint.
+- `--verbose` (flag, optional): Emit real-time crawl diagnostic traces to stderr.
+
+---
+
+## Component Architecture & File Inventory
+
+Every script and reference in this skill serves a distinct, critical role:
+
+| Path | Type | Purpose & Agent Calling Role |
+|---|---|---|
+| `scripts/acquire_inventory.py` | Standalone Script | Canonical entrypoint used by `audit-orchestrator` to acquire `inv.json` with infrastructure stats. |
+| `scripts/run_scraper.py` | CLI Tool | Autonomous crawler with custom arguments (`--max-pages`, `--max-depth`, `--strict-robots`, `--format`). |
+| `scripts/safe_fetch.py` | Network Core | Shared zero-trust SSRF network engine enforcing DNS pre-resolution, private IP blocking, streaming chunk caps, and redirect re-validation. |
+| `scripts/crawler/engine.py` | Internal Module | Streaming single-pass crawl orchestrator managing the link frontier, rate limiting, and response preservation. |
+| `scripts/crawler/robots.py` | Internal Module | RFC 9309 parser evaluating 16 AI bots, octet-level UTF-8 matching, and terminal wildcards. |
+| `scripts/crawler/sitemap.py` | Internal Module | XML sitemap parser with safe subset DTD rejection (XXE defense) and recursive index traversal. |
+| `scripts/crawler/frontier.py` | Internal Module | Priority queue frontier scoring high-value commercial routes (`/pricing`, `/products`, `/about`). |
+| `scripts/crawler/parser.py` | Internal Module | HTML DOM parser computing Signal-to-Noise Ratio (SNR) and extracting Trafilatura-grade clean Markdown. |
+| `scripts/crawler/jsonld.py` | Internal Module | Schema.org extractor flattening `@graph` hierarchies and normalizing entity objects. |
+| `scripts/crawler/evidence.py` | Internal Module | Response payload archiving and SHA-256 evidence hashing for reproducible audit trails. |
+| `scripts/crawler/classify.py` | Internal Module | Page archetype classifier (homepage, product, pricing, article, docs, legal). |
+| `scripts/crawler/canonical.py` | Internal Module | Canonical URL resolution and cross-origin traversal prevention. |
+| `scripts/crawler/budget.py` | Internal Module | Monotonic crawl deadline and byte limit enforcement. |
+| `scripts/crawler/policy.py` | Internal Module | Safe query string filtering and mutating route sanitization. |
+| `scripts/crawler/models.py` | Dataclasses | Data schemas for `Page`, `Inventory`, `RobotsDirective`, and `CrawledResource`. |
+| `references/bot-registry.json` | Reference JSON | Authoritative catalogue of 16 AI retrieval and training bots, user agents, provider roles, and functions. |
+| `references/knowledge-base.md` | Reference KB | Comprehensive technical specification covering SSRF blocked subnets, RFC 9309 rules, and SNR math. |
 
 ---
 
@@ -63,6 +93,7 @@ This skill executes diagnostic checks for its specific domain.
 
 - [Web Scraper Knowledge Base](references/knowledge-base.md): Complete architecture reference, 16 AI retrieval crawler matrix, RFC 9309 longest-match precedence rules, Trafilatura-grade SNR extraction heuristics, and SSRF blocked network table.
 - [AI Bot Registry](references/bot-registry.json): Authoritative registry of AI crawler user agents, provider roles, and crawler capabilities.
+
 
 ---
 

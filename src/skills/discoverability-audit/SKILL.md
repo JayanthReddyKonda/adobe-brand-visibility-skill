@@ -14,12 +14,14 @@ allowed-tools:
 
 # Discoverability Audit Skill (Sensor-Brain Protocol)
 
-| Task | Execution Command | Output Contract |
-|---|---|---|
-| **Crawlability & AI Indexation Check** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory <inv>` | `status`, `findings`, `recommendations` |
+| Component / Task | Execution Command | Output Contract | Role / Mode |
+|---|---|---|---|
+| **Offline Discoverability Sensor (Standard)** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, coverage}` | Primary Offline Inspection |
+| **State-Augmented Discoverability Audit** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, coverage}` | Multi-Turn Stateful Evaluation |
+| **Direct Standalone Discoverability Probe** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json` | `{status, findings, recommendations, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `discoverability_check.py` is a pure measurement sensor. It inspects RFC 9309 crawler matrices, HTTP response codes, meta directives, canonical chains, and raw HTML extractability. It outputs observed empirical evidence without canned recommendation prose.
+> - **Deterministic Read-Only Sensor:** `discoverability_check.py` is a pure measurement sensor. It inspects RFC 9309 crawler matrices across 16 AI retrieval and training bots, HTTP response codes, meta directives (`noindex`, `nofollow`, `noarchive`), canonical chains, XML sitemaps, and raw HTML extractability. It outputs observed empirical evidence without canned recommendation prose.
 > - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
 > - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests this sensor's output, applies Layer 0 causal gating (suppressing downstream schema/GEO complaints if retrieval is blocked), simulates query strategies, and synthesizes bespoke dual-track fixes.
 
@@ -28,26 +30,43 @@ Evaluates the accessibility and indexing pipeline of a website for AI retrieval 
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`, `cat`, `type`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
-This skill executes diagnostic checks for its specific domain.
+Evaluates the technical discoverability and machine-readability pipeline of a brand website for AI retrieval engines. Deterministically audits 37 research checks across RFC 9309 crawler access rules, HTTP status barriers, meta robots directives, canonical fragmentation, XML sitemap indexation, and raw HTML extractability thresholds (< 25 words with mounting div containers).
 
 ## When to use
 
-- Diagnose why AI search assistants cannot retrieve or cite a site's pages.
-- Verify crawler access rules in `robots.txt`, distinguishing real-time retrieval bots from training dataset collectors.
+- Diagnose why AI search assistants (ChatGPT Search, Claude Search, Perplexity Pro, Google AI Overviews) cannot retrieve, crawl, or index a site's pages.
+- Verify crawler access rules in `robots.txt`, distinguishing real-time retrieval bots (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) from training dataset collectors (`GPTBot`, `ClaudeBot`, `Google-Extended`).
 - Detect client-side rendering (CSR) dependencies where primary text is missing from raw unrendered HTML.
-- Validate canonical link consolidation and noindex directives.
+- Validate canonical link consolidation, pagination loops, and noindex/noarchive directives.
+- Deep-dive into specific routes flagged by orchestrator telemetry as blocked, unrendered, or canonical-mismatched.
 
 ---
 
 ## Inputs
-- `--site <url>`: Target website URL or domain (e.g., `https://example.com`)
-- `--inventory <path>`: (Optional) Pre-acquired site inventory JSON payload
-- `--state <path>`: (Optional) Shared Stateful Knowledge Graph file
-- `--format json`: Machine-readable JSON output mode
+
+- `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
+- `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
+- `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
+
+---
+
+## Component Architecture & File Inventory
+
+Every script and reference in this skill serves a distinct diagnostic role:
+
+| Path | Type | Purpose & Agent Calling Role |
+|---|---|---|
+| `scripts/discoverability_check.py` | Sensor Script | Core measurement sensor evaluating 37 discoverability checks across crawler access, HTTP headers, canonicals, sitemaps, and CSR extractability. |
+| `references/checks.md` | Reference Catalogue | Full research specification covering checks A1-A5 (robots.txt matrix), B1-B5 (indexation & HTTP), C1-C6 (rendering & JS extractability), D1-D8 (XML sitemaps), and E1-E5 (encoding & syntax). |
+| `references/knowledge-base.md` | Reference KB | Comprehensive technical reference on RFC 9309 longest-match precedence, user-agent matrix, CSR threshold heuristics, and international SEO. |
+| `evals/evals.json` | Verification Fixtures | Test scenarios validating crawler matrix classification, noindex detection, and CSR gap identification. |
+
+---
 
 ## References & Documentation Library
 
@@ -62,6 +81,7 @@ Load these resources as needed during discoverability checks:
 ### Step 1: Read Domain Knowledge Base & Checks (MANDATORY)
 
 Read the specialist references before interpreting sensor findings:
+Read the specialist reference files using your native file reading capabilities (do NOT use bash `cat`):
 - `skills/discoverability-audit/references/checks.md`
 - `skills/discoverability-audit/references/knowledge-base.md`
 

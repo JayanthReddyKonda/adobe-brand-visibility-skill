@@ -8,7 +8,7 @@ Pure Python standard library (json).
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .models import FactCandidate, Observation
 
@@ -79,16 +79,29 @@ class JsonLdExtractor:
         return schemas, facts, observations
 
     @classmethod
-    def _flatten_jsonld(cls, data: Any) -> List[Dict[str, Any]]:
-        """Flattens a JSON-LD structure into a list of entity dictionaries."""
+    def _flatten_jsonld(cls, data: Any, visited: Optional[Set[int]] = None) -> List[Dict[str, Any]]:
+        """Flattens a JSON-LD structure into a list of entity dictionaries with circular reference protection."""
+        if visited is None:
+            visited = set()
+        data_id = id(data)
+        if data_id in visited:
+            return []
+        visited.add(data_id)
+
         results: List[Dict[str, Any]] = []
         if isinstance(data, list):
             for element in data:
-                results.extend(cls._flatten_jsonld(element))
+                results.extend(cls._flatten_jsonld(element, visited))
         elif isinstance(data, dict):
             if "@graph" in data and isinstance(data["@graph"], list):
+                if "@type" in data:
+                    results.append({k: v for k, v in data.items() if k != "@graph"})
                 for element in data["@graph"]:
-                    results.extend(cls._flatten_jsonld(element))
+                    if isinstance(element, dict) and id(element) in visited:
+                        clean_elem = {k: v for k, v in element.items() if k != "@graph"}
+                        results.append(clean_elem)
+                    else:
+                        results.extend(cls._flatten_jsonld(element, visited))
             else:
                 results.append(data)
         return results
