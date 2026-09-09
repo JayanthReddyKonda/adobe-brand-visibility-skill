@@ -33,6 +33,8 @@
 └──────┴─────────────────────────────┴──────────────────────────┴─────────────────────────────┘
 ```
 
+The 17-Rule Matrix represents the high-impact core evaluation benchmark subset. The comprehensive 134-check domain catalogue (`A1` through `J10`) is partitioned across specialist skill references in `src/skills/*/references/checks.md` and synthesized in `src/skills/audit-orchestrator/references/checks.json`.
+
 ---
 
 ## 2. The 0–30 CITE Citability Score Rubric
@@ -67,15 +69,18 @@ Every build and commit must cleanly pass all five automated stages:
 ## 4. How to Execute Tests & Rebuild Submission
 
 ```bash
-# 1. Run full production QA pipeline
+# 1. Run full production QA pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
 ./scripts/qa_check.sh
 
-# 2. Run specific test suite
-pytest tests/unit/test_geo_content_unit.py -q
+# 2. Run scoped test suites
+pytest tests/unit/ -q
+pytest tests/integration/ -q
+pytest tests/system/ -q
 
-# 3. Verify zero emojis and LaTeX across all documentation
-./scripts/qa_check.sh
-
-# 4. Rebuild submission package
+# 3. Rebuild submission package and validate marketplace zip
 ./scripts/build.sh
+python3 tests/validate_package.py
+
+# 4. Synchronize runtime mirror
+./scripts/sync.sh
 ```

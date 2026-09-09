@@ -6,26 +6,24 @@
 
 ---
 
-## 1. The Core Architectural Philosophy: The AI Agent IS the Orchestrator
+## 1. Core Architecture & Two-Layer Separation of Concerns
 
-This system implements a **True Agentic Marketplace**. There is no monolithic master Python runner in `src/` that conceals decision logic in procedural code. 
+The suite implements a modular, specification-compliant architecture operating under two complementary execution modalities:
 
-The AI agent acts as the cognitive engine:
-1. The AI reads each skill's `SKILL.md` and domain knowledge bases to understand decision boundaries.
-2. The AI invokes pure-Python deterministic sensor scripts via CLI to gather telemetry.
-3. The AI applies multi-signal cognitive reasoning to diagnose root causes, deduplicate findings, and map evidence.
-4. The AI synthesizes the final report and validates it against the Draft-07 schema gate.
+1. **Cognitive Agent Mode:** An autonomous AI agent acts as the reasoning engine, reading skill manifests (`SKILL.md`) and domain knowledge bases, invoking deterministic sensors, applying multi-signal cognitive reasoning, and synthesizing findings.
+2. **Automated Pipeline Mode:** Deterministic CLI utilities in `audit-orchestrator` (`orchestrator.py`, `audit.py`) provide automated single-pass crawling, sensor fan-out, causal DAG clustering (`causal_gate.py`), and schema validation (`validate_report.py`).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           AI AGENT (Reasoner)                           │
+│              COGNITIVE AGENT & ORCHESTRATION ENGINE                     │
+│  (audit-orchestrator: orchestrator.py / audit.py / SKILL.md)           │
 │                                                                         │
-│  1. Reads SKILL.md files & Knowledge Bases                             │
-│  2. Executes web-scraper (run_scraper.py) → Canonical inv.json snapshot │
-│  3. Executes Specialist Diagnostic Scripts → Collects pure telemetry   │
-│  4. Applies Multi-Signal Reasoning → Root-causes defects (HF-01 to W-08)│
-│  5. Computes 6 Orthogonal Scores & Wilson 95% Confidence Intervals      │
-│  6. Generates Final JSON Report → Validates with validate_report.py     │
+│  1. Single-Pass Acquisition → web-scraper (acquire_inventory.py)        │
+│  2. Offline Specialist Sensors → 6 Diagnostic check.py scripts          │
+│  3. Multi-Signal Reasoning & Causal Clustering → causal_gate.py         │
+│  4. Dual-Track Remediation → Technical fix + Creative fix               │
+│  5. 6 Orthogonal Scores & Wilson 95% Confidence Intervals               │
+│  6. Final Report Emission & Draft-07 Gate → validate_report.py          │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
            ┌─────────────────────────┼────────────────────────┐
@@ -40,8 +38,8 @@ The AI agent acts as the cognitive engine:
 ```
 
 ### Two-Layer Separation of Concerns
-- **AI Cognitive Layer (`SKILL.md`, Knowledge Bases):** Responsible for judgment, causal inference, dual-track remediation, and qualitative synthesis. Never executes unvalidated HTTP requests directly.
-- **Deterministic Sensor Layer (`_check.py`, `safe_fetch.py`):** Responsible for raw data extraction, RFC parsing, DOM evaluation, and mathematical calculations. Completely isolated, testable with unit tests, and 100% pure Python standard library.
+- **Cognitive Reasoning Layer (`SKILL.md`, Knowledge Bases, `causal_gate.py`):** Responsible for qualitative judgment, causal inference, root-cause clustering, and dual-track remediation synthesis. Never executes unvalidated HTTP requests directly.
+- **Deterministic Sensor Layer (`_check.py`, `safe_fetch.py`):** Responsible for raw data extraction, RFC parsing, DOM evaluation, and mathematical scoring. Completely isolated, testable with unit tests, and 100% pure Python standard library.
 
 ---
 

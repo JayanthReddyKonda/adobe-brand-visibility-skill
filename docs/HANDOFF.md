@@ -24,7 +24,7 @@ To maintain a 100/100 evaluation score, you MUST preserve these strict rules:
 3. **Draft-07 JSON Schema Gate:** Final audit report MUST strictly validate against `report-schema.json` with support for both string and structured evidence objects, dual-track remediation (`technical_fix`, `creative_fix`, `verification`), and proactive actions.
 4. **Recommend-Only Mandate:** Never execute mutating operations on the target domain; recommend fixes with `technical_fix` and `creative_fix`.
 5. **Zero Emojis Policy:** Absolute zero emojis in any markdown documentation across all skills and docs.
-6. **Package Ceiling:** Zip size must stay <= 50 MB (current build is ~274 KB).
+6. **Package Ceiling:** Zip size must stay <= 50 MB (current build is ~490 KB).
 7. **Time Ceiling:** Audit execution must complete in < 5 minutes (test suite runs in ~45s, live audits finish in < 3s).
 
 ---
@@ -108,23 +108,108 @@ adobe-brand-visibility-skill/
 
 ---
 
-## 4. Critical Environment Quirks & Watch-Outs for the Agent
+## 4. Execution Interfaces & Operational Runbooks
 
-1. **IDE Buffer Lock / File Reversion Danger:**
-   - In this development environment, calling interactive replacement tools across multiple files can trigger an editor buffer review lock. If the user dismisses the review widget, files roll back to the last clean git commit.
-   - **Solution:** Apply multi-file code updates directly to disk using standalone Python automation scripts executed via `run_command`. This guarantees changes physically persist to disk.
-2. **The Twin Directory Invariant:**
-   - `src/skills/` and `.agents/skills/` must be identical at all times. Always run `cp -a src/skills/* .agents/skills/` after any update.
-3. **The `validate_report.py` Strictness:**
-   - `report-schema.json` has `additionalProperties: false` enabled on every object level. If you add an unrecognized key to a finding or recommendation, the validation gate will reject the entire report.
-4. **Pure Python Standard Library Invariant:**
-   - Never run `pip install`. If an evaluator runs the code in an isolated sandbox without internet access, any missing third-party package will crash the submission and score 0.
+### Interface 1: Autonomous Cognitive Pipeline (`orchestrator.py`)
+Master end-to-end entrypoint executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions:
+```bash
+python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json
+```
+
+### Interface 2: Contract-Driven Multi-Pass Audit Engine (`audit.py`)
+Multi-pass orchestration isolating bounded evidence collection, semantic agent review, and Draft-07 schema validation:
+```bash
+# 1. Bounded single-pass collection & baseline report emission (bounded to 160s)
+python3 src/skills/audit-orchestrator/scripts/audit.py collect https://example.com --out output/audit
+
+# 2. Agent semantic finalization composing collected evidence with review.json
+python3 src/skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review output/audit/review.json --out output/audit/final-report.json
+
+# 3. Validate final report against Draft-07 schema and consistency invariants
+python3 src/skills/audit-orchestrator/scripts/audit.py validate output/audit/final-report.json
+```
+
+### Interface 3: Modular Specialist Sensor Invocations
+Each sensor runs completely offline against `inv.json` with self-resolving path discovery (`SCRAPER_DIR`):
+```bash
+# 1. Acquire canonical site inventory via single-pass web scraper
+python3 src/skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
+
+# 2. Execute specialist sensors against inv.json
+python3 src/skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
+python3 src/skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
+python3 src/skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
+python3 src/skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
+python3 src/skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
+python3 src/skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
+
+# 3. Validate output report against Draft-07 schema gate
+python3 src/skills/audit-orchestrator/scripts/validate_report.py final_report.json
+```
 
 ---
 
-## 5. Strategic Roadmap for Further Perfection
+## 5. Specialist Sensor Interface Contract
 
-If you wish to elevate this project beyond its current state, consider these high-leverage enhancements:
+Every diagnostic sensor implements the standard programmatic interface:
+```python
+def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_file: Optional[str] = None) -> Dict[str, Any]:
+    """Execute diagnostic sensor against inventory.
+    
+    Returns:
+        Dict matching {"status": "ok"|"inconclusive", "findings": [...], "recommendations": [...]}
+    """
+```
+
+### Finding Object Invariants
+Every emitted finding must strictly provide:
+- `id` *(string)*: Unique defect identifier (e.g., `F-001`).
+- `cause_id` *(string)*: Root cause key matching `knowledge-base.md`.
+- `title` *(string)*: Clean descriptive defect title.
+- `category` *(string)*: Functional audit domain.
+- `severity` *(enum)*: Strictly `"critical" | "high" | "medium" | "low"`.
+- `confidence` *(enum)*: Strictly `"high" | "medium" | "low"`.
+- `evidence` *(string | object)*: Concise diagnostic proof without synthetic fabrication.
+- `suggested_action` *(object)*: Actionable mitigation with required `"summary"` and `"priority"`, plus `"technical_fix"`, `"creative_fix"`, and `"verification"`.
+
+---
+
+## 6. Critical Environment Quirks & Watch-Outs for the Agent
+
+1. **The Twin Directory Invariant:**
+   - `src/skills/` is the canonical source of truth; `.agents/skills/` is the generated runtime mirror.
+   - Always run `./scripts/build.sh && ./scripts/sync.sh` after any modification.
+2. **Canonical Import Resolution:**
+   - `safe_fetch.py` and `acquire_inventory.py` reside canonically in `src/skills/web-scraper/scripts/`.
+   - Never re-create duplicate shims in specialist skills; sensors resolve `SCRAPER_DIR` dynamically.
+3. **The `validate_report.py` Strictness:**
+   - `report-schema.json` has `additionalProperties: false` enabled on every object level. Unrecognized keys will trigger schema validation failure.
+4. **Pure Python Standard Library Invariant:**
+   - Never import runtime `pip` packages. All runtime scripts must execute on vanilla Python 3.9+.
+5. **Frozen Vendor Directory:**
+   - Never modify, format, or lint files in `resources/`. Target tools strictly to `src/` and `tests/`.
+
+---
+
+## 7. Developer QA Pipeline & Verification Commands
+
+All modifications must pass the complete QA suite before declaring work complete:
+```bash
+# 1. Full Production QA Pipeline (Ruff, Flake8, MyPy, Draft-07 Schema, Pytest)
+./scripts/qa_check.sh
+
+# 2. Package Build & Marketplace Compliance Validation
+./scripts/build.sh
+python3 tests/validate_package.py
+
+# 3. Synchronize Runtime Mirror
+./scripts/sync.sh
+```
+
+---
+
+## 8. Strategic Roadmap for Further Perfection
+
 1. **Live AI Search Probes (Optional API Extension):**
    - Provide an optional CLI mode (`--live-probe`) connecting to Perplexity Sonar API or OpenAI Search API to compare theoretical citability against live citation events.
 2. **Deep Graph Web Traversal (WebWalker ACL 2025):**
