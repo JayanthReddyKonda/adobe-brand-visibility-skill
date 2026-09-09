@@ -4,7 +4,7 @@
 **Version:** 3.0.0 (Production SOTA Release)  
 **Project:** Brand AI-Readiness & Generative Engine Optimization (GEO/AEO) Audit Suite  
 **Target Audience:** Incoming Autonomous AI Agent taking over project stewardship  
-**Status:** 100% OPERATIONAL — 264/264 TESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
+**Status:** 100% OPERATIONAL — 188/188 TESTS + 29 SUBTESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
 
 ---
 
@@ -25,14 +25,14 @@ To maintain a 100/100 evaluation score, you MUST preserve these strict rules:
 4. **Recommend-Only Mandate:** Never execute mutating operations on the target domain; recommend fixes with `technical_fix` and `creative_fix`.
 5. **Zero Emojis Policy:** Absolute zero emojis in any markdown documentation across all skills and docs.
 6. **Package Ceiling:** Zip size must stay <= 50 MB (current build is ~274 KB).
-7. **Time Ceiling:** Audit execution must complete in < 5 minutes (test suite runs in ~20s, live audits finish in < 3s).
+7. **Time Ceiling:** Audit execution must complete in < 5 minutes (test suite runs in ~45s, live audits finish in < 3s).
 
 ---
 
 ## 2. Codebase Directory & Capabilities Map
 
 The codebase exists in two synchronized representations:
-- `src/skills/`: The primary source codebase.
+- `src/skills/`: The primary canonical source codebase.
 - `.agents/skills/`: The runtime agent marketplace environment.
 - **Rule:** Any change made in `src/skills/` MUST be mirrored to `.agents/skills/` (`./scripts/sync.sh`).
 
@@ -42,19 +42,21 @@ adobe-brand-visibility-skill/
 ├── src/skills/                      # Source skills directory (8 skills total)
 │   ├── audit-orchestrator/          # Entrypoint coordinator & report synthesis
 │   │   ├── SKILL.md                 # Orchestrator runbook & synthesis guidelines
-│   │   ├── scripts/                 # acquire_inventory.py, validate_report.py, safe_fetch.py
-│   │   └── references/              # report-schema.json, knowledge base, SOTA benchmark docs
+│   │   ├── scripts/                 # orchestrator.py, audit.py, assemble_report.py, causal_gate.py, validate_report.py
+│   │   └── references/              # report-schema.json, knowledge-base.md, checks.md, checks.json
 │   ├── web-scraper/                 # Autonomous crawler, RFC 9309 matrices, markdown & JSON-LD
 │   │   ├── SKILL.md                 # Scraper runbook & CLI guidelines
+│   │   ├── scripts/safe_fetch.py    # Canonical zero-trust SSRF fetcher
+│   │   ├── scripts/acquire_inventory.py # Canonical inventory acquisition crawler
 │   │   ├── scripts/run_scraper.py   # CLI entrypoint with JSON & MD table outputs
-│   │   └── scripts/crawler/         # 17 pure-Python modules (policy, fetch, robots, sitemap, etc.)
+│   │   └── scripts/crawler/         # 16 pure-Python modules (policy, fetch, robots, sitemap, etc.)
 │   ├── discoverability-audit/       # RFC 9309, AI bots, SNR, nosnippet (HF-03, HF-04, HF-05)
 │   ├── entity-content-audit/        # Schema.org @graph, sameAs, ISO 4217, product consistency (HF-06)
 │   ├── fact-consistency-audit/      # Cross-page contradiction ledger, price drift (W-03)
 │   ├── corroboration-authority-audit/# Zero-trust linkbacks, 57% off-site footprint (W-04)
 │   ├── geo-content-audit/           # Evidence genres, hedge lexicon, FTR, BLUF, Wilson CIs (TX01-TX06)
 │   └── engagement-context-audit/    # Post-citation intent handoff, value CTAs, /pricing.md
-├── tests/                           # 264 automated unit tests across 24 test suites
+├── tests/                           # Pure stdlib + pytest suite (unit/, integration/, system/)
 ├── docs/                            # High-level knowledge base and architectural docs
 ├── resources/                       # Unabridged research papers, PDFs, cloned repos, and specs
 └── scripts/
@@ -68,18 +70,22 @@ adobe-brand-visibility-skill/
 ## 3. High-Level Skill Responsibilities
 
 ### 1. `audit-orchestrator` (The Master Coordinator)
-- **Role:** Coordinates the audit runbook.
+- **Role:** Coordinates the audit runbook and synthesizes diagnostic reports.
 - **Key Tools:**
-  - `acquire_inventory.py`: Crawls target domain up to bounded depth (default 10 pages), fetches `/robots.txt`, `/sitemap.xml`, and `/llms.txt`, and classifies page types.
+  - `orchestrator.py`: Master CLI pipeline executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions.
+  - `audit.py`: Multi-pass execution engine coordinating collection, agent review finalization, and validation.
+  - `assemble_report.py`: Assembles candidate finding objects into Draft-07 schema compliance with dual-track remediation.
+  - `causal_gate.py`: Graph clustering engine mapping findings to keystone root causes and suppressing symptomatic duplicates.
   - `validate_report.py`: Strict Draft-07 JSON schema validator enforcing required fields and locked enums.
-  - `safe_fetch.py`: Enterprise-grade SSRF protection blocking private RFC-1918, link-local, and loopback IP addresses.
 - **Cognitive Responsibility:** The agent synthesizes specialist telemetry, deduplicates overlapping findings, calculates the 6 Orthogonal Scores, maps root causes to the 16-Defect Matrix, and outputs the final report.
 
 ### 2. `web-scraper` (Single-Pass Crawler & Content Extractor)
 - **Role:** Autonomous, zero-dependency web crawler and AI content extractor.
 - **Key Tools:**
+  - `safe_fetch.py`: Canonical zero-trust SSRF protection blocking private RFC-1918, link-local, and loopback IP addresses.
+  - `acquire_inventory.py`: Canonical crawler generating `inv.json` with page classifications, HTML, clean text, and robots directives.
   - `run_scraper.py`: Production CLI with JSON output (`inv.json`) and clean terminal Markdown tables.
-  - `crawler/`: 17 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval & training bots, recursive sitemap parsing, Trafilatura-grade clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, and zero-trust SSRF defense.
+  - `crawler/`: 16 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval & training bots, recursive sitemap parsing, clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, and zero-trust SSRF defense.
 
 ### 3. `discoverability-audit` (Crawl & Index Eligibility)
 - **Evaluates:** RFC 9309 rules (500 KiB cap `CR04`, 5xx fail-closed `CR05`), AI search indexers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) vs. training bots (`GPTBot`, `ClaudeBot`), Signal-to-Noise Ratio (`RD02`, `SNR >= 0.12`), and nosnippet restrictions (`HF-05`).

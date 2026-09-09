@@ -15,7 +15,7 @@ allowed-tools:
 
 | Component | Execution Command | Output Contract |
 |---|---|---|
-| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) |
+| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) |
 | **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements |
 | **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` |
@@ -95,7 +95,7 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 **Step 1: Acquire Inventory via Safe Crawler**
 Execute single-pass web crawl to build the authoritative site inventory under SSRF protection:
 ```bash
-python3 skills/audit-orchestrator/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
+python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 ```
 
 **Step 2: Collect Telemetry Grid Across Sensors**

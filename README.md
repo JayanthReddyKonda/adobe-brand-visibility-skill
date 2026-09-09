@@ -160,7 +160,7 @@ Where severity bands map as S4=4 (critical), S3=3 (high), S2=2 (medium), S1=1 (l
 
 ## 7. Verification & Quality Metrics
 
-- **315 Automated Tests Passed (100% Pass Rate):** Across unit, integration, and compliance test suites in under 45 seconds.
+- **188 Automated Tests + 29 Subtests Passed (100% Pass Rate):** Across unit, integration, and compliance test suites in under 50 seconds.
 - **36 Marketplace Compliance Tests:** Verifying robots RFC 9309 rules, SSRF safety, detectors, DAG cycle rejection, and Draft-07 schema gating.
 - **Strict Linting & Style:** 0 errors under Ruff and Flake8 (`--max-line-length=140`).
 - **Static Type Safety:** 0 errors under MyPy across all 8 skills.
