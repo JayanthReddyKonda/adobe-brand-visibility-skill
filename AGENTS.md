@@ -7,12 +7,14 @@ Operating specification and engineering manual for AI coding assistants and deve
 ## 1. Core Engineering Principles (Coding Guidelines)
 
 ### 1. Think Before Coding
+
 - **Don't assume. Don't hide confusion. Surface tradeoffs.**
 - Before implementing, state assumptions explicitly. If multiple interpretations exist, present them.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop, name what is confusing, and ask.
 
 ### 2. Simplicity First
+
 - **Minimum code that solves the problem. Nothing speculative.**
 - No features beyond what was asked.
 - No abstractions for single-use code.
@@ -21,6 +23,7 @@ Operating specification and engineering manual for AI coding assistants and deve
 - If 50 lines solves it cleanly, do not write 200 lines. Ask: *"Would a senior engineer say this is overcomplicated?"*
 
 ### 3. Surgical Changes
+
 - **Touch only what you must. Clean up only your own mess.**
 - When editing existing code, do not "improve" adjacent code, comments, or formatting.
 - Do not refactor things that are not broken.
@@ -29,6 +32,7 @@ Operating specification and engineering manual for AI coding assistants and deve
 - The test: Every changed line must trace directly to the requested task.
 
 ### 4. Goal-Driven Execution
+
 - **Define success criteria. Loop until verified.**
 - Transform tasks into verifiable milestones (reproduce issue -> implement surgical fix -> verify with automated tests).
 - Run linting, typing, and test suites after changes before declaring completion.
@@ -50,7 +54,9 @@ Strict directory boundaries must be maintained to prevent build contamination an
 | **`build/`** | **Packaging Staging** | **GENERATED**. Managed by `python scripts/build.py`. | Never commit manual files to `build/`. |
 
 ### Build & Repository Synchronization
+
 Always build the distribution package and mirror `src/` to `.agents/` after any edit:
+
 ```bash
 # Cross-platform (recommended)
 python scripts/build.py
@@ -79,6 +85,7 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
    - Crawling is performed strictly once by `web-scraper` (`acquire_inventory.py` / `run_scraper.py`), saving `inv.json`. All diagnostic sensors run offline against `inv.json` with zero redundant network overhead.
 5. **Canonical Import Resolution:**
    - Specialist sensors locate the canonical `safe_fetch.py` dynamically via self-resolving path discovery:
+
      ```python
      SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
      SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
@@ -86,6 +93,7 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
          if os.path.isdir(_p) and _p not in sys.path:
              sys.path.insert(0, _p)
      ```
+
    - Never duplicate `safe_fetch.py` or create local shims.
 6. **Draft-07 Schema Compliance:**
    - Output reports from `orchestrator.py` must validate cleanly against `src/skills/audit-orchestrator/references/report-schema.json`.
@@ -108,12 +116,15 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
 ## 4. Skills Portfolio & Sensor Interface Contract
 
 The suite consists of 8 modular skills coordinated by `audit-orchestrator`:
+
 - **`audit-orchestrator`**: Master coordinator, causal synthesis, and Draft-07 report emission (`orchestrator.py`, `audit.py`, `assemble_report.py`, `causal_gate.py`, `validate_report.py`). Supports `--telemetry` mode for AI agent cognitive synthesis and `--baseline-only` for automated CI/CD.
 - **`web-scraper`**: Single-pass acquisition and zero-trust SSRF fetcher (`safe_fetch.py`, `acquire_inventory.py`, `crawler/`).
 - **Specialist Diagnostic Sensors (6)**: `discoverability-audit`, `entity-content-audit`, `fact-consistency-audit`, `corroboration-authority-audit`, `geo-content-audit`, `engagement-context-audit`.
 
 ### Sensor Programmatic Interface Contract
+
 Every sensor script implements the standard interface:
+
 ```python
 def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_file: Optional[str] = None) -> Dict[str, Any]:
     """Execute diagnostic sensor against inventory.
@@ -124,6 +135,7 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
 ```
 
 ### Knowledge Base & Check Catalogue Standard
+
 - Every skill maintains its domain knowledge base strictly at `references/knowledge-base.md`. Never introduce fragmented satellite knowledge bases.
 - The master 134-check catalogue lives in `src/skills/audit-orchestrator/references/checks.md` and `checks.json`, with domain subsets maintained in each specialist skill's `references/checks.md`.
 - Architectural overviews, research citations, and handoff guides belong strictly in `docs/`.
@@ -178,7 +190,8 @@ python scripts/sync.py
 
 ## 7. AI Coding Agent Operational Directives
 
-### Mandatory Workflow:
+### Mandatory Workflow
+
 - Author code strictly under `src/skills/` and tests under `tests/`.
 - Immediately run `python scripts/build.py` followed by `python scripts/sync.py` (or `./scripts/build.sh` and `./scripts/sync.sh`) after altering skill logic or manifests.
 - Keep `SKILL.md` documents concise and structured according to the 14-section Production Standard Order. Extended reference material belongs in `references/`.
@@ -188,7 +201,8 @@ python scripts/sync.py
 - Tool-Agnostic File Reading: In skill runbooks, instruct agents to use native file-reading tools; never embed shell `cat` commands.
 - Transparent Pair Programming: Communicate directly, clearly, and concisely with the user as a senior software engineer. State assumptions, surface tradeoffs, and verify implementations with automated tests.
 
-### Strictly Forbidden:
+### Strictly Forbidden
+
 - **DO NOT** edit files inside `.agents/` or `build/` directly.
 - **DO NOT** modify, format, or lint files in `resources/`.
 - **DO NOT** import runtime `pip` packages in `src/skills/`.
