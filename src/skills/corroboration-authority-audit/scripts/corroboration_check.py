@@ -373,15 +373,15 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
     checked = []
     broken = []
 
-    # Probe external authorities (excluding internal mirror domains)
-    for u in external_authorities[:5]:
+    # Probe external authorities (excluding internal mirror domains, max 2 per SKILL.md invariant)
+    for u in external_authorities[:2]:
         checked.append(u)
-        status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512 * 1024, method="GET")
-        if status in (404, 410) or (status and status >= 500) or status == 0:
+        status, ext_html, _, _ = safe_fetch(u, timeout=1.5, max_bytes=512 * 1024, method="GET")
+        if status in (404, 410) or (status and status >= 500):
             broken.append(f"{u} (HTTP {status})")
-        elif status in (401, 403, 429, 999):
+        elif status in (401, 403, 429, 999) or status == 0 or status is None:
             observations.append(
-                {"observation": f"Authority link {u} returned bot challenge/access restriction (HTTP {status}); not treated as broken anchor."}
+                {"observation": f"Authority link {u} returned status {status}; not treated as broken anchor."}
             )
 
         elif brand_name and ext_html:
@@ -714,12 +714,15 @@ def main():
     p = urlparse(s)
     base = f"{p.scheme}://{p.netloc}"
     inv = None
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     res = audit(base, p.netloc, inv=inv, state_file=args.state, candidate_backlinks=args.candidate_backlinks)
     print(json.dumps(res, indent=2))
 

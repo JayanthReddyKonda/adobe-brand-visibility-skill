@@ -1153,12 +1153,15 @@ def main():
     args = parser.parse_args()
     base, domain = parse_domain(args.site)
     inv = None
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     res = audit(base, domain, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 

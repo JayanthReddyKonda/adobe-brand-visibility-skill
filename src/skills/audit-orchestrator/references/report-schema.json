@@ -11,6 +11,10 @@
     "findings"
   ],
   "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Report schema version (e.g. 1.0.0)"
+    },
     "site": {
       "type": "string",
       "description": "Target website domain or URL audited"
@@ -201,6 +205,19 @@
           "impact": {
             "type": "string",
             "description": "How the defect impacts AI search citation probability or visitor retention"
+          },
+          "scope": {
+            "type": [
+              "string",
+              "object"
+            ],
+            "description": "Granular defect scope (entity, page, route, or matrix)",
+            "properties": {
+              "type": { "type": "string" },
+              "entity": { "type": "string" },
+              "locale": { "type": "string" },
+              "url": { "type": "string" }
+            }
           },
           "confidence": {
             "type": "string",

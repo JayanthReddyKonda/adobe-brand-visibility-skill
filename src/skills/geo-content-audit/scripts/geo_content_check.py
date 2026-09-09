@@ -1256,12 +1256,15 @@ def main():
     base = f"{p.scheme}://{p.netloc}"
     domain = p.netloc
 
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     else:
         status, html, _, _ = safe_fetch(base)
         if status == 200 and html:

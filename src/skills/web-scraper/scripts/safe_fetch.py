@@ -15,6 +15,7 @@ import http.client
 import ipaddress
 import socket
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -50,7 +51,27 @@ def _is_safe_host(hostname: Optional[str]) -> Tuple[bool, str, List[Any]]:
             return False, "Malformed hostname", []
 
         clean_hostname = (hostname or "").strip().strip("[]")
-        ip_info = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
+        result_holder: List[Any] = []
+        error_holder: List[Exception] = []
+
+        def _resolve():
+            try:
+                res = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
+                result_holder.append(res)
+            except Exception as e:
+                error_holder.append(e)
+
+        t = threading.Thread(target=_resolve, daemon=True)
+        t.start()
+        t.join(timeout=0.8)
+        if t.is_alive():
+            return False, "DNS resolution timed out", []
+        if error_holder:
+            return False, f"DNS resolution failed: {error_holder[0]}", []
+        if not result_holder:
+            return False, "No IP resolved", []
+        ip_info = result_holder[0]
+
         safe_ips = []
         for sf in ip_info:
             ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(sf[4][0])
