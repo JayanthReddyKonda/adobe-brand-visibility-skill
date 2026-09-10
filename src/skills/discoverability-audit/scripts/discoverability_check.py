@@ -838,11 +838,41 @@ def audit(base, domain, inv=None, state_file=None):
                 unrendered_pages.append((p_url, p_words, p_type))
 
         if unrendered_pages:
+            def _rep_priority(item):
+                u, w, pt = item
+                u_lower = u.lower()
+                penalty = 0
+                if "/drafts/" in u_lower:
+                    penalty += 1000
+                if "/content/dam/" in u_lower or "/dam/" in u_lower:
+                    penalty += 500
+                if "/quiz/" in u_lower or "quiz" in u_lower:
+                    penalty += 300
+                if any(frag in u_lower for frag in ("/nav", "/footer", "/header", "/sidebar")):
+                    penalty += 200
+                type_rank = {
+                    "product_detail": 10,
+                    "product": 15,
+                    "pricing": 20,
+                    "category": 30,
+                    "catalog": 35,
+                    "article": 40,
+                    "general": 50,
+                }
+                base_prio = type_rank.get(pt, 60)
+                if any(k in u_lower for k in ("/product", "/shop", "/item", "/store")):
+                    base_prio -= 5
+                elif any(k in u_lower for k in ("/coffee", "/tea", "/machines", "/accessories")):
+                    base_prio -= 3
+                return (penalty, base_prio, len(u))
+
+            unrendered_pages.sort(key=_rep_priority)
             rep_url, rep_words, rep_type = unrendered_pages[0]
+            display_type = f"{rep_type} routes" if rep_type and rep_type not in ("general", "unknown") else "core routes"
             findings.append(
                 {
                     "category": "rendering",
-                    "title": f"Primary copy missing from initial raw HTML (client-side rendering gap on {rep_type or 'catalog'})",
+                    "title": f"Primary copy missing from initial raw HTML (client-side rendering gap on {display_type})",
                     "severity": "high",
                     "confidence": "high",
                     "root_cause": f"RENDERED_CONTENT_GAP: Page {rep_url} serves an unrendered client-side JavaScript shell containing only {rep_words} words.",
@@ -851,6 +881,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_id": "RENDERED_CONTENT_GAP",
                     "url": rep_url,
                     "scope": rep_url,
+                    "affected_urls": [u for u, _, _ in unrendered_pages],
                     "impact": "Non-JavaScript AI retrieval engines (SearchGPT, PerplexityBot) ingest an empty shell without product listings or catalog prose.",
                     "evidence": f"Initial HTML on {rep_url} contains only {rep_words} words before JavaScript execution across {len(unrendered_pages)} route(s).",
                     "suggested_action": {

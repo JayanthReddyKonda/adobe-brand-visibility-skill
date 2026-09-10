@@ -29,6 +29,14 @@ except (ImportError, ValueError):
         from plan import LABELS, plan  # type: ignore
         from validate_report import validate_report_dict  # type: ignore
 
+try:
+    from .causal_gate import apply_causal_suppression  # type: ignore
+except (ImportError, ValueError):
+    try:
+        from causal_gate import apply_causal_suppression  # type: ignore
+    except ImportError:
+        apply_causal_suppression = None
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -137,6 +145,46 @@ def assemble(
     observations: List[Dict[str, Any]] = []
     dropped: List[Dict[str, Any]] = []
     merged: Dict[Any, Dict[str, Any]] = {}
+    proactive_actions: List[Dict[str, Any]] = []
+
+    if apply_causal_suppression is not None and candidates:
+        inv_pages = []
+        for r in records:
+            if isinstance(r, dict) and r.get("url"):
+                text_str = r.get("text") or ""
+                wc = len(text_str.split()) if text_str else r.get("word_count", 0)
+                inv_pages.append({
+                    "url": r["url"],
+                    "word_count": wc,
+                    "status": r.get("status", 200),
+                    "html": text_str[:2000] if text_str else "",
+                })
+        orig_candidates = list(candidates)
+        surviving, suppressed, _dag_meta = apply_causal_suppression(candidates, inv={"pages": inv_pages})
+        for sc in suppressed:
+            dropped.append(dict(
+                candidate_index=orig_candidates.index(sc) if sc in orig_candidates else -1,
+                check_id=sc.get("check_id"),
+                reason="Suppressed by 6-Layer Causal DAG: downstream symptom of upstream blocker",
+            ))
+        candidates = surviving
+
+        unrendered_prod = [
+            sc for sc in suppressed
+            if any(k in str(sc.get("cause_id") or sc.get("id") or sc.get("check_id", "")) for k in ("ATTRIBUTE", "PRODUCT", "OFFER", "SCHEMA", "E"))
+        ]
+        if unrendered_prod:
+            sample_scope = unrendered_prod[0].get("scope", "commercial route")
+            proactive_actions.append({
+                "id": "P-001",
+                "title": "Pre-Hydration Product Schema Architecture",
+                "category": "entity",
+                "summary": f"Commercial routes (e.g. {sample_scope}) serve unrendered client-side JS shells. When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup in initial HTML to prevent downstream answerability gaps.",
+                "priority": "high",
+                "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
+                "creative_fix": "Ensure core product specs, pricing, and availability are visible above the fold in semantic HTML.",
+                "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is detected.",
+            })
 
     for index, item in enumerate(candidates):
         try:
@@ -186,6 +234,11 @@ def assemble(
                 if curr_band_num > prev_band_num:
                     prev["actual_band"] = item["actual_band"]
                 prev["depends_on"] = sorted(set(prev["depends_on"] + item["depends_on"]))
+                if item.get("downstream_symptoms"):
+                    prev_syms = prev.setdefault("downstream_symptoms", [])
+                    for s in item["downstream_symptoms"]:
+                        if s not in prev_syms:
+                            prev_syms.append(s)
                 prev["priority_index"] = None
                 prev["difficulty"] = None
             else:
@@ -226,12 +279,13 @@ def assemble(
         schema_version="1.0.0",
         site=site,
         audited_at=now(),
-        audit_status="complete",
+        audit_status="partial" if (coverage and coverage.get("sensor_errors")) else "complete",
         summary=summary,
         findings=findings,
-        proactive_actions=[],
+        proactive_actions=proactive_actions,
         observations=observations,
         dropped_findings=dropped,
+        coverage=coverage if coverage else {},
     )
     validate_report(report)
     return report

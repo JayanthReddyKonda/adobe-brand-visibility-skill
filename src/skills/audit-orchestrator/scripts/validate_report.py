@@ -43,6 +43,32 @@ def validate_type(instance, schema, path="root"):
             except ValueError:
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
 
+        if "string" in type_list and isinstance(instance, str) and schema.get("format") == "uri":
+            from urllib.parse import urlparse
+            parsed = urlparse(instance)
+            if not parsed.scheme or (parsed.scheme in ("http", "https") and not parsed.netloc):
+                return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
+
+    # Format checking when type is omitted but instance is string
+    if not expected_type and isinstance(instance, str) and "format" in schema:
+        fmt = schema["format"]
+        if fmt == "date-time":
+            import datetime
+            if not re.search(r"(Z|[+-]\d{2}:\d{2})$", instance):
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string (missing explicit timezone offset)"
+            try:
+                dt_str = instance.replace("Z", "+00:00")
+                dt = datetime.datetime.fromisoformat(dt_str)
+                if dt.tzinfo is None:
+                    return f"{path}: '{instance}' is missing timezone offset"
+            except ValueError:
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
+        elif fmt == "uri":
+            from urllib.parse import urlparse
+            parsed = urlparse(instance)
+            if not parsed.scheme or (parsed.scheme in ("http", "https") and not parsed.netloc):
+                return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
+
     # P1-89: Disallow NaN and Infinity numeric values
     if isinstance(instance, (int, float)) and not isinstance(instance, bool):
         import math
@@ -55,8 +81,49 @@ def validate_type(instance, schema, path="root"):
     if "maximum" in schema and isinstance(instance, (int, float)) and instance > schema["maximum"]:
         return f"{path}: Value {instance} is greater than maximum {schema['maximum']}"
 
-    if "enum" in schema and instance not in schema["enum"]:
-        return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
+    if "enum" in schema:
+        matched = False
+        for item in schema["enum"]:
+            if instance == item and (type(instance) is bool) == (type(item) is bool):
+                matched = True
+                break
+        if not matched:
+            return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
+
+    if "const" in schema:
+        c = schema["const"]
+        if instance != c or (type(instance) is bool) != (type(c) is bool):
+            return f"{path}: Value {instance!r} does not match const {c!r}"
+
+    if "allOf" in schema and isinstance(schema["allOf"], list):
+        for subschema in schema["allOf"]:
+            err = validate_type(instance, subschema, path=path)
+            if err:
+                return err
+
+    if "anyOf" in schema and isinstance(schema["anyOf"], list):
+        passed = False
+        any_errs = []
+        for subschema in schema["anyOf"]:
+            err = validate_type(instance, subschema, path=path)
+            if not err:
+                passed = True
+                break
+            any_errs.append(err)
+        if not passed:
+            return f"{path}: Value does not match any allowed schema in anyOf ({'; '.join(any_errs[:2])})"
+
+    if "oneOf" in schema and isinstance(schema["oneOf"], list):
+        matches = 0
+        one_errs = []
+        for subschema in schema["oneOf"]:
+            err = validate_type(instance, subschema, path=path)
+            if not err:
+                matches += 1
+            else:
+                one_errs.append(err)
+        if matches != 1:
+            return f"{path}: Value matched {matches} schemas in oneOf, expected exactly 1 ({'; '.join(one_errs[:2])})"
 
     if "minLength" in schema and isinstance(instance, str) and len(instance) < schema["minLength"]:
         return f"{path}: String too short, expected at least {schema['minLength']} chars"

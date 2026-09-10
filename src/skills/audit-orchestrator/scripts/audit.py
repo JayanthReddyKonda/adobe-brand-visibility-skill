@@ -15,7 +15,7 @@ import multiprocessing
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -98,7 +98,12 @@ def compute_coverage(checks: List[Dict[str, Any]], candidates: List[Dict[str, An
     }
 
 
-def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[Dict[str, Any]]:
+def execute_audit_sensors(
+    base: str,
+    domain: str,
+    inv: Dict[str, Any],
+    sensor_errors: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
     """Run specialist sensors offline against inventory and extract candidates."""
     candidates: List[Dict[str, Any]] = []
 
@@ -115,12 +120,15 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                 cid = raw_cid.split("-")[0] if "-" in raw_cid else raw_cid
                 if not (len(cid) in (2, 3) and cid[0].isalpha() and cid[1:].isdigit()):
                     cid = "B1"
+                cand_scope = f.get("url") or f.get("scope") or (inv.get("pages", [{}])[0].get("url", base) if inv.get("pages") else base)
                 candidates.append({
                     "check_id": cid,
+                    "cause_id": str(f.get("cause_id") or f.get("id") or cid),
+                    "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Discoverability observation")),
                     "actual_band": "S4" if f.get("severity") == "critical" else ("S3" if f.get("severity") == "high" else "S2"),
                     "finding_kind": "confirmed_problem",
-                    "scope": inv.get("pages", [{}])[0].get("url", base) if inv.get("pages") else base,
+                    "scope": cand_scope,
                     "observation": str(f.get("evidence", "")),
                     "evidence_refs": [{
                         "artifact": "response-0001",
@@ -134,8 +142,9 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "priority": f.get("severity", "medium"),
                     }),
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "discoverability-audit", "error": str(e), "error_type": type(e).__name__})
 
     # 2. Entity & Content sensor
     try:
@@ -150,12 +159,15 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                 cid = raw_cid.split("-")[0] if "-" in raw_cid else raw_cid
                 if not (len(cid) in (2, 3) and cid[0].isalpha() and cid[1:].isdigit()):
                     cid = "E1"
+                cand_scope = f.get("url") or f.get("scope") or base
                 candidates.append({
                     "check_id": cid,
+                    "cause_id": str(f.get("cause_id") or f.get("id") or cid),
+                    "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Entity schema observation")),
                     "actual_band": "S3" if f.get("severity") in ("critical", "high") else "S2",
                     "finding_kind": "confirmed_problem",
-                    "scope": base,
+                    "scope": cand_scope,
                     "observation": str(f.get("evidence", "")),
                     "evidence_refs": [{
                         "artifact": "response-0001",
@@ -169,8 +181,9 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "priority": f.get("severity", "medium"),
                     }),
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "entity-content-audit", "error": str(e), "error_type": type(e).__name__})
 
     # 3. Fact consistency sensor
     try:
@@ -193,12 +206,15 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "CONFLICTING_COMMERCIAL_TERMS": "N4",
                     }
                     raw_cid = fact_map.get(cause, "N4")
+                cand_scope = f.get("url") or f.get("scope") or base
                 candidates.append({
                     "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Fact consistency observation")),
                     "actual_band": "S3" if f.get("severity") in ("critical", "high") else "S2",
                     "finding_kind": "confirmed_problem",
-                    "scope": base,
+                    "scope": cand_scope,
                     "observation": str(f.get("evidence", "")),
                     "evidence_refs": [{
                         "artifact": "response-0001",
@@ -212,8 +228,9 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "priority": f.get("severity", "medium"),
                     }),
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "fact-consistency-audit", "error": str(e), "error_type": type(e).__name__})
 
     # 4. Corroboration sensor
     try:
@@ -235,12 +252,15 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "CLAIM_CORROBORATION_GAP": "PP1",
                     }
                     raw_cid = corrob_map.get(cause, "BC6")
+                cand_scope = f.get("url") or f.get("scope") or base
                 candidates.append({
                     "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Authority anchor observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",
-                    "scope": base,
+                    "scope": cand_scope,
                     "observation": str(f.get("evidence", "")),
                     "evidence_refs": [{
                         "artifact": "response-0001",
@@ -254,8 +274,9 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "priority": "low",
                     }),
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "corroboration-authority-audit", "error": str(e), "error_type": type(e).__name__})
 
     # 5. GEO Content sensor
     try:
@@ -280,12 +301,15 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "CONTENT_RECENCY_DEFICIT": "G8",
                     }
                     raw_cid = geo_map.get(cause, "G1")
+                cand_scope = f.get("url") or f.get("scope") or base
                 candidates.append({
                     "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "GEO citability observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",
-                    "scope": base,
+                    "scope": cand_scope,
                     "observation": str(f.get("evidence", "")),
                     "evidence_refs": [{
                         "artifact": "response-0001",
@@ -299,8 +323,9 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "priority": "medium",
                     }),
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "geo-content-audit", "error": str(e), "error_type": type(e).__name__})
 
     # 6. Engagement & Bridge sensor
     try:
@@ -321,12 +346,15 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "GENERIC_H1": "J4",
                     }
                     raw_cid = eng_map.get(cause, "J1")
+                cand_scope = f.get("url") or f.get("scope") or base
                 candidates.append({
                     "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Visitor engagement observation")),
                     "actual_band": "S2",
                     "finding_kind": "advisory",
-                    "scope": base,
+                    "scope": cand_scope,
                     "observation": str(f.get("evidence", "")),
                     "evidence_refs": [{
                         "artifact": "response-0001",
@@ -340,8 +368,9 @@ def execute_audit_sensors(base: str, domain: str, inv: Dict[str, Any]) -> List[D
                         "priority": "medium",
                     }),
                 })
-    except Exception:
-        pass
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "engagement-context-audit", "error": str(e), "error_type": type(e).__name__})
 
     return candidates
 
@@ -407,13 +436,15 @@ def worker_collect(site: str, out_dir: Path, max_pages: int, seconds: int, probe
     base = normalize_site_url(site)
     parsed = urlparse(base)
     domain = parsed.netloc or parsed.path
-    candidates = execute_audit_sensors(base, domain, inv)
+    sensor_errors: List[Dict[str, Any]] = []
+    candidates = execute_audit_sensors(base, domain, inv, sensor_errors=sensor_errors)
 
     # 3. Coverage tracking
     cov = compute_coverage(checks, candidates, pages)
     cov["requests"] = len(records)
     cov["elapsed_seconds"] = round(time.monotonic() - started, 3)
     cov["skipped_urls"] = []
+    cov["sensor_errors"] = sensor_errors
 
     # 4. Save bundle
     bundle = {
@@ -425,6 +456,7 @@ def worker_collect(site: str, out_dir: Path, max_pages: int, seconds: int, probe
         "profiles": [],
         "browser": {"available": False, "reason": "Standard pure Python library execution", "captures": []},
         "coverage": cov,
+        "sensor_errors": sensor_errors,
     }
     write_atomic_json(out_dir / "bundle.json", bundle)
 

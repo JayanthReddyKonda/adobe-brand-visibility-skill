@@ -8,12 +8,24 @@ tailored reference briefing from the knowledge base in a single pass without too
 import argparse
 import json
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILLS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 REFERENCES_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "references"))
+
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
+try:
+    from orchestrator import detect_business_archetype
+except ImportError:
+    try:
+        from .orchestrator import detect_business_archetype
+    except ImportError:
+        detect_business_archetype = None
 
 
 def detect_signals(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -97,9 +109,9 @@ def detect_signals(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     text_corpus = " ".join(text_corpus_parts)
 
     # Detect internationalization
-    if any(code in url_corpus for code in ("/es/", "/fr/", "/de/", "/ja/", "/it/", "/pt/", "/zh/")):
+    if re.search(r"/(en|es|fr|de|ja|it|pt|zh|ko|nl|sv|ar|ru)(-[a-z]{2})?(/|$|\?|#)", url_corpus):
         signals["is_multilingual"] = True
-    if "hreflang" in text_corpus or any(p.get("language") and p.get("language") != "en" for p in pages if isinstance(p, dict)):
+    if "hreflang" in text_corpus or any(p.get("language") and p.get("language") != "en" for p in pages if isinstance(p, dict)) or any(p.get("hreflangs") for p in pages if isinstance(p, dict)):
         signals["is_multilingual"] = True
 
     # Detect pricing / commerce
@@ -111,25 +123,28 @@ def detect_signals(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
     # Business archetype classification
     if signals["archetype"] == "corporate":
-        ecom_indicators = ["add to cart", "buy now", "sku", "in stock", "shopping bag", "pricecurrency", "product"]
-        saas_indicators = ["pricing", "api docs", "sign up free", "per user", "monthly plan", "workspace", "softwareapplication"]
-        pub_indicators = ["published by", "news", "editorial team", "min read", "opinion", "article", "newsarticle"]
-        local_indicators = ["localbusiness", "postaladdress", "openinghours", "store-locator", "location", "branches"]
+        if detect_business_archetype is not None and isinstance(inv, dict):
+            signals["archetype"] = detect_business_archetype(inv)
+        else:
+            ecom_indicators = ["add to cart", "buy now", "sku", "in stock", "shopping bag", "pricecurrency", "product"]
+            saas_indicators = ["pricing", "api docs", "sign up free", "per user", "monthly plan", "workspace", "softwareapplication"]
+            pub_indicators = ["published by", "news", "editorial team", "min read", "opinion", "article", "newsarticle"]
+            local_indicators = ["localbusiness", "postaladdress", "openinghours", "store-locator", "location", "branches"]
 
-        ecom_count = sum(1 for ind in ecom_indicators if ind in text_corpus)
-        saas_count = sum(1 for ind in saas_indicators if ind in text_corpus)
-        pub_count = sum(1 for ind in pub_indicators if ind in text_corpus)
-        local_count = sum(1 for ind in local_indicators if ind in text_corpus)
+            ecom_count = sum(1 for ind in ecom_indicators if ind in text_corpus)
+            saas_count = sum(1 for ind in saas_indicators if ind in text_corpus)
+            pub_count = sum(1 for ind in pub_indicators if ind in text_corpus)
+            local_count = sum(1 for ind in local_indicators if ind in text_corpus)
 
-        scores = [
-            (ecom_count, "ecommerce"),
-            (saas_count, "saas"),
-            (pub_count, "publisher"),
-            (local_count, "local_business"),
-        ]
-        scores.sort(key=lambda x: x[0], reverse=True)
-        if scores[0][0] >= 2:
-            signals["archetype"] = scores[0][1]
+            scores = [
+                (ecom_count, "ecommerce"),
+                (saas_count, "saas"),
+                (pub_count, "publisher"),
+                (local_count, "local_business"),
+            ]
+            scores.sort(key=lambda x: x[0], reverse=True)
+            if scores[0][0] >= 2:
+                signals["archetype"] = scores[0][1]
 
     low_depth_count = 0
     for p in pages:

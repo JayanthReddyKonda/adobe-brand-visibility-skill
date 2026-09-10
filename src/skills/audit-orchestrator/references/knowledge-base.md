@@ -217,6 +217,7 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 - **Exclusion:** Single-page applications with prerendered meta tags and server-side hydration.
 - **Severity:** `high`.
 - **Confidence:** `high`.
+- **Causal DAG Role:** Keystone defect at Layer 1. On unrendered routes, suppresses downstream Layer 2 answerability (`ATTRIBUTE_INCOMPLETENESS`), Layer 3 facts (`FIRST_PARTY_FACT_CONFLICT`), Layer 4 GEO citability (`LOW_CITABILITY_SCORE`), and Layer 6 engagement (`CTA_REACHABILITY_FRICTION`). Downstream observations are preserved in `downstream_symptoms`. Product schema requirements are bundled into conditional proactive actions (`P-003: Pre-Hydration Product Schema Architecture`).
 - **Remediation:** Implement server-side rendering (SSR) or dynamic prerendering for bots.
 - **Verification:** Verify raw HTML response contains visible body copy.
 
@@ -851,9 +852,11 @@ Layer 5: ENGINE SELECTION & CONVERSION
 ```
 
 ### The Keystone Defect Rule (Anti-Inflation Gate):
-1. **Upstream Preemption**: If a Layer 0 defect (e.g. `AI_RETRIEVAL_BLOCKED` or `ROBOTS_5XX_FAIL_CLOSED`) or a Layer 1 defect (e.g. `RENDERED_CONTENT_GAP` or `WAF_BOT_CHALLENGE`) is present, downstream omissions at Layers 2–4 are **consequential symptoms**, not independent defects.
-2. **Consolidation Mandate**: The orchestrator MUST attribute the root failure to the single upstream "Keystone Defect". Downstream observations (such as missing JSON-LD or zero body text extracted) must be recorded as supporting evidence under that Keystone Defect, rather than inflating the report with 5 separate critical findings.
-3. **Severity Decoupling**: Downstream findings cannot carry higher severity than their enabling upstream root cause.
+1. **Upstream Preemption**: If a Layer 0 defect (e.g. `AI_RETRIEVAL_BLOCKED` or `ROBOTS_5XX_FAIL_CLOSED`) or a Layer 1 defect (e.g. `RENDERED_CONTENT_GAP` or `WAF_BOT_CHALLENGE`) is present, downstream omissions at Layers 2–6 are **consequential symptoms**, not independent defects.
+2. **Route-Level Granular Suppression**: Suppression evaluates route scope with exact path and prefix matching. An upstream blocker on `/en/products/default` suppresses downstream symptoms only on matching routes, allowing valid findings on rendered routes (e.g. `/pricing`) to surface normally. Site-wide blockers (e.g. universal robots.txt `Disallow: /`) suppress domain-wide.
+3. **Consolidation & Symptom Nesting Mandate**: The orchestrator MUST attribute the root failure to the single upstream "Keystone Defect". Downstream observations (such as missing JSON-LD, fact conflicts, low citability, or CTA reachability friction on unrendered shells) must NOT be emitted as independent findings. Instead, they MUST be nested under the keystone finding's `downstream_symptoms` list (`CAUSE_KEY: description`), preserving complete diagnostic observability without inflating report defect counts.
+4. **Conditional Proactive Action Bundling**: When unrendered product routes have suppressed schema omissions, the orchestrator and cognitive brain bundle conditional pre-hydration structured data specifications under `proactive_actions` (e.g. `P-003: Pre-Hydration Product Schema Architecture`) to prepare engineering for post-SSR deployment without generating false-positive primary findings.
+5. **Severity Decoupling**: Downstream findings cannot carry higher severity than their enabling upstream root cause.
 
 ---
 

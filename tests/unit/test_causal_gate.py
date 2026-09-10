@@ -297,6 +297,244 @@ class TestCausalGate(unittest.TestCase):
         self.assertEqual(nodes["on_site_orientation"], "confirmed_fail")
         self.assertEqual(nodes["engagement_handoff"], "confirmed_fail")
 
+    def test_route_level_rendering_gap_suppression_and_nesting(self):
+        """Route-level RENDERED_CONTENT_GAP must suppress downstream symptoms on that route and nest them."""
+        raw_findings = [
+            {
+                "id": "F-001",
+                "cause_id": "RENDERED_CONTENT_GAP",
+                "scope": "https://example.com/en/products/default",
+                "severity": "high",
+                "title": "Blank SPA Shell on Product Route",
+            },
+            {
+                "id": "F-002",
+                "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                "scope": "https://example.com/en/products/default",
+                "severity": "high",
+                "title": "No Product Schema",
+            },
+            {
+                "id": "F-003",
+                "cause_id": "CTA_REACHABILITY_FRICTION",
+                "scope": "https://example.com/en/products/default",
+                "severity": "medium",
+                "title": "Delayed CTA on Product Route",
+            },
+            {
+                "id": "F-004",
+                "cause_id": "CTA_REACHABILITY_FRICTION",
+                "scope": "https://example.com/pricing",
+                "severity": "medium",
+                "title": "Delayed CTA on Rendered Pricing Route",
+            },
+        ]
+        inv = {
+            "pages": [
+                {"url": "https://example.com/", "page_type": "homepage", "word_count": 400, "snr": 0.4},
+                {"url": "https://example.com/en/products/default", "page_type": "product", "word_count": 3, "snr": 0.01},
+                {"url": "https://example.com/pricing", "page_type": "pricing", "word_count": 350, "snr": 0.35},
+            ]
+        }
+
+        allowed, suppressed, dag_metadata = apply_causal_suppression(raw_findings, inv=inv)
+
+        self.assertFalse(dag_metadata["is_site_wide_rendering_gap"])
+        allowed_scopes = [f.get("scope") for f in allowed]
+        self.assertIn("https://example.com/en/products/default", allowed_scopes)
+        self.assertIn("https://example.com/pricing", allowed_scopes)
+
+        # F-002 and F-003 on /en/products/default must be suppressed
+        suppressed_ids = [f["cause_id"] for f in suppressed]
+        self.assertIn("ATTRIBUTE_INCOMPLETENESS", suppressed_ids)
+        self.assertIn("CTA_REACHABILITY_FRICTION", suppressed_ids)
+        self.assertEqual(len(suppressed), 2)
+
+        # Downstream symptoms must be nested under F-001 (the keystone)
+        keystone = next(f for f in allowed if f["id"] == "F-001")
+        self.assertIn("downstream_symptoms", keystone)
+        self.assertGreaterEqual(len(keystone["downstream_symptoms"]), 2)
+        symptom_text = " ".join(keystone["downstream_symptoms"])
+        self.assertIn("ATTRIBUTE_INCOMPLETENESS", symptom_text)
+        self.assertIn("CTA_REACHABILITY_FRICTION", symptom_text)
+
+    def test_routes_match_prevents_substring_collisions(self):
+        """Topological route matching must not produce false substring collisions on shared character sequences."""
+        from causal_gate import routes_match
+
+        # Substring prefix/containment collisions must NOT match
+        self.assertFalse(routes_match("/en", "https://example.com/enterprise"))
+        self.assertFalse(routes_match("/art", "https://example.com/partners"))
+        self.assertFalse(routes_match("/app", "https://example.com/apple"))
+        self.assertFalse(routes_match("/en/products/default", "https://example.com/en"))
+        self.assertFalse(routes_match("https://example.com/en/products/default", "/en"))
+        self.assertFalse(routes_match("https://otherdomain.com/pricing", "https://example.com/pricing"))
+
+        # Valid topological matches must match
+        self.assertTrue(routes_match("/en/products/default", "https://example.com/en/products/default"))
+        self.assertTrue(routes_match("/en/products/default/", "https://example.com/en/products/default"))
+        self.assertTrue(routes_match("/en/products/default?ref=123", "https://example.com/en/products/default"))
+        self.assertTrue(routes_match("/en/products/default#reviews", "https://example.com/en/products/default"))
+        self.assertTrue(routes_match("https://example.com/pricing", "https://example.com/pricing/"))
+
+    def test_route_level_suppression_preserves_other_routes_and_unscoped_findings(self):
+        """A rendering gap on a single product route must NOT suppress findings on other rendered routes or unscoped findings."""
+        raw_findings = [
+            {
+                "id": "F-001",
+                "cause_id": "RENDERED_CONTENT_GAP",
+                "scope": "https://example.com/en/products/default",
+                "severity": "critical",
+                "title": "Blank SPA Shell on Product Route",
+            },
+            {
+                "id": "F-002",
+                "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                "scope": "https://example.com/en/products/default",
+                "severity": "high",
+                "title": "No Product Schema on Shell Route",
+            },
+            {
+                "id": "F-003",
+                "cause_id": "SCHEMA_MISSING",
+                "severity": "high",
+                "title": "Missing Organization Schema Site-Wide",
+            },
+            {
+                "id": "F-004",
+                "cause_id": "CTA_REACHABILITY_FRICTION",
+                "scope": "https://example.com/en",
+                "severity": "medium",
+                "title": "Delayed CTA on English Home",
+            },
+            {
+                "id": "F-005",
+                "cause_id": "CTA_REACHABILITY_FRICTION",
+                "scope": "https://example.com/enterprise",
+                "severity": "medium",
+                "title": "Delayed CTA on Enterprise Page",
+            },
+        ]
+        inv = {
+            "pages": [
+                {"url": "https://example.com/en", "page_type": "homepage", "word_count": 450, "snr": 0.45},
+                {"url": "https://example.com/enterprise", "page_type": "services", "word_count": 600, "snr": 0.5},
+                {"url": "https://example.com/en/products/default", "page_type": "product", "word_count": 3, "snr": 0.01},
+            ]
+        }
+
+        allowed, suppressed, dag_metadata = apply_causal_suppression(raw_findings, inv=inv)
+        self.assertFalse(dag_metadata["is_site_wide_rendering_gap"])
+
+        # F-002 on /en/products/default must be suppressed
+        suppressed_ids = [f["id"] for f in suppressed]
+        self.assertEqual(suppressed_ids, ["F-002"])
+
+        # F-001 (keystone), F-003 (unscoped Org schema), F-004 (/en), F-005 (/enterprise) must ALL survive
+        allowed_ids = [f["id"] for f in allowed]
+        self.assertIn("F-001", allowed_ids)
+        self.assertIn("F-003", allowed_ids)
+        self.assertIn("F-004", allowed_ids)
+        self.assertIn("F-005", allowed_ids)
+
+    def test_orchestrator_synthesize_report_downstream_symptoms_order_independence(self):
+        """Orchestrator must attach downstream symptoms to keystone finding even when keystone has higher severity."""
+        from orchestrator import synthesize_audit_report
+
+        raw_findings = [
+            {
+                "id": "F-KEYSTONE",
+                "cause_id": "RENDERED_CONTENT_GAP",
+                "scope": "https://example.com/en/products/default",
+                "severity": "critical",
+                "title": "Blank SPA Shell on Product Route",
+                "evidence": "Raw HTML contains 3 words before client-side hydration.",
+                "suggested_action": {"summary": "Implement SSR", "priority": "critical"},
+            },
+            {
+                "id": "F-SYMPTOM",
+                "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                "scope": "https://example.com/en/products/default",
+                "severity": "medium",
+                "title": "Missing Product Schema",
+                "evidence": "Product JSON-LD omitted.",
+                "suggested_action": {"summary": "Add Product Schema", "priority": "medium"},
+            },
+        ]
+        inv = {
+            "pages": [
+                {"url": "https://example.com/", "page_type": "homepage", "word_count": 400, "snr": 0.4},
+                {"url": "https://example.com/en/products/default", "page_type": "product", "word_count": 3, "snr": 0.01},
+            ]
+        }
+        report = synthesize_audit_report("https://example.com", inv, {"test": {"findings": raw_findings}})
+        self.assertEqual(len(report["findings"]), 1)
+        keystone = report["findings"][0]
+        self.assertEqual(keystone["cause_id"], "RENDERED_CONTENT_GAP")
+        self.assertIn("downstream_symptoms", keystone)
+        self.assertEqual(len(keystone["downstream_symptoms"]), 1)
+        self.assertIn("ATTRIBUTE_INCOMPLETENESS", keystone["downstream_symptoms"][0])
+
+    def test_assemble_preserves_downstream_symptoms_and_proactive_actions(self):
+        """assemble() must preserve downstream symptoms and emit Pre-Hydration Product Schema action."""
+        from assemble_report import assemble
+
+        candidates = [
+            {
+                "check_id": "C1",
+                "title": "Blank SPA Shell on Product Route",
+                "actual_band": "S3",
+                "finding_kind": "confirmed_problem",
+                "scope": "https://example.com/en/products/default",
+                "cause_id": "RENDERED_CONTENT_GAP",
+                "observation": "Only 3 words in initial HTML",
+                "evidence_refs": [{"artifact": "r1", "locator": "source.text", "quote": "shell"}],
+                "collection_complete_for_scope": True,
+                "severity_reason": "SPA unrendered shell",
+                "suggested_action": {"summary": "Implement SSR", "priority": "high"},
+            },
+            {
+                "check_id": "E5",
+                "title": "Missing Product Schema",
+                "actual_band": "S3",
+                "finding_kind": "confirmed_problem",
+                "scope": "https://example.com/en/products/default",
+                "cause_id": "ATTRIBUTE_INCOMPLETENESS",
+                "observation": "Missing Product JSON-LD",
+                "evidence_refs": [{"artifact": "r1", "locator": "source.text", "quote": "shell"}],
+                "collection_complete_for_scope": True,
+                "severity_reason": "Missing schema on product route",
+                "suggested_action": {"summary": "Add Schema", "priority": "high"},
+            },
+        ]
+        records = [
+            {
+                "artifact": "r1",
+                "url": "https://example.com/en/products/default",
+                "text": "shell three words",
+                "source": {"text": "shell three words", "canonicals": []},
+                "status": 200,
+            },
+        ]
+        checks = [
+            {"check_id": "C1", "solution_level": "C", "solution": "Implement SSR"},
+            {"check_id": "E5", "solution_level": "C", "solution": "Add Product JSON-LD"},
+        ]
+        report = assemble("https://example.com", candidates, records, checks, {})
+
+        # The downstream E5 candidate should be suppressed from findings
+        finding_check_ids = [f["check_id"] for f in report["findings"]]
+        self.assertEqual(finding_check_ids, ["C1"])
+
+        # Keystone C1 finding must have downstream symptoms attached
+        c1_finding = report["findings"][0]
+        self.assertIn("downstream_symptoms", c1_finding)
+        self.assertTrue(any("ATTRIBUTE_INCOMPLETENESS" in s for s in c1_finding["downstream_symptoms"]))
+
+        # Proactive action for pre-hydration schema should be emitted
+        proactive_titles = [p["title"] for p in report.get("proactive_actions", [])]
+        self.assertIn("Pre-Hydration Product Schema Architecture", proactive_titles)
+
 
 if __name__ == "__main__":
     unittest.main()

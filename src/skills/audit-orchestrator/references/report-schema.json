@@ -226,6 +226,20 @@
               "medium",
               "low"
             ]
+          },
+          "downstream_symptoms": {
+            "type": "array",
+            "description": "Downstream consequential defects suppressed or subsumed by this keystone cause",
+            "items": {
+              "type": "string"
+            }
+          },
+          "affected_urls": {
+            "type": "array",
+            "description": "List of URLs or routes directly affected by this defect",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
@@ -366,6 +380,36 @@
         "object"
       ],
       "description": "Detected business archetype and confidence"
+    },
+    "readiness": {
+      "type": "object",
+      "description": "Deterministic readiness score, grade, and dimension breakdown",
+      "properties": {
+        "composite_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "F"
+          ]
+        },
+        "dimensions": {
+          "type": "object"
+        },
+        "weights": {
+          "type": "object"
+        },
+        "score_scope": {
+          "type": "string"
+        }
+      }
     }
   },
   "additionalProperties": false

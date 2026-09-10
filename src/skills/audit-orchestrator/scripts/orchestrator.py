@@ -104,18 +104,23 @@ _SUPPRESSED_BY_LAYER0: Set[str] = {
     "CTA_REACHABILITY_FRICTION",
     "ABOVE_FOLD_ACTION_DELAY",
 }
-# Findings at Layers 3-4 that are symptoms of Layer 1 (rendering gap)
+# Findings at Layers 2-6 that are symptoms of Layer 1 (rendering gap)
 _SUPPRESSED_BY_LAYER1: Set[str] = {
-    # Layer 3 — cannot read facts from an unrendered shell
-    "FIRST_PARTY_FACT_CONFLICT",
-    "INCOMPLETE_OFFER_ATTRIBUTES",
+    # Layer 2 — Entity & Answerability (Product/Catalog routes cannot resolve schema without hydration)
     "ATTRIBUTE_INCOMPLETENESS",
+    "INCOMPLETE_OFFER_ATTRIBUTES",
+    "SCHEMA_MISSING",
+    "SCHEMA_INVALID",
+    "MISSING_MATERIAL_FACT",
+    # Layer 3 — Fact Ledger (cannot read facts from an unrendered shell)
+    "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
     "CONFLICTING_COMMERCIAL_TERMS",
     "DISCONTINUED_VS_CURRENT_CONFLICT",
     "CONTENT_RECENCY_DEFICIT",
     "TEMPORAL_DRIFT_DETECTED",
-    # Layer 4 — cannot evaluate citation quality of an empty page
+    "STALE_AUTHORITATIVE_FACT",
+    # Layer 4 — Citability & Text Structure (cannot evaluate citation quality of an empty page)
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
     "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
@@ -126,6 +131,19 @@ _SUPPRESSED_BY_LAYER1: Set[str] = {
     "LACK_OF_SPECIFIC_EVIDENCE",
     "LOW_INFORMATION_SCENT",
     "INTENT_SCENT_DILUTION",
+    "STANDALONE_FAQ_DEFICIT",
+    "EXCESSIVE_KEYWORD_DENSITY",
+    # Layer 5 & 6 — Engagement, Orientation & Referral Continuity (cannot measure CTAs or headings on unrendered DOM)
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
+    "VIEWPORT_ANSWER_ABSENCE",
+    "AGENT_INTERACTION_BARRIER",
+    "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "DESTINATION_NAVIGATION_FRICTION",
+    "AI_REFERRAL_DISCONTINUITY",
+    "GENERIC_H1",
+    "HEADING_HIERARCHY_VACUUM",
 }
 
 # ---------------------------------------------------------------------------
@@ -216,6 +234,9 @@ try:
         compute_severity_score,
         evaluate_causal_nodes,
         evaluate_epistemic_state,
+        extract_finding_route,
+        normalize_route_path,
+        routes_match,
         severity_from_score,
     )
 except ImportError:
@@ -226,6 +247,47 @@ except ImportError:
     compute_severity_score = None  # type: ignore
     compute_archetype_confidence = None  # type: ignore
     severity_from_score = None  # type: ignore
+
+    def extract_finding_route(f: Dict[str, Any]) -> str:
+        if not isinstance(f, dict):
+            return ""
+        url = f.get("url") or f.get("scope")
+        if isinstance(url, dict):
+            url = url.get("url") or url.get("scope") or ""
+        if not url and isinstance(f.get("evidence"), dict):
+            url = f["evidence"].get("scope") or ""
+        if not url and isinstance(f.get("evidence"), str):
+            m = re.search(r'https?://[^\s,\(\)\]"\']+', f["evidence"])
+            if m:
+                url = m.group(0)
+        return str(url or "").strip().lower()
+
+    def normalize_route_path(route: str) -> str:
+        if not route:
+            return ""
+        r = route.strip().lower()
+        parsed = urlparse(r)
+        path = parsed.path if parsed.scheme else r
+        path = path.rstrip("/")
+        return path if path else "/"
+
+    def routes_match(r1: str, r2: str) -> bool:
+        if not r1 or not r2:
+            return False
+        r1_norm = r1.strip().lower()
+        r2_norm = r2.strip().lower()
+        if r1_norm == r2_norm:
+            return True
+        p1 = normalize_route_path(r1)
+        p2 = normalize_route_path(r2)
+        if p1 != "/" and p2 != "/" and p1 == p2:
+            return True
+        if p1 != "/" and len(p1) > 2 and (p1 in r2_norm or r2_norm in p1):
+            return True
+        if p2 != "/" and len(p2) > 2 and (p2 in r1_norm or r1_norm in p2):
+            return True
+        return False
+
     LAYER0_CAUSE_IDS = _LAYER0_CAUSE_IDS
     LAYER1_CAUSE_IDS = _LAYER1_CAUSE_IDS
     SUPPRESSED_BY_LAYER0 = _SUPPRESSED_BY_LAYER0
@@ -307,6 +369,14 @@ def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, An
 
 def detect_business_archetype(inv: Dict[str, Any]) -> str:
     """Classifies website into primary business archetype from crawl inventory."""
+    if not inv or not isinstance(inv, dict):
+        return "corporate"
+
+    # Explicit archetype in inventory if declared and valid
+    explicit_arch = inv.get("archetype") or (inv.get("metadata", {}).get("archetype") if isinstance(inv.get("metadata"), dict) else None)
+    if explicit_arch in ("ecommerce", "saas", "publisher", "local_business", "corporate"):
+        return explicit_arch
+
     pages = inv.get("pages", []) if inv else []
     if not pages:
         return "corporate"
@@ -317,6 +387,8 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
     local_score = 0
 
     for p in pages:
+        if not isinstance(p, dict):
+            continue
         ptype = (p.get("page_type") or "")
         if isinstance(ptype, dict):
             ptype = str(ptype.get("value", "")).lower()
@@ -341,13 +413,20 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
         jld_str = json.dumps(p.get("jsonld", []) or p.get("json_ld_contents", []) or []).lower()
         content = f"{html} {text} {title} {h1} {jld_str}"
 
-        if ptype in ("product_detail", "product", "product_listing", "category") or any(
-            k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog")
+        # 1. Ecommerce
+        if ptype in ("product_detail", "product", "product_listing", "category", "cart", "checkout", "subscription") or any(
+            k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog", "/cart", "/checkout", "/subscription")
         ):
             ecomm_score += 2
-        if "schema.org/product" in content or "schema.org/offer" in content or '"@type": "product"' in content or "add to cart" in content:
+        if any(k in content for k in (
+            "schema.org/product", "schema.org/offer", '"@type": "product"',
+            "add to cart", "buy now", "comprar", "shopping cart", "in stock",
+            "free shipping", "envío gratis", "pricecurrency", "bagged-coffee",
+            "coffee-machines"
+        )):
             ecomm_score += 3
 
+        # 2. SaaS
         if ptype in ("pricing", "subscription_flow", "documentation") or any(
             k in url for k in ("/pricing", "/plans", "/docs", "/api", "/billing", "/features")
         ):
@@ -355,15 +434,28 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
         if "softwareapplication" in content or '"@type": "softwareapplication"' in content or "per user" in content or "api docs" in content:
             saas_score += 3
 
-        if ptype in ("article", "blog") or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
+        # 3. Publisher
+        if ptype in ("article", "blog", "news") or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
             publisher_score += 2
         if "newsarticle" in content or "blogposting" in content or '"@type": "article"' in content:
             publisher_score += 3
 
-        if ptype in ("location", "contact") or any(k in url for k in ("/location", "/store-locator", "/contact", "/branches")):
+        # 4. Local Business
+        # Physical store presence indicators: store locators, branch directories, physical locations
+        # (Exclude generic contact-us pages which exist on every corporate, ecomm, and saas website)
+        if ptype in ("store_locator", "branches", "local_business") or any(
+            k in url for k in ("/store-locator", "/our-stores", "/branches")
+        ):
+            local_score += 2
+        elif any(k in url for k in ("/locations", "/location")):
             local_score += 1
+
         if "localbusiness" in content or "postaladdress" in content or "openinghours" in content:
             local_score += 3
+
+    # If active ecommerce transactional signals exist, prioritize ecommerce over local storefront listings
+    if ecomm_score >= 4 and ecomm_score >= local_score:
+        return "ecommerce"
 
     candidates = [
         (ecomm_score, "ecommerce"),
@@ -388,33 +480,62 @@ def synthesize_audit_report(
     _domain_clean = domain.split(":")[0]
     _brand_guess = _domain_clean.split(".")[0].capitalize()
 
-    for p in pages:
-        p_html = p.get("html") or ""
-        m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
-        if m_og and m_og.group(1).strip():
-            _brand_guess = m_og.group(1).strip()
-            break
-        m_title = re.search(r'<title[^>]*>([^<]+)</title>', p_html, re.I)
-        if m_title and m_title.group(1).strip():
-            t_raw = m_title.group(1).strip()
-            t_parts = re.split(r'[\s|:–—\-]+', t_raw)
-            if t_parts and len(t_parts[0]) > 1:
-                _brand_guess = t_parts[0].strip()
+    # 1. Prefer brand from entity sensor snapshot if valid
+    entity_brand = specialist_results.get("entity-content-audit", {}).get("entity_snapshot", {}).get("brand_name")
+    if entity_brand and isinstance(entity_brand, str) and len(entity_brand.strip()) > 1:
+        _brand_guess = entity_brand.strip()
+    else:
+        # 2. Inspect homepage specifically (root path or matching base)
+        homepage_candidates = [
+            p for p in pages
+            if urlparse(p.get("url") or "").path in ("", "/", "/index.html")
+            or (p.get("url") or "").rstrip("/") == base.rstrip("/")
+            or p.get("page_type") == "homepage"
+        ]
+        target_pages = homepage_candidates if homepage_candidates else pages
+        for p in target_pages:
+            p_html = p.get("html") or ""
+            m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
+            if m_og and m_og.group(1).strip():
+                _brand_guess = m_og.group(1).strip()
                 break
+            m_title = re.search(r'<title[^>]*>([^<]+)</title>', p_html, re.I)
+            if m_title and m_title.group(1).strip():
+                t_raw = m_title.group(1).strip()
+                t_parts = re.split(r'[\s|:–—\-]+', t_raw)
+                if t_parts and len(t_parts[0]) > 1:
+                    _brand_guess = t_parts[0].strip()
+                    break
+
+    # 3. Guard against generic / non-brand titles
+    GENERIC_BRAND_BLACKLIST = {
+        "signup", "sign up", "sign-up", "login", "log in", "log-in", "register",
+        "home", "homepage", "index", "default", "welcome", "untitled", "test",
+        "draft", "drafts", "cart", "checkout", "search", "products", "services",
+        "about", "contact", "category", "account", "profile", "overview", "landing"
+    }
+    if _brand_guess.lower() in GENERIC_BRAND_BLACKLIST or len(_brand_guess) <= 1:
+        _brand_guess = _domain_clean.split(".")[0].capitalize()
 
     sample_routes: List[str] = []
     sample_product_route = None
     sample_pricing_route = None
+    EXCLUDED_ROUTE_PATTERNS = ("/drafts/", "/content/dam/", "/quiz/", "/assets/", "/static/", "/cdn-cgi/", "/_")
     for p in pages:
         p_url = p.get("url") or ""
         parsed_p = urlparse(p_url)
         path = parsed_p.path or "/"
-        if path not in ("/", "") and path not in sample_routes:
-            sample_routes.append(path)
-        if not sample_product_route and any(k in path.lower() for k in ("/product", "/item", "/shop", "/catalog")):
-            sample_product_route = path
+        if path not in ("/", ""):
+            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
+                if not path.lower().endswith((".jpg", ".png", ".gif", ".svg", ".css", ".js")):
+                    if path not in sample_routes:
+                        sample_routes.append(path)
+        if not sample_product_route and any(k in path.lower() for k in ("/product", "/item", "/shop", "/catalog", "/coffee", "/tea", "/machines")):
+            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
+                sample_product_route = path
         if not sample_pricing_route and any(k in path.lower() for k in ("/pricing", "/plans", "/billing")):
-            sample_pricing_route = path
+            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
+                sample_pricing_route = path
 
     has_llms_txt = any("llms.txt" in (p.get("url") or "").lower() for p in pages) or bool(inv.get("llms_txt") if inv else False)
 
@@ -422,64 +543,38 @@ def synthesize_audit_report(
     all_raw_recommendations: List[Dict[str, Any]] = []
 
     statuses = []
+    has_sensor_error = False
     for _skill_name, result in specialist_results.items():
-        statuses.append(result.get("status", "ok"))
+        st = result.get("status", "ok")
+        statuses.append(st)
+        if st == "failed" or result.get("error"):
+            has_sensor_error = True
         all_raw_findings.extend(result.get("findings", []))
         all_raw_recommendations.extend(result.get("recommendations", []))
 
     if inv.get("status") == "failed" or (not pages and not inv.get("infrastructure", {}).get("homepage_reachable", True)):
         audit_status = "failed"
-    elif all(s == "ok" for s in statuses):
+    elif all(s == "ok" for s in statuses) and not has_sensor_error:
         audit_status = "complete"
-    elif any(s in ("ok", "inconclusive") for s in statuses):
+    elif any(s in ("ok", "inconclusive", "failed") for s in statuses):
         audit_status = "partial"
     else:
         audit_status = "failed"
 
     # 1. Full 6-Layer Causal DAG Precedence Analysis & Keystone Defect Identification
     # (Source: knowledge-base.md Section 12)
-    def _is_sitewide_l0(f: Dict[str, Any]) -> bool:
-        c_id = f.get("cause_id") or f.get("id", "")
-        if c_id not in _LAYER0_CAUSE_IDS and TAXONOMY_ALIASES.get(c_id, "") not in _LAYER0_CAUSE_IDS:
-            return False
-        if c_id in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO"):
-            return True
-        ev = str(f.get("evidence", "")).lower()
-        root = str(f.get("root_cause", "")).lower()
-        if c_id in ("NOINDEX_EXCLUSION", "META_DIRECTIVE_CONFLICT") and ("sitewide" in ev or "homepage" in ev or f.get("scope") in ("/", base, domain)):
-            return True
-        if c_id == "AI_RETRIEVAL_BLOCKED":
-            if "disallows all" in root or "disallow: / " in ev or "disallow: /\n" in ev:
-                return True
-            if "disallow: /" in ev and not any(sub in ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content")):
-                return True
-        return False
-
-    has_sitewide_layer0_block = any(_is_sitewide_l0(f) for f in all_raw_findings)
-    layer0_blocked_pages = {
-        str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
-        for f in all_raw_findings
-        if (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER0_CAUSE_IDS
-    }
-    layer0_blocked_pages = {p for p in layer0_blocked_pages if p}
-    has_layer1_rendering_gap = any(
-        (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER1_CAUSE_IDS
-        for f in all_raw_findings
-    )
-    rendering_gap_pages = {
-        str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
-        for f in all_raw_findings
-        if (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER1_CAUSE_IDS
-    }
-    rendering_gap_pages = {p for p in rendering_gap_pages if p}
-    home_page = next((p for p in pages if p.get("page_type") == "homepage" or p.get("url") in (base, f"{base}/")), pages[0] if pages else {})
-    home_wc = home_page.get("word_count", 0)
-    is_site_wide_rendering_gap = (
-        has_layer1_rendering_gap and (
-            (home_wc < 30 and home_wc > 0)
-            or (pages and all(p.get("word_count", 0) < 60 for p in pages))
-        )
-    )
+    unrendered_product_routes: Set[str] = set()
+    if apply_causal_suppression is not None:
+        allowed_findings, suppressed_findings, dag_metadata = apply_causal_suppression(all_raw_findings, inv=inv)
+        downstream_symptoms_by_cause = dag_metadata.get("downstream_symptoms", {})
+        for sc in suppressed_findings:
+            sym_cid = sc.get("cause_id") or sc.get("id") or ""
+            if any(k in str(sym_cid) for k in ("ATTRIBUTE", "PRODUCT", "OFFER", "SCHEMA", "E")):
+                sc_scope = extract_finding_route(sc)
+                unrendered_product_routes.add(sc_scope or "commercial routes")
+    else:
+        allowed_findings = all_raw_findings
+        downstream_symptoms_by_cause = {}
 
     # 2. Scope-Aware Deduplication of Findings
     deduped_findings: List[Dict[str, Any]] = []
@@ -488,26 +583,11 @@ def synthesize_audit_report(
 
     # Order by severity: critical -> high -> medium -> low
     severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-    all_raw_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
+    allowed_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
 
-    for f in all_raw_findings:
+    for f in allowed_findings:
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
-        cid_alias = TAXONOMY_ALIASES.get(cid, "")
-        f_scope = str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
-        if isinstance(f.get("evidence"), dict):
-            f_scope = f_scope or str(f["evidence"].get("scope", "")).lower()
-
-        # Full 6-Layer Causal DAG Keystone Suppression (P0-11):
-        # Layer 0 access block preempts downstream symptoms if site-wide or on the specific blocked page
-        if has_sitewide_layer0_block and (cid in _SUPPRESSED_BY_LAYER0 or cid_alias in _SUPPRESSED_BY_LAYER0):
-            continue
-        if f_scope and any(blk in f_scope or f_scope in blk for blk in layer0_blocked_pages) and (cid in _SUPPRESSED_BY_LAYER0 or cid_alias in _SUPPRESSED_BY_LAYER0):
-            continue
-        # Layer 1 rendering gap only suppresses downstream if site-wide or on the specific unrendered page
-        if is_site_wide_rendering_gap and (cid in _SUPPRESSED_BY_LAYER1 or cid_alias in _SUPPRESSED_BY_LAYER1):
-            continue
-        if f_scope and any(gap in f_scope or f_scope in gap for gap in rendering_gap_pages) and (cid in _SUPPRESSED_BY_LAYER1 or cid_alias in _SUPPRESSED_BY_LAYER1):
-            continue
+        f_scope = extract_finding_route(f) or str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
 
         # P0-10: Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
         dedup_key = f"{cid}::{f.get('title', '')}"
@@ -668,12 +748,31 @@ def synthesize_audit_report(
 
         if f.get("scope"):
             clean_finding["scope"] = f["scope"]
+        if f.get("affected_urls"):
+            clean_finding["affected_urls"] = list(f["affected_urls"])
         if prio_idx is not None:
             clean_finding["priority_index"] = prio_idx
         if f.get("depends_on"):
             clean_finding["depends_on"] = f["depends_on"]
+        if f.get("downstream_symptoms"):
+            clean_finding["downstream_symptoms"] = list(f["downstream_symptoms"])
 
         deduped_findings.append(clean_finding)
+
+    # Attach downstream symptoms to keystone findings across all processed findings
+    for clean_finding in deduped_findings:
+        f_cid = clean_finding.get("cause_id") or clean_finding.get("id") or clean_finding.get("title", "")
+        f_alias = TAXONOMY_ALIASES.get(f_cid, "")
+        matching_symptoms = list(clean_finding.get("downstream_symptoms", []))
+        for cause_k, syms in downstream_symptoms_by_cause.items():
+            is_l1_match = (cause_k == "RENDERED_CONTENT_GAP" and (f_cid in _LAYER1_CAUSE_IDS or f_alias in _LAYER1_CAUSE_IDS))
+            is_l0_match = (cause_k == "AI_RETRIEVAL_BLOCKED" and (f_cid in _LAYER0_CAUSE_IDS or f_alias in _LAYER0_CAUSE_IDS))
+            if cause_k in (f_cid, f_alias) or TAXONOMY_ALIASES.get(cause_k) in (f_cid, f_alias) or is_l1_match or is_l0_match:
+                for s in syms:
+                    if s not in matching_symptoms:
+                        matching_symptoms.append(s)
+        if matching_symptoms:
+            clean_finding["downstream_symptoms"] = matching_symptoms
 
     # 3. Archetype Detection, Severity Reweighting & Proactive Opportunities Synthesis
     archetype = detect_business_archetype(inv)
@@ -731,6 +830,20 @@ def synthesize_audit_report(
         deduped_findings = sorted_output
     else:
         deduped_findings.sort(key=task_sort_key)
+
+    # Re-index finding IDs sequentially after sorting so final report has F-001, F-002, F-003...
+    id_remap = {}
+    for idx, f in enumerate(deduped_findings, 1):
+        old_id = f.get("id")
+        new_id = f"F-{idx:03d}"
+        if old_id:
+            id_remap[old_id] = new_id
+        f["id"] = new_id
+
+    if id_remap:
+        for f in deduped_findings:
+            if f.get("depends_on"):
+                f["depends_on"] = [id_remap.get(dep, dep) for dep in f["depends_on"]]
 
     # Re-compute counts after reweighting
     crit_count = sum(1 for f in deduped_findings if f["severity"] == "critical")
@@ -790,8 +903,28 @@ def synthesize_audit_report(
         })
         proactive_counter += 1
 
+    # Conditional Pre-Hydration Product Schema Architecture (when unrendered product shells were detected)
+    if unrendered_product_routes:
+        sample_routes = ", ".join(sorted(list(unrendered_product_routes))[:3])
+        proactive_actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": "Pre-Hydration Product Schema Architecture",
+            "category": "entity",
+            "summary": (
+                f"Commercial route(s) ({sample_routes}) serve unrendered client-side JS shells. "
+                "When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup "
+                "(declaring name, description, offers with price, priceCurrency, and inStock availability) "
+                "in the initial HTML document before client hydration to ensure instant discovery by AI shopping assistants."
+            ),
+            "priority": "high" if archetype == "ecommerce" else "medium",
+            "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
+            "creative_fix": "Ensure product title, description, pricing, and stock status are presented in semantic HTML above the fold.",
+            "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is present.",
+        })
+        proactive_counter += 1
+
     # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists)
-    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids:
+    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids and not unrendered_product_routes:
         proactive_actions.append({
             "id": f"P-{proactive_counter:03d}",
             "title": f"Implement Structured Specification Comparison Tables for {_brand_guess}",
@@ -877,12 +1010,111 @@ def synthesize_audit_report(
     # 4. Counts-by-Severity Summary (computed earlier after archetype reweighting)
     # (crit_count, high_count, med_count, low_count already set above)
 
+    # 5. Deterministic Readiness Score & Dimensions Breakdown
+    pages_list = inv.get("pages", []) if inv else []
+    total_pages = max(len(pages_list), 1)
+
+    if pages_list:
+        def _to_code(p_item):
+            c = p_item.get("status_code") or p_item.get("status")
+            try:
+                return int(c)
+            except (ValueError, TypeError):
+                return 200
+        crawlable_count = sum(1 for p in pages_list if _to_code(p) < 400)
+        crawlability = round((crawlable_count / total_pages) * 100.0, 2)
+    else:
+        crawlability = 0.0 if inv.get("status") == "failed" else 100.0
+
+    disc_cov = specialist_results.get("discoverability-audit", {}).get("coverage", {})
+    substantive_pages = [
+        p for p in pages_list
+        if (p.get("word_count", 0) or 0) >= 50
+        and not any(k in (p.get("url") or "").lower() for k in ("/footer", "/nav", "/draft", "/fragment"))
+    ]
+    retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2)
+
+    geo_cov = specialist_results.get("geo-content-audit", {}).get("coverage", {})
+    avg_cit = geo_cov.get("average_citability_score", 0.0)
+    citation_readiness = round(float(avg_cit or 0.0), 2)
+
+    entity_cov = specialist_results.get("entity-content-audit", {}).get("coverage", {})
+    corrob_cov = specialist_results.get("corroboration-authority-audit", {}).get("coverage", {})
+    has_jsonld = bool(entity_cov.get("jsonld_present", False))
+    has_org = bool(specialist_results.get("entity-content-audit", {}).get("entity_snapshot", {}).get("organization"))
+    sameas_count = int(corrob_cov.get("sameas_declared", 0) or 0)
+    if has_jsonld and has_org and sameas_count >= 2:
+        entity_authority = 100.0
+    elif has_jsonld or has_org:
+        entity_authority = 50.0
+    elif sameas_count > 0:
+        entity_authority = 25.0
+    else:
+        entity_authority = 0.0
+
+    raw_bots_allowed = disc_cov.get("retrieval_bots_allowed")
+    bots_allowed = int(raw_bots_allowed) if raw_bots_allowed is not None else 4
+    raw_bots_total = disc_cov.get("retrieval_bots_total")
+    bots_total = max(int(raw_bots_total) if raw_bots_total is not None else 4, 1)
+    bot_ratio = bots_allowed / bots_total if bots_total else 1.0
+    cross_engine_visibility = round(bot_ratio * retrieval_readiness, 2)
+
+    def _is_commerce_page(p_item):
+        u = str(p_item.get("url") or "").lower()
+        if any(k in u for k in ("/product", "/pricing", "/cart", "/shop")):
+            return True
+        pt = p_item.get("page_type")
+        if isinstance(pt, dict):
+            pt = pt.get("value")
+        pt_str = str(pt or "").lower()
+        return pt_str in ("product", "pricing", "catalog")
+
+    commerce_pages = sum(1 for p in pages_list if _is_commerce_page(p))
+    agentic_commerce = round((commerce_pages / total_pages) * 100.0, 2)
+
+    dimensions = {
+        "crawlability": crawlability,
+        "retrieval_readiness": retrieval_readiness,
+        "citation_readiness": citation_readiness,
+        "entity_authority": entity_authority,
+        "cross_engine_visibility": cross_engine_visibility,
+        "agentic_commerce": agentic_commerce,
+    }
+    weights = {
+        "crawlability": 0.2,
+        "retrieval_readiness": 0.15,
+        "citation_readiness": 0.25,
+        "entity_authority": 0.2,
+        "cross_engine_visibility": 0.1,
+        "agentic_commerce": 0.1,
+    }
+    composite_score = round(sum(dimensions[k] * weights[k] for k in weights), 2)
+    if composite_score >= 85.0:
+        grade = "A"
+    elif composite_score >= 70.0:
+        grade = "B"
+    elif composite_score >= 50.0:
+        grade = "C"
+    elif composite_score >= 30.0:
+        grade = "D"
+    else:
+        grade = "F"
+
+    readiness = {
+        "composite_score": composite_score,
+        "grade": grade,
+        "dimensions": dimensions,
+        "weights": weights,
+        "score_scope": "Observed static inventory and specialist telemetry; not live provider ranking or citation data.",
+    }
+
     # 6. Assemble Final Draft-07 Compliant Report (Signal Only, Zero Bloat)
     report: Dict[str, Any] = {
         "schema_version": "1.0.0",
         "site": site,
         "audited_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "audit_status": audit_status,
+        "archetype": archetype,
         "summary": {
             "total_findings": len(deduped_findings),
             "critical": crit_count,
@@ -892,6 +1124,21 @@ def synthesize_audit_report(
         },
         "findings": deduped_findings,
         "proactive_actions": final_proactive,
+        "readiness": readiness,
+        "coverage": {
+            "pages_crawled": len(pages_list),
+            "specialist_domains": len(specialist_results),
+            "sensor_errors": [
+                k for k, v in specialist_results.items()
+                if (v.get("status") in ("inconclusive", "failed") and v.get("error")) or v.get("status") == "failed"
+            ],
+        },
+        "limitations": [
+            "No JavaScript browser rendering was performed.",
+            "Robots eligibility was simulated from the captured robots.txt; bot-specific server responses were not tested.",
+            "No external analytics were supplied, so engagement findings are content and navigation proxies rather than observed bounce rates.",
+            "No claim is made about actual citation by any specific AI assistant.",
+        ],
     }
 
     return report
@@ -976,41 +1223,41 @@ def collect_telemetry(
     try:
         from discoverability_check import audit as audit_disc
         specialist_results["discoverability-audit"] = run_specialist_sensor(audit_disc, base, domain, inv)
-    except Exception:
-        specialist_results["discoverability-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["discoverability-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from entity_content_check import audit as audit_entity
         specialist_results["entity-content-audit"] = run_specialist_sensor(audit_entity, base, domain, inv)
-    except Exception:
-        specialist_results["entity-content-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["entity-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from fact_consistency_check import audit as audit_fact
         extra = {"responses_file": responses} if responses else None
         specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv, extra)
-    except Exception:
-        specialist_results["fact-consistency-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["fact-consistency-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from corroboration_check import audit as audit_corrob
         extra = {"candidate_backlinks": candidate_backlinks} if candidate_backlinks else None
         specialist_results["corroboration-authority-audit"] = run_specialist_sensor(audit_corrob, base, domain, inv, extra)
-    except Exception:
-        specialist_results["corroboration-authority-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["corroboration-authority-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from geo_content_check import audit as audit_geo
         specialist_results["geo-content-audit"] = run_specialist_sensor(audit_geo, base, domain, inv)
-    except Exception:
-        specialist_results["geo-content-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["geo-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from engagement_check import audit as audit_eng
         extra = {"analytics": analytics} if analytics else None
         specialist_results["engagement-context-audit"] = run_specialist_sensor(audit_eng, base, domain, inv, extra)
-    except Exception:
-        specialist_results["engagement-context-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["engagement-context-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     return inv, specialist_results
 
@@ -1045,23 +1292,28 @@ def get_telemetry_payload(
     dag_root_causes: List[Dict[str, Any]] = []
     suppressed_categories: Set[str] = set()
 
-    if has_layer0_block:
-        dag_root_causes.append({
-            "code": "AI_RETRIEVAL_BLOCKED",
-            "scope": "site",
-            "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER0)),
-            "rationale": "RFC 9309 search retrieval bot blocked or HTTP 4xx/5xx crawl failure preempts downstream evaluation.",
-        })
-        suppressed_categories.update(_SUPPRESSED_BY_LAYER0)
+    if apply_causal_suppression is not None:
+        _allowed, _suppressed, dag_meta = apply_causal_suppression(all_raw_findings, inv=inv)
+        dag_root_causes = dag_meta.get("root_causes", [])
+        suppressed_categories = set(dag_meta.get("suppressed_categories", []))
+    else:
+        if has_layer0_block:
+            dag_root_causes.append({
+                "code": "AI_RETRIEVAL_BLOCKED",
+                "scope": "site",
+                "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER0)),
+                "rationale": "RFC 9309 search retrieval bot blocked or HTTP 4xx/5xx crawl failure preempts downstream evaluation.",
+            })
+            suppressed_categories.update(_SUPPRESSED_BY_LAYER0)
 
-    if has_layer1_rendering_gap:
-        dag_root_causes.append({
-            "code": "RENDERED_CONTENT_GAP",
-            "scope": "site",
-            "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER1)),
-            "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability and fact evaluation.",
-        })
-        suppressed_categories.update(_SUPPRESSED_BY_LAYER1)
+        if has_layer1_rendering_gap:
+            dag_root_causes.append({
+                "code": "RENDERED_CONTENT_GAP",
+                "scope": "site",
+                "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER1)),
+                "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability and fact evaluation.",
+            })
+            suppressed_categories.update(_SUPPRESSED_BY_LAYER1)
 
     # Extract normalized sensor measurements
     disc_res = specialist_results.get("discoverability-audit", {})

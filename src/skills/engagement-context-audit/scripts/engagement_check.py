@@ -205,7 +205,12 @@ class SemanticIntentEngine:
 
 
 COMMERCIAL_ACTION_PATTERNS = re.compile(
-    r"\b(buy|order|purchase|checkout|add to cart|subscribe|start free trial|try free|sign up|get started|book demo|contact sales|request demo|get quote)\b",
+    r"\b("
+    r"buy|order|purchase|checkout|add to cart|subscribe|start free trial|try free|sign up|get started|book demo|contact sales|request demo|get quote|"
+    r"comprar|comprar ahora|comprar ya|compra|añadir al carrito|carrito|cesta|suscríbete|suscribirse|suscripción|contactar|contacto|pedir|pedido|solicitar|empezar ahora|empezar|mostrar ahora|"
+    r"acheter|acheter maintenant|achat|ajouter au panier|panier|s'abonner|abonnement|contactez-nous|commander|commande|commencer|"
+    r"kaufen|jetzt kaufen|in den warenkorb|warenkorb|abonnieren|kontakt|bestellen|jetzt starten|anmelden"
+    r")\b",
     re.IGNORECASE,
 )
 
@@ -765,7 +770,15 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
     if facts.get("scoped_prices"):
         # The page successfully satisfied the information requirement for the pricing intent.
         # Now evaluate continuity: Does it offer the next logical step?
-        action_found = any(cta in all_action_text for cta in ["buy", "cart", "subscribe", "contact", "order", "get", "trial", "demo", "pricing", "sign up"])
+        action_found = any(
+            cta in all_action_text
+            for cta in [
+                "buy", "cart", "subscribe", "contact", "order", "get", "trial", "demo", "pricing", "sign up", "checkout", "shop",
+                "comprar", "compra", "carrito", "cesta", "suscrib", "suscripci", "contacto", "contactar", "pedir", "pedido", "empezar", "mostrar",
+                "acheter", "achat", "panier", "abonn", "commander", "commande",
+                "kaufen", "kauf", "warenkorb", "bestellen",
+            ]
+        )
         if not action_found:
             findings.append(
                 {
@@ -775,6 +788,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                     "cause_family": "EXPERIENCE.CONTINUITY",
                     "id": "INTENT_TO_LANDING_MISMATCH",
                     "cause_id": "INTENT_TO_LANDING_MISMATCH",
+                    "url": url,
+                    "scope": url,
                     "root_cause": "The page provides pricing facts for an entity but lacks explicit next-step commercial navigation or transactional actions.",
                     "confidence": "high",
                     "evidence": f"Page {url} provides explicit commercial facts (pricing for '{facts['scoped_prices'][0]['entity']}'), satisfying a bottom-funnel intent, but provides no clear transactional or sales-contact navigation.",
@@ -814,6 +829,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                     "cause_family": "EXPERIENCE.CONTINUITY",
                     "id": "LOW_INFORMATION_SCENT",
                     "cause_id": "LOW_INFORMATION_SCENT",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
                     "suggested_action": {
                         "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
@@ -838,6 +855,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "AGENT_INTERACTION_BARRIER",
                 "cause_id": "AGENT_INTERACTION_BARRIER",
+                "url": url,
+                "scope": url,
                 "evidence": f"Page {url} contains {div_onclicks} non-semantic <div onclick> element(s).",
                 "impact": "Autonomous AI agents and browser automation assistants cannot discover, tab through, or trigger non-semantic onclick divs.",
                 "suggested_action": {
@@ -936,6 +955,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "VIEWPORT_ANSWER_ABSENCE",
                 "cause_id": "VIEWPORT_ANSWER_ABSENCE",
+                "url": url,
+                "scope": url,
                 "evidence": f"Page {url} ({page_type}) lacks immediate proposition anchoring in its lead {viewport_data['lead_words_count']} words.",
                 "suggested_action": {
                     "summary": "Anchor the core product proposition, pricing figures, or direct answer in the lead 60 words.",
@@ -948,7 +969,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
         )
 
     # 1.2 CTA Reachability Index (CRO / Transactional Continuation)
-    if page_type in ("product_detail", "pricing", "subscription_flow") and cta_data["is_delayed"]:
+    if page_type in ("product_detail", "pricing", "subscription_flow") and cta_data["is_delayed"] and total_body_words >= 30:
         findings.append(
             {
                 "category": "engagement",
@@ -963,6 +984,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "CTA_REACHABILITY_FRICTION",
                 "cause_id": "CTA_REACHABILITY_FRICTION",
+                "url": url,
+                "scope": url,
                 "evidence": f"Page {url} ({page_type}) places its first commercial CTA at position #{cta_data['first_commercial_cta_index'] + 1 if cta_data['first_commercial_cta_index'] is not None else 'N/A'}.",
                 "suggested_action": {
                     "summary": "Position a prominent commercial continuation CTA within the first 3 interactive elements on the page.",
@@ -1009,6 +1032,60 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                 "verification": "Confirm average sentence length in opening paragraphs is <= 22 words.",
             }
         )
+
+    # 1.5 Multilingual Locale Scent & Hreflang Continuity Check
+    loc_match = re.search(r"^https?://[^/]+/([a-z]{2}(?:-[a-z]{2})?)/", url, re.IGNORECASE)
+    if loc_match and total_body_words >= 50:
+        current_locale = loc_match.group(1).lower()
+        parsed_current = urlparse(url)
+        current_host = parsed_current.netloc.lower()
+        internal_links = []
+        for href in (dom.ctas + dom.nav_links):
+            if not isinstance(href, str):
+                continue
+            h = href.strip()
+            if not h or h.startswith(("#", "javascript:", "mailto:", "tel:")):
+                continue
+            if h.startswith("/") and not h.startswith(("//", "/api", "/static", "/assets", "/_next", "/favicon")):
+                internal_links.append(h)
+            elif "://" in h:
+                p_h = urlparse(h)
+                if p_h.netloc.lower() == current_host and not p_h.path.startswith(("/api", "/static", "/assets", "/_next", "/favicon")):
+                    internal_links.append(p_h.path + (("?" + p_h.query) if p_h.query else ""))
+        if len(internal_links) >= 4:
+            leaked_links = [
+                h for h in internal_links
+                if not h.startswith(f"/{current_locale}/") and h != f"/{current_locale}" and not h.startswith(f"/{current_locale}?")
+            ]
+            if len(leaked_links) / len(internal_links) > 0.7:
+                if not any(f.get("cause_id") == "COMMERCIAL_HANDOFF_DISCONTINUITY" for f in findings):
+                    findings.append(
+                        {
+                            "category": "conversion-continuity",
+                            "title": f"Multilingual navigation links drop /{current_locale}/ locale prefix on {url}",
+                            "severity": "medium",
+                            "confidence": "high",
+                            "root_cause": (
+                                f"COMMERCIAL_HANDOFF_DISCONTINUITY: Arriving visitors at localized route ({url}, locale: '{current_locale}') "
+                                f"encounter {len(leaked_links)}/{len(internal_links)} internal navigation links that omit the /{current_locale}/ prefix. "
+                                "High-intent citation traffic arriving from AI search in a specific language experiences context drop-off when navigation resets to the default language."
+                            ),
+                            "cause_family": "EXPERIENCE.CONTINUITY",
+                            "id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+                            "cause_id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+                            "url": url,
+                            "scope": url,
+                            "impact": "Visitors arriving from international AI citations lose language orientation upon clicking internal navigation.",
+                            "evidence": f"Found {len(leaked_links)} unlocalized link(s) on {url} (e.g. '{leaked_links[0]}').",
+                            "suggested_action": {
+                                "summary": f"Preserve the /{current_locale}/ prefix across all internal navigation and CTA links on {url}.",
+                                "technical_fix": f"Update URL generation helper or router to prepend /{current_locale} to internal href attributes.",
+                                "creative_fix": f"Ensure language consistency across product catalog and checkout flows for the '{current_locale}' locale.",
+                                "priority": "medium",
+                                "verification": f"Verify internal navigation links on {url} maintain the /{current_locale}/ prefix.",
+                            },
+                        }
+                    )
 
     return (
         findings,
@@ -1130,6 +1207,8 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                             "cause_family": "EXPERIENCE.CONTINUITY",
                             "id": "AI_REFERRAL_DISCONTINUITY",
                             "cause_id": "AI_REFERRAL_DISCONTINUITY",
+                            "url": p_url,
+                            "scope": p_url,
                             "confidence": "high",
                             "root_cause": (
                                 f"Observed AI referral traffic exhibits a {ai_bounce * 100:.1f}% bounce rate compared to a "
@@ -1216,6 +1295,8 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                         "check_id": "J9",
                         "actual_band": "S1",
                         "finding_kind": "confirmed_problem",
+                        "url": p.get("url"),
+                        "scope": p.get("url"),
                         "title": "404 recovery affordances deficit in error response",
                         "severity": "low",
                         "confidence": "high",
