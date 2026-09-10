@@ -211,11 +211,17 @@ def safe_fetch(
             return None, "", {}, "Global deadline exceeded"
         timeout = min(timeout, remaining)
 
+    if method not in ("GET", "HEAD"):
+        return None, "", {}, f"Disallowed HTTP method: {method}. Safe fetch is strictly read-only (GET, HEAD only)."
+
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return None, "", {}, f"Disallowed scheme: {parsed.scheme}"
     if not parsed.hostname or parsed.username is not None or parsed.password is not None:
         return None, "", {}, "Malformed URL: credentials and missing host are disallowed"
+    port = parsed.port
+    if port is not None and port not in (80, 443):
+        return None, "", {}, f"Disallowed port: {port}. Only standard web ports (80, 443) are permitted."
     if max_bytes < 0:
         return None, "", {}, "Invalid max_bytes: must be non-negative"
 

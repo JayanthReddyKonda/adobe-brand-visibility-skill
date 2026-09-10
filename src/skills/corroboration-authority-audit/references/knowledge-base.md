@@ -42,7 +42,7 @@ A critical architectural principle of this skill is the strict separation betwee
 2. **Verified Candidate Backlinks (`verified_candidate_backlinks`):**
    - **Definition:** Inbound hyperlinks from third-party websites pointing *to* the brand's canonical domain or deep links (`<a href="https://brand.com/...">`).
    - **Purpose:** Validates external editorial citations, press mentions, reviews, and community references that AI search engines retrieve during query fan-out.
-   - **Verification Input Contract:** Ingests user-supplied candidate backlink URLs via `--candidate-backlinks` or `inventory.json`. Probes each candidate page (capped at 10, 5s timeout, 512 KiB limit, SSRF-safe) to verify the actual presence of the inbound hyperlink, anchor text, and `rel` attributes (`nofollow`, `ugc`, `sponsored`, `dofollow`).
+   - **Verification Input Contract:** Ingests user-supplied candidate backlink URLs via `--candidate-backlinks` or `inv.json`. Probes each candidate page (capped at 10, 5s timeout, 512 KiB limit, SSRF-safe) to verify the actual presence of the inbound hyperlink, anchor text, and `rel` attributes (`nofollow`, `ugc`, `sponsored`, `dofollow`).
 
 ### The Common Crawl CDX Limitation (Why Web-Wide Discovery Cannot Be Claimed)
 

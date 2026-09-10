@@ -367,6 +367,37 @@ def build_bundle(site: str, data: Optional[Dict[str, Any]] = None) -> str:
     return "\n".join(output_lines)
 
 
+def verify_reference_integrity() -> Dict[str, Any]:
+    """Verify presence and calculate SHA-256 checksums of core knowledge base and schema references."""
+    import hashlib
+    ref_files = [
+        "checks.json",
+        "knowledge-base.md",
+        "core-synthesis-digest.md",
+        "report-schema.json",
+        "telemetry-schema.json",
+    ]
+    status: Dict[str, Any] = {"all_valid": True, "references": {}}
+    for fname in ref_files:
+        fpath = os.path.join(REFERENCES_DIR, fname)
+        if os.path.exists(fpath):
+            with open(fpath, "rb") as f:
+                chash = hashlib.sha256(f.read()).hexdigest()
+            status["references"][fname] = {
+                "present": True,
+                "sha256": chash,
+                "size_bytes": os.path.getsize(fpath),
+            }
+        else:
+            status["all_valid"] = False
+            status["references"][fname] = {
+                "present": False,
+                "sha256": None,
+                "size_bytes": 0,
+            }
+    return status
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -396,7 +427,13 @@ def main():
 
     if args.format == "json":
         signals = detect_signals(data_payload)
-        out = json.dumps({"site": args.site, "signals": signals, "briefing": bundle_text}, indent=2)
+        ref_status = verify_reference_integrity()
+        out = json.dumps({
+            "site": args.site,
+            "signals": signals,
+            "reference_integrity": ref_status,
+            "briefing": bundle_text,
+        }, indent=2)
     else:
         out = bundle_text
 

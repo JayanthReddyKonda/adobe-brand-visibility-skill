@@ -1211,6 +1211,7 @@ def audit(base, domain, inv=None, state_file=None):
         "raw_html_content_available": visible_words >= 60,
         "semantic_landmarks_present": has_semantic_landmarks,
         "signal_to_noise_ratio": snr,
+        "average_page_snr": snr,
     }
 
     if state_file:

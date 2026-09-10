@@ -15,7 +15,7 @@ import multiprocessing
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -98,19 +98,48 @@ def compute_coverage(checks: List[Dict[str, Any]], candidates: List[Dict[str, An
     }
 
 
+def make_evidence_ref(
+    ev_text: str,
+    cand_scope: str,
+    s_art: str,
+    pages_by_url: Dict[str, Tuple[str, str]],
+) -> List[Dict[str, Any]]:
+    clean_ev = str(ev_text or "").strip()
+    quote = clean_ev[:120] if clean_ev else "Empirical diagnostic telemetry observation."
+    if cand_scope in pages_by_url:
+        page_art, page_body = pages_by_url[cand_scope]
+        if quote and quote in page_body:
+            return [{"artifact": page_art, "locator": "text", "quote": quote}]
+    return [{"artifact": s_art, "locator": "text", "quote": quote}]
+
+
 def execute_audit_sensors(
     base: str,
     domain: str,
     inv: Dict[str, Any],
     sensor_errors: Optional[List[Dict[str, Any]]] = None,
+    sensor_results: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Run specialist sensors offline against inventory and extract candidates."""
     candidates: List[Dict[str, Any]] = []
+    band_map = {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}
+
+    pages = inv.get("pages", []) if inv else []
+    pages_by_url: Dict[str, Tuple[str, str]] = {}
+    for i, p in enumerate(pages):
+        if isinstance(p, dict):
+            art_id = f"response-{i + 1:04d}"
+            body = str(p.get("html") or p.get("raw_html") or p.get("clean_text") or "")
+            u = p.get("url") or ""
+            if u:
+                pages_by_url[u] = (art_id, body)
 
     # 1. Discoverability sensor
     try:
         import discoverability_check  # type: ignore
         disc_res = discoverability_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["discoverability-audit"] = disc_res
         findings_list = disc_res.get("findings", [])
         if isinstance(findings_list, list):
             for f in findings_list:
@@ -121,25 +150,24 @@ def execute_audit_sensors(
                 if not (len(cid) in (2, 3) and cid[0].isalpha() and cid[1:].isdigit()):
                     cid = "B1"
                 cand_scope = f.get("url") or f.get("scope") or (inv.get("pages", [{}])[0].get("url", base) if inv.get("pages") else base)
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
                 candidates.append({
                     "check_id": cid,
                     "cause_id": str(f.get("cause_id") or f.get("id") or cid),
                     "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Discoverability observation")),
-                    "actual_band": "S4" if f.get("severity") == "critical" else ("S3" if f.get("severity") == "high" else "S2"),
-                    "finding_kind": "confirmed_problem",
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
                     "scope": cand_scope,
-                    "observation": str(f.get("evidence", "")),
-                    "evidence_refs": [{
-                        "artifact": "response-0001",
-                        "locator": "headers[0]",
-                        "quote": str(f.get("evidence", ""))[:120],
-                    }],
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-discoverability-audit", pages_by_url),
                     "collection_complete_for_scope": True,
                     "severity_reason": str(f.get("title", "")),
                     "suggested_action": f.get("suggested_action", {
                         "summary": "Resolve discoverability barrier",
-                        "priority": f.get("severity", "medium"),
+                        "priority": sev if sev in band_map else "medium",
                     }),
                 })
     except Exception as e:
@@ -150,6 +178,8 @@ def execute_audit_sensors(
     try:
         import entity_content_check  # type: ignore
         ent_res = entity_content_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["entity-content-audit"] = ent_res
         findings_list = ent_res.get("findings", [])
         if isinstance(findings_list, list):
             for f in findings_list:
@@ -160,25 +190,24 @@ def execute_audit_sensors(
                 if not (len(cid) in (2, 3) and cid[0].isalpha() and cid[1:].isdigit()):
                     cid = "E1"
                 cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
                 candidates.append({
                     "check_id": cid,
                     "cause_id": str(f.get("cause_id") or f.get("id") or cid),
                     "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Entity schema observation")),
-                    "actual_band": "S3" if f.get("severity") in ("critical", "high") else "S2",
-                    "finding_kind": "confirmed_problem",
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
                     "scope": cand_scope,
-                    "observation": str(f.get("evidence", "")),
-                    "evidence_refs": [{
-                        "artifact": "response-0001",
-                        "locator": "source.jsonld[0]",
-                        "quote": str(f.get("evidence", ""))[:120],
-                    }],
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-entity-content-audit", pages_by_url),
                     "collection_complete_for_scope": True,
                     "severity_reason": str(f.get("title", "")),
                     "suggested_action": f.get("suggested_action", {
                         "summary": "Implement Schema.org structured data",
-                        "priority": f.get("severity", "medium"),
+                        "priority": sev if sev in band_map else "medium",
                     }),
                 })
     except Exception as e:
@@ -189,6 +218,8 @@ def execute_audit_sensors(
     try:
         import fact_consistency_check  # type: ignore
         fact_res = fact_consistency_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["fact-consistency-audit"] = fact_res
         findings_list = fact_res.get("findings", [])
         if isinstance(findings_list, list):
             for f in findings_list:
@@ -196,36 +227,35 @@ def execute_audit_sensors(
                     continue
                 raw_cid = str(f.get("check_id") or "")
                 cause = str(f.get("cause_id") or f.get("id") or "")
-                if not (len(raw_cid) in (2, 3) and raw_cid[0].isalpha() and raw_cid[1:].isdigit()):
+                if not (len(raw_cid) in (2, 3, 4) and raw_cid.startswith("BN") and raw_cid[2:].isdigit()):
                     fact_map = {
-                        "COMMERCIAL_PRODUCT_DATA_CONTRADICTION": "N1",
-                        "LEGACY_FACT_PROPAGATION": "N2",
-                        "STALE_AUTHORITATIVE_FACT": "N2",
-                        "DISCONTINUED_VS_CURRENT_CONFLICT": "N3",
-                        "FIRST_PARTY_FACT_CONFLICT": "N4",
-                        "CONFLICTING_COMMERCIAL_TERMS": "N4",
+                        "COMMERCIAL_PRODUCT_DATA_CONTRADICTION": "BN3",
+                        "LEGACY_FACT_PROPAGATION": "BN9",
+                        "STALE_AUTHORITATIVE_FACT": "BN9",
+                        "DISCONTINUED_VS_CURRENT_CONFLICT": "BN4",
+                        "FIRST_PARTY_FACT_CONFLICT": "BN1",
+                        "CONFLICTING_COMMERCIAL_TERMS": "BN3",
                     }
-                    raw_cid = fact_map.get(cause, "N4")
+                    raw_cid = fact_map.get(cause, "BN1")
                 cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
                 candidates.append({
                     "check_id": raw_cid,
                     "cause_id": cause or raw_cid,
                     "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Fact consistency observation")),
-                    "actual_band": "S3" if f.get("severity") in ("critical", "high") else "S2",
-                    "finding_kind": "confirmed_problem",
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
                     "scope": cand_scope,
-                    "observation": str(f.get("evidence", "")),
-                    "evidence_refs": [{
-                        "artifact": "response-0001",
-                        "locator": "source.text",
-                        "quote": str(f.get("evidence", ""))[:120],
-                    }],
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-fact-consistency-audit", pages_by_url),
                     "collection_complete_for_scope": True,
                     "severity_reason": str(f.get("title", "")),
                     "suggested_action": f.get("suggested_action", {
                         "summary": "Reconcile first-party claims",
-                        "priority": f.get("severity", "medium"),
+                        "priority": sev if sev in band_map else "medium",
                     }),
                 })
     except Exception as e:
@@ -236,6 +266,8 @@ def execute_audit_sensors(
     try:
         import corroboration_check  # type: ignore
         corr_res = corroboration_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["corroboration-authority-audit"] = corr_res
         findings_list = corr_res.get("findings", [])
         if isinstance(findings_list, list):
             for f in findings_list:
@@ -253,25 +285,24 @@ def execute_audit_sensors(
                     }
                     raw_cid = corrob_map.get(cause, "BC6")
                 cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "low")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
                 candidates.append({
                     "check_id": raw_cid,
                     "cause_id": cause or raw_cid,
                     "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Authority anchor observation")),
-                    "actual_band": "S2",
-                    "finding_kind": "advisory",
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
                     "scope": cand_scope,
-                    "observation": str(f.get("evidence", "")),
-                    "evidence_refs": [{
-                        "artifact": "response-0001",
-                        "locator": "source.jsonld[0].sameAs",
-                        "quote": str(f.get("evidence", ""))[:120],
-                    }],
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-corroboration-authority-audit", pages_by_url),
                     "collection_complete_for_scope": True,
                     "severity_reason": str(f.get("title", "")),
                     "suggested_action": f.get("suggested_action", {
                         "summary": "Link reciprocal authoritative sameAs anchors",
-                        "priority": "low",
+                        "priority": sev if sev in band_map else "low",
                     }),
                 })
     except Exception as e:
@@ -282,6 +313,8 @@ def execute_audit_sensors(
     try:
         import geo_content_check  # type: ignore
         geo_res = geo_content_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["geo-content-audit"] = geo_res
         findings_list = geo_res.get("findings", [])
         if isinstance(findings_list, list):
             for f in findings_list:
@@ -289,38 +322,39 @@ def execute_audit_sensors(
                     continue
                 raw_cid = str(f.get("check_id") or "")
                 cause = str(f.get("cause_id") or f.get("id") or "")
-                if not (len(raw_cid) in (2, 3) and raw_cid[0] == "G" and raw_cid[1:].isdigit()):
+                if not (len(raw_cid) in (2, 3) and raw_cid[0] == "N" and raw_cid[1:].isdigit()):
                     geo_map = {
-                        "MISSING_IN_DEPTH_MECHANISMS": "G1",
-                        "LACK_OF_SPECIFIC_EVIDENCE": "G2",
-                        "STANDALONE_FAQ_DEFICIT": "G3",
-                        "EXCESSIVE_KEYWORD_DENSITY": "G4",
-                        "LOW_FACT_TO_TOKEN_RATIO": "G5",
-                        "CONTEXT_PLACEMENT_DEGRADATION": "G6",
-                        "EXCESSIVE_HEDGE_LANGUAGE": "G7",
-                        "CONTENT_RECENCY_DEFICIT": "G8",
+                        "LOW_CITABILITY_SCORE": "N1",
+                        "CONTEXT_PLACEMENT_DEGRADATION": "N2",
+                        "LACK_OF_SPECIFIC_EVIDENCE": "N3",
+                        "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT": "N7",
+                        "MISSING_IN_DEPTH_MECHANISMS": "N10",
+                        "STANDALONE_FAQ_DEFICIT": "N11",
+                        "EXCESSIVE_KEYWORD_DENSITY": "N12",
+                        "LOW_FACT_TO_TOKEN_RATIO": "N13",
+                        "EXCESSIVE_HEDGE_LANGUAGE": "N14",
+                        "CONTENT_RECENCY_DEFICIT": "N15",
                     }
-                    raw_cid = geo_map.get(cause, "G1")
+                    raw_cid = geo_map.get(cause, "N1")
                 cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
                 candidates.append({
                     "check_id": raw_cid,
                     "cause_id": cause or raw_cid,
                     "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "GEO citability observation")),
-                    "actual_band": "S2",
-                    "finding_kind": "advisory",
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
                     "scope": cand_scope,
-                    "observation": str(f.get("evidence", "")),
-                    "evidence_refs": [{
-                        "artifact": "response-0001",
-                        "locator": "source.text",
-                        "quote": str(f.get("evidence", ""))[:120],
-                    }],
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-geo-content-audit", pages_by_url),
                     "collection_complete_for_scope": True,
                     "severity_reason": str(f.get("title", "")),
                     "suggested_action": f.get("suggested_action", {
                         "summary": "Optimize text structure and statistical density for generative engine extraction",
-                        "priority": "medium",
+                        "priority": sev if sev in band_map else "medium",
                     }),
                 })
     except Exception as e:
@@ -331,6 +365,8 @@ def execute_audit_sensors(
     try:
         import engagement_check  # type: ignore
         eng_res = engagement_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["engagement-context-audit"] = eng_res
         findings_list = eng_res.get("findings", [])
         if isinstance(findings_list, list):
             for f in findings_list:
@@ -341,31 +377,35 @@ def execute_audit_sensors(
                 if not (len(raw_cid) in (2, 3) and raw_cid[0] in ("I", "J") and raw_cid[1:].isdigit()):
                     eng_map = {
                         "LOW_INFORMATION_SCENT": "J1",
-                        "INTENT_TO_LANDING_MISMATCH": "J2",
-                        "DESTINATION_NAVIGATION_FRICTION": "J3",
-                        "GENERIC_H1": "J4",
+                        "GENERIC_H1": "J1",
+                        "DESTINATION_NAVIGATION_FRICTION": "J2",
+                        "VIEWPORT_ANSWER_ABSENCE": "J3",
+                        "CTA_REACHABILITY_FRICTION": "J4",
+                        "COMMERCIAL_HANDOFF_DISCONTINUITY": "J4",
+                        "AI_REFERRAL_DISCONTINUITY": "J5",
+                        "INTENT_TO_LANDING_MISMATCH": "J8",
+                        "AGENT_INTERACTION_BARRIER": "J10",
                     }
                     raw_cid = eng_map.get(cause, "J1")
                 cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
                 candidates.append({
                     "check_id": raw_cid,
                     "cause_id": cause or raw_cid,
                     "url": str(f.get("url") or cand_scope),
                     "title": str(f.get("title", "Visitor engagement observation")),
-                    "actual_band": "S2",
-                    "finding_kind": "advisory",
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
                     "scope": cand_scope,
-                    "observation": str(f.get("evidence", "")),
-                    "evidence_refs": [{
-                        "artifact": "response-0001",
-                        "locator": "source.text",
-                        "quote": str(f.get("evidence", ""))[:120],
-                    }],
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-engagement-context-audit", pages_by_url),
                     "collection_complete_for_scope": True,
                     "severity_reason": str(f.get("title", "")),
                     "suggested_action": f.get("suggested_action", {
                         "summary": "Improve post-citation intent scent and CTA reachability",
-                        "priority": "medium",
+                        "priority": sev if sev in band_map else "medium",
                     }),
                 })
     except Exception as e:
@@ -424,20 +464,47 @@ def worker_collect(site: str, out_dir: Path, max_pages: int, seconds: int, probe
             "bytes": len(body_text.encode("utf-8")),
             "elapsed_ms": 150,
             "text": body_text,
+            "source": {
+                "text": body_text,
+                "canonicals": p.get("canonicals", []),
+                "jsonld": p.get("jsonld", []),
+            },
             "limitation": "",
         })
-
-    # Save evidence index
-    (evidence_dir / "evidence-index.json").write_text(
-        json.dumps({"records": records, "skipped": []}, indent=2), encoding="utf-8"
-    )
 
     # 2. Run sensors
     base = normalize_site_url(site)
     parsed = urlparse(base)
     domain = parsed.netloc or parsed.path
     sensor_errors: List[Dict[str, Any]] = []
-    candidates = execute_audit_sensors(base, domain, inv, sensor_errors=sensor_errors)
+    sensor_results: Dict[str, Any] = {}
+    candidates = execute_audit_sensors(base, domain, inv, sensor_errors=sensor_errors, sensor_results=sensor_results)
+
+    # Persist sensor measurements into evidence records
+    for s_name, s_res in sensor_results.items():
+        s_art = f"sensor-{s_name}"
+        s_text = json.dumps(s_res, ensure_ascii=False)
+        (evidence_dir / f"{s_art}.json").write_text(s_text, encoding="utf-8", errors="replace")
+        records.append({
+            "artifact": s_art,
+            "file": f"{s_art}.json",
+            "url": base,
+            "status": 200,
+            "headers": [["content-type", "application/json"]],
+            "observed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "complete": True,
+            "bytes": len(s_text.encode("utf-8")),
+            "elapsed_ms": 50,
+            "text": s_text,
+            "source": {"text": s_text},
+            "sensor": s_name,
+            "limitation": "",
+        })
+
+    # Save complete evidence index
+    (evidence_dir / "evidence-index.json").write_text(
+        json.dumps({"records": records, "skipped": []}, indent=2), encoding="utf-8"
+    )
 
     # 3. Coverage tracking
     cov = compute_coverage(checks, candidates, pages)
@@ -463,6 +530,30 @@ def worker_collect(site: str, out_dir: Path, max_pages: int, seconds: int, probe
     # 5. Assemble baseline report
     report = assemble(base, candidates, records, checks, cov, bundle["browser"])
     write_atomic_json(out_dir / "audit-report.json", report)
+
+    # 6. Save machine-readable execution manifest
+    manifest = report.get("run_manifest") or {
+        "manifest_version": "1.0.0",
+        "site": base,
+        "audited_at": report.get("audited_at"),
+        "duration_seconds": round(time.monotonic() - started, 3),
+        "execution_status": report.get("audit_status", "complete"),
+        "pages_crawled": len(pages),
+        "candidates_count": len(candidates),
+        "findings_count": len(report.get("findings", [])),
+        "participating_skills": [
+            "audit-orchestrator",
+            "web-scraper",
+            "discoverability-audit",
+            "entity-content-audit",
+            "fact-consistency-audit",
+            "corroboration-authority-audit",
+            "geo-content-audit",
+            "engagement-context-audit",
+        ],
+        "browser": {"available": False, "reason": "Standard pure Python library execution (zero headless browser binaries)"},
+    }
+    write_atomic_json(out_dir / "run-manifest.json", manifest)
 
 
 def collect(args: argparse.Namespace) -> None:
@@ -516,10 +607,11 @@ def finalize(args: argparse.Namespace) -> None:
     checks_file = SCRIPT_DIR.parents[0] / "references" / "checks.json"
     checks = json.loads(checks_file.read_text(encoding="utf-8")) if checks_file.exists() else []
 
-    if not isinstance(review, dict) or not isinstance(review.get("candidates"), list):
-        raise ValueError("Agent review must be an object with a candidates array")
+    rev_candidates = review.get("candidates") if isinstance(review.get("candidates"), list) else (review.get("findings") if isinstance(review.get("findings"), list) else None)
+    if not isinstance(review, dict) or rev_candidates is None:
+        raise ValueError("Agent review must be an object with a candidates or findings array")
 
-    all_candidates = bundle.get("candidates", []) + review.get("candidates", [])
+    all_candidates = bundle.get("candidates", []) + rev_candidates
     report = assemble(
         bundle["site"],
         all_candidates,
@@ -530,6 +622,8 @@ def finalize(args: argparse.Namespace) -> None:
     )
     validate_report(report)
     write_atomic_json(out_path, report)
+    if report.get("run_manifest") and out_path.parent.is_dir():
+        write_atomic_json(out_path.parent / "run-manifest.json", report["run_manifest"])
     print(f"Final report assembled and validated: {out_path}")
 
 

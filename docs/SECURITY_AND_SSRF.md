@@ -1,7 +1,7 @@
 # SSRF Defense & Network Security Architecture
 
 **Author:** Jayanth Reddy Konda
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Module:** `web-scraper/scripts/safe_fetch.py` (Canonical Zero-Trust Socket Fetcher)  
 **Security Level:** Zero-Trust Hermetic Boundary  
 
@@ -69,6 +69,13 @@ if getattr(ip_obj, "ipv4_mapped", None):
 
 - Redirects are limited to a maximum of 5 hops with per-hop IP validation.
 - Decompression (`gzip`, `deflate`) enforces a strict buffer cap (default 2 MB) using `zlib.decompressobj()`, preventing memory exhaustion from gzip bombs.
+
+### E. Port Whitelisting, Method Restrictions, & XML XXE Defense
+
+- **Strict Port Whitelisting:** Only public HTTP (80) and HTTPS (443) ports are permitted. Requests to internal/alternative ports (22, 8080, 8443, etc.) are aborted immediately before socket initialization.
+- **Read-Only Method Restrictions:** Only idempotent `GET` and `HEAD` requests are permitted. State-mutating methods (`POST`, `PUT`, `DELETE`, `PATCH`) are strictly rejected.
+- **XXE Defense in XML Sitemap Parsing:** The XML parser enforces safe subset parsing, rejecting any `DOCTYPE` or `ENTITY` declarations to prevent XML External Entity (XXE) and SSRF attacks via sitemaps.
+
 
 ---
 

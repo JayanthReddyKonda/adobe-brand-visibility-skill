@@ -204,12 +204,24 @@ class RobotsAuditor:
         matching_rules: List[RobotsRule] = []
         agent_lower = user_agent.lower()
 
+        agent_product = re.split(r"[/;\s]", agent_lower)[0].strip()
+
         # Step 1: Combine rules from ALL groups matching the user-agent product token (RFC 9309 section 2.2.1)
         matched_specific = False
         for group in self.groups:
             for ua in group.user_agents:
                 ua_clean = ua.strip().lower()
-                if ua_clean != "*" and (ua_clean == agent_lower or ua_clean in agent_lower or agent_lower in ua_clean):
+                if ua_clean == "*":
+                    continue
+                rule_product = re.split(r"[/;\s]", ua_clean)[0].strip()
+                # RFC 9309: Match product token case-insensitively, allowing version prefixes
+                is_match = (
+                    ua_clean == agent_lower
+                    or rule_product == agent_product
+                    or (agent_lower.startswith(ua_clean) and (len(agent_lower) == len(ua_clean) or agent_lower[len(ua_clean)] in ("/", "-", " ")))
+                    or (ua_clean.startswith(agent_product) and (len(ua_clean) == len(agent_product) or ua_clean[len(agent_product)] in ("/", "-", " ")))
+                )
+                if is_match:
                     matching_rules.extend(group.rules)
                     matched_specific = True
                     break

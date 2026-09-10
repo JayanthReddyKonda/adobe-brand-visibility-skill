@@ -203,9 +203,20 @@ def main() -> int:
         out_dir = os.path.dirname(os.path.abspath(args.output))
         if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
-        content_to_write = md_str if args.format == "markdown" else json_str
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write(content_to_write)
+        if args.format == "markdown":
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(md_str)
+        elif args.format == "both":
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(json_str)
+            md_path = os.path.splitext(args.output)[0] + ".md"
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_str)
+            if args.verbose:
+                sys.stderr.write(f"[*] Markdown summary written to {md_path}\n")
+        else:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(json_str)
         if args.verbose:
             sys.stderr.write(f"[*] Inventory written to {args.output}\n")
 

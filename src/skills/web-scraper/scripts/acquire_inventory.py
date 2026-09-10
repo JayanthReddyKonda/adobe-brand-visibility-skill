@@ -358,8 +358,16 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
 
     # 1. Homepage Acquisition
     status, html, headers, err = safe_fetch(base_url + "/", timeout=10, max_bytes=2 * 1024 * 1024)
-    if status is None or not html:
-        inv["limitations"].append(f"Homepage unreachable ({err or 'network error'}); inventory could not be built.")
+    ct = (headers.get("content-type") or "").lower()
+    is_html = any(t in ct for t in ("text/html", "application/xhtml+xml"))
+    if not is_html and html:
+        sample_body = html[:512].lower()
+        if "<html" in sample_body or "<!doctype html" in sample_body:
+            is_html = True
+
+    if status is None or status != 200 or not html or not is_html:
+        fail_reason = err or (f"HTTP {status}" if status != 200 else f"Non-HTML content ({ct})")
+        inv["limitations"].append(f"Homepage unreachable or non-HTML ({fail_reason}); inventory could not be built.")
         return inv, {
             "homepage_reachable": False,
             "html_pages_sampled": 0,
@@ -652,7 +660,7 @@ def main():
     )
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
     parser.add_argument("--output", "-o", help="Destination path to write acquired inventory JSON (e.g. inv.json)")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
+    parser.add_argument("--format", choices=["json"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
 
     s = args.site.strip()

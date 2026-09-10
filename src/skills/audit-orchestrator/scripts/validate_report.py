@@ -174,7 +174,13 @@ def verify_summary_counts(report):
     if not isinstance(findings, list) or not isinstance(summary, dict):
         return errors
 
-    if "total_findings" in summary and summary["total_findings"] != len(findings):
+    status = report.get("audit_status")
+    if status not in ("complete", "partial", "failed"):
+        errors.append(f"Invalid or missing audit_status '{status}'. Must be 'complete', 'partial', or 'failed'")
+
+    if "total_findings" not in summary:
+        errors.append("summary is missing required property 'total_findings'")
+    elif summary["total_findings"] != len(findings):
         errors.append(f"total_findings ({summary['total_findings']}) does not match findings count ({len(findings)})")
 
     expected = {
@@ -182,13 +188,26 @@ def verify_summary_counts(report):
         for sev in ("critical", "high", "medium", "low")
     }
     for sev, count in expected.items():
-        if sev in summary and summary[sev] != count:
+        if sev not in summary:
+            errors.append(f"summary is missing required severity count '{sev}'")
+        elif summary[sev] != count:
             errors.append(f"summary.{sev} ({summary[sev]}) does not match actual {sev} findings count ({count})")
 
-    # Invariant: Duplicate finding IDs for standardized finding IDs
-    finding_ids = [f.get("id") for f in findings if isinstance(f, dict) and isinstance(f.get("id"), str) and re.match(r"^F-\d+$", f.get("id", ""))]
+    # Invariant: Duplicate finding IDs across standardized findings
+    finding_ids = [
+        f.get("id")
+        for f in findings
+        if isinstance(f, dict) and isinstance(f.get("id"), str) and re.match(r"^F-\d+$", f.get("id", ""))
+    ]
     if len(set(finding_ids)) != len(finding_ids):
         errors.append("Duplicate finding ID detected in findings array")
+
+    # Invariant: Duplicate proactive action IDs
+    actions = report.get("proactive_actions", [])
+    if isinstance(actions, list):
+        action_ids = [a.get("id") for a in actions if isinstance(a, dict) and isinstance(a.get("id"), str)]
+        if len(set(action_ids)) != len(action_ids):
+            errors.append("Duplicate proactive action ID detected in proactive_actions array")
 
     # Invariant: actual_band to severity mapping and priority_index formula
     band_to_sev = {"S4": "critical", "S3": "high", "S2": "medium", "S1": "low", "S0": "info", "U": "unassessable"}
@@ -309,7 +328,9 @@ def main():
             print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
             sys.exit(2)
 
-    print(json.dumps(instance, indent=2))
+    schema_name = os.path.basename(schema_path)
+    target_name = os.path.basename(args.input_file) if args.input_file != "-" else "stdin"
+    print(f"Valid: {target_name} conforms to {schema_name}")
     sys.exit(0)
 
 

@@ -224,7 +224,18 @@ A page can achieve a 95/100 technical SEO score and still fail completely in AI 
 - **Strong Value-Driven CTAs:** `Start Free Trial`, `See Live Pricing`, `Explore Documentation`, `Download Architecture PDF`.
 - **Formula:** `[Action Verb] + [Specific Desired Outcome/Asset]`.
 
+### The 7 Post-Citation Bounce Mechanisms (The 5-Second Abandonment Filter):
+When visitors click through from AI assistant citations (ChatGPT, Perplexity, Claude), up to 70% bounce within 5 seconds if the destination violates intent continuity:
+1. **`VIEWPORT_ANSWER_ABSENCE`**: The primary claim, product, or price quoted by the AI assistant does not appear in the top 600px viewport. The visitor cannot confirm what the AI told them and leaves immediately.
+2. **`LOW_INFORMATION_SCENT` (`GENERIC_H1`)**: The page title or H1 displays generic marketing copy ("Innovating Together", "Welcome") rather than echoing the specific entity or topic cited.
+3. **`CTA_REACHABILITY_FRICTION`**: The transaction or next-step action is hidden behind multi-level menus, modal popups, or deep scrolling (>3 interaction actions).
+4. **`COMMERCIAL_HANDOFF_DISCONTINUITY`**: The AI summary promised a commercial solution or pricing, but the destination page offers no transparent purchasing or self-serve checkout mechanism.
+5. **`AGENT_INTERACTION_BARRIER`**: Actions rely on non-semantic `<div onclick>` handlers, locking out autonomous purchasing agents and keyboard users.
+6. **`LOCALE_MISCONFIGURATION`**: Destination page delivers mismatched language, wrong currency, or missing locale indicators, causing instant regional bounce.
+7. **`COGNITIVE_READABILITY_FRICTION`**: Overly dense text (ARI > 14) or heavy buzzwords delay the visitor's ability to verify the answer.
+
 ---
+
 
 ## 7. Autonomous AI Buying Agent Readiness (`/pricing.md`)
 

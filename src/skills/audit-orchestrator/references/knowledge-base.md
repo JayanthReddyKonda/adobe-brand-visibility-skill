@@ -364,10 +364,17 @@ This document specifies the structure, validation constraints, and field semanti
 | `audit_status` | String (Enum) | Yes | Audit completion status: `complete`, `partial`, `failed` |
 | `summary` | Object | Yes | Aggregate counts of findings categorized by severity (`critical`, `high`, `medium`, `low`) |
 | `findings` | Array | Yes | Ordered list of verified defects with supporting evidence and suggested actions |
+| `readiness` | Object | No | Multi-dimensional score breakdown, composite score, letter grade, and weights |
+| `dimension_status` | Object | No | Pass/warning/fail status per scoring dimension |
+| `run_manifest` | Object | No | Execution provenance tracking reference SHA-256 checksums and runtime environment |
+| `suppressed_findings` | Array | No | Trace of downstream symptoms suppressed by upstream keystone blockers |
 | `proactive_actions` | Array | No | Deduplicated proactive opportunities (e.g. sitemap creation, llms.txt, JSON-LD) |
 | `evidence_classes` | Object | No | Explicit segregation: `declared_identity_nodes` (Schema sameAs) vs `verified_candidate_backlinks` (verified via bounded probe) |
 | `analytics_summary` | Object | No | Quantitative metrics from first-party analytics (total referrals, bounce rates, dwell) and heuristic fallback caveats |
 | `page_improvement_plans` | Array | No | Deterministic page-level content improvement plans with gap analysis, structural and textual actions, and epistemic boundaries |
+| `geo_citability_summary` | Object | No | Aggregated Princeton KDD 2024 / AutoGEO citability metrics |
+| `engagement_continuity_summary` | Object | No | Post-citation intent scent and transactional handoff continuity summary |
+| `ai_agent_scrapeability_summary` | Object | No | Average text-to-HTML SNR, bot matrix permissions, and rendering status |
 
 ---
 
@@ -391,7 +398,8 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
 | :--- | :--- | :--- | :--- |
 | `id` | String | Yes | Unique finding identifier (e.g., `F-001`, `F-002`) |
 | `title` | String | Yes | Concise, human-readable summary of the defect |
-| `severity` | Enum | Yes | `critical` \| `high` \| `medium` \| `low` \| `evidence` | String | Yes | Concrete data, observed metrics, or reproduction steps verifying the finding |
+| `severity` | Enum | Yes | `critical` \| `high` \| `medium` \| `low` |
+| `evidence` | String | Yes | Concrete data, observed metrics, or reproduction steps verifying the finding |
 | `suggested_action` | Object | Yes | Actionable, mechanism-sound remediation plan |
 | `confidence` | Enum | No | `high` \| `medium` \| `low` |
 | `category` | String | No | Functional category (e.g. `access`, `entity-integrity`, `fact-consistency`, `orientation`) |
@@ -399,6 +407,9 @@ Each entry in the `findings` array represents a verified, evidence-backed defect
 | `cause_id` | String | No | Specific root cause identifier |
 | `impact` | String | No | Explanation of downstream impact on AI citations and user retention |
 | `verification` | String | No | Procedure to verify resolution |
+| `priority_index` | Integer / Null | No | Task priority score: `5 * severity + (6 - difficulty)` |
+| `difficulty` | Integer / Null | No | Estimated implementation difficulty (1 = low, 5 = high) |
+
 
 ### Suggested Action Object
 

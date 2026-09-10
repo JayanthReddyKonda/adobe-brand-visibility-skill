@@ -1,6 +1,7 @@
 """Audit report fixtures for Draft-07 schema validation testing."""
 
 VALID_SCHEMA_REPORT = {
+    "schema_version": "1.0.0",
     "site": "https://example.com",
     "audited_at": "2026-09-06T12:00:00Z",
     "audit_status": "complete",
@@ -19,6 +20,7 @@ VALID_SCHEMA_REPORT = {
             "category": "discoverability",
             "root_cause": "User-agent Disallow directive",
             "confidence": "high",
+            "scope": "robots.txt",
             "evidence": {
                 "summary": "Disallow: / found for OAI-SearchBot",
                 "scope": "robots.txt",
@@ -30,6 +32,7 @@ VALID_SCHEMA_REPORT = {
                     }
                 ],
             },
+            "impact": "Impairs AI crawler indexation, causing the domain or catalog to be omitted from AI search retrieval.",
             "suggested_action": {
                 "summary": "Allow AI search bots in robots.txt",
                 "priority": "high",
@@ -53,6 +56,7 @@ VALID_SCHEMA_REPORT = {
 }
 
 VALID_STRING_EVIDENCE_REPORT = {
+    "schema_version": "1.0.0",
     "site": "https://example.com",
     "audited_at": "2026-09-06T12:00:00Z",
     "audit_status": "complete",
@@ -71,7 +75,9 @@ VALID_STRING_EVIDENCE_REPORT = {
             "category": "discoverability",
             "root_cause": "noindex meta tag present",
             "confidence": "high",
+            "scope": "https://example.com/",
             "evidence": "Found <meta name='robots' content='noindex'> on homepage",
+            "impact": "Prevents AI search engines from indexing the homepage.",
             "suggested_action": {
                 "summary": "Remove noindex tag",
                 "priority": "critical",
@@ -85,6 +91,7 @@ VALID_STRING_EVIDENCE_REPORT = {
 }
 
 INVALID_SEVERITY_REPORT = {
+    "schema_version": "1.0.0",
     "site": "https://example.com",
     "audited_at": "2026-09-06T12:00:00Z",
     "audit_status": "complete",
@@ -103,7 +110,9 @@ INVALID_SEVERITY_REPORT = {
             "category": "discoverability",
             "root_cause": "Test",
             "confidence": "low",
+            "scope": "https://example.com/",
             "evidence": "Test evidence",
+            "impact": "Minor observation impact.",
             "suggested_action": {
                 "summary": "Fix",
                 "priority": "low",
@@ -122,6 +131,7 @@ MISSING_REQUIRED_FIELD_REPORT = {
 }
 
 NON_INTEGER_SUMMARY_REPORT = {
+    "schema_version": "1.0.0",
     "site": "https://example.com",
     "audited_at": "2026-09-06T12:00:00Z",
     "audit_status": "complete",

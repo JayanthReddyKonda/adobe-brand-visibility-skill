@@ -772,6 +772,353 @@ class TestFrescopaHardeningAndArchetype(unittest.TestCase):
         self.assertGreaterEqual(score_a, 85.0)
         self.assertEqual(grade_a, "A")
 
+    def test_schema_dollar_and_priority_index_accepted(self):
+        """Validate report with $schema, priority_index, difficulty, and dimension_status."""
+        from validate_report import validate_report_dict
+
+        report = {
+            "$schema": "src/skills/audit-orchestrator/references/report-schema.json",
+            "schema_version": "1.0.0",
+            "site": "https://example.com",
+            "audited_at": "2026-09-10T12:00:00Z",
+            "audit_status": "complete",
+            "archetype": "ecommerce",
+            "summary": {
+                "total_findings": 1,
+                "critical": 0,
+                "high": 1,
+                "medium": 0,
+                "low": 0,
+            },
+            "findings": [
+                {
+                    "id": "F-001",
+                    "title": "Missing Schema.org Product",
+                    "severity": "high",
+                    "actual_band": "S3",
+                    "category": "entity_content",
+                    "confidence": "high",
+                    "root_cause": "Product detail page lacks Schema.org JSON-LD.",
+                    "scope": "https://example.com/products/1",
+                    "evidence": "Raw HTML contains 0 JSON-LD scripts.",
+                    "impact": "Incomplete structured representation can make entity attributes less explicit for downstream machine interpretation.",
+                    "priority_index": 19,
+                    "difficulty": 2,
+                    "suggested_action": {
+                        "summary": "Embed Schema.org Product markup.",
+                        "priority": "high",
+                        "technical_fix": "<script type=\"application/ld+json\">{}</script>",
+                        "creative_fix": None,
+                        "verification": "Inspect rendered HTML with Google Rich Results Test.",
+                        "priority_index": 19,
+                        "difficulty": 2,
+                    },
+                }
+            ],
+            "proactive_actions": [
+                {
+                    "id": "P-001",
+                    "title": "Pre-Hydration Product Schema Architecture",
+                    "summary": "Pre-render JSON-LD in server HTML before client bundle hydrates.",
+                    "priority": "high",
+                }
+            ],
+            "readiness": {
+                "composite_score": 75.0,
+                "grade": "B",
+                "dimensions": {
+                    "crawlability": 100.0,
+                    "retrieval_readiness": 80.0,
+                    "citation_readiness": 70.0,
+                    "entity_authority": 50.0,
+                    "cross_engine_visibility": 80.0,
+                    "agentic_commerce": 70.0,
+                },
+                "dimension_status": {
+                    "crawlability": "observed",
+                    "retrieval_readiness": "observed",
+                    "citation_readiness": "observed",
+                    "entity_authority": "provisional",
+                    "cross_engine_visibility": "observed",
+                    "agentic_commerce": "provisional",
+                },
+            },
+            "run_manifest": {
+                "manifest_version": "1.0.0",
+                "site": "https://example.com",
+                "started_at": "2026-09-10T12:00:00Z",
+                "completed_at": "2026-09-10T12:00:01Z",
+                "duration_seconds": 1.0,
+                "execution_status": "complete",
+            },
+        }
+        valid, errors = validate_report_dict(report)
+        self.assertTrue(valid, f"Validation failed with errors: {errors}")
+
+    def test_orchestrator_review_flag_ingestion(self):
+        """orchestrator.py must ingest review findings and proactive actions via review dict."""
+        from orchestrator import synthesize_audit_report
+
+        inv = {
+            "pages": [
+                {"url": "https://example.com/", "status": 200, "word_count": 120, "page_type": "homepage"},
+            ]
+        }
+        review = {
+            "findings": [
+                {
+                    "check_id": "D1",
+                    "cause_id": "ROBOTS_TXT_DISALLOW_SEARCHBOT",
+                    "title": "Agent identified AI bot blockage",
+                    "severity": "high",
+                    "actual_band": "S3",
+                    "category": "discoverability",
+                    "scope": "https://example.com/blog",
+                    "evidence": "Disallow: /blog for OAI-SearchBot",
+                    "suggested_action": {
+                        "summary": "Allow AI search crawler access",
+                        "priority": "high",
+                        "technical_fix": "Remove Disallow rule",
+                        "creative_fix": None,
+                        "verification": "Check robots.txt",
+                    },
+                }
+            ],
+            "proactive_actions": [
+                {
+                    "id": "P-099",
+                    "title": "Custom Agent Proactive Strategy",
+                    "summary": "Deploy llms.txt at root",
+                    "priority": "medium",
+                }
+            ],
+        }
+        report = synthesize_audit_report("https://example.com", inv, {}, review=review)
+        self.assertEqual(report["audit_status"], "complete")
+        self.assertIn("readiness", report)
+        self.assertIn("run_manifest", report)
+        finding_titles = [f["title"] for f in report["findings"]]
+        self.assertIn("Agent identified AI bot blockage", finding_titles)
+
+    def test_assemble_produces_readiness_and_manifest(self):
+        """assemble_report.py assemble() must compute readiness and attach run_manifest."""
+        from assemble_report import assemble
+
+        records = [
+            {
+                "artifact": "response-0001",
+                "url": "https://example.com/",
+                "status": 200,
+                "text": "<html><body><h1>Example</h1><p>Substantive text content with more than fifty words to qualify as a valid substantive route for AI retrieval engines.</p></body></html>",
+                "word_count": 60,
+            }
+        ]
+        candidates = [
+            {
+                "id": "F-001",
+                "check_id": "D1",
+                "title": "Robots Test",
+                "severity": "medium",
+                "actual_band": "S2",
+                "finding_kind": "confirmed_problem",
+                "scope": "https://example.com/",
+                "collection_complete_for_scope": True,
+                "severity_reason": "Robots restriction",
+                "difficulty": 2,
+                "difficulty_reason": "Standard robots.txt config edit",
+                "resolved_context": True,
+                "validation_results": True,
+                "remedy_readiness": "ready",
+                "evidence_refs": [{"artifact": "response-0001", "locator": "text", "quote": "Example"}],
+                "suggested_action": {
+                    "summary": "Fix robots",
+                    "priority": "medium",
+                    "technical_fix": "Fix line",
+                    "creative_fix": None,
+                    "verification": "Check line",
+                },
+            }
+        ]
+        checks = [{"check_id": "D1", "solution_level": "C", "reference_band": "S2"}]
+        report = assemble("https://example.com", candidates, records, checks, {})
+        self.assertIn("readiness", report)
+        self.assertIn("run_manifest", report)
+        self.assertEqual(report["readiness"]["grade"], "F")
+        self.assertEqual(report["readiness"]["composite_score"], 20.0)
+        self.assertEqual(report["findings"][0]["difficulty"], 2)
+        self.assertEqual(report["findings"][0]["priority_index"], 14)
+        self.assertEqual(report["findings"][0]["priority_rank"], 1)
+        self.assertEqual(report["findings"][0]["dag_node"], "RETRIEVAL")
+        self.assertIn("Rank #1", report["findings"][0]["priority_justification"])
+        self.assertEqual(report["summary"]["detected_archetype"], "corporate")
+
+    def test_priority_ranking_order_and_justification(self):
+        """Findings must be strictly ordered by priority_index with contiguous 1..N priority_rank."""
+        from assemble_report import assemble
+
+        records = [
+            {
+                "artifact": "response-0001",
+                "url": "https://example.com/",
+                "status": 200,
+                "text": "<html><body><h1>Example</h1><p>Substantive text content with more than fifty words to qualify as a valid substantive route for AI retrieval engines.</p></body></html>",
+                "word_count": 60,
+            }
+        ]
+        candidates = [
+            {
+                "id": "F-001",
+                "check_id": "J1",  # Engagement -> Layer 5
+                "title": "Low Information Scent",
+                "severity": "low",
+                "actual_band": "S1",
+                "finding_kind": "confirmed_problem",
+                "scope": "https://example.com/about",
+                "collection_complete_for_scope": True,
+                "difficulty": 3,
+                "difficulty_reason": "Header copy rewrite",
+                "severity_reason": "Low scent",
+                "evidence_refs": [{"artifact": "response-0001", "locator": "text", "quote": "Example"}],
+                "suggested_action": {
+                    "summary": "Improve H1",
+                    "priority": "low",
+                    "technical_fix": "Change H1",
+                },
+            },
+            {
+                "id": "F-002",
+                "check_id": "D1",  # Discoverability -> Layer 0
+                "title": "Universal AI Bot Block",
+                "severity": "critical",
+                "actual_band": "S4",
+                "finding_kind": "confirmed_problem",
+                "scope": "https://example.com/robots.txt",
+                "collection_complete_for_scope": True,
+                "difficulty": 1,
+                "difficulty_reason": "One-line robots.txt update",
+                "severity_reason": "Robots block all",
+                "evidence_refs": [{"artifact": "response-0001", "locator": "text", "quote": "Example"}],
+                "suggested_action": {
+                    "summary": "Fix robots.txt",
+                    "priority": "critical",
+                    "technical_fix": {
+                        "file_or_route": "robots.txt",
+                        "change_type": "replace",
+                        "snippet": "User-agent: *\nAllow: /",
+                        "anchor": "User-agent: *",
+                    },
+                },
+            },
+            {
+                "id": "F-003",
+                "check_id": "E1",  # Entity -> Layer 2
+                "title": "Missing Organization Schema",
+                "severity": "high",
+                "actual_band": "S3",
+                "finding_kind": "confirmed_problem",
+                "scope": "https://example.com/products",
+                "collection_complete_for_scope": True,
+                "difficulty": 2,
+                "difficulty_reason": "JSON-LD injection in head",
+                "severity_reason": "No Org schema",
+                "evidence_refs": [{"artifact": "response-0001", "locator": "text", "quote": "Example"}],
+                "suggested_action": {
+                    "summary": "Inject JSON-LD",
+                    "priority": "high",
+                    "technical_fix": "Add JSON-LD",
+                },
+            },
+        ]
+        checks = [
+            {"check_id": "D1", "solution_level": "C", "reference_band": "S4"},
+            {"check_id": "E1", "solution_level": "C", "reference_band": "S3"},
+            {"check_id": "J1", "solution_level": "C", "reference_band": "S1"},
+        ]
+        report = assemble("https://example.com", candidates, records, checks, {})
+        findings = report["findings"]
+        self.assertEqual(len(findings), 3)
+
+        # Ranks must be contiguous 1..3
+        self.assertEqual([f["priority_rank"] for f in findings], [1, 2, 3])
+
+        # #1 must be the S4 diff 1 (priority_index = 25)
+        self.assertEqual(findings[0]["id"], "F-002")
+        self.assertEqual(findings[0]["dag_node"], "RETRIEVAL")
+        self.assertIn("Rank #1", findings[0]["priority_justification"])
+
+        # #2 must be the S3 diff 2 (priority_index = 19)
+        self.assertEqual(findings[1]["id"], "F-003")
+        self.assertEqual(findings[1]["dag_node"], "ENTITY")
+        self.assertIn("Rank #2", findings[1]["priority_justification"])
+
+        # #3 must be the S1 diff 3 (priority_index = 8)
+        self.assertEqual(findings[2]["id"], "F-001")
+        self.assertEqual(findings[2]["dag_node"], "ENGAGEMENT")
+        self.assertIn("Rank #3", findings[2]["priority_justification"])
+
+        # Schema validation must pass
+        valid, errors = validate_report_dict(report)
+        self.assertTrue(valid, f"Report validation failed: {errors}")
+
+    def test_structured_technical_fix_and_proactive_flag_validates(self):
+        """Structured technical_fix objects and is_proactive flags must validate against report-schema.json."""
+        from orchestrator import synthesize_audit_report
+
+        inv = {
+            "pages": [
+                {"url": "https://example.com/", "status": 200, "word_count": 200, "page_type": "homepage"},
+            ]
+        }
+        review = {
+            "findings": [
+                {
+                    "check_id": "D1",
+                    "cause_id": "AI_RETRIEVAL_BLOCKED",
+                    "title": "OAI-SearchBot Blocked in robots.txt",
+                    "severity": "critical",
+                    "actual_band": "S4",
+                    "category": "discoverability",
+                    "scope": "https://example.com/robots.txt",
+                    "evidence": "Disallow: / for OAI-SearchBot",
+                    "difficulty": 1,
+                    "suggested_action": {
+                        "summary": "Permit OAI-SearchBot crawler in robots.txt",
+                        "priority": "critical",
+                        "technical_fix": {
+                            "file_or_route": "robots.txt",
+                            "change_type": "replace",
+                            "snippet": "User-agent: OAI-SearchBot\nAllow: /",
+                            "anchor": "User-agent: OAI-SearchBot",
+                        },
+                        "creative_fix": None,
+                        "verification": "curl -I https://example.com/robots.txt",
+                        "is_proactive": False,
+                    },
+                }
+            ],
+            "proactive_actions": [
+                {
+                    "id": "P-001",
+                    "title": "Machine Manifest Deployment",
+                    "summary": "Deploy /llms.txt at root to index core offerings for retrieval agents",
+                    "priority": "medium",
+                }
+            ],
+        }
+        report = synthesize_audit_report("https://example.com", inv, {}, review=review)
+        self.assertEqual(report["audit_status"], "complete")
+        self.assertEqual(len(report["findings"]), 1)
+        finding = report["findings"][0]
+        self.assertEqual(finding["priority_rank"], 1)
+        self.assertIsInstance(finding["suggested_action"]["technical_fix"], dict)
+        self.assertEqual(finding["suggested_action"]["technical_fix"]["file_or_route"], "robots.txt")
+        self.assertFalse(finding["suggested_action"]["is_proactive"])
+
+        # Entire report must validate cleanly against report-schema.json
+        valid, errors = validate_report_dict(report)
+        self.assertTrue(valid, f"Validation failed with errors: {errors}")
+
 
 if __name__ == "__main__":
     unittest.main()
+

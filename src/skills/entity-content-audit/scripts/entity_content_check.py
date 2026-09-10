@@ -610,6 +610,7 @@ def audit(base, domain, inv=None, state_file=None):
     )
 
     if not org_entity:
+        og_note = f" (og:site_name '{og_site_name}' detected, but machine search engines require explicit Schema.org Organization JSON-LD)" if og_site_name else " (no og:site_name detected)"
         findings.append(
             {
                 "category": "entity-identity",
@@ -621,7 +622,7 @@ def audit(base, domain, inv=None, state_file=None):
                 "id": "MATERIAL_ENTITY_AMBIGUITY",
                 "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
                 "impact": "AI models cannot resolve the brand entity with high confidence, leading to entity collisions and ungrounded answers.",
-                "evidence": f"No JSON-LD Organization block or og:site_name found on {base}/.",
+                "evidence": f"No Schema.org Organization JSON-LD block detected on {base}/{og_note}.",
                 "suggested_action": {
                     "summary": "Publish Organization JSON-LD markup declaring name, url, logo, and sameAs links.",
                     "technical_fix": "Deploy Organization JSON-LD with @type, name, url, logo, and sameAs links to official profiles.",

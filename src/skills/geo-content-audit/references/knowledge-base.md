@@ -130,8 +130,8 @@ LLM parsers extract tabular data with near-100% precision compared to narrative 
     </tr>
     <tr>
       <th scope="row">Pricing</th>
-      <td>\$49 / month</td>
-      <td>\$499 / month</td>
+      <td>49 USD / month</td>
+      <td>499 USD / month</td>
     </tr>
   </tbody>
 </table>

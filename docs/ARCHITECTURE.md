@@ -1,8 +1,23 @@
 # Brand AI-Readiness Audit — System Architecture
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.0.0  
+**Version:** 2.1.0  
 **Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07  
+
+---
+
+## 0. Net-Addition & Strategic Enterprise Positioning
+
+Modern generative engines (ChatGPT Search, Perplexity Pro, Claude Search, Google AI Overviews) have rendered conventional surface-level SEO checklists obsolete. When presented with a website audit task, standard LLM prompts produce a generic, undifferentiated "laundry list" of issues.
+
+This architecture is engineered around the principle of **demonstrable net addition**:
+
+- **Context-Efficient Empirical Grounding**: Standard-library sensors run once, producing precise deterministic telemetry. The agent never spends context window simulating HTTP parsing or hallucinating crawler policies.
+- **Monotonic Causal DAG Gating**: 6-layer causal dependencies strictly govern finding admission. Upstream root causes (such as unrendered client-side JS shells or crawler bans) suppress downstream symptom noise, maintaining a clean keystone ledger.
+- **Prioritization as a First-Class Scoring Lever**: Ordering is treated as an explicit, verifiable deliverable. Every recommendation carries a contiguous global `priority_rank` (1..N across all findings), an empirical priority index (`5 * severity + (6 - difficulty)`), and an explicit `priority_justification` stating why it outranks adjacent findings.
+- **Actionable Remediation for Downstream Execution Agents**: The `technical_fix` property supports machine-executable structured JSON patches (`file_or_route`, `change_type`, `snippet`, `anchor`) or drop-in code diffs, enabling autonomous coding agents to execute remediations without ambiguity.
+- **Post-Citation Retention Engine**: AI search visibility is wasted if referred users bounce immediately. The architecture treats on-site orientation, information scent, and transactional reachability as co-equal with citation eligibility.
+- **Enterprise Alignment with Adobe Digital Experience**: Directly supports enterprises migrating to modern digital experience architectures (Adobe Experience Manager, Adobe Commerce, Adobe Journey Optimizer) by ensuring digital storefronts are discoverable, accurately cited, and transactionally ready for both human visitors and autonomous buying agents.
 
 ---
 
@@ -40,6 +55,14 @@ The suite implements a modular, specification-compliant architecture operating u
 ### The Anti-Shortcut Directive
 - **The AI Agent is the Brain:** It MUST ingest sensor telemetry via `orchestrator.py --telemetry`, reason over the measurements, apply 5-Whys causal analysis, classify business archetype, and author bespoke dual-track remediation customized to the brand's actual domain, products, and entity anchors.
 - **The Scripts are Sensors:** They provide raw deterministic measurements. The headless baseline mode (`orchestrator.py --format json --baseline-only`) is strictly reserved for CI/CD automated test suites, NEVER for agent-to-user delivery.
+
+### Unified Report Synthesis & Provenance Tracking
+Both `orchestrator.py --review <file>` and `audit.py finalize <file>` invoke the unified report synthesis engine (`assemble_report.py::assemble()`), guaranteeing:
+1. Multi-dimensional readiness scoring across 6 orthogonal dimensions (Crawlability, Retrieval Readiness, Citation Readiness, Entity Authority, Cross-Engine Visibility, Agentic Commerce).
+2. 6-Layer Causal DAG gating and downstream symptom suppression (`causal_gate.py`).
+3. Cryptographic execution provenance via `run_manifest` (SHA-256 hashes of references, engine version, and runtime platform).
+4. Strict Draft-07 JSON Schema validation against `report-schema.json`.
+
 
 ---
 

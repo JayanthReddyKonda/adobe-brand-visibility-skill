@@ -124,7 +124,8 @@ python3 skills/discoverability-audit/scripts/discoverability_check.py --site htt
 4. **Canonical Consolidation (`DISCOVERY.DISCOVERY_PATH.CANONICAL_FRAGMENTATION`):**
    - If `<link rel="canonical">` points to an external un-audited host -> `medium` finding.
 5. **Initial HTML Extractability (`DISCOVERY.REPRESENTATION_AVAILABILITY.RENDERED_CONTENT_GAP`):**
-   - If visible text in raw HTML < 25 words and an unrendered SPA root (`<div id="root|app">`) is present -> `high` severity rendering risk indicator.
+   - If visible text in raw HTML < 25 words and an unrendered SPA root (`<div id="root|app">`) is present -> `high` severity rendering risk indicator. Computes `average_page_snr` (and legacy `signal_to_noise_ratio`) metrics to evaluate raw text-to-code density.
+
 6. **Internationalization & Hreflang Validation (`DISCOVERY.HREFLANG.INVALID_TARGET`):**
    - Validates `<link rel="alternate" hreflang="...">` declarations across all crawled routes against ISO 639-1 / ISO 3166-1 standards and checks for broken target URLs.
 7. **Machine Discoverability Manifests (`DISCOVERY.MANIFEST.MACHINE_READABLE_ABSENT`):**

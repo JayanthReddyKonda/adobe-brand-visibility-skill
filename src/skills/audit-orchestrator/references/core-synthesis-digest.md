@@ -50,6 +50,8 @@ Composite Score = 0.20 * C_crawl + 0.15 * R_retr + 0.25 * C_cite + 0.20 * E_auth
 ```
 
 - **Grade A**: >= 85.0 | **Grade B**: 70.0 - 84.9 | **Grade C**: 50.0 - 69.9 | **Grade D**: 30.0 - 49.9 | **Grade F**: < 30.0
+- **Dimension Status**: Each dimension evaluates to `"pass"` (>= threshold), `"warning"` (healthy - 20 <= score < healthy), or `"fail"` (< healthy - 20).
+
 
 ---
 
@@ -146,5 +148,22 @@ Each major AI retrieval engine and generative search system utilizes distinct re
 
 1. **Single-Pass Acquisition Mandate:** Web crawling is strictly performed once via `acquire_inventory.py` / `web-scraper` emitting `inv.json`. All downstream diagnostic sensors analyze `inv.json` offline.
 2. **Strictly Banned Agent Tools:** Never use agent built-in URL reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or direct `curl`/`wget`. Direct agent reading bypasses socket-level zero-trust SSRF validation and corrupts multi-skill analysis.
-3. **Clean Output Delivery:** Emit strictly the final validated Draft-07 JSON report in a single ````json```` block. Never prepend conversational preambles, intermediate tool traces, or duplicate Markdown tables before the JSON block.
-4. **Clean String Formatting:** In JSON report string fields (`technical_fix`, `creative_fix`, `summary`, `evidence`), never embed escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML. Strings must be clean, single-line or semicolon-delimited (` ; `).
+3. **Reproducible Report Synthesis (`--review` or `audit.py finalize`):** Candidate findings refined by the agent are synthesized using the unified synthesis engine (`assemble_report.py::assemble()` via `orchestrator.py --review <file>` or `audit.py finalize <file>`), guaranteeing causal gating, scoring math consistency, and execution provenance via `run_manifest` (SHA-256 reference hashes).
+4. **Clean Output Delivery:** Emit strictly the final validated Draft-07 JSON report in a single ````json```` block. Never prepend conversational preambles, intermediate tool traces, or duplicate Markdown tables before the JSON block.
+5. **Clean String Formatting:** In JSON report string fields (`technical_fix`, `creative_fix`, `summary`, `evidence`), never embed escaped literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML. Strings must be clean, single-line or semicolon-delimited (` ; `).
+
+---
+
+## 9. Post-Citation Engagement & The 5-Second Bounce Mechanisms
+
+Securing an AI citation (via ChatGPT, Perplexity, or Claude) is only half the battle. When referred visitors arrive, an estimated 60-70% bounce within 5 seconds if the destination fails first-visit orientation. The suite diagnoses this through 7 distinct failure mechanisms:
+
+1. **`VIEWPORT_ANSWER_ABSENCE`**: The exact proposition, price, or claim cited in the generative AI answer is absent from the top 600px above-the-fold viewport. The visitor cannot immediately verify what the AI promised, triggering an immediate bounce.
+2. **`LOW_INFORMATION_SCENT` (`GENERIC_H1`)**: The primary `<h1>` or lead headline uses generic marketing slogans ("Welcome to the Future", "Elevate Your Journey") instead of confirming the specific brand, product, or topic entity cited by the AI model.
+3. **`CTA_REACHABILITY_FRICTION`**: The next conversion action is buried beneath multi-tier navigation menus, modal overlays, or deep scrolling (>3 interaction events to reach the primary transaction path).
+4. **`COMMERCIAL_HANDOFF_DISCONTINUITY`**: The AI summary cites commercial terms or products, but the landing page provides only informational content or forces a generic "Contact Sales" form without transparent transactional checkout.
+5. **`AGENT_INTERACTION_BARRIER`**: Critical conversion triggers and navigation links are implemented as non-semantic `<div onclick>` or `<span onclick>` elements rather than standard `<a href>` or `<button type="button">`, blocking both autonomous buying agents (OpenAI Operator, Project Mariner) and assistive keyboard technologies.
+6. **`LOCALE_MISCONFIGURATION`**: Cross-language or cross-regional links land users on mismatched languages, non-local currency, or missing `hreflang` routes, causing immediate regional bounce.
+7. **`COGNITIVE_READABILITY_FRICTION`**: High Automated Readability Index (ARI > 14) and dense marketing jargon obscure direct answers, causing cognitive fatigue for users seeking immediate factual clarity.
+
+

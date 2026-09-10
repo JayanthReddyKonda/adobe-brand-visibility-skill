@@ -79,7 +79,7 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
 2. **No Headless Browsers:**
    - Zero Playwright, Puppeteer, Selenium, or Chromium binaries. Sensor analysis must remain lightweight, fast (< 5 min), and deterministic.
 3. **Zero-Trust SSRF Protection:**
-   - All network operations must flow through [`src/skills/web-scraper/scripts/safe_fetch.py`](file:///home/jayanth/CODE/projects/adobe-brand-visibility-skill/src/skills/web-scraper/scripts/safe_fetch.py).
+   - All network operations must flow through `src/skills/web-scraper/scripts/safe_fetch.py`.
    - Target IPs are resolved and validated before socket creation. Immediate abort on private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`), cloud metadata (`169.254.169.254`), and carrier-grade NAT subnets.
 4. **Single-Pass Acquisition Architecture:**
    - Crawling is performed strictly once by `web-scraper` (`acquire_inventory.py` / `run_scraper.py`), saving `inv.json`. All diagnostic sensors run offline against `inv.json` with zero redundant network overhead.

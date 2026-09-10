@@ -1,6 +1,7 @@
 # Brand AI-Readiness & Visibility Marketplace
 
 **Author:** Jayanth Reddy Konda
+**Version:** 2.1.0
 **Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 
 ---
@@ -118,8 +119,12 @@ python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.c
 
 # 2. Collect empirical telemetry from all sensors
 python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry
+
+# 3. Ingest agent review findings into unified causal DAG report synthesis
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
 ```
-The AI agent then reasons over the telemetry, consults domain knowledge bases, and synthesizes the final report.
+The AI agent reasons over the telemetry, consults domain knowledge bases, authors refined findings into `review.json`, and synthesizes the final report with cryptographic provenance (`run_manifest`).
+
 
 ### Automated CI/CD Pipeline
 ```bash

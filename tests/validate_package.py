@@ -6,7 +6,7 @@ Checks:
 - Zip contains no __pycache__ or .pyc files
 - Zip contains exactly 8 skill folders
 - Zip contains marketplace.json, README.md, LICENSE at root
-- marketplace.json inside zip has a "version" field ("1.0.0")
+- marketplace.json inside zip has a "version" field ("2.1.0")
 - Every Python script in the package has valid Python syntax (py_compile sweep)
 - Every relative link in every Markdown file resolves to an existing file in the package
 

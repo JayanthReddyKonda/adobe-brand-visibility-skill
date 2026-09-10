@@ -17,6 +17,7 @@ allowed-tools:
 |---|---|---|---|
 | **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) | Acquisition |
 | **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Mode** |
+| **Agent Cognitive Review Synthesizer** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --review review.json --output report.json` | Causal-Gated & Scored Draft-07 JSON Report | **Primary Synthesis Mode** |
 | **Dynamic Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py --site <url> --inventory inv.json` | Tailored Knowledge Base & Remediation Briefing | Context Compilation |
 | **Remediation Priority Ranker** | `python3 skills/audit-orchestrator/scripts/plan.py --severity <1-4> --difficulty <1-5>` or `--report report.json` | Task Priority Index & Queue Disposition | Remediation Planning |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements | Targeted Deep Inspection |
@@ -64,6 +65,7 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 
 - **`--site`** (string, required): The target domain or URL to audit (e.g. `https://example.com` or `example.com`).
 - **`--inventory`** (string, optional): Path to a pre-built inventory JSON file (skips crawl phase, speeds up re-audits).
+- **`--review`** (string, optional): Path to agent review JSON containing refined candidate findings and proactive actions to ingest into causal DAG synthesis.
 - **`--candidate-backlinks`** (string, optional): Path to candidate backlinks JSON/CSV file for bounded authority verification.
 - **`--analytics`** (string, optional): Path to first-party route-level web analytics JSON/CSV file.
 - **`--responses` / `--observations`** (string, optional): Path to observed AI assistant outputs JSON to cross-check against site facts.
@@ -79,19 +81,19 @@ Every script and reference in this skill serves a distinct, critical orchestrati
 
 | Path | Type | Purpose & Agent Calling Role |
 |---|---|---|
-| `scripts/orchestrator.py` | Master Script | Entrypoint coordinating crawler and all 6 specialist sensors, aggregating empirical telemetry (`--telemetry`), and synthesizing Draft-07 reports. |
-| `scripts/bundle_context.py` | CLI Tool | Dynamic context compiler extracting archetype-tailored rules, Schema.org templates, and research cheatsheets based on site signals. |
+| `scripts/orchestrator.py` | Master Script | Entrypoint coordinating crawler and all 6 specialist sensors, aggregating empirical telemetry (`--telemetry`), ingesting agent review findings (`--review`), and synthesizing Draft-07 reports. |
+| `scripts/bundle_context.py` | CLI Tool | Dynamic context compiler extracting archetype-tailored rules, Schema.org templates, and research cheatsheets based on site signals. Verified with SHA-256 reference checksums. |
 | `scripts/plan.py` | CLI Tool | Task priority calculator computing `priority_index = 5 * severity + (6 - difficulty)` and ranking findings roadmap. |
 | `scripts/causal_gate.py` | Standalone CLI | 6-Layer Causal DAG engine evaluating epistemic states, causal node graph, and applying deterministic defect suppression. |
-| `scripts/assemble_report.py` | Standalone CLI | Evidence gate, cause-scoped deduplication, queue ordering, and report assembler. |
+| `scripts/assemble_report.py` | Standalone CLI | Unified evidence gate, cause-scoped deduplication, queue ordering, readiness scoring, and report assembler. |
 | `scripts/validate_report.py` | CLI Tool | Strict Draft-07 JSON Schema validator supporting `--schema` for both `report-schema.json` and `telemetry-schema.json`. |
-| `scripts/audit.py` | Multi-Sensor Runner | Sensor executor mapping raw sensor findings directly to research check IDs in `checks.json`. |
+| `scripts/audit.py` | Multi-Sensor Runner | Sensor executor mapping raw sensor findings directly to research check IDs in `checks.json`, providing `collect`, `finalize`, and `validate` subcommands with `run_manifest` tracking. |
 | `references/checks.json` | Master Catalogue | Authoritative 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels. |
 | `references/checks.md` | Reference Catalogue | Human-readable master diagnostic check procedures across all 8 AI visibility domains. |
 | `references/core-synthesis-digest.md` | Reference Digest | Concise executive reference (< 2,500 tokens) on the 6-Layer Causal DAG, scoring math, and 9 Princeton GEO vectors. |
 | `references/knowledge-base.md` | Master KB | Definitive master specification covering 17 root causes, Draft-07 schemas, severity scales (S0-S4/U), and GEO benchmarks. |
-| `references/report-schema.json` | Draft-07 Schema | Schema defining exact required fields, enums, and non-negative integer summary counts for final reports. |
-| `references/telemetry-schema.json` | Draft-07 Schema | Schema defining empirical sensor telemetry emitted by `orchestrator.py --telemetry`. |
+| `references/report-schema.json` | Draft-07 Schema | Schema defining exact required fields, enums, non-negative integer summary counts, and optional properties ($schema, priority_index, difficulty, dimension_status, run_manifest). |
+| `references/telemetry-schema.json` | Draft-07 Schema | Schema defining empirical sensor telemetry emitted by `orchestrator.py --telemetry`, supporting disambiguated average_page_snr. |
 | `evals/evals.json` | Verification Fixtures | Multi-archetype test fixtures validating end-to-end orchestration, causal gating, and schema compliance. |
 
 ---
@@ -205,23 +207,34 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
    - **Publisher / Media:** Prioritize NewsArticle, Person authorship, and verified source citations. Deploy E-E-A-T credentials and 40-60w BLUF answer blocks (+40.9% quotation lift).
    - **Local Business:** Prioritize LocalBusiness schema, GeoCoordinates, openingHours, and NAP consistency across branch locations.
 
-3. **Author Bespoke Dual-Track Remediations (No Generic Canned Text):**
-   - **`technical_fix`**: Craft precise, copy-pasteable code, config, or Schema.org JSON-LD `@graph` snippets customized to the brand's actual domain name, real product names, currency, and entity anchors.
+3. **Author Bespoke Dual-Track Remediations (Machine-Actionable for Downstream Agents):**
+   - **`technical_fix`**: Craft precise, patch-applicable code, config, or Schema.org JSON-LD `@graph` snippets customized to the brand's actual domain name, real product names, currency, and entity anchors. May be emitted as a clean code string or a structured `{file_or_route, change_type, snippet, anchor}` object designed for direct consumption by a downstream execution agent.
    - **`creative_fix`**: Provide concrete, actionable copywriting and architecture guidance grounded in Princeton KDD 2024 / AutoGEO research (+40.9% quotation lift, +40.0% statistics lift, +28.2% causal conjunction lift, 40-60 word BLUF answers).
    - **`verification`**: Provide a deterministic test command or validation step to verify remediation.
 
-4. **Rank Tasks with Mathematical Priority Index (`plan.py`):**
-   - Use `plan.py` to calculate exact priority ranking:
-     `priority_index = 5 * severity + (6 - difficulty)`
-     - S4 Critical (diff 1-5): index 25 down to 21
-     - S3 High (diff 1-5): index 20 down to 16
-     - S2 Medium (diff 1-5): index 15 down to 11
-     - S1 Low (diff 1-5): index 10 down to 6
-   - Verify ready tasks are in `confirmed`, while blocked tasks wait in `investigation`.
+4. **Rank Tasks with Global Ordering (`priority_rank` & `priority_justification`):**
+   - Sort all findings across the entire report by DAG position (Retrieval -> Rendering -> Entity -> Facts -> Corroboration -> Citability -> Engagement) -> severity -> number of simulated AI assistants affected.
+   - Assign a contiguous global **`priority_rank`** from `1` to `N`.
+   - For every pair of findings sharing a severity tier, provide a **`priority_justification`** explaining which moves the needle more and why (this ordering judgment is explicitly evaluated).
+   - Assign the causal **`dag_node`** (`RETRIEVAL`, `RENDERING`, `ENTITY`, `FACTS`, `CORROBORATION`, `GEO_CITABILITY`, `ENGAGEMENT`).
+   - Use `plan.py` for mathematical priority indexing: `priority_index = 5 * severity + (6 - difficulty)`.
 
-5. **Eliminate Report Bloat:**
-   - Ensure `proactive_actions` contains strictly forward-looking, value-add enhancements (e.g. authoritative `/llms.txt` manifest, edge markdown content negotiation `Accept: text/markdown`) where no explicit defect exists. Never duplicate findings in proactive actions.
+5. **Eliminate Report Bloat & Structure Beyond-Defect Actions (`is_proactive: true`):**
+   - For DAG branches without defects, propose archetype-grounded, non-obvious strengthening moves (e.g. E-Commerce missing `MerchantReturnPolicy` or UCP manifest; SaaS un-gated `/pricing.md` manifest for autonomous AI purchasing agents). Mark with `"is_proactive": true`.
+   - Never duplicate defect findings in proactive actions.
    - Ensure all JSON string fields are clean prose or semicolon-delimited (` ; `). Never embed literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML tags inside JSON strings.
+
+6. **Unified Report Synthesis via CLI (`--review` or `audit.py finalize`):**
+   - Save agent candidate findings and proactive actions into `review.json`:
+   ```bash
+   # Option A: Ingest review findings through orchestrator into full Draft-07 report
+   python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
+
+   # Option B: Finalize via unified multi-sensor runner
+   python3 skills/audit-orchestrator/scripts/audit.py finalize review.json --out report.json
+   ```
+   Both options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, causal gating, `priority_rank`, `priority_justification`, and SHA-256 reference hashes (`run_manifest`).
+
 
 ---
 
@@ -231,6 +244,10 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
 Ensure the final report validates against `report-schema.json`:
 ```bash
 python3 skills/audit-orchestrator/scripts/validate_report.py < report.json
+```
+Or validate using file path:
+```bash
+python3 skills/audit-orchestrator/scripts/validate_report.py report.json
 ```
 Ensure exit code is 0 (pass).
 

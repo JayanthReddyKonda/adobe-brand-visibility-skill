@@ -218,7 +218,9 @@ The skill emits a structured JSON document conforming to the following shape:
   "stats": {
     "pages_crawled": 1,
     "total_bytes": 45120,
-    "elapsed_seconds": 1.25
+    "elapsed_seconds": 1.25,
+    "average_snr": 0.42,
+    "site_scrapeability_snr": 0.42
   }
 }
 ```

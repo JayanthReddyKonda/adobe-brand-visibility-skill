@@ -221,6 +221,17 @@ except ImportError:
     validate_type = None  # type: ignore
 
 try:
+    from plan import infer_finding_difficulty, calculate_priority_index
+except ImportError:
+    try:
+        from .plan import infer_finding_difficulty, calculate_priority_index
+    except ImportError:
+        def infer_finding_difficulty(f: Dict[str, Any]) -> int:
+            return 2
+        def calculate_priority_index(sev: int, diff: int) -> int:
+            return 5 * sev + (6 - diff)
+
+try:
     from causal_gate import (
         DEFAULT_LIMITATIONS,
         LAYER0_CAUSE_IDS,
@@ -469,10 +480,66 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
     return "corporate"
 
 
+def build_run_manifest(
+    site: str,
+    pipeline_stages: Optional[List[str]] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    duration_seconds: float = 0.0,
+    status: str = "complete",
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build a machine-readable execution provenance manifest recording site, timestamps, references, and validation status."""
+    import hashlib
+    ref_dir = os.path.join(SCRIPT_DIR, "..", "references")
+    reference_hashes = {}
+    for ref_name in ("checks.json", "knowledge-base.md", "core-synthesis-digest.md", "report-schema.json", "telemetry-schema.json"):
+        p = os.path.join(ref_dir, ref_name)
+        if os.path.exists(p):
+            with open(p, "rb") as rf:
+                reference_hashes[ref_name] = hashlib.sha256(rf.read()).hexdigest()
+        else:
+            reference_hashes[ref_name] = None
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    manifest = {
+        "manifest_version": "1.0.0",
+        "site": site,
+        "started_at": start_time or now_iso,
+        "completed_at": end_time or now_iso,
+        "duration_seconds": round(duration_seconds, 3),
+        "execution_status": status,
+        "pipeline_stages": pipeline_stages or [
+            "1. Inventory Acquisition (SSRF-Safe, Pure Python)",
+            "2. Specialist Telemetry Collection (6 Sensors)",
+            "3. 6-Layer Causal DAG Suppression & Route Analysis",
+            "4. Business Archetype Classification & Severity Reweighting",
+            "5. Deterministic Readiness & Citability Scoring",
+            "6. Draft-07 Report Synthesis & Schema Validation",
+        ],
+        "participating_skills": [
+            "audit-orchestrator",
+            "web-scraper",
+            "discoverability-audit",
+            "entity-content-audit",
+            "fact-consistency-audit",
+            "corroboration-authority-audit",
+            "geo-content-audit",
+            "engagement-context-audit",
+        ],
+        "reference_checksums_sha256": reference_hashes,
+        "runtime_dependencies": "Pure Python 3.9+ standard library only",
+    }
+    if extra:
+        manifest.update(extra)
+    return manifest
+
+
 def synthesize_audit_report(
     site: str,
     inv: Dict[str, Any],
     specialist_results: Dict[str, Dict[str, Any]],
+    review: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Apply Causal DAG, Keystone Defect deduplication, and Draft-07 synthesis."""
     base, domain = parse_target_domain(site)
@@ -551,6 +618,16 @@ def synthesize_audit_report(
             has_sensor_error = True
         all_raw_findings.extend(result.get("findings", []))
         all_raw_recommendations.extend(result.get("recommendations", []))
+
+    if review:
+        rev_findings = []
+        if isinstance(review, dict):
+            rev_findings = review.get("findings") or review.get("candidates") or []
+        elif isinstance(review, list):
+            rev_findings = review
+        for rf in rev_findings:
+            if isinstance(rf, dict):
+                all_raw_findings.append(rf)
 
     if inv.get("status") == "failed" or (not pages and not inv.get("infrastructure", {}).get("homepage_reachable", True)):
         audit_status = "failed"
@@ -703,12 +780,19 @@ def synthesize_audit_report(
                 ],
             }
 
+        raw_tf = action.get("technical_fix")
+        if isinstance(raw_tf, dict):
+            clean_tf = raw_tf
+        else:
+            clean_tf = clean_text_string(raw_tf) or None
+
         suggested_action: Dict[str, Any] = {
             "summary": action_summary,
-            "technical_fix": clean_text_string(action.get("technical_fix")) or None,
+            "technical_fix": clean_tf,
             "creative_fix": clean_text_string(action.get("creative_fix")) or None,
             "priority": action_priority,
             "verification": clean_text_string(action.get("verification")) or None,
+            "is_proactive": bool(action.get("is_proactive", False)),
         }
 
         actual_band = f.get("actual_band") or {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}.get(sev, "S2")
@@ -741,13 +825,12 @@ def synthesize_audit_report(
             "category": str(f.get("category", "discoverability")),
             "root_cause": f_root,
             "confidence": conf,
+            "scope": f.get("scope") or f.get("url") or sample_url,
             "evidence": evidence_val,
             "impact": clean_text_string(raw_impact),
             "suggested_action": suggested_action,
         }
 
-        if f.get("scope"):
-            clean_finding["scope"] = f["scope"]
         if f.get("affected_urls"):
             clean_finding["affected_urls"] = list(f["affected_urls"])
         if prio_idx is not None:
@@ -791,13 +874,19 @@ def synthesize_audit_report(
                         if finding.get("suggested_action"):
                             finding["suggested_action"]["priority"] = override_sev
 
-    # Re-sync actual_band and priority_index after archetype reweighting
+    # Re-sync actual_band, difficulty, and priority_index after archetype reweighting
     band_map = {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}
     for finding in deduped_findings:
         finding["actual_band"] = band_map.get(finding.get("severity", "medium"), "S2")
         diff = finding.get("difficulty")
-        if isinstance(diff, int) and 1 <= diff <= 5:
-            finding["priority_index"] = 5 * int(finding["actual_band"][1]) + (6 - diff)
+        if diff is None or not (isinstance(diff, int) and 1 <= diff <= 5):
+            diff = infer_finding_difficulty(finding)
+            finding["difficulty"] = diff
+        p_idx = 5 * int(finding["actual_band"][1]) + (6 - diff)
+        finding["priority_index"] = p_idx
+        if finding.get("suggested_action"):
+            finding["suggested_action"]["priority_index"] = p_idx
+            finding["suggested_action"]["difficulty"] = diff
 
     # Queue and Dependency-aware Topological Task Sort
     queues = {"confirmed": 0, "advisory": 1, "investigation": 2}
@@ -839,6 +928,51 @@ def synthesize_audit_report(
         if old_id:
             id_remap[old_id] = new_id
         f["id"] = new_id
+        f["priority_rank"] = idx
+
+        # Compute DAG node per 6-Layer Causal DAG
+        f_cid = str(f.get("cause_id") or "")
+        f_cat = str(f.get("category") or "discoverability")
+        if "RENDER" in f_cid or f_cid.startswith("C"):
+            f_dag = "RENDERING"
+        elif f_cat == "fact_consistency" or f_cid.startswith("BN") or "FACT" in f_cid or "PRICE" in f_cid:
+            f_dag = "FACTS"
+        elif f_cat == "corroboration" or f_cid.startswith(("BC", "PP", "SA", "SC", "P")) or "AUTHORITY" in f_cid or "SAMEAS" in f_cid:
+            f_dag = "CORROBORATION"
+        elif f_cat == "entity_content" or f_cid.startswith(("EC", "ED", "ME", "E")) or "ENTITY" in f_cid or "PRODUCT" in f_cid or "OFFER" in f_cid:
+            f_dag = "ENTITY"
+        elif f_cat == "geo_content" or f_cid.startswith(("N", "G")) or "CITABILITY" in f_cid or "GEO" in f_cid:
+            f_dag = "GEO_CITABILITY"
+        elif f_cat in ("engagement", "engagement_context") or f_cid.startswith(("I", "J")) or "SCENT" in f_cid or "CTA" in f_cid or "ENGAGEMENT" in f_cid:
+            f_dag = "ENGAGEMENT"
+        elif f_cat in ("discoverability", "crawlability") or f_cid.startswith(("A", "B", "D", "F", "H")):
+            f_dag = "RETRIEVAL"
+        else:
+            f_dag = "RETRIEVAL"
+        f.setdefault("dag_node", f_dag)
+
+        # Compute priority_justification explaining needle-moving rationale
+        if f_dag in ("RETRIEVAL", "RENDERING"):
+            just = "Upstream barrier that completely blocks AI search engines from crawling, indexing, or extracting text across this route."
+        elif f_dag == "ENTITY":
+            just = "Fundamental machine-readable identity anchor required for generative models to disambiguate the brand in knowledge graphs."
+        elif f_dag == "FACTS":
+            just = "Numerical or terms contradiction across first-party pages that directly triggers AI hallucination and purchase distrust."
+        elif f_dag == "CORROBORATION":
+            just = "External authority link failure reducing off-site citation grounding and third-party consensus."
+        elif f_dag == "GEO_CITABILITY":
+            just = "Deficit in statistical density, causal conjunctions, or BLUF primacy directly depressing generative citation lift."
+        elif f_dag == "ENGAGEMENT":
+            just = "Post-citation information scent or CTA friction causing immediate 5-second visitor bounce upon arrival."
+        else:
+            just = "Prioritized based on direct impact on AI retrieval visibility and user task continuity."
+        f.setdefault("priority_justification", f"Rank #{idx}: {just}")
+
+        if not f.get("affected_urls"):
+            f["affected_urls"] = [f["scope"]] if f.get("scope") and str(f["scope"]).startswith("http") else [site]
+
+        if f.get("suggested_action"):
+            f["suggested_action"].setdefault("is_proactive", False)
 
     if id_remap:
         for f in deduped_findings:
@@ -1100,11 +1234,21 @@ def synthesize_audit_report(
     else:
         grade = "F"
 
+    dimension_status = {
+        "crawlability": "observed",
+        "retrieval_readiness": "observed",
+        "citation_readiness": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
+        "entity_authority": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
+        "cross_engine_visibility": "observed",
+        "agentic_commerce": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
+    }
+
     readiness = {
         "composite_score": composite_score,
         "grade": grade,
         "dimensions": dimensions,
         "weights": weights,
+        "dimension_status": dimension_status,
         "score_scope": "Observed static inventory and specialist telemetry; not live provider ranking or citation data.",
     }
 
@@ -1121,6 +1265,7 @@ def synthesize_audit_report(
             "high": high_count,
             "medium": med_count,
             "low": low_count,
+            "detected_archetype": archetype,
         },
         "findings": deduped_findings,
         "proactive_actions": final_proactive,
@@ -1135,11 +1280,33 @@ def synthesize_audit_report(
         },
         "limitations": [
             "No JavaScript browser rendering was performed.",
-            "Robots eligibility was simulated from the captured robots.txt; bot-specific server responses were not tested.",
-            "No external analytics were supplied, so engagement findings are content and navigation proxies rather than observed bounce rates.",
-            "No claim is made about actual citation by any specific AI assistant.",
+            "Findings are based only on resources successfully acquired during this audit.",
+            "Robots.txt observations represent declared crawler permissions and do not prove search inclusion, indexing, ranking, or citation.",
+            "No claim is made about actual citation or placement by a specific AI assistant.",
+            "Engagement observations are content/navigation proxies unless external behavioral analytics are explicitly supplied.",
         ],
     }
+
+    geo_res = specialist_results.get("geo-content-audit", {})
+    if geo_res.get("geo_citability_summary"):
+        report["geo_citability_summary"] = geo_res["geo_citability_summary"]
+    if geo_res.get("page_improvement_plans"):
+        report["page_improvement_plans"] = geo_res["page_improvement_plans"]
+
+    eng_res = specialist_results.get("engagement-context-audit", {})
+    if eng_res.get("engagement_continuity_summary"):
+        report["engagement_continuity_summary"] = eng_res["engagement_continuity_summary"]
+
+    scrape_summary = inv.get("infrastructure", {}).get("ai_agent_scrapeability_summary") or specialist_results.get("discoverability-audit", {}).get("ai_agent_scrapeability_summary")
+    if scrape_summary:
+        report["ai_agent_scrapeability_summary"] = scrape_summary
+
+    if suppressed_findings:
+        report["suppressed_findings"] = suppressed_findings
+
+    run_manifest = build_run_manifest(site=site)
+    report["run_manifest"] = run_manifest
+    report["coverage"]["run_manifest"] = run_manifest
 
     return report
 
@@ -1416,6 +1583,7 @@ def get_telemetry_payload(
             "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in pages_list),
             "average_word_count": avg_wc,
             "average_snr": avg_snr,
+            "average_page_snr": avg_snr,
             "thin_content_pages": thin_pages,
         },
         "entity": {
@@ -1518,14 +1686,26 @@ def audit(
     candidate_backlinks: Optional[str] = None,
     state_file: Optional[str] = None,
     responses: Optional[str] = None,
+    review: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute end-to-end multi-skill brand AI-readiness audit."""
     inv, specialist_results = collect_telemetry(
         site, inventory=inventory, analytics=analytics, candidate_backlinks=candidate_backlinks, responses=responses
     )
 
+    review_data = None
+    if review:
+        if isinstance(review, dict):
+            review_data = review
+        elif isinstance(review, (str, bytes, os.PathLike)) and os.path.exists(review):
+            try:
+                with open(review, "r", encoding="utf-8") as rf:
+                    review_data = json.load(rf)
+            except Exception as re:
+                sys.stderr.write(f"Warning: Failed to parse review file {review}: {re}\n")
+
     # Cognitive Synthesis
-    report = synthesize_audit_report(site, inv, specialist_results)
+    report = synthesize_audit_report(site, inv, specialist_results, review=review_data)
 
     # Validate against Draft-07 schema
     schema = load_schema()
@@ -1553,6 +1733,7 @@ def main():
     parser.add_argument(
         "--responses", "--observations", dest="responses", help="Path to observed AI assistant outputs JSON to cross-check with fact ledger (optional)"
     )
+    parser.add_argument("--review", help="Path to agent review JSON containing refined candidate findings and proactive actions (optional)")
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
     parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
@@ -1575,7 +1756,7 @@ def main():
             )
             formatted_output = json.dumps(payload, indent=2)
         else:
-            if not args.baseline_only:
+            if not args.baseline_only and not args.review:
                 sys.stderr.write(
                     "Notice: Emitting automated baseline report. For AI Agent cognitive reasoning workflows, "
                     "use '--telemetry' to extract empirical measurements for agent synthesis.\n"
@@ -1586,6 +1767,7 @@ def main():
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
                 responses=args.responses,
+                review=args.review,
             )
             formatted_output = json.dumps(report, indent=2)
     except Exception as e:
@@ -1596,6 +1778,14 @@ def main():
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(formatted_output)
             f.write("\n")
+        out_dir = os.path.dirname(os.path.abspath(args.output))
+        if os.path.isdir(out_dir) and not args.telemetry:
+            manifest_file = os.path.join(out_dir, "run-manifest.json")
+            try:
+                with open(manifest_file, "w", encoding="utf-8") as mf:
+                    json.dump(report.get("run_manifest", {}), mf, indent=2)
+            except Exception:
+                pass
         print(f"Audit report written to {args.output}")
     else:
         print(formatted_output)

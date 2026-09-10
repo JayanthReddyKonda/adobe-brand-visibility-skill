@@ -77,4 +77,8 @@ class CanonicalValidator:
                 )
             )
 
-        return True, observations
+        has_defect = any(
+            obs.type in ("canonical_gap", "canonical_defect", "canonical_cross_domain")
+            for obs in observations
+        )
+        return not has_defect, observations

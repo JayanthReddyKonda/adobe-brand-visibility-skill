@@ -268,7 +268,7 @@ class SafeFetcher:
         if not raw_data or not encoding:
             return raw_data
 
-        limit = max_decoded_bytes or (self.budget.max_page_bytes * 2)
+        limit = max_decoded_bytes or self.budget.max_page_bytes
         enc = encoding.strip().lower()
 
         if enc in ("gzip", "deflate"):

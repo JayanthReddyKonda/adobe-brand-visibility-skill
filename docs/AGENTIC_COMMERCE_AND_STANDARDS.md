@@ -1,7 +1,7 @@
 # Autonomous Agent Protocols & Agentic Commerce Standards (2026)
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.0.0  
+**Version:** 2.1.0  
 **Scope:** Machine-Readable Protocols for Autonomous AI Buying & Procurement Agents  
 
 ---

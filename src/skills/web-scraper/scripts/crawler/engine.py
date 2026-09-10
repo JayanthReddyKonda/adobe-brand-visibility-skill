@@ -292,23 +292,38 @@ class WebAuditEngine:
                 pass
 
     def _discover_sitemap_urls(self, seed_sitemaps: List[str]) -> List[str]:
-        """Collects URLs declared in XML sitemaps."""
+        """Collects URLs declared in XML sitemaps, validating same-origin to prevent external sitemap probing."""
         discovered: List[str] = []
+        base_parsed = urlparse(self.site_url)
+        base_host = (base_parsed.hostname or "").lower()
+
         for sm_url in seed_sitemaps[:3]:
+            sm_parsed = urlparse(sm_url)
+            if (sm_parsed.hostname or "").lower() != base_host:
+                continue
             try:
                 res = self.fetcher.fetch(sm_url, timeout=5.0)
                 if res.status == 200:
                     xml_text = res.body_bytes.decode("utf-8", errors="replace")
                     urls, child_sitemaps = SitemapParser.parse_sitemap(xml_text)
-                    discovered.extend([u.loc for u in urls[:100]])
-                    # Follow first 2 child sitemaps if index
+                    for u in urls[:100]:
+                        u_parsed = urlparse(u.loc)
+                        if (u_parsed.hostname or "").lower() == base_host:
+                            discovered.append(u.loc)
+                    # Follow first 2 child sitemaps if index (validating origin)
                     for child in child_sitemaps[:2]:
+                        c_parsed = urlparse(child)
+                        if (c_parsed.hostname or "").lower() != base_host:
+                            continue
                         try:
                             c_res = self.fetcher.fetch(child, timeout=5.0)
                             if c_res.status == 200:
                                 c_xml = c_res.body_bytes.decode("utf-8", errors="replace")
                                 c_urls, _ = SitemapParser.parse_sitemap(c_xml)
-                                discovered.extend([u.loc for u in c_urls[:50]])
+                                for u in c_urls[:50]:
+                                    u_parsed = urlparse(u.loc)
+                                    if (u_parsed.hostname or "").lower() == base_host:
+                                        discovered.append(u.loc)
                         except Exception:
                             continue
             except Exception:
@@ -328,8 +343,14 @@ class WebAuditEngine:
         if res.status != 200:
             return None
 
-        # Only parse HTML content
-        if "text/html" not in res.content_type.lower() and not res.url.endswith(".html"):
+        # Only parse genuine HTML content (prevent non-HTML binaries with .html suffix)
+        ct_lower = (res.content_type or "").lower()
+        is_html = any(t in ct_lower for t in ("text/html", "application/xhtml+xml"))
+        if not is_html:
+            sample_prefix = res.body_bytes[:512].lower()
+            if b"<html" in sample_prefix or b"<!doctype html" in sample_prefix:
+                is_html = True
+        if not is_html:
             return None
 
         # Multi-stage resilient HTML decoding with BOM stripping
@@ -473,6 +494,7 @@ class WebAuditEngine:
         return {
             "total_crawled_pages": total_pages,
             "average_snr": round(avg_snr, 4),
+            "site_scrapeability_snr": round(avg_snr, 4),
             "snr_health": "good" if avg_snr >= 0.12 else "low",
             "semantic_landmarks_coverage_pct": round((pages_with_landmarks / total_pages) * 100, 1),
             "sparse_spa_shells_count": sparse_shells,

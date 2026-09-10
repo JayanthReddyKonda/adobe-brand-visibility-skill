@@ -55,6 +55,7 @@
               "h1": {"type": ["string", "null"]},
               "word_count": {"type": ["integer", "null"]},
               "snr": {"type": ["number", "null"]},
+              "page_snr": {"type": ["number", "null"]},
               "canonical": {"type": ["string", "null"]},
               "has_jsonld": {"type": "boolean"}
             }
@@ -87,6 +88,7 @@
         "spa_root_markers_detected": {"type": "boolean"},
         "average_word_count": {"type": ["number", "null"]},
         "average_snr": {"type": ["number", "null"]},
+        "average_page_snr": {"type": ["number", "null"]},
         "thin_content_pages": {"type": "array", "items": {"type": "string"}}
       }
     },

@@ -1,10 +1,10 @@
 # Master Agent Handover & Project Knowledge Base
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.1.0 (Production SOTA Release)  
+**Version:** 2.1.0 (Production SOTA Release)  
 **Project:** Brand AI-Readiness & Generative Engine Optimization (GEO/AEO) Audit Suite  
 **Target Audience:** Incoming Autonomous AI Agent taking over project stewardship  
-**Status:** 100% OPERATIONAL — 257/257 TESTS + 29 SUBTESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
+**Status:** 100% OPERATIONAL — 263/263 TESTS + 29 SUBTESTS GREEN — 0 LINT DEFECTS — PURE PYTHON STANDARD LIBRARY  
 
 ---
 
@@ -17,7 +17,7 @@ Traditional SEO optimizes for keyword rank across 10 organic blue links. However
 
 This codebase delivers an end-to-end audit skill that evaluates any brand's website for AI readiness, identifies deterministic crawl and entity defects, measures content citability and answer absorption, scores autonomous agent commerce readiness, and produces a Draft-07 schema-validated audit report with dual-track remediation.
 
-### The Non-Negotiable Evaluator Constraints (`round3_PS.pdf`)
+### The Non-Negotiable Evaluator Constraints (`resources/round3_PS.pdf`)
 To maintain a 100/100 evaluation score, you MUST preserve these strict rules:
 1. **Zero External Dependencies:** 100% pure Python standard library (`urllib.request`, `html.parser`, `re`, `json`, `math`, `datetime`, `subprocess`, `ssl`, `socket`). No `pip` packages (`requests`, `beautifulsoup4`, `playwright`, `pydantic`).
 2. **Single Entrypoint Architecture:** Exactly 1 entrypoint orchestrator (`audit-orchestrator`) coordinating 7 specialist skills (including dedicated `web-scraper`) defined in `marketplace.json` conforming to the `agentskills.io` standard (8 skills total).
@@ -114,7 +114,7 @@ adobe-brand-visibility-skill/
 
 ## 4. Execution Interfaces & Operational Runbooks
 
-### Interface 1: AI Agent Cognitive Pipeline (`orchestrator.py --telemetry`)
+### Interface 1: AI Agent Cognitive Pipeline (`orchestrator.py --telemetry` & `--review`)
 Primary entrypoint for AI agents. Acquires inventory and collects empirical telemetry for cognitive synthesis:
 ```bash
 # 1. Acquire site inventory (single-pass, SSRF-safe)
@@ -122,8 +122,11 @@ python3 src/skills/audit-orchestrator/scripts/acquire_inventory.py --site https:
 
 # 2. Collect aggregated sensor telemetry for AI agent reasoning
 python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry
+
+# 3. Ingest agent review findings into unified causal DAG report synthesis
+python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
 ```
-The AI agent then reasons over the telemetry, applies the 6-Layer Causal DAG, classifies the business archetype, and synthesizes bespoke dual-track remediation.
+The AI agent reasons over the telemetry, applies the 6-Layer Causal DAG, classifies the business archetype, authors bespoke dual-track remediation into `review.json`, and synthesizes a schema-validated report with cryptographic provenance (`run_manifest`).
 
 ### Interface 1b: Headless CI/CD Baseline Runner (Automated Testing ONLY)
 ```bash
