@@ -30,7 +30,7 @@ Evaluates external entity authority by verifying that declared identity links (`
 ---
 
 > [!TIP]
-> **Execution Context:** Assume your working directory is the repository root. All commands and file paths below are absolute relative to the root directory. Adapt shell commands (`python3`, `python`) to match your host operating system (Linux, macOS, or Windows). Always use forward slashes (`/`) for cross-platform file paths.
+> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/` or `src/skills/`. Resolve the root path before running commands. Always adapt shell commands (`python3`, `python`) to match your host operating system and use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
@@ -128,8 +128,7 @@ python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --si
 ### Step 3: Decision Protocol & Check Logic
 
 1. **Declared Identity Nodes (`declared_identity_nodes`):**
-   - Extract declared `sameAs` URLs from Organization JSON-LD markup.
-   - Probe up to 5 declared links (bounded 5s timeout, SSRF-protected).
+   - Extract declared sameAs URLs from Organization JSON-LD markup. Probe up to 2 declared external authority links (bounded 1.5s timeout, SSRF-protected).
    - If a declared URL returns HTTP 4xx or 5xx -> report `BROKEN_AUTHORITY_ANCHOR` (Severity: `medium`, Confidence: `high`).
    - If a probe times out or is network-blocked -> mark probe as `inconclusive`, never flag as a broken link.
    - Separate internal mirror domain clusters from independent third-party knowledge graph entities (Wikidata, Wikipedia, LinkedIn).
@@ -158,7 +157,7 @@ All string fields in emitted findings and recommendations must be clean, single-
 - **Declared Identity vs Inbound Backlinks:** Declared `sameAs` links are outbound entity assertions from the brand; candidate backlinks are inbound references from third-party sites. They are two distinct evidence classes and must never be conflated.
 - **Common Crawl CDX Limitation:** Common Crawl's CDX index is a URL index of crawled pages, not an inverted link graph index. It cannot truthfully discover arbitrary inbound linking pages across the web without multi-petabyte graph traversal. Backlink analysis is strictly bounded to supplied candidate ledgers.
 - **Broken Links vs Missing Links:** A declared `sameAs` link that returns HTTP 4xx/5xx is a defect finding (`BROKEN_AUTHORITY_ANCHOR`). Total absence of declared links is an advisory recommendation.
-- **Bounded Remote Probing:** Probe at most 5 declared authority URLs and 10 candidate backlink URLs with a strict 5-second timeout and 512 KB payload cap to prevent latency bottlenecks.
+- **Bounded Remote Probing:** Probe at most 2 declared authority URLs (1.5s timeout) and up to 10 candidate backlink URLs (cumulative 8.0s deadline, 512 KiB cap) to prevent latency bottlenecks.
 - **Timeout is `inconclusive`, not broken:** A declared link that times out or is rate-limited is classified as `inconclusive`, never as `BROKEN_AUTHORITY_ANCHOR`.
 - **Social mirror clusters are not independent corroboration:** Multiple links all pointing to pages on the same root domain (e.g., `brand.com/about`, `brand.com/press`) are treated as a single self-referential corroboration node, not independent third-party substantiation.
 

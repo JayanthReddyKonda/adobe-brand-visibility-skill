@@ -618,6 +618,12 @@ class WebAuditEngine:
                     "tables": [t.to_dict() for t in p.tables],
                     "code_blocks": p.code_blocks,
                     "images": p.images,
+                    # Architectural Design Tradeoff (Scale & Sensor-Brain Separation):
+                    # Raw HTML is retained in inv.json so downstream deterministic sensors
+                    # can execute single-pass offline analysis with zero redundant network I/O.
+                    # INVARIANT: inv.json is an intermediate machine artifact on disk and must
+                    # NEVER be loaded directly into LLM agent context. Agents consume distilled
+                    # telemetry via orchestrator.py --telemetry and context bundles.
                     "html": p.raw_html,
                     "headers": p.headers,
                     "latency_ms": p.fetch_telemetry.get("latency_ms", 0.0),

@@ -168,6 +168,7 @@ class TestChecksIntegrity(unittest.TestCase):
             with open(md_path, "r", encoding="utf-8") as f:
                 content = f.read()
             found = re.findall(r"^##\s+([A-Za-z0-9_]+)", content, re.MULTILINE)
+            found = [x for x in found if x not in {"Table", "Contents"}]
             md_ids.update(found)
 
         orphans_in_json = json_ids - md_ids

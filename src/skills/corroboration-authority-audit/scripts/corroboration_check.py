@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 

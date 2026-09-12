@@ -28,12 +28,19 @@ allowed-tools:
 > - **Deterministic Read-Only Acquisition:** `web-scraper` executes bounded, single-pass website acquisition (`run_scraper.py` and `acquire_inventory.py` emitting `inv.json`). It enforces pre-connect zero-trust SSRF validation, parses RFC 9309 crawler matrices across 16 AI bots, traverses XML sitemaps, and extracts Trafilatura-grade clean Markdown. It **must not** recommend fixes, assign severities, or call LLMs.
 > - **Cognitive Orchestrator:** All downstream diagnostic sensors and the Master Orchestrator run offline against `inv.json`, eliminating redundant crawls and ensuring single-pass efficiency.
 
+> [!NOTE]
+> **Scale Architecture and Context Boundary (`inv.json`):**
+> Full raw HTML is persisted in `inv.json` to enable deterministic offline diagnostic sensors to inspect DOM structures, JSON-LD graphs, and visible word counts without duplicate network roundtrips. To protect LLM context limits, `inv.json` is strictly an intermediate machine artifact on disk and must NEVER be read into the AI agent's context window. The AI agent ingests only distilled empirical telemetry via `orchestrator.py --telemetry` and context bundles via `bundle_context.py`.
+
 > [!CAUTION]
 > **ZERO DIRECT AGENT URL READING MANDATE:**
 > You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to inspect websites or robots.txt.
 > All acquisition must flow through `python3 skills/web-scraper/scripts/acquire_inventory.py` or `run_scraper.py` to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
 
 ---
+
+> [!TIP]
+> **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/` or `src/skills/`. Resolve the root path before running commands. Always adapt shell commands (`python3`, `python`) to match your host operating system and use forward slashes (`/`) for cross-platform file paths.
 
 ## Summary
 
@@ -84,8 +91,13 @@ Every script and reference in this skill serves a distinct, critical role:
 | `scripts/crawler/budget.py` | Internal Module | Monotonic crawl deadline and byte limit enforcement. |
 | `scripts/crawler/policy.py` | Internal Module | Safe query string filtering and mutating route sanitization. |
 | `scripts/crawler/models.py` | Dataclasses | Data schemas for `Page`, `Inventory`, `RobotsDirective`, and `CrawledResource`. |
+| `scripts/crawler/fetch.py` | Internal Module | Streaming fetch wrapper coordinating zero-trust SSRF safe fetching within the crawl loop. |
+| `scripts/crawler/links.py` | Internal Module | HTML link parser extracting internal links, stripping URL fragments, and filtering tracking parameters. |
+| `scripts/crawler/metadata.py` | Internal Module | Extraction engine for title, meta tags, OpenGraph, Twitter cards, and edge HTTP headers. |
+| `scripts/crawler/cli.py` | Internal Module | CLI option parser and configuration builder for the autonomous crawler. |
 | `references/bot-registry.json` | Reference JSON | Authoritative catalogue of 16 AI retrieval and training bots, user agents, provider roles, and functions. |
 | `references/knowledge-base.md` | Reference KB | Comprehensive technical specification covering SSRF blocked subnets, RFC 9309 rules, and SNR math. |
+| `evals/evals.json` | Verification Fixtures | Single-pass acquisition test fixtures validating RFC 9309 crawler matrices, SNR scoring, and SSRF prevention. |
 
 ---
 

@@ -13,6 +13,7 @@ import socket
 import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 from typing import Any, Dict, List, Optional
@@ -37,15 +38,53 @@ def parse_retry_after(header_val: str) -> float:
         return 0.0
 
 
+class PinnedConnectionPool:
+    """Tracks pinned IPs per hostname to ensure DNS TOCTOU protection across redirects."""
+
+    def __init__(self, policy: SecurityPolicy, initial_host: str, initial_ip: Optional[str] = None) -> None:
+        self.policy = policy
+        clean_init = initial_host.lower().strip("[]")
+        self.host_to_ip: Dict[str, str] = {}
+        if initial_ip:
+            self.host_to_ip[clean_init] = initial_ip
+        self.last_connected_ip: Optional[str] = initial_ip
+
+    def get_or_resolve_ip(self, host: str, port: int) -> str:
+        clean_host = host.lower().strip("[]")
+        if clean_host in self.host_to_ip:
+            ip = self.host_to_ip[clean_host]
+            self.last_connected_ip = ip
+            return ip
+        safe, reason, resolved_ip = self.policy.resolve_and_verify_host(clean_host, port)
+        if not safe or not resolved_ip:
+            raise SecurityValidationError(f"SSRF rejection during connection to {clean_host}: {reason}")
+        self.host_to_ip[clean_host] = resolved_ip
+        self.last_connected_ip = resolved_ip
+        return resolved_ip
+
+
 class PinnedHTTPConnection(http.client.HTTPConnection):
     """HTTPConnection that connects directly to a pre-validated IP address."""
 
-    def __init__(self, host: str, port: Optional[int] = None, timeout: float = 15.0, pinned_ip: Optional[str] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: Optional[int] = None,
+        timeout: float = 15.0,
+        pool: Optional[PinnedConnectionPool] = None,
+        pinned_ip: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(host, port, timeout=timeout, **kwargs)
+        self.pool = pool
         self.pinned_ip = pinned_ip
 
     def connect(self) -> None:
-        target_ip = self.pinned_ip or self.host.strip("[]")
+        clean_host = self.host.strip("[]")
+        if self.pool:
+            target_ip = self.pool.get_or_resolve_ip(clean_host, self.port or 80)
+        else:
+            target_ip = self.pinned_ip or clean_host
         source_addr = getattr(self, "source_address", None)
         self.sock = socket.create_connection((target_ip, self.port), self.timeout, source_addr)
 
@@ -53,47 +92,64 @@ class PinnedHTTPConnection(http.client.HTTPConnection):
 class PinnedHTTPSConnection(http.client.HTTPSConnection):
     """HTTPSConnection that connects directly to a pre-validated IP address with TLS SNI verification."""
 
-    def __init__(self, host: str, port: Optional[int] = None, timeout: float = 15.0, pinned_ip: Optional[str] = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: Optional[int] = None,
+        timeout: float = 15.0,
+        pool: Optional[PinnedConnectionPool] = None,
+        pinned_ip: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(host, port, timeout=timeout, **kwargs)
+        self.pool = pool
         self.pinned_ip = pinned_ip
 
     def connect(self) -> None:
-        target_ip = self.pinned_ip or self.host.strip("[]")
+        clean_host = self.host.strip("[]")
+        if self.pool:
+            target_ip = self.pool.get_or_resolve_ip(clean_host, self.port or 443)
+        else:
+            target_ip = self.pinned_ip or clean_host
         source_addr = getattr(self, "source_address", None)
         self.sock = socket.create_connection((target_ip, self.port), self.timeout, source_addr)
         if getattr(self, "_tunnel_host", None):
             tunnel_fn = getattr(self, "_tunnel", None)
             if callable(tunnel_fn):
                 tunnel_fn()
-        server_hostname = self.host.strip("[]")
+        server_hostname = clean_host
         ctx = getattr(self, "_context", None) or ssl.create_default_context()
         self.sock = ctx.wrap_socket(self.sock, server_hostname=server_hostname)
 
 
 class PinnedHTTPHandler(urllib.request.HTTPHandler):
-    def __init__(self, pinned_ip: Optional[str] = None) -> None:
+    def __init__(self, pool: Optional[PinnedConnectionPool] = None, pinned_ip: Optional[str] = None) -> None:
         super().__init__()
+        self.pool = pool
         self.pinned_ip = pinned_ip
 
     def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(
             lambda host, port=None, timeout=15.0, **kwargs: PinnedHTTPConnection(
-                host, port, timeout=timeout, pinned_ip=self.pinned_ip, **kwargs
+                host, port, timeout=timeout, pool=self.pool, pinned_ip=self.pinned_ip, **kwargs
             ),
             req,
         )
 
 
 class PinnedHTTPSHandler(urllib.request.HTTPSHandler):
-    def __init__(self, context: ssl.SSLContext, pinned_ip: Optional[str] = None) -> None:
+    def __init__(
+        self, context: ssl.SSLContext, pool: Optional[PinnedConnectionPool] = None, pinned_ip: Optional[str] = None
+    ) -> None:
         super().__init__(context=context)
+        self.pool = pool
         self.pinned_ip = pinned_ip
         self.ssl_context = context
 
     def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(
             lambda host, port=None, timeout=15.0, **kwargs: PinnedHTTPSConnection(
-                host, port, timeout=timeout, pinned_ip=self.pinned_ip, **{**kwargs, "context": self.ssl_context}
+                host, port, timeout=timeout, pool=self.pool, pinned_ip=self.pinned_ip, **{**kwargs, "context": self.ssl_context}
             ),
             req,
             context=self.ssl_context,
@@ -103,9 +159,12 @@ class PinnedHTTPSHandler(urllib.request.HTTPSHandler):
 class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
     """Intercepts HTTP redirects to enforce SSRF validation and redirect ceilings."""
 
-    def __init__(self, policy: SecurityPolicy, max_redirects: int = 5) -> None:
+    def __init__(
+        self, policy: SecurityPolicy, pool: Optional[PinnedConnectionPool] = None, max_redirects: int = 5
+    ) -> None:
         super().__init__()
         self.policy = policy
+        self.pool = pool
         self.max_redirects = max_redirects
         self.redirect_chain: List[str] = []
 
@@ -116,9 +175,14 @@ class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
             raise SecurityValidationError(f"Exceeded maximum redirects ceiling ({self.max_redirects})")
 
         original_url = req.full_url
-        safe, reason, resolved_url, _ = self.policy.validate_redirect(original_url, newurl)
+        safe, reason, resolved_url, target_ip = self.policy.validate_redirect(original_url, newurl)
         if not safe:
             raise SecurityValidationError(f"Redirect security rejection: {reason}")
+
+        if self.pool and target_ip:
+            new_parsed = urllib.parse.urlparse(resolved_url)
+            if new_parsed.hostname:
+                self.pool.host_to_ip[new_parsed.hostname.lower().strip("[]")] = target_ip
 
         self.redirect_chain.append(resolved_url)
         return super().redirect_request(req, fp, code, msg, headers, resolved_url)
@@ -176,12 +240,16 @@ class SafeFetcher:
 
             req = urllib.request.Request(url, headers=req_headers)
 
+            parsed_initial = urllib.parse.urlparse(url)
+            initial_host = parsed_initial.hostname or ""
+            pool = PinnedConnectionPool(policy=self.policy, initial_host=initial_host, initial_ip=resolved_ip)
+
             redirect_handler = SafeRedirectHandler(
-                policy=self.policy, max_redirects=self.budget.max_redirects
+                policy=self.policy, pool=pool, max_redirects=self.budget.max_redirects
             )
-            # Use pinned connection handlers to guarantee DNS TOCTOU protection
-            http_handler = PinnedHTTPHandler(pinned_ip=resolved_ip)
-            https_handler = PinnedHTTPSHandler(context=self.ssl_context, pinned_ip=resolved_ip)
+            # Use pinned connection handlers to guarantee DNS TOCTOU protection across redirects
+            http_handler = PinnedHTTPHandler(pool=pool, pinned_ip=resolved_ip)
+            https_handler = PinnedHTTPSHandler(context=self.ssl_context, pool=pool, pinned_ip=resolved_ip)
             opener = urllib.request.build_opener(redirect_handler, http_handler, https_handler)
 
             start_time = time.monotonic()
@@ -225,7 +293,7 @@ class SafeFetcher:
                         content_type=content_type,
                         latency_ms=latency_ms,
                         redirects=redirect_handler.redirect_chain,
-                        ip_address=resolved_ip,
+                        ip_address=pool.last_connected_ip or resolved_ip,
                     )
 
             except urllib.error.HTTPError as e:
@@ -245,16 +313,17 @@ class SafeFetcher:
                     pass
 
                 resp_headers = {k.lower(): v for k, v in e.headers.items()} if e.headers else {}
+                decompressed_error = self._decompress_body(error_body, resp_headers.get("content-encoding"))
                 return Resource(
                     url=url,
                     final_url=getattr(e, "url", getattr(e, "geturl", lambda: url)()),
                     status=e.code,
                     headers=resp_headers,
-                    body_bytes=error_body,
+                    body_bytes=decompressed_error,
                     content_type=resp_headers.get("content-type", "text/html"),
                     latency_ms=latency_ms,
                     redirects=redirect_handler.redirect_chain,
-                    ip_address=resolved_ip,
+                    ip_address=pool.last_connected_ip or resolved_ip,
                 )
 
             except urllib.error.URLError as e:

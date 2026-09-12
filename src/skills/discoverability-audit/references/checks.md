@@ -2,6 +2,65 @@
 
 Research-derived rules, not unconditional failure predicates. Read only applicable IDs.
 
+### Table of Contents
+
+#### Robots.txt and Crawler Directives (A1-A5)
+- [A1 robots.txt exists, HTTP 200, valid](#a1-robotstxt-exists-http-200-valid)
+- [A2 No blanket wildcard disallow](#a2-no-blanket-wildcard-disallow)
+- [A3 Per-bot permission matrix](#a3-per-bot-permission-matrix)
+- [A4 Crawl-delay starvation](#a4-crawl-delay-starvation)
+- [A5 Sitemap directive in robots](#a5-sitemap-directive-in-robots)
+
+#### Indexation, Canonicals, and Access Barriers (B1-B5)
+- [B1 Meta noindex](#b1-meta-noindex)
+- [B2 X-Robots-Tag noindex](#b2-x-robots-tag-noindex)
+- [B3 Canonical correctness](#b3-canonical-correctness)
+- [B4 HTTP status and redirects](#b4-http-status-and-redirects)
+- [B5 Login, CAPTCHA, bot walls](#b5-login-captcha-bot-walls)
+
+#### Client-Side Rendering and Hydration Parity (C1-C5)
+- [C1 Raw versus rendered word count](#c1-raw-versus-rendered-word-count)
+- [C2 Target facts require JavaScript](#c2-target-facts-require-javascript)
+- [C3 Hash/client-side routes](#c3-hashclient-side-routes)
+- [C4 SSR or prerendered fallback](#c4-ssr-or-prerendered-fallback)
+- [C5 Delayed assembly beyond crawler timeout](#c5-delayed-assembly-beyond-crawler-timeout)
+
+#### XML Sitemaps and Crawl Topology (D1-D5)
+- [D1 Reachable valid sitemap](#d1-reachable-valid-sitemap)
+- [D2 Sitemap versus link graph coverage](#d2-sitemap-versus-link-graph-coverage)
+- [D3 lastmod reflects actual edits](#d3-lastmod-reflects-actual-edits)
+- [D4 Key commercial pages excluded](#d4-key-commercial-pages-excluded)
+- [D5 Large sitemap/index support](#d5-large-sitemapindex-support)
+
+#### Structured Data and Entity Baseline (E1-E7)
+- [E1 JSON-LD presence](#e1-json-ld-presence)
+- [E2 Organization/Brand fields](#e2-organizationbrand-fields)
+- [E3 Product/Offer fields](#e3-productoffer-fields)
+- [E4 FAQ/HowTo/Article applicability](#e4-faqhowtoarticle-applicability)
+- [E5 JSON-LD validity](#e5-json-ld-validity)
+- [E6 Duplicate/contradictory blocks](#e6-duplicatecontradictory-blocks)
+- [E7 Markup overclaims visible content](#e7-markup-overclaims-visible-content)
+
+#### Non-Text Content and Media Accessibility (F1-F5)
+- [F1 Facts locked in images/canvas](#f1-facts-locked-in-imagescanvas)
+- [F2 Alt-text quality](#f2-alt-text-quality)
+- [F3 Audio/video transcript or captions](#f3-audiovideo-transcript-or-captions)
+- [F4 Real text in tables/PDFs](#f4-real-text-in-tablespdfs)
+- [F5 PDF-only facts](#f5-pdf-only-facts)
+
+#### AI Discovery Protocols (G1-G2)
+- [G1 llms.txt present](#g1-llmstxt-present)
+- [G2 llms.txt accurate and synchronized](#g2-llmstxt-accurate-and-synchronized)
+
+#### Latency, Landmarks, and Parity (H1-H3)
+- [H1 Response latency](#h1-response-latency)
+- [H2 Headings and landmarks](#h2-headings-and-landmarks)
+- [H3 Mobile/desktop parity](#h3-mobiledesktop-parity)
+
+---
+
+
+
 ## A1 robots.txt exists, HTTP 200, valid
 
 Feasibility: Possible. Reference band: S4. Solution level: C.

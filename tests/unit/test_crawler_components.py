@@ -11,9 +11,11 @@ if SCRAPER_DIR not in sys.path:
 
 from crawler.classify import PageClassifier
 from crawler.evidence import EvidenceExtractor
+from crawler.fetch import PinnedConnectionPool, SafeFetcher
 from crawler.links import LinkProcessor
 from crawler.metadata import MetadataProcessor
 from crawler.parser import StreamingHTMLParser
+from crawler.policy import SecurityPolicy
 
 from tests.fixtures.html_fixtures import (
     CLEAN_ENTERPRISE_HTML,
@@ -145,6 +147,33 @@ class TestCrawlerComponents(unittest.TestCase):
         metadata, obs = MetadataProcessor.process_metadata(meta_tags, "https://example.com/staging")
         self.assertIn("noindex", metadata["robots_directives"])
         self.assertTrue(any(o.value == "noindex_detected" for o in obs))
+
+    def test_fetcher_decompress_body(self):
+        """Success test: Decompresses gzip and deflate payloads."""
+        import gzip
+        import zlib
+        fetcher = SafeFetcher()
+        payload = b"<html><body>Error 403 Forbidden</body></html>"
+
+        # Gzip
+        gz = gzip.compress(payload)
+        self.assertEqual(fetcher._decompress_body(gz, "gzip"), payload)
+
+        # Deflate
+        df = zlib.compress(payload)
+        self.assertEqual(fetcher._decompress_body(df, "deflate"), payload)
+
+    def test_pinned_connection_pool(self):
+        """Security test: PinnedConnectionPool caches host IPs and enforces SSRF policy on redirects."""
+        policy = SecurityPolicy()
+        pool = PinnedConnectionPool(policy, initial_host="example.com", initial_ip="93.184.216.34")
+
+        # Initial host uses pre-pinned IP
+        self.assertEqual(pool.get_or_resolve_ip("example.com", 80), "93.184.216.34")
+
+        # Private IP rejection on cross-host redirect
+        with self.assertRaises(Exception):
+            pool.get_or_resolve_ip("127.0.0.1", 80)
 
 
 if __name__ == "__main__":

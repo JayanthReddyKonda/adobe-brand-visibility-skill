@@ -97,11 +97,7 @@ class JsonLdExtractor:
                 if "@type" in data:
                     results.append({k: v for k, v in data.items() if k != "@graph"})
                 for element in data["@graph"]:
-                    if isinstance(element, dict) and id(element) in visited:
-                        clean_elem = {k: v for k, v in element.items() if k != "@graph"}
-                        results.append(clean_elem)
-                    else:
-                        results.extend(cls._flatten_jsonld(element, visited))
+                    results.extend(cls._flatten_jsonld(element, visited))
             else:
                 results.append(data)
         return results

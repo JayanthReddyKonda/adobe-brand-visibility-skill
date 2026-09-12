@@ -601,6 +601,14 @@ def build_inventory(site, max_pages=28, timeout_seconds=90, deadline=None):
                 "semantic_landmarks_list": c_landmarks_list,
                 "images": [],
                 "canonicals": [],
+                # Architectural Design Tradeoff (Scale & Sensor-Brain Separation):
+                # Raw HTML is retained in inv.json so downstream deterministic sensors
+                # (discoverability, entity, fact, corroboration, geo, engagement) can perform
+                # single-pass offline extraction (JSON-LD parsing, DOM analysis, raw word count)
+                # with zero redundant network overhead.
+                # INVARIANT: inv.json is strictly an intermediate disk artifact and must NEVER
+                # be injected directly into the LLM context window. The agent ingests only distilled
+                # telemetry via orchestrator.py --telemetry and context bundles via bundle_context.py.
                 "html": p_html,
                 "headers": p_headers,
             }

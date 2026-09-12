@@ -19,11 +19,11 @@ allowed-tools:
 | **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Mode** |
 | **Agent Cognitive Review Synthesizer** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --review review.json --output report.json` | Causal-Gated & Scored Draft-07 JSON Report | **Primary Synthesis Mode** |
 | **Dynamic Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py --site <url> --inventory inv.json` | Tailored Knowledge Base & Remediation Briefing | Context Compilation |
-| **Remediation Priority Ranker** | `python3 skills/audit-orchestrator/scripts/plan.py --severity <1-4> --difficulty <1-5>` or `--report report.json` | Task Priority Index & Queue Disposition | Remediation Planning |
+| **Remediation Priority Ranker** | `python3 skills/audit-orchestrator/scripts/plan.py --severity <1-4> --difficulty <1-5>` or `python3 skills/audit-orchestrator/scripts/plan.py --report report.json` | Task Priority Index & Queue Disposition | Remediation Planning |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements | Targeted Deep Inspection |
 | **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` | Modular Pipeline |
 | **Headless CI Runner (Automated Testing ONLY)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json --baseline-only` | Baseline Draft-07 Validated Report JSON | **CI/CD Only (No Agent Shortcut)** |
-| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or 1 (fail) | Verification Gate |
+| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or non-zero (fail) (exit code 2 on failure) | Verification Gate |
 
 > [!IMPORTANT]
 > **ANTI-SHORTCUT DIRECTIVE: AGENT REASONING SUPREMACY**
@@ -72,6 +72,7 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 - **`--output`** (string, optional): Path to write final JSON report or telemetry payload (defaults to stdout).
 - **`--telemetry`** (flag, optional): Emits raw aggregated empirical sensor measurements for cognitive synthesis.
 - **`--baseline-only`** (flag, optional): Emits automated baseline report directly (strictly reserved for automated CI/CD suites).
+- **`--format`** (enum, optional, default: `json`): Output serialization format.
 
 ---
 
@@ -109,6 +110,7 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 - [Orchestrator Knowledge Base](references/knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, epistemic reasoning policy, shared zero-trust SSRF standards, normalized vocabulary, severity scales (S0-S4/U), solution levels (V/C/E/X), and SOTA GEO benchmarks.
 
 ### Specialist Skill Guides & Domain References (Consult by Anomaly)
+- [Web Scraper](../web-scraper/SKILL.md) & [Web Scraper KB](../web-scraper/references/knowledge-base.md): Single-pass acquisition, RFC 9309 crawler matrices, XML sitemap parsing, clean Markdown extraction, and zero-trust SSRF sandboxing.
 - [Discoverability Audit](../discoverability-audit/SKILL.md) & [Discoverability KB](../discoverability-audit/references/knowledge-base.md): RFC 9309 crawler matrices, meta directives, canonical loops, and CSR unrendered shells.
 - [Entity Content Audit](../entity-content-audit/SKILL.md) & [Entity Content KB](../entity-content-audit/references/knowledge-base.md): Schema.org `@graph`, `Organization`, `Product`, `Offer`, priceCurrency, and answerability.
 - [Fact Consistency Audit](../fact-consistency-audit/SKILL.md) & [Fact Consistency KB](../fact-consistency-audit/references/knowledge-base.md): Multi-page factual discrepancies, pricing conflicts, and stale terms.
@@ -231,7 +233,7 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
    python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
 
    # Option B: Finalize via unified multi-sensor runner
-   python3 skills/audit-orchestrator/scripts/audit.py finalize review.json --out report.json
+   python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review review.json --out report.json
    ```
    Both options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, causal gating, `priority_rank`, `priority_justification`, and SHA-256 reference hashes (`run_manifest`).
 
@@ -294,7 +296,7 @@ The final report must strictly conform to the `references/report-schema.json` Dr
 - **Non-Destructive Execution & User Approval Gate:** All diagnostic audits are strictly read-only, non-destructive, and analytical. Never execute destructive operations such as HTTP POST, PUT, DELETE, data purging, or file removal.
 - **SSRF Hard Boundary:** All fetches pass through `safe_fetch.py`. Never probe private RFC-1918 subnets, cloud metadata (169.254.169.254), or loopback interfaces.
 - **Non-HTML Resource Invariant:** XML sitemaps, robots.txt, JSON feeds, and PDFs are infrastructure metadata and must NEVER be audited for narrative or heading content.
-- **Training Bot vs Retrieval Bot:** Blocking `GPTBot` (training) is a governance decision — NOT a critical defect. Blocking `OAI-SearchBot` or `PerplexityBot` (retrieval) IS a critical defect. See `discoverability-audit/SKILL.md` for the full crawler matrix.
+- **Training Bot vs Retrieval Bot:** Blocking `GPTBot` (training) is a governance decision — NOT a critical defect. Blocking `OAI-SearchBot` or `PerplexityBot` (retrieval) IS a critical defect. See [discoverability-audit/SKILL.md](../discoverability-audit/SKILL.md) for the full crawler matrix.
 
 ---
 

@@ -12,7 +12,7 @@ Pure Python standard library (re).
 from __future__ import annotations
 
 import re
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .models import ClaimCandidate, FactCandidate, Heading, Observation, TableData
 

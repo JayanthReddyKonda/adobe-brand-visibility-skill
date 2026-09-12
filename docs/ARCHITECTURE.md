@@ -56,6 +56,11 @@ The suite implements a modular, specification-compliant architecture operating u
 - **The AI Agent is the Brain:** It MUST ingest sensor telemetry via `orchestrator.py --telemetry`, reason over the measurements, apply 5-Whys causal analysis, classify business archetype, and author bespoke dual-track remediation customized to the brand's actual domain, products, and entity anchors.
 - **The Scripts are Sensors:** They provide raw deterministic measurements. The headless baseline mode (`orchestrator.py --format json --baseline-only`) is strictly reserved for CI/CD automated test suites, NEVER for agent-to-user delivery.
 
+### Single-Pass Acquisition Architecture & Scale Tradeoff (`inv.json`)
+The crawler performs a single acquisition pass under zero-trust socket-level SSRF protection, saving intermediate site data into `inv.json`.
+- **Deterministic Sensor Ingestion:** Full raw HTML (`page["html"]`) is persisted in `inv.json` specifically so that downstream Python sensors can parse DOM structures, extract Schema.org JSON-LD graphs, evaluate signal-to-noise ratios, and count raw visible words offline with zero redundant network I/O.
+- **LLM Context Isolation:** Because raw HTML across 15-25 pages can consume megabytes, `inv.json` is strictly an intermediate machine artifact on disk and MUST NEVER be fed directly into the AI agent's context window. The agent ingests only distilled empirical telemetry (`orchestrator.py --telemetry`) and filtered context (`bundle_context.py`), preserving 100% evidence fidelity without risk of token overflow.
+
 ### Unified Report Synthesis & Provenance Tracking
 Both `orchestrator.py --review <file>` and `audit.py finalize <file>` invoke the unified report synthesis engine (`assemble_report.py::assemble()`), guaranteeing:
 1. Multi-dimensional readiness scoring across 6 orthogonal dimensions (Crawlability, Retrieval Readiness, Citation Readiness, Entity Authority, Cross-Engine Visibility, Agentic Commerce).

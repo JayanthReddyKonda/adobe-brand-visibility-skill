@@ -1,6 +1,64 @@
 # Entity Content Audit Check Procedures
 
-Entity identity, structured data, and commercial answerability checks.
+Entity identity, structured data, and commercial answerability checks across 5 core business archetypes.
+
+### Table of Contents
+
+#### E-Commerce Product Entities (EC1-EC9)
+- [EC1 Numeric product facts](#ec1-numeric-product-facts)
+- [EC2 Comparative-claim sources](#ec2-comparative-claim-sources)
+- [EC3 Real customer quotes and Review schema](#ec3-real-customer-quotes-and-review-schema)
+- [EC4 Authoritative nonhype tone](#ec4-authoritative-nonhype-tone)
+- [EC5 Prepurchase FAQ](#ec5-prepurchase-faq)
+- [EC6 Product schema completeness](#ec6-product-schema-completeness)
+- [EC7 Fair structured comparisons](#ec7-fair-structured-comparisons)
+- [EC8 No stuffed titles/descriptions](#ec8-no-stuffed-titlesdescriptions)
+- [EC9 Current price/stock/promotions](#ec9-current-pricestockpromotions)
+
+#### SaaS and Software Offerings (SA1-SA9)
+- [SA1 Feature outcomes](#sa1-feature-outcomes)
+- [SA2 Independent benchmarks/reviews](#sa2-independent-benchmarksreviews)
+- [SA3 Result-specific customer quotes](#sa3-result-specific-customer-quotes)
+- [SA4 Correct documentation terminology](#sa4-correct-documentation-terminology)
+- [SA5 Fair comparisons/alternatives](#sa5-fair-comparisonsalternatives)
+- [SA6 Applicable software/product schema](#sa6-applicable-softwareproduct-schema)
+- [SA7 Different marketing/docs tone](#sa7-different-marketingdocs-tone)
+- [SA8 Nonstuffed feature headings](#sa8-nonstuffed-feature-headings)
+- [SA9 Dated changelog/release notes](#sa9-dated-changelogrelease-notes)
+
+#### Social Communities and Marketplaces (SC1-SC7)
+- [SC1 Plain policy facts and sourced statistics](#sc1-plain-policy-facts-and-sourced-statistics)
+- [SC2 Real member/moderator quotes](#sc2-real-membermoderator-quotes)
+- [SC3 Disclosed community counts](#sc3-disclosed-community-counts)
+- [SC4 Self-contained FAQ help center](#sc4-self-contained-faq-help-center)
+- [SC5 Entity parity with app stores/press](#sc5-entity-parity-with-app-storespress)
+- [SC6 Nonstuffed landing pages](#sc6-nonstuffed-landing-pages)
+- [SC7 Authoritative trust/safety tone](#sc7-authoritative-trustsafety-tone)
+
+#### Education and Courseware Catalogs (ED1-ED9)
+- [ED1 Concrete course outcomes](#ed1-concrete-course-outcomes)
+- [ED2 Curriculum sources](#ed2-curriculum-sources)
+- [ED3 Instructor/learner quotes](#ed3-instructorlearner-quotes)
+- [ED4 Course FAQs and FAQPage](#ed4-course-faqs-and-faqpage)
+- [ED5 Defined subject terminology](#ed5-defined-subject-terminology)
+- [ED6 HowTo on tutorials](#ed6-howto-on-tutorials)
+- [ED7 Fluency and simplicity](#ed7-fluency-and-simplicity)
+- [ED8 No stuffed course catalogs](#ed8-no-stuffed-course-catalogs)
+- [ED9 Curriculum freshness](#ed9-curriculum-freshness)
+
+#### Media and Entertainment Catalogs (ME1-ME8)
+- [ME1 Concrete entertainment metadata](#me1-concrete-entertainment-metadata)
+- [ME2 Attributed critic scores](#me2-attributed-critic-scores)
+- [ME3 Review/cast/critic quotes](#me3-reviewcastcritic-quotes)
+- [ME4 Video/Movie/TVSeries schema](#me4-videomovietvseries-schema)
+- [ME5 Fluent nonoverstated synopsis](#me5-fluent-nonoverstated-synopsis)
+- [ME6 Practical FAQs](#me6-practical-faqs)
+- [ME7 No title/metadata stuffing](#me7-no-titlemetadata-stuffing)
+- [ME8 Current availability and status](#me8-current-availability-and-status)
+
+---
+
+
 
 ## EC1 Numeric product facts
 

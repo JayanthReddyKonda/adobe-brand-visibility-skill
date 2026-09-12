@@ -150,7 +150,7 @@ Incorporate these causal markers to maximize RAG extraction probability (+28% ca
 
 Synthesis of empirical findings from:
 1. Princeton University / KDD 2024: "GEO: Generative Engine Optimization" (Aggarwal et al., arXiv:2311.09735)
-2. Carnegie Mellon University (CMU): "What Generative Search Engines Like & AutoGEO" (Wu et al., arXiv:2501.05361, preprint)
+2. Carnegie Mellon University (CMU): "What Generative Search Engines Like & AutoGEO" (Wu et al., arXiv:2510.11438, preprint)
 3. TU Darmstadt / NAVER AI Lab: "C-SEO Bench: Does Conversational SEO Work?" (Puerto et al., arXiv:2506.11097, preprint)
 
 ---

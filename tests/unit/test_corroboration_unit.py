@@ -57,5 +57,19 @@ class TestCorroborationUnit(unittest.TestCase):
         self.assertIn(res["status"], ["ok", "inconclusive"])
 
 
+    def test_audit_with_candidate_backlinks(self):
+        """Regression test: Candidate backlinks audit runs with time deadline and does not crash with NameError."""
+        inv = make_healthy_inventory("https://example.com")
+        res = corroboration_check.audit(
+            "https://example.com",
+            "example.com",
+            inv,
+            candidate_backlinks=[{"source_url": "https://example.com/source", "expected_target": "https://example.com"}],
+        )
+        self.assertEqual(res["status"], "ok")
+        self.assertIn("verified_candidate_backlinks", res.get("evidence_classes", {}))
+
+
 if __name__ == "__main__":
     unittest.main()
+
