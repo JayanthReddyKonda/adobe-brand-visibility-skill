@@ -58,12 +58,17 @@ class TestE2EScenarios(unittest.TestCase):
             all_findings.extend(data.get("findings", []))
 
         # 2. Synthesize complete final report
+        for f in all_findings:
+            f.setdefault("scope", "https://example.com")
+            f.setdefault("impact", "Impairs AI search engine discovery and entity indexing.")
+
         critical_count = sum(1 for f in all_findings if f.get("severity") == "critical")
         high_count = sum(1 for f in all_findings if f.get("severity") == "high")
         medium_count = sum(1 for f in all_findings if f.get("severity") == "medium")
         low_count = sum(1 for f in all_findings if f.get("severity") == "low")
 
         final_report = {
+            "schema_version": "1.0.0",
             "site": "https://example.com",
             "audited_at": "2026-09-06T12:00:00Z",
             "audit_status": "complete",
@@ -122,7 +127,12 @@ class TestE2EScenarios(unittest.TestCase):
         )
 
         # Synthesize final report with dual-track remediation
+        for f in all_findings:
+            f.setdefault("scope", "https://example.com")
+            f.setdefault("impact", "Impairs AI search engine discovery and entity indexing.")
+
         final_report = {
+            "schema_version": "1.0.0",
             "site": "https://example.com",
             "audited_at": "2026-09-06T12:00:00Z",
             "audit_status": "complete",

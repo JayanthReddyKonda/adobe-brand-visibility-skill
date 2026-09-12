@@ -72,6 +72,17 @@ class TestGeoContentUnit(unittest.TestCase):
         self.assertIn("status", res)
         self.assertIn(res["status"], ["ok", "inconclusive"])
 
+    def test_abbreviation_aware_sentence_splitting_and_causal_density(self):
+        """Elevation test: Sentence splitting preserves abbreviations and calculates causal density."""
+        text = "The clinical trial led by Dr. Smith achieved a 42% recovery rate because the dosage was optimized."
+        sents = geo_content_check.split_sentences_abbr(text)
+        self.assertEqual(len(sents), 1)
+        self.assertIn("Dr. Smith", sents[0])
+
+        score = geo_content_check.score_passage_citability(text, headings=["Methodology"])
+        self.assertGreaterEqual(score["causal_conjunction_count"], 1)
+        self.assertGreaterEqual(score["causal_density_ratio"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

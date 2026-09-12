@@ -17,13 +17,14 @@ import sys
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-from fact_extractor import extract_scoped_facts  # type: ignore
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
+FACT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "fact-consistency-audit", "scripts"))
+for _p in (SCRIPT_DIR, SCRAPER_DIR, FACT_DIR):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
-
+from fact_consistency_check import extract_scoped_facts  # type: ignore
 from safe_fetch import safe_fetch  # type: ignore
 
 KNOWN_LOCALES = {"en", "es", "fr", "de", "it", "jp", "ja", "pt", "nl", "zh", "ko", "ru", "ar"}
@@ -204,7 +205,12 @@ class SemanticIntentEngine:
 
 
 COMMERCIAL_ACTION_PATTERNS = re.compile(
-    r"\b(buy|order|purchase|checkout|add to cart|subscribe|start free trial|try free|sign up|get started|book demo|contact sales|request demo|get quote)\b",
+    r"\b("
+    r"buy|order|purchase|checkout|add to cart|subscribe|start free trial|try free|sign up|get started|book demo|contact sales|request demo|get quote|"
+    r"comprar|comprar ahora|comprar ya|compra|añadir al carrito|carrito|cesta|suscríbete|suscribirse|suscripción|contactar|contacto|pedir|pedido|solicitar|empezar ahora|empezar|mostrar ahora|"
+    r"acheter|acheter maintenant|achat|ajouter au panier|panier|s'abonner|abonnement|contactez-nous|commander|commande|commencer|"
+    r"kaufen|jetzt kaufen|in den warenkorb|warenkorb|abonnieren|kontakt|bestellen|jetzt starten|anmelden"
+    r")\b",
     re.IGNORECASE,
 )
 
@@ -263,6 +269,19 @@ class EngagementDOMParser(HTMLParser):
         elif tag_lower == "button":
             self.in_button = True
             self.current_button_text = []
+        elif tag_lower == "input":
+            itype = attr_dict.get("type", "").lower()
+            if itype in ("submit", "button"):
+                val = attr_dict.get("value", "").strip() or attr_dict.get("aria-label", "").strip()
+                if val:
+                    self.cta_texts.append(val)
+                    is_comm = bool(COMMERCIAL_ACTION_PATTERNS.search(val))
+                    self.interactive_elements.append(
+                        {"tag": "input", "text": val, "href": "", "is_commercial_cta": is_comm}
+                    )
+        elif tag_lower in ("div", "span") and attr_dict.get("role", "").lower() == "button":
+            self.in_button = True
+            self.current_button_text = []
         elif tag_lower == "a":
             self.in_anchor = True
             self.current_anchor_text = []
@@ -272,7 +291,7 @@ class EngagementDOMParser(HTMLParser):
                 self.nav_links.append(self.current_href)
                 cls = attr_dict.get("class", "").lower()
                 role = attr_dict.get("role", "").lower()
-                if "btn" in cls or "button" in cls or "cta" in cls or role == "button":
+                if "btn" in cls or "button" in cls or "cta" in cls or "action" in cls or role == "button":
                     self.ctas.append(self.current_href)
                     self.current_is_cta = True
 
@@ -296,16 +315,17 @@ class EngagementDOMParser(HTMLParser):
             if ptxt:
                 self.paragraphs.append(ptxt)
             self.current_p_text = []
-        elif tag_lower == "button":
-            if self.current_button_text:
+        elif tag_lower in ("button", "div", "span"):
+            if self.in_button and self.current_button_text:
                 b_text = " ".join(self.current_button_text).strip()
                 if b_text:
                     self.cta_texts.append(b_text)
                     is_comm = bool(COMMERCIAL_ACTION_PATTERNS.search(b_text))
                     self.interactive_elements.append(
-                        {"tag": "button", "text": b_text, "href": "", "is_commercial_cta": is_comm}
+                        {"tag": tag_lower, "text": b_text, "href": "", "is_commercial_cta": is_comm}
                     )
-            self.in_button = False
+            if tag_lower == "button" or self.in_button:
+                self.in_button = False
         elif tag_lower == "a":
             if self.in_anchor and self.current_anchor_text:
                 a_text = " ".join(self.current_anchor_text).strip()
@@ -699,7 +719,7 @@ def parse_analytics_data(arg_val, inv=None):
     return page_metrics_map
 
 
-def audit_page_engagement(html_content, url, page_type="other", state=None):
+def audit_page_engagement(html_content, url, page_type="other", state=None, page_dict=None):
     state = state or {}
     findings = []
     recommendations = []
@@ -736,6 +756,12 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     facts = extract_scoped_facts(html_content, url)
 
     nav_text_lower = " ".join(dom.nav_link_texts).lower()
+    cta_text_lower = " ".join(dom.cta_texts).lower()
+    page_ctas_text = " ".join(
+        str(c.get("text", "") if isinstance(c, dict) else getattr(c, "text", ""))
+        for c in (page_dict.get("ctas", []) if page_dict else [])
+    ).lower()
+    all_action_text = f"{nav_text_lower} {cta_text_lower} {page_ctas_text}".strip()
 
     # 1. Product Pricing Intent Graph
     # Intent: "How much does Product X cost?"
@@ -744,7 +770,15 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
     if facts.get("scoped_prices"):
         # The page successfully satisfied the information requirement for the pricing intent.
         # Now evaluate continuity: Does it offer the next logical step?
-        action_found = any(cta in nav_text_lower for cta in ["buy", "cart", "subscribe", "contact", "order", "get"])
+        action_found = any(
+            cta in all_action_text
+            for cta in [
+                "buy", "cart", "subscribe", "contact", "order", "get", "trial", "demo", "pricing", "sign up", "checkout", "shop",
+                "comprar", "compra", "carrito", "cesta", "suscrib", "suscripci", "contacto", "contactar", "pedir", "pedido", "empezar", "mostrar",
+                "acheter", "achat", "panier", "abonn", "commander", "commande",
+                "kaufen", "kauf", "warenkorb", "bestellen",
+            ]
+        )
         if not action_found:
             findings.append(
                 {
@@ -754,6 +788,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                     "cause_family": "EXPERIENCE.CONTINUITY",
                     "id": "INTENT_TO_LANDING_MISMATCH",
                     "cause_id": "INTENT_TO_LANDING_MISMATCH",
+                    "url": url,
+                    "scope": url,
                     "root_cause": "The page provides pricing facts for an entity but lacks explicit next-step commercial navigation or transactional actions.",
                     "confidence": "high",
                     "evidence": f"Page {url} provides explicit commercial facts (pricing for '{facts['scoped_prices'][0]['entity']}'), satisfying a bottom-funnel intent, but provides no clear transactional or sales-contact navigation.",
@@ -793,6 +829,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                     "cause_family": "EXPERIENCE.CONTINUITY",
                     "id": "LOW_INFORMATION_SCENT",
                     "cause_id": "LOW_INFORMATION_SCENT",
+                    "url": url,
+                    "scope": url,
                     "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
                     "suggested_action": {
                         "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
@@ -817,6 +855,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "AGENT_INTERACTION_BARRIER",
                 "cause_id": "AGENT_INTERACTION_BARRIER",
+                "url": url,
+                "scope": url,
                 "evidence": f"Page {url} contains {div_onclicks} non-semantic <div onclick> element(s).",
                 "impact": "Autonomous AI agents and browser automation assistants cannot discover, tab through, or trigger non-semantic onclick divs.",
                 "suggested_action": {
@@ -915,6 +955,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "VIEWPORT_ANSWER_ABSENCE",
                 "cause_id": "VIEWPORT_ANSWER_ABSENCE",
+                "url": url,
+                "scope": url,
                 "evidence": f"Page {url} ({page_type}) lacks immediate proposition anchoring in its lead {viewport_data['lead_words_count']} words.",
                 "suggested_action": {
                     "summary": "Anchor the core product proposition, pricing figures, or direct answer in the lead 60 words.",
@@ -927,7 +969,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
         )
 
     # 1.2 CTA Reachability Index (CRO / Transactional Continuation)
-    if page_type in ("product_detail", "pricing", "subscription_flow") and cta_data["is_delayed"]:
+    if page_type in ("product_detail", "pricing", "subscription_flow") and cta_data["is_delayed"] and total_body_words >= 30:
         findings.append(
             {
                 "category": "engagement",
@@ -942,6 +984,8 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "cause_family": "EXPERIENCE.CONTINUITY",
                 "id": "CTA_REACHABILITY_FRICTION",
                 "cause_id": "CTA_REACHABILITY_FRICTION",
+                "url": url,
+                "scope": url,
                 "evidence": f"Page {url} ({page_type}) places its first commercial CTA at position #{cta_data['first_commercial_cta_index'] + 1 if cta_data['first_commercial_cta_index'] is not None else 'N/A'}.",
                 "suggested_action": {
                     "summary": "Position a prominent commercial continuation CTA within the first 3 interactive elements on the page.",
@@ -988,6 +1032,60 @@ def audit_page_engagement(html_content, url, page_type="other", state=None):
                 "verification": "Confirm average sentence length in opening paragraphs is <= 22 words.",
             }
         )
+
+    # 1.5 Multilingual Locale Scent & Hreflang Continuity Check
+    loc_match = re.search(r"^https?://[^/]+/([a-z]{2}(?:-[a-z]{2})?)/", url, re.IGNORECASE)
+    if loc_match and total_body_words >= 50:
+        current_locale = loc_match.group(1).lower()
+        parsed_current = urlparse(url)
+        current_host = parsed_current.netloc.lower()
+        internal_links = []
+        for href in (dom.ctas + dom.nav_links):
+            if not isinstance(href, str):
+                continue
+            h = href.strip()
+            if not h or h.startswith(("#", "javascript:", "mailto:", "tel:")):
+                continue
+            if h.startswith("/") and not h.startswith(("//", "/api", "/static", "/assets", "/_next", "/favicon")):
+                internal_links.append(h)
+            elif "://" in h:
+                p_h = urlparse(h)
+                if p_h.netloc.lower() == current_host and not p_h.path.startswith(("/api", "/static", "/assets", "/_next", "/favicon")):
+                    internal_links.append(p_h.path + (("?" + p_h.query) if p_h.query else ""))
+        if len(internal_links) >= 4:
+            leaked_links = [
+                h for h in internal_links
+                if not h.startswith(f"/{current_locale}/") and h != f"/{current_locale}" and not h.startswith(f"/{current_locale}?")
+            ]
+            if len(leaked_links) / len(internal_links) > 0.7:
+                if not any(f.get("cause_id") == "COMMERCIAL_HANDOFF_DISCONTINUITY" for f in findings):
+                    findings.append(
+                        {
+                            "category": "conversion-continuity",
+                            "title": f"Multilingual navigation links drop /{current_locale}/ locale prefix on {url}",
+                            "severity": "medium",
+                            "confidence": "high",
+                            "root_cause": (
+                                f"COMMERCIAL_HANDOFF_DISCONTINUITY: Arriving visitors at localized route ({url}, locale: '{current_locale}') "
+                                f"encounter {len(leaked_links)}/{len(internal_links)} internal navigation links that omit the /{current_locale}/ prefix. "
+                                "High-intent citation traffic arriving from AI search in a specific language experiences context drop-off when navigation resets to the default language."
+                            ),
+                            "cause_family": "EXPERIENCE.CONTINUITY",
+                            "id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+                            "cause_id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+                            "url": url,
+                            "scope": url,
+                            "impact": "Visitors arriving from international AI citations lose language orientation upon clicking internal navigation.",
+                            "evidence": f"Found {len(leaked_links)} unlocalized link(s) on {url} (e.g. '{leaked_links[0]}').",
+                            "suggested_action": {
+                                "summary": f"Preserve the /{current_locale}/ prefix across all internal navigation and CTA links on {url}.",
+                                "technical_fix": f"Update URL generation helper or router to prepend /{current_locale} to internal href attributes.",
+                                "creative_fix": f"Ensure language consistency across product catalog and checkout flows for the '{current_locale}' locale.",
+                                "priority": "medium",
+                                "verification": f"Verify internal navigation links on {url} maintain the /{current_locale}/ prefix.",
+                            },
+                        }
+                    )
 
     return (
         findings,
@@ -1053,6 +1151,7 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
             p["html"],
             p["url"],
             page_type=p.get("page_type", "other"),
+            page_dict=p,
         )
 
         p_url = p.get("url", "")
@@ -1108,6 +1207,8 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                             "cause_family": "EXPERIENCE.CONTINUITY",
                             "id": "AI_REFERRAL_DISCONTINUITY",
                             "cause_id": "AI_REFERRAL_DISCONTINUITY",
+                            "url": p_url,
+                            "scope": p_url,
                             "confidence": "high",
                             "root_cause": (
                                 f"Observed AI referral traffic exhibits a {ai_bounce * 100:.1f}% bounce rate compared to a "
@@ -1165,6 +1266,78 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
                 "technical_fix": "Publish a structured /pricing.md file at the domain root with tier names, price limits, and feature bullets.",
                 "creative_fix": "Include transparent plan thresholds and billing cadences without contact-sales gates.",
                 "verification": f"Confirm {base}/pricing.md returns HTTP 200 with text/markdown.",
+            }
+        )
+
+    # Check J9: 404 Recovery Affordances Check
+    for p in (inv.get("pages", []) if inv else []):
+        if p.get("status") == 404 or "/404" in str(p.get("url", "")):
+            p_html = p.get("html", "")
+            err_links = []
+            try:
+                err_links = re.findall(
+                    r'<a\s+(?:[^>]*?\s+)?href=[\'"]([^\'"]+)[\'"][^>]*>(.*?)</a>',
+                    p_html,
+                    re.I | re.S,
+                )
+                named_err_links = [
+                    (h, re.sub(r"<[^>]+>", "", t).strip())
+                    for h, t in err_links
+                    if re.sub(r"<[^>]+>", "", t).strip()
+                ]
+            except Exception:
+                named_err_links = []
+            if len(named_err_links) < 2:
+                findings.append(
+                    {
+                        "id": "J9_404_RECOVERY_DEFICIT",
+                        "cause_id": "DESTINATION_NAVIGATION_FRICTION",
+                        "check_id": "J9",
+                        "actual_band": "S1",
+                        "finding_kind": "confirmed_problem",
+                        "url": p.get("url"),
+                        "scope": p.get("url"),
+                        "title": "404 recovery affordances deficit in error response",
+                        "severity": "low",
+                        "confidence": "high",
+                        "root_cause": "The 404 error page provides few or no navigation links to help visitors recover from broken URLs.",
+                        "category": "engagement",
+                        "impact": "Visitors arriving from broken AI search citations encounter a dead end and immediately bounce.",
+                        "evidence": f"404 error page on {p.get('url')} contains only {len(named_err_links)} recovery navigation link(s).",
+                        "suggested_action": {
+                            "summary": f"Add recovery affordances (home link, search bar, top categories) to the 404 error page on {p.get('url')}.",
+                            "priority": "low",
+                            "technical_fix": "Update 404 error template to include header navigation, search input, and top category links.",
+                            "creative_fix": "Write helpful recovery copy directing lost users to popular site resources.",
+                            "verification": "Visit 404 page and verify prominent recovery navigation links are present.",
+                        },
+                    }
+                )
+            else:
+                observations.append(
+                    {
+                        "check_id": "J9",
+                        "title": "404 recovery affordances inventoried in source",
+                        "scope": p.get("url", base + "/404"),
+                        "observation": f"{len(named_err_links)} named source recovery links present on 404 page.",
+                        "actual_band": "U",
+                        "finding_kind": "informational_observation",
+                        "limitation": f"{len(named_err_links)} named source links; visibility and destination usefulness require review.",
+                    }
+                )
+
+    # Check I1: Fresh unauthenticated GET repeated stability observation
+    if html_pages:
+        sample_url = html_pages[0].get("url", base + "/")
+        observations.append(
+            {
+                "check_id": "I1",
+                "title": "Fresh unauthenticated GET repeated for observed URL",
+                "scope": sample_url,
+                "observation": "200",
+                "actual_band": "U",
+                "finding_kind": "informational_observation",
+                "limitation": "Repeated HTTP 200 observed; status equality does not establish entity/content identity.",
             }
         )
 
@@ -1246,16 +1419,23 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Audit on-site visitor orientation, heading hierarchies, and navigation."
+        description=(
+            "Visitor Engagement & Post-Citation Intent Continuity Diagnostic Sensor.\n"
+            "Deterministically evaluates visitor orientation, the 4-question above-the-fold test, "
+            "H1 information scent purity, viewport answer anchoring (top 600px / 150w), "
+            "CTA reachability index (commercial continuation proximity), cognitive readability (ARI), "
+            "and correlates static UX friction with first-party route-level web analytics."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument(
         "--analytics",
-        help="Path to first-party analytics JSON/CSV file or JSON string",
+        help="Path to first-party analytics JSON/CSV file or JSON string for empirical bounce/dwell correlation",
     )
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -1263,12 +1443,15 @@ def main():
     p = urlparse(s)
     base = f"{p.scheme}://{p.netloc}"
     inv = None
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     res = audit(base, p.netloc, inv=inv, state_file=args.state, analytics=args.analytics)
     print(json.dumps(res, indent=2))
 

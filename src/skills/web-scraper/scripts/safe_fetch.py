@@ -1,22 +1,35 @@
 """
-safe_fetch.py - Zero-dependency SSRF-safe HTTP/HTTPS fetching utility.
-Enforces strict redirect boundaries, IP validation per hop,
-bounded decompression, and DNS TOCTOU pinning.
+safe_fetch.py - Canonical zero-dependency SSRF-safe HTTP/HTTPS fetching utility.
+Part of the Brand AI-Readiness multi-skill suite (hosted in web-scraper).
+
+Enforces:
+- Strict socket-level zero-trust SSRF IP validation per hop
+- RFC-1918, loopback, link-local, carrier-grade NAT, and cloud metadata blocking
+- DNS TOCTOU resolution pinning before socket creation
+- Bounded decompression (zlib bomb protection) up to MAX_HTML_BYTES (2 MB)
+- Max 5 redirects with IP re-validation on every redirect
+- Honest, un-spoofed User-Agent with standard HTTP content negotiation headers
 """
 
 import http.client
 import ipaddress
 import socket
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+from typing import Any, Dict, List, Optional, Tuple
 
-DEFAULT_USER_AGENT = "Brand-AI-Readiness-Audit/1.0.0"
+# Canonical single source of truth for maximum HTML fetch size across all skills (2 MB)
+MAX_HTML_BYTES: int = 2 * 1024 * 1024
 
-BLOCKED_NETWORKS = [
+# Transparent, non-evasive audit user-agent
+DEFAULT_USER_AGENT: str = "Brand-AI-Readiness-Audit/1.0.0 (compatible; public audit sensor)"
+
+BLOCKED_NETWORKS: List[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
     ipaddress.ip_network("0.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
     ipaddress.ip_network("127.0.0.0/8"),
@@ -32,18 +45,37 @@ BLOCKED_NETWORKS = [
 ]
 
 
-def _is_safe_host(hostname):
+def _is_safe_host(hostname: Optional[str]) -> Tuple[bool, str, List[Any]]:
     try:
-        # Prevent malformed hostnames from reaching DNS
         if not hostname or " " in hostname:
             return False, "Malformed hostname", []
 
         clean_hostname = (hostname or "").strip().strip("[]")
-        ip_info = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
+        result_holder: List[Any] = []
+        error_holder: List[Exception] = []
+
+        def _resolve():
+            try:
+                res = socket.getaddrinfo(clean_hostname, 80, proto=socket.IPPROTO_TCP)
+                result_holder.append(res)
+            except Exception as e:
+                error_holder.append(e)
+
+        t = threading.Thread(target=_resolve, daemon=True)
+        t.start()
+        t.join(timeout=0.8)
+        if t.is_alive():
+            return False, "DNS resolution timed out", []
+        if error_holder:
+            return False, f"DNS resolution failed: {error_holder[0]}", []
+        if not result_holder:
+            return False, "No IP resolved", []
+        ip_info = result_holder[0]
+
         safe_ips = []
         for sf in ip_info:
-            ip_obj = ipaddress.ip_address(sf[4][0])
-            if getattr(ip_obj, "ipv4_mapped", None):
+            ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(sf[4][0])
+            if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped is not None:
                 ip_obj = ip_obj.ipv4_mapped
             is_blocked = False
             if (
@@ -71,7 +103,7 @@ def _is_safe_host(hostname):
 
 
 class SafeHTTPConnection(http.client.HTTPConnection):
-    def connect(self):
+    def connect(self) -> None:
         is_safe, err, safe_ips = _is_safe_host(self.host)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked: {err}")
@@ -80,7 +112,7 @@ class SafeHTTPConnection(http.client.HTTPConnection):
 
 
 class SafeHTTPSConnection(http.client.HTTPSConnection):
-    def connect(self):
+    def connect(self) -> None:
         is_safe, err, safe_ips = _is_safe_host(self.host)
         if not is_safe:
             raise urllib.error.URLError(f"SSRF blocked: {err}")
@@ -95,21 +127,29 @@ class SafeHTTPSConnection(http.client.HTTPSConnection):
 
 
 class SafeHTTPHandler(urllib.request.HTTPHandler):
-    def http_open(self, req):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(SafeHTTPConnection, req)
 
 
 class SafeHTTPSHandler(urllib.request.HTTPSHandler):
-    def https_open(self, req):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(SafeHTTPSConnection, req, context=ssl.create_default_context())
 
 
 class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def __init__(self, max_redirects=5):
+    def __init__(self, max_redirects: int = 5) -> None:
         self.max_redirects = max_redirects
         self.redirects = 0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Optional[urllib.request.Request]:
         self.redirects += 1
         if self.redirects > self.max_redirects:
             raise urllib.error.URLError("Too many redirects")
@@ -124,13 +164,13 @@ class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def _decompress_bounded(response, max_bytes):
+def _decompress_bounded(response: Any, max_bytes: int) -> bytes:
     encoding = response.headers.get("Content-Encoding", "").lower()
     if encoding == "gzip":
         decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
     elif encoding == "deflate":
         decompressor = zlib.decompressobj(-zlib.MAX_WBITS)
-    elif encoding == "zstd" or encoding == "br":
+    elif encoding in ("zstd", "br"):
         raise ValueError(f"Unsupported encoding: {encoding}")
     else:
         return response.read(max_bytes)
@@ -152,44 +192,53 @@ def _decompress_bounded(response, max_bytes):
 
 
 def safe_fetch(
-    url,
-    timeout=10,
-    max_bytes=5 * 1024 * 1024,
-    user_agent=None,
-    method="GET",
-    deadline=None,
-    is_retry=False,
-):
+    url: str,
+    timeout: float = 10.0,
+    max_bytes: int = MAX_HTML_BYTES,
+    user_agent: Optional[str] = None,
+    method: str = "GET",
+    deadline: Optional[float] = None,
+    is_retry: bool = False,
+) -> Tuple[Optional[int], str, Dict[str, str], str]:
+    """Fetch URL with strict SSRF controls, size limits, and non-evasive headers.
+
+    Returns:
+        (status_code, response_body_text, response_headers_dict, error_message)
+    """
     if deadline:
         remaining = deadline - time.monotonic()
         if remaining <= 0.1:
             return None, "", {}, "Global deadline exceeded"
         timeout = min(timeout, remaining)
 
+    if method not in ("GET", "HEAD"):
+        return None, "", {}, f"Disallowed HTTP method: {method}. Safe fetch is strictly read-only (GET, HEAD only)."
+
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https"):
         return None, "", {}, f"Disallowed scheme: {parsed.scheme}"
     if not parsed.hostname or parsed.username is not None or parsed.password is not None:
         return None, "", {}, "Malformed URL: credentials and missing host are disallowed"
+    port = parsed.port
+    if port is not None and port not in (80, 443):
+        return None, "", {}, f"Disallowed port: {port}. Only standard web ports (80, 443) are permitted."
     if max_bytes < 0:
         return None, "", {}, "Invalid max_bytes: must be non-negative"
 
-    opener = urllib.request.build_opener(SafeHTTPHandler(), SafeHTTPSHandler(), SafeRedirectHandler(max_redirects=5))
+    opener = urllib.request.build_opener(
+        SafeHTTPHandler(),
+        SafeHTTPSHandler(),
+        SafeRedirectHandler(max_redirects=5),
+    )
 
     ua = user_agent if user_agent else DEFAULT_USER_AGENT
+    # Standard HTTP content negotiation headers (no browser/OS spoofing)
     headers = {
         "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Encoding": "gzip, deflate",
         "Accept-Language": "en-US,en;q=0.9",
-        "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
+        "Connection": "close",
     }
     req = urllib.request.Request(url, headers=headers, method=method)
 
@@ -250,8 +299,101 @@ def safe_fetch(
         return None, "", {}, str(e)
 
 
-def safe_check_status(url, timeout=5, deadline=None):
+def safe_check_status(url: str, timeout: float = 5.0, deadline: Optional[float] = None) -> Optional[int]:
+    """Lightweight check to probe status code without downloading full response."""
     status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=1024, method="HEAD", deadline=deadline)
     if status in (403, 405, 501):
         status, _, _, _ = safe_fetch(url, timeout=timeout, max_bytes=1024, method="GET", deadline=deadline)
     return status
+
+
+__all__ = [
+    "MAX_HTML_BYTES",
+    "DEFAULT_USER_AGENT",
+    "BLOCKED_NETWORKS",
+    "safe_fetch",
+    "safe_check_status",
+    "SafeHTTPConnection",
+    "SafeHTTPSConnection",
+    "SafeHTTPHandler",
+    "SafeHTTPSHandler",
+    "SafeRedirectHandler",
+]
+
+
+def main():
+    import argparse
+    import json
+    import time
+
+    parser = argparse.ArgumentParser(
+        description="SSRF-safe zero-trust web fetcher and probe utility."
+    )
+    parser.add_argument("--url", required=True, help="Target URL to fetch or probe under zero-trust SSRF validation")
+    parser.add_argument("--method", choices=["GET", "HEAD"], default="GET", help="HTTP method (default: GET)")
+    parser.add_argument("--timeout", type=float, default=10.0, help="Socket timeout in seconds (default: 10.0)")
+    parser.add_argument("--max-bytes", type=int, default=MAX_HTML_BYTES, help="Maximum bytes to read (default: 2097152)")
+    parser.add_argument("--check-only", action="store_true", help="Only check status code without outputting full HTML")
+    parser.add_argument("--output", help="Path to write output HTML or JSON (optional, defaults to stdout)")
+    args = parser.parse_args()
+
+    t0 = time.monotonic()
+    if args.check_only:
+        status, _, _, err = safe_fetch(
+            args.url,
+            timeout=args.timeout,
+            max_bytes=1024,
+            method="HEAD",
+        )
+        if status in (403, 405, 501):
+            status, _, _, err = safe_fetch(
+                args.url,
+                timeout=args.timeout,
+                max_bytes=1024,
+                method="GET",
+            )
+        duration_ms = round((time.monotonic() - t0) * 1000, 2)
+        is_ssrf = bool(err and "SSRF" in str(err))
+        out_obj = {
+            "url": args.url,
+            "status": status,
+            "latency_ms": duration_ms,
+            "ssrf_safe": not is_ssrf,
+            "error": err if err else None,
+        }
+        print(json.dumps(out_obj, indent=2))
+        return
+
+    status, body, headers, err = safe_fetch(
+        args.url,
+        timeout=args.timeout,
+        max_bytes=args.max_bytes,
+        method=args.method,
+    )
+    duration_ms = round((time.monotonic() - t0) * 1000, 2)
+
+    result = {
+        "url": args.url,
+        "status": status,
+        "latency_ms": duration_ms,
+        "content_length": len(body),
+        "headers": headers,
+        "error": err if err else None,
+        "ssrf_safe": True if "SSRF" not in str(err) else False,
+    }
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            if args.output.endswith(".json"):
+                result["body_preview"] = body[:2000]
+                json.dump(result, f, indent=2)
+            else:
+                f.write(body)
+        print(f"Response written to {args.output}")
+    else:
+        result["body_preview"] = body[:500] if len(body) > 500 else body
+        print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()

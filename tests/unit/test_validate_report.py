@@ -87,6 +87,142 @@ class TestValidateReport(unittest.TestCase):
         res = run_validator(report)
         self.assertNotEqual(res.returncode, 0)
 
+    def test_recommended_public_report_contract_validates(self):
+        """Success test: The user's exact recommended top-tier public JSON report contract validates cleanly."""
+        recommended_report = {
+            "schema_version": "1.0.0",
+            "site": "https://example.com",
+            "audited_at": "2026-09-10T12:00:00Z",
+            "audit_status": "complete",
+            "summary": {
+                "total_findings": 3,
+                "critical": 0,
+                "high": 1,
+                "medium": 1,
+                "low": 1,
+            },
+            "findings": [
+                {
+                    "id": "F-001",
+                    "title": "Conflicting Product Pricing Across First-Party Pages",
+                    "severity": "high",
+                    "category": "fact_consistency",
+                    "root_cause": "The same product is represented with conflicting current prices across first-party sources.",
+                    "confidence": "high",
+                    "scope": {
+                        "type": "entity",
+                        "entity": "Example Product",
+                        "attribute": "price",
+                        "locale": "en-US",
+                    },
+                    "evidence": {
+                        "summary": "Two first-party sources expose different prices for the same product.",
+                        "sources": [
+                            {
+                                "url": "https://example.com/product",
+                                "type": "first_party",
+                                "observation": "Visible product price is $999.",
+                            },
+                            {
+                                "url": "https://example.com/pricing",
+                                "type": "first_party",
+                                "observation": "Visible product price is $1099.",
+                            },
+                        ],
+                    },
+                    "impact": "Conflicting first-party representations reduce confidence in which product price should be treated as current when the brand is represented in AI-assisted discovery.",
+                    "suggested_action": {
+                        "summary": "Establish one authoritative current pricing representation and synchronize all applicable surfaces.",
+                        "priority": "high",
+                        "technical_fix": "Synchronize visible pricing, structured Product/Offer data, and relevant first-party endpoints with the authoritative price source. Preserve currency and billing interval explicitly.",
+                        "creative_fix": "Present the price consistently with clear currency, billing interval, applicable variant, and pricing conditions.",
+                        "verification": "Re-run the audit and verify that all applicable first-party sources resolve to the same current price for the same entity, variant, locale, and billing interval.",
+                    },
+                },
+                {
+                    "id": "F-002",
+                    "title": "Weak Intent-to-Landing Context Continuity",
+                    "severity": "medium",
+                    "category": "engagement",
+                    "root_cause": "The candidate landing experience does not clearly preserve the informational context associated with the user intent represented by the referring query.",
+                    "confidence": "medium",
+                    "scope": {
+                        "type": "page",
+                        "url": "https://example.com/products/example",
+                    },
+                    "evidence": {
+                        "summary": "The landing page provides limited early-page evidence connecting the page to the evaluated user intent.",
+                        "sources": [
+                            {
+                                "url": "https://example.com/products/example",
+                                "type": "visible_content",
+                                "observation": "The primary heading and early-page content provide limited explicit context for the evaluated intent.",
+                            }
+                        ],
+                    },
+                    "impact": "A visitor arriving with a specific intent may need additional interpretation or navigation before confirming that the page addresses the original need.",
+                    "suggested_action": {
+                        "summary": "Make the landing page immediately communicate the relationship between the user's intent and the page's content.",
+                        "priority": "medium",
+                        "technical_fix": "Ensure the page exposes an unambiguous title, canonical URL, structured metadata, and machine-readable content corresponding to the page's actual purpose.",
+                        "creative_fix": "Strengthen the primary heading, introductory copy, and first relevant action so the page immediately confirms the user's intended task.",
+                        "verification": "Re-run the intent-to-landing analysis and confirm stronger alignment between the expected intent, page purpose, relevant facts, and next action.",
+                    },
+                },
+                {
+                    "id": "F-003",
+                    "title": "Limited Machine-Readable Entity Evidence",
+                    "severity": "low",
+                    "category": "entity_content",
+                    "root_cause": "Important entity attributes are not consistently represented in the machine-readable evidence observed on the audited page.",
+                    "confidence": "medium",
+                    "scope": {
+                        "type": "page",
+                        "url": "https://example.com/product/example",
+                    },
+                    "evidence": {
+                        "summary": "The page exposes incomplete structured evidence for the detected entity.",
+                        "sources": [
+                            {
+                                "url": "https://example.com/product/example",
+                                "type": "structured_data",
+                                "observation": "Observed Product structured data does not expose all expected attributes for the detected entity.",
+                            }
+                        ],
+                    },
+                    "impact": "Incomplete structured representation can make entity attributes less explicit for downstream machine interpretation.",
+                    "suggested_action": {
+                        "summary": "Complete the structured representation for attributes that are actually supported by the page.",
+                        "priority": "low",
+                        "technical_fix": "Add accurate Schema.org properties supported by the page and keep structured values synchronized with visible content.",
+                        "creative_fix": None,
+                        "verification": "Re-run structured-data extraction and verify that each emitted attribute is present, accurate, entity-bound, and consistent with visible first-party content.",
+                    },
+                },
+            ],
+            "proactive_actions": [
+                {
+                    "id": "P-001",
+                    "title": "Establish a Canonical Fact Source",
+                    "category": "fact_governance",
+                    "summary": "Define authoritative first-party sources for high-value entity attributes and keep derived representations synchronized.",
+                    "priority": "medium",
+                    "technical_fix": "Maintain a canonical source for important attributes such as price, availability, contact details, and lifecycle status, and validate derived representations against it.",
+                    "creative_fix": "Use consistent terminology and contextual labels for important facts across major customer-facing pages.",
+                    "verification": "Run periodic cross-source consistency checks and confirm that important facts resolve to one current authoritative representation.",
+                }
+            ],
+            "limitations": [
+                "No JavaScript browser rendering was performed.",
+                "Findings are based only on resources successfully acquired during this audit.",
+                "Robots.txt observations represent declared crawler permissions and do not prove search inclusion, indexing, ranking, or citation.",
+                "No claim is made about actual citation or placement by a specific AI assistant.",
+                "Engagement observations are content/navigation proxies unless external behavioral analytics are explicitly supplied.",
+            ],
+        }
+        res = run_validator(recommended_report)
+        self.assertEqual(res.returncode, 0, f"Validator failed on recommended report: {res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

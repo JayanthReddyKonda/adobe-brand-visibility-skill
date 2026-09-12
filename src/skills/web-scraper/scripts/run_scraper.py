@@ -92,6 +92,10 @@ def format_markdown_summary(inventory: dict) -> str:
     robots = inventory.get("robots", {})
     sitemaps = inventory.get("sitemaps", [])
     stats = inventory.get("stats", {})
+    infra = inventory.get("infrastructure", {})
+
+    total_ctas = sum(len(p.get("ctas", [])) for p in pages)
+    total_social = sum(len(p.get("social_links", [])) for p in pages)
 
     md = [
         f"# Web Scraping Inventory: {site}",
@@ -99,14 +103,36 @@ def format_markdown_summary(inventory: dict) -> str:
         f"- **Crawled At:** {inventory.get('crawled_at', 'N/A')}",
         f"- **Pages Acquired:** {len(pages)}",
         f"- **Sitemaps Discovered:** {len(sitemaps)}",
+        f"- **Total CTAs Extracted:** {total_ctas}",
+        f"- **Social / Contact Anchors Found:** {total_social}",
         f"- **Total Bytes:** {stats.get('total_bytes', 0):,} bytes",
         f"- **Duration:** {stats.get('elapsed_seconds', 0.0):.2f}s",
+        "",
+        "## AI Discovery & Infrastructure Manifests",
+        "",
+        "| Manifest | Status | Path |",
+        "|---|---|---|",
+    ]
+
+    manifests = [
+        ("llms.txt", infra.get("llms_txt", {})),
+        ("pricing.md", infra.get("pricing_md", {})),
+        ("ai-plugin.json", infra.get("ai_plugin", {})),
+        ("security.txt", infra.get("security_txt", {})),
+    ]
+    for name, item in manifests:
+        pres = item.get("present", False)
+        status = "Present" if pres else "Not Discovered"
+        path = f"`{item.get('path', '')}`" if pres and item.get("path") else "-"
+        md.append(f"| `{name}` | {status} | {path} |")
+
+    md.extend([
         "",
         "## AI Crawler Bot Access Matrix",
         "",
         "| Crawler Bot | Permitted | Role |",
         "|---|---|---|",
-    ]
+    ])
 
     matrix = robots.get("matrix", {})
     for bot, allowed in sorted(matrix.items()):
@@ -118,8 +144,8 @@ def format_markdown_summary(inventory: dict) -> str:
         "",
         "## Acquired Pages Inventory",
         "",
-        "| URL | Type | Status | SNR | Words | JSON-LD Entities |",
-        "|---|---|---|---|---|---|",
+        "| URL | Type | Status | SNR | Words | JSON-LD Entities | CTAs |",
+        "|---|---|---|---|---|---|---|",
     ])
 
     for p in pages:
@@ -129,7 +155,8 @@ def format_markdown_summary(inventory: dict) -> str:
         snr = f"{p.get('snr', 0.0):.2f}"
         words = p.get("word_count", 0)
         entities = len(p.get("jsonld", []))
-        md.append(f"| `{u}` | `{ptype}` | {code} | {snr} | {words:,} | {entities} |")
+        ctas = len(p.get("ctas", []))
+        md.append(f"| `{u}` | `{ptype}` | {code} | {snr} | {words:,} | {entities} | {ctas} |")
 
     return "\n".join(md)
 
@@ -176,9 +203,20 @@ def main() -> int:
         out_dir = os.path.dirname(os.path.abspath(args.output))
         if out_dir and not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
-        content_to_write = md_str if args.format == "markdown" else json_str
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write(content_to_write)
+        if args.format == "markdown":
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(md_str)
+        elif args.format == "both":
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(json_str)
+            md_path = os.path.splitext(args.output)[0] + ".md"
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write(md_str)
+            if args.verbose:
+                sys.stderr.write(f"[*] Markdown summary written to {md_path}\n")
+        else:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(json_str)
         if args.verbose:
             sys.stderr.write(f"[*] Inventory written to {args.output}\n")
 

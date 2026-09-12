@@ -21,8 +21,10 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
+SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
+for _p in (SCRIPT_DIR, SCRAPER_DIR):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from safe_fetch import safe_fetch  # type: ignore
 
@@ -54,6 +56,41 @@ _CREDENTIAL_TITLE_RE = re.compile(
     r"\b(?:Dr\.|PhD|MD|Professor|Prof\.|Chief Scientist|VP of|Director of|Lead Researcher|Principal Scientist)\b",
     re.IGNORECASE,
 )
+_ABBR_MAP = {
+    "e.g.": "__ABBR_EG__",
+    "i.e.": "__ABBR_IE__",
+    "Dr.": "__ABBR_DR__",
+    "Prof.": "__ABBR_PROF__",
+    "Mr.": "__ABBR_MR__",
+    "Ms.": "__ABBR_MS__",
+    "Mrs.": "__ABBR_MRS__",
+    "Ph.D.": "__ABBR_PHD__",
+    "vs.": "__ABBR_VS__",
+    "Inc.": "__ABBR_INC__",
+    "Ltd.": "__ABBR_LTD__",
+}
+
+
+def split_sentences_abbr(text: str) -> list:
+    """Split sentences protecting common abbreviations with periods."""
+    if not text:
+        return []
+    t = text
+    for abbr, token in _ABBR_MAP.items():
+        if abbr in t:
+            t = t.replace(abbr, token)
+    raw_sents = re.split(r"[.!?]+(?:\s+|$)", t)
+    sents = []
+    for s in raw_sents:
+        for abbr, token in _ABBR_MAP.items():
+            if token in s:
+                s = s.replace(token, abbr)
+        s_clean = s.strip()
+        if s_clean:
+            sents.append(s_clean)
+    return sents if sents else [s.strip() for s in re.split(r"[.!?]+", text) if s.strip()]
+
+
 _COMMON_STOPWORDS = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't",
     "as", "at", "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
@@ -493,7 +530,7 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
 
     # 3. Structural Readability (max 20 pts)
     sr = 0
-    sentences = re.split(r"[.!?]+", text)
+    sentences = split_sentences_abbr(text)
     clear_sentences = sum(1 for s in sentences if 5 <= len(s.split()) <= 25)
     if sentences and (clear_sentences / max(len(sentences), 1)) >= 0.6:
         sr += 10
@@ -535,6 +572,19 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
         else 0
     )
 
+    causal_connectors = [
+        "because",
+        "due to",
+        "as a result of",
+        "which leads to",
+        "which enables",
+        "consequently",
+        "therefore",
+        "resulting in",
+    ]
+    causal_count = sum(text.lower().count(c) for c in causal_connectors)
+    causal_density = round(causal_count / max(len(sentences), 1), 2)
+
     total = min(abq + sc + sr + sd + uq, 100)
     return {
         "total": total,
@@ -546,6 +596,8 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
         "evidence_genres_score": min(evidence_score, 20),
         "attributed_quotations_score": quotes_score,
         "bluf_primacy_score": bluf_score,
+        "causal_conjunction_count": causal_count,
+        "causal_density_ratio": causal_density,
     }
 
 
@@ -785,6 +837,53 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
+        # Author Attribution & Credential Check (Princeton KDD 2024 / E-E-A-T)
+        has_author_signal = bool(p.get("authors")) or has_credentials or _CREDENTIAL_RE.search(full_text)
+        if ptype in ("article", "guide", "documentation") and total_words >= 200 and not has_author_signal:
+            recommendations.append(
+                {
+                    "id": "PROACTIVE.GEO.CREDENTIALED_AUTHOR_ATTRIBUTION.001",
+                    "title": "Publish credentialed author bylines on informational assets",
+                    "category": "content",
+                    "summary": f"Page {url} lacks explicit author attribution or professional credentials. AI models heavily favor verifiable human expertise and credentialed bylines when selecting authoritative citation sources.",
+                    "priority": "medium",
+                    "technical_fix": "Add <meta name='author' content='...'> and Schema.org Author markup with Person credentials (e.g. jobTitle, worksFor).",
+                    "creative_fix": "Include author bylines with relevant domain expertise, degrees, or industry experience in article headers.",
+                    "verification": "Confirm page publishes visible author name and Schema.org Person markup.",
+                }
+            )
+
+        # Commercial CTA Intrusion on Informational Routes
+        if ptype in ("article", "documentation", "guide", "faq"):
+            comm_ctas = [
+                c for c in p.get("ctas", [])
+                if (c.get("is_commercial_cta") if isinstance(c, dict) else getattr(c, "is_commercial_cta", False))
+            ]
+            if len(comm_ctas) >= 4:
+                findings.append(
+                    {
+                        "category": "content",
+                        "title": "Excessive commercial CTA intrusion inside informational content",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": f"COMMERCIAL_INTRUSION: Page contains {len(comm_ctas)} commercial call-to-action elements within informational prose, reducing factual authority scores.",
+                        "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                        "id": "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
+                        "cause_id": "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
+                        "url": url,
+                        "scope": url,
+                        "evidence": f"Informational route {url} contains {len(comm_ctas)} commercial CTAs ({', '.join(str(c.get('text') if isinstance(c, dict) else getattr(c, 'text', '')) for c in comm_ctas[:3])}).",
+                        "impact": "Generative search engines (Perplexity, Claude) penalize heavily promotional passages, reducing citation likelihood.",
+                        "suggested_action": {
+                            "summary": "Limit transactional promotional callouts on informational and educational pages to 1 primary CTA.",
+                            "technical_fix": "Relocate aggressive promotional popups and inline buttons to a subtle footer or sidebar module.",
+                            "creative_fix": "Maintain objective, educational tone throughout informational and technical guides.",
+                            "priority": "medium",
+                            "verification": "Verify informational passages maintain focus on answers with at most 1 conversion link.",
+                        },
+                    }
+                )
+
         # TX03: Atomic Fact-to-Token Ratio (FTR) (FActScore Benchmark)
         atomic_facts = count_atomic_facts(full_text)
         ftr = round(atomic_facts / max(total_words, 1), 3)
@@ -915,7 +1014,7 @@ def audit(base, domain, inv=None, state_file=None):
                     }
                 )
 
-        # 3.1 Freshness & Recency Sensor (SE Ranking 1.3M Citation Study)
+        # 3.1 Freshness & Recency Sensor (industry analysis: recency correlates with AI citation frequency)
         if ptype in ("article", "content", "blog", "product_detail") and total_words >= 150:
             date_raw = parser.modified_date or parser.published_date
             if not date_raw:
@@ -924,7 +1023,7 @@ def audit(base, domain, inv=None, state_file=None):
                         "id": "PROACTIVE.GEO.VISIBLE_RECENCY_DATE.001",
                         "title": "Publish visible last-updated dates on substantive content",
                         "category": "content",
-                        "summary": f"Substantive page {url} lacks visible publication or modification dates. Generative search engines (SE Ranking 1.3M study) deprioritize undated content, selecting pages updated within 3 months 3x more often.",
+                        "summary": f"Substantive page {url} lacks visible publication or modification dates. Generative search engines deprioritize undated content; pages updated within 3 months are cited more frequently across multiple industry analyses.",
                         "priority": "medium",
                         "technical_fix": "Add a <time datetime='YYYY-MM-DD'> element and article:modified_time meta tag to the page header.",
                         "creative_fix": "Prominently display 'Last Updated: [Month Year]' at the top of the article beside the author byline.",
@@ -1243,11 +1342,20 @@ def audit(base, domain, inv=None, state_file=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generative Engine Optimization (GEO) audit layer.")
-    parser.add_argument("--site", required=True, help="Target website URL")
-    parser.add_argument("--inventory", required=False, help="Path to pre-acquired site inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument("--format", required=False, help="Output format (json)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generative Engine Optimization (GEO) & Citability Diagnostic Sensor.\n"
+            "Deterministically scores web content against the 9 empirical Princeton KDD 2024 / AutoGEO vectors: "
+            "causal mechanisms (+28% preference), statistical evidence density (+40% lift), attributed expert quotations "
+            "(+40.9% lift), BLUF top-30% placement, standalone FAQ penalties (-5.7%), keyword stuffing perplexity degradation, "
+            "and synthesizes deterministic 120-180 word passage improvement plans."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", required=False, help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -1256,12 +1364,15 @@ def main():
     base = f"{p.scheme}://{p.netloc}"
     domain = p.netloc
 
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     else:
         status, html, _, _ = safe_fetch(base)
         if status == 200 and html:

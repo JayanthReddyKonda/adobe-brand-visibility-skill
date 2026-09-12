@@ -93,7 +93,7 @@ class PinnedHTTPSHandler(urllib.request.HTTPSHandler):
     def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
         return self.do_open(
             lambda host, port=None, timeout=15.0, **kwargs: PinnedHTTPSConnection(
-                host, port, timeout=timeout, pinned_ip=self.pinned_ip, context=self.ssl_context, **kwargs
+                host, port, timeout=timeout, pinned_ip=self.pinned_ip, **{**kwargs, "context": self.ssl_context}
             ),
             req,
             context=self.ssl_context,
@@ -268,7 +268,7 @@ class SafeFetcher:
         if not raw_data or not encoding:
             return raw_data
 
-        limit = max_decoded_bytes or (self.budget.max_page_bytes * 2)
+        limit = max_decoded_bytes or self.budget.max_page_bytes
         enc = encoding.strip().lower()
 
         if enc in ("gzip", "deflate"):

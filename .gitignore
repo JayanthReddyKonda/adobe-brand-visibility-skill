@@ -23,8 +23,10 @@ htmlcov/
 .agents/
 build/
 legacy_reference/
+ADOBE-Hackathon
 
 
 # Generated Artifacts
 *.zip
+*.sha256
 *.audit-report.json

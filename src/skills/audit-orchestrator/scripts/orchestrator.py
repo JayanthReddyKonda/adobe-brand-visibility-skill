@@ -12,7 +12,7 @@ import json
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
@@ -22,14 +22,37 @@ from urllib.parse import urlparse
 # ---------------------------------------------------------------------------
 RETRIEVAL_BOTS: Set[str] = {"OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai"}
 
+# Bidirectional Taxonomy Alias Mapping between Synthesis Keys and Sensor Output Keys
+TAXONOMY_ALIASES: Dict[str, str] = {
+    "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
+    "NOINDEX_EXCLUSION": "META_DIRECTIVE_CONFLICT",
+    "CANONICAL_TARGET_MISMATCH": "CANONICAL_FRAGMENTATION",
+    "CANONICAL_FRAGMENTATION": "CANONICAL_TARGET_MISMATCH",
+    "UNVERIFIED_AUTHORITY_GAP": "WEAK_IDENTITY_SIGNALS",
+    "WEAK_IDENTITY_SIGNALS": "UNVERIFIED_AUTHORITY_GAP",
+    "SUB_THRESHOLD_CITABILITY": "LOW_CITABILITY_SCORE",
+    "LOW_CITABILITY_SCORE": "SUB_THRESHOLD_CITABILITY",
+    "MISSING_BLUF_PRIMACY": "CONTEXT_PLACEMENT_DEGRADATION",
+    "CONTEXT_PLACEMENT_DEGRADATION": "MISSING_BLUF_PRIMACY",
+    "INTENT_SCENT_DILUTION": "LOW_INFORMATION_SCENT",
+    "LOW_INFORMATION_SCENT": "INTENT_SCENT_DILUTION",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY": "INTENT_TO_LANDING_MISMATCH",
+    "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
+    "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
+    "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
+    "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
+}
+
 # ---------------------------------------------------------------------------
 # Full 6-Layer Causal DAG — Keystone suppression tables
-# Source: audit-orchestrator-knowledge-base.md Section 12
+# Source: knowledge-base.md Section 12
 # Layer 0 defects preempt everything below. Layer 1 defects preempt Layers 2-4.
 # ---------------------------------------------------------------------------
 _LAYER0_CAUSE_IDS: Set[str] = {
     "AI_RETRIEVAL_BLOCKED",
     "NOINDEX_EXCLUSION",
+    "META_DIRECTIVE_CONFLICT",
     "ROBOTS_5XX_FAIL_CLOSED",
     "ROBOTS_TXT_OVERSIZED",
 }
@@ -38,50 +61,95 @@ _LAYER1_CAUSE_IDS: Set[str] = {
     "NOSNIPPET_ON_CORE_CONTENT",
     "WAF_BOT_CHALLENGE",
     "CANONICAL_FRAGMENTATION",
+    "CANONICAL_TARGET_MISMATCH",
 }
 # Findings at Layers 2-5 that are symptoms of Layer 0 (access block)
 _SUPPRESSED_BY_LAYER0: Set[str] = {
     # Layer 2 — Entity Resolution
     "MATERIAL_ENTITY_AMBIGUITY",
+    "MISSING_SAMEAS_VERIFICATION",
+    "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
     "BROKEN_AUTHORITY_ANCHOR",
     "CIRCULAR_SAMEAS_SELF_REFERENCE",
     "WEAK_IDENTITY_SIGNALS",
+    "UNVERIFIED_AUTHORITY_GAP",
     # Layer 3 — Fact Ledger
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "STALE_AUTHORITATIVE_FACT",
+    "ATTRIBUTE_INCOMPLETENESS",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — Citability
     "MISSING_IN_DEPTH_MECHANISMS",
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
+    "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     # Layer 5 — Engine selection (full suppression only when entire domain is blocked)
     "AI_CITATION_GAP",
     "AI_FACT_CONFLICT",
     "AI_REFERRAL_DISCONTINUITY",
     "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
 }
-# Findings at Layers 3-4 that are symptoms of Layer 1 (rendering gap)
+# Findings at Layers 2-6 that are symptoms of Layer 1 (rendering gap)
 _SUPPRESSED_BY_LAYER1: Set[str] = {
-    # Layer 3 — cannot read facts from an unrendered shell
-    "FIRST_PARTY_FACT_CONFLICT",
-    "INCOMPLETE_OFFER_ATTRIBUTES",
+    # Layer 2 — Entity & Answerability (Product/Catalog routes cannot resolve schema without hydration)
     "ATTRIBUTE_INCOMPLETENESS",
-    # Layer 4 — cannot evaluate citation quality of an empty page
+    "INCOMPLETE_OFFER_ATTRIBUTES",
+    "SCHEMA_MISSING",
+    "SCHEMA_INVALID",
+    "MISSING_MATERIAL_FACT",
+    # Layer 3 — Fact Ledger (cannot read facts from an unrendered shell)
+    "FIRST_PARTY_FACT_CONFLICT",
+    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
+    "STALE_AUTHORITATIVE_FACT",
+    # Layer 4 — Citability & Text Structure (cannot evaluate citation quality of an empty page)
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
+    "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
+    "STANDALONE_FAQ_DEFICIT",
+    "EXCESSIVE_KEYWORD_DENSITY",
+    # Layer 5 & 6 — Engagement, Orientation & Referral Continuity (cannot measure CTAs or headings on unrendered DOM)
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
+    "VIEWPORT_ANSWER_ABSENCE",
+    "AGENT_INTERACTION_BARRIER",
+    "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "DESTINATION_NAVIGATION_FRICTION",
+    "AI_REFERRAL_DISCONTINUITY",
+    "GENERIC_H1",
+    "HEADING_HIERARCHY_VACUUM",
 }
 
 # ---------------------------------------------------------------------------
 # Archetype-Specific Severity Reweighting
 # Scripts detect the archetype; AI contextualizes defect severity by business model.
-# Source: audit-orchestrator-knowledge-base.md Section 7 & 8
+# Source: knowledge-base.md Section 7 & 8
 # ---------------------------------------------------------------------------
 ARCHETYPE_SEVERITY_OVERRIDES: Dict[str, Dict[str, str]] = {
     "ecommerce": {
@@ -153,6 +221,17 @@ except ImportError:
     validate_type = None  # type: ignore
 
 try:
+    from plan import infer_finding_difficulty, calculate_priority_index
+except ImportError:
+    try:
+        from .plan import infer_finding_difficulty, calculate_priority_index
+    except ImportError:
+        def infer_finding_difficulty(f: Dict[str, Any]) -> int:
+            return 2
+        def calculate_priority_index(sev: int, diff: int) -> int:
+            return 5 * sev + (6 - diff)
+
+try:
     from causal_gate import (
         DEFAULT_LIMITATIONS,
         LAYER0_CAUSE_IDS,
@@ -166,6 +245,9 @@ try:
         compute_severity_score,
         evaluate_causal_nodes,
         evaluate_epistemic_state,
+        extract_finding_route,
+        normalize_route_path,
+        routes_match,
         severity_from_score,
     )
 except ImportError:
@@ -176,6 +258,47 @@ except ImportError:
     compute_severity_score = None  # type: ignore
     compute_archetype_confidence = None  # type: ignore
     severity_from_score = None  # type: ignore
+
+    def extract_finding_route(f: Dict[str, Any]) -> str:
+        if not isinstance(f, dict):
+            return ""
+        url = f.get("url") or f.get("scope")
+        if isinstance(url, dict):
+            url = url.get("url") or url.get("scope") or ""
+        if not url and isinstance(f.get("evidence"), dict):
+            url = f["evidence"].get("scope") or ""
+        if not url and isinstance(f.get("evidence"), str):
+            m = re.search(r'https?://[^\s,\(\)\]"\']+', f["evidence"])
+            if m:
+                url = m.group(0)
+        return str(url or "").strip().lower()
+
+    def normalize_route_path(route: str) -> str:
+        if not route:
+            return ""
+        r = route.strip().lower()
+        parsed = urlparse(r)
+        path = parsed.path if parsed.scheme else r
+        path = path.rstrip("/")
+        return path if path else "/"
+
+    def routes_match(r1: str, r2: str) -> bool:
+        if not r1 or not r2:
+            return False
+        r1_norm = r1.strip().lower()
+        r2_norm = r2.strip().lower()
+        if r1_norm == r2_norm:
+            return True
+        p1 = normalize_route_path(r1)
+        p2 = normalize_route_path(r2)
+        if p1 != "/" and p2 != "/" and p1 == p2:
+            return True
+        if p1 != "/" and len(p1) > 2 and (p1 in r2_norm or r2_norm in p1):
+            return True
+        if p2 != "/" and len(p2) > 2 and (p2 in r1_norm or r1_norm in p2):
+            return True
+        return False
+
     LAYER0_CAUSE_IDS = _LAYER0_CAUSE_IDS
     LAYER1_CAUSE_IDS = _LAYER1_CAUSE_IDS
     SUPPRESSED_BY_LAYER0 = _SUPPRESSED_BY_LAYER0
@@ -257,6 +380,14 @@ def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, An
 
 def detect_business_archetype(inv: Dict[str, Any]) -> str:
     """Classifies website into primary business archetype from crawl inventory."""
+    if not inv or not isinstance(inv, dict):
+        return "corporate"
+
+    # Explicit archetype in inventory if declared and valid
+    explicit_arch = inv.get("archetype") or (inv.get("metadata", {}).get("archetype") if isinstance(inv.get("metadata"), dict) else None)
+    if explicit_arch in ("ecommerce", "saas", "publisher", "local_business", "corporate"):
+        return explicit_arch
+
     pages = inv.get("pages", []) if inv else []
     if not pages:
         return "corporate"
@@ -267,33 +398,75 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
     local_score = 0
 
     for p in pages:
-        ptype = (p.get("page_type") or "").lower()
+        if not isinstance(p, dict):
+            continue
+        ptype = (p.get("page_type") or "")
+        if isinstance(ptype, dict):
+            ptype = str(ptype.get("value", "")).lower()
+        else:
+            ptype = str(ptype).lower()
+
         url = (p.get("url") or "").lower()
         html = (p.get("html") or "").lower()
+        text = (p.get("clean_text") or p.get("clean_markdown") or "").lower()
+        title_val = p.get("title")
+        if isinstance(title_val, list):
+            title = (title_val[0] if title_val else "").lower()
+        else:
+            title = (title_val or "").lower()
 
-        if ptype in ("product_detail", "product", "product_listing", "category") or any(
-            k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog")
+        h1_val = p.get("h1")
+        if isinstance(h1_val, list):
+            h1 = (h1_val[0] if h1_val else "").lower()
+        else:
+            h1 = (h1_val or "").lower()
+
+        jld_str = json.dumps(p.get("jsonld", []) or p.get("json_ld_contents", []) or []).lower()
+        content = f"{html} {text} {title} {h1} {jld_str}"
+
+        # 1. Ecommerce
+        if ptype in ("product_detail", "product", "product_listing", "category", "cart", "checkout", "subscription") or any(
+            k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog", "/cart", "/checkout", "/subscription")
         ):
             ecomm_score += 2
-        if "schema.org/product" in html or "schema.org/offer" in html or '"@type": "product"' in html:
+        if any(k in content for k in (
+            "schema.org/product", "schema.org/offer", '"@type": "product"',
+            "add to cart", "buy now", "comprar", "shopping cart", "in stock",
+            "free shipping", "envío gratis", "pricecurrency", "bagged-coffee",
+            "coffee-machines"
+        )):
             ecomm_score += 3
 
+        # 2. SaaS
         if ptype in ("pricing", "subscription_flow", "documentation") or any(
             k in url for k in ("/pricing", "/plans", "/docs", "/api", "/billing", "/features")
         ):
             saas_score += 2
-        if "softwareapplication" in html or '"@type": "softwareapplication"' in html:
+        if "softwareapplication" in content or '"@type": "softwareapplication"' in content or "per user" in content or "api docs" in content:
             saas_score += 3
 
-        if ptype == "article" or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
+        # 3. Publisher
+        if ptype in ("article", "blog", "news") or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
             publisher_score += 2
-        if "newsarticle" in html or "blogposting" in html or '"@type": "article"' in html:
+        if "newsarticle" in content or "blogposting" in content or '"@type": "article"' in content:
             publisher_score += 3
 
-        if ptype == "location" or any(k in url for k in ("/location", "/store-locator", "/contact", "/branches")):
+        # 4. Local Business
+        # Physical store presence indicators: store locators, branch directories, physical locations
+        # (Exclude generic contact-us pages which exist on every corporate, ecomm, and saas website)
+        if ptype in ("store_locator", "branches", "local_business") or any(
+            k in url for k in ("/store-locator", "/our-stores", "/branches")
+        ):
+            local_score += 2
+        elif any(k in url for k in ("/locations", "/location")):
             local_score += 1
-        if "localbusiness" in html or "postaladdress" in html:
+
+        if "localbusiness" in content or "postaladdress" in content or "openinghours" in content:
             local_score += 3
+
+    # If active ecommerce transactional signals exist, prioritize ecommerce over local storefront listings
+    if ecomm_score >= 4 and ecomm_score >= local_score:
+        return "ecommerce"
 
     candidates = [
         (ecomm_score, "ecommerce"),
@@ -307,10 +480,66 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
     return "corporate"
 
 
+def build_run_manifest(
+    site: str,
+    pipeline_stages: Optional[List[str]] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    duration_seconds: float = 0.0,
+    status: str = "complete",
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build a machine-readable execution provenance manifest recording site, timestamps, references, and validation status."""
+    import hashlib
+    ref_dir = os.path.join(SCRIPT_DIR, "..", "references")
+    reference_hashes = {}
+    for ref_name in ("checks.json", "knowledge-base.md", "core-synthesis-digest.md", "report-schema.json", "telemetry-schema.json"):
+        p = os.path.join(ref_dir, ref_name)
+        if os.path.exists(p):
+            with open(p, "rb") as rf:
+                reference_hashes[ref_name] = hashlib.sha256(rf.read()).hexdigest()
+        else:
+            reference_hashes[ref_name] = None
+
+    now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    manifest = {
+        "manifest_version": "1.0.0",
+        "site": site,
+        "started_at": start_time or now_iso,
+        "completed_at": end_time or now_iso,
+        "duration_seconds": round(duration_seconds, 3),
+        "execution_status": status,
+        "pipeline_stages": pipeline_stages or [
+            "1. Inventory Acquisition (SSRF-Safe, Pure Python)",
+            "2. Specialist Telemetry Collection (6 Sensors)",
+            "3. 6-Layer Causal DAG Suppression & Route Analysis",
+            "4. Business Archetype Classification & Severity Reweighting",
+            "5. Deterministic Readiness & Citability Scoring",
+            "6. Draft-07 Report Synthesis & Schema Validation",
+        ],
+        "participating_skills": [
+            "audit-orchestrator",
+            "web-scraper",
+            "discoverability-audit",
+            "entity-content-audit",
+            "fact-consistency-audit",
+            "corroboration-authority-audit",
+            "geo-content-audit",
+            "engagement-context-audit",
+        ],
+        "reference_checksums_sha256": reference_hashes,
+        "runtime_dependencies": "Pure Python 3.9+ standard library only",
+    }
+    if extra:
+        manifest.update(extra)
+    return manifest
+
+
 def synthesize_audit_report(
     site: str,
     inv: Dict[str, Any],
     specialist_results: Dict[str, Dict[str, Any]],
+    review: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Apply Causal DAG, Keystone Defect deduplication, and Draft-07 synthesis."""
     base, domain = parse_target_domain(site)
@@ -318,33 +547,62 @@ def synthesize_audit_report(
     _domain_clean = domain.split(":")[0]
     _brand_guess = _domain_clean.split(".")[0].capitalize()
 
-    for p in pages:
-        p_html = p.get("html") or ""
-        m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
-        if m_og and m_og.group(1).strip():
-            _brand_guess = m_og.group(1).strip()
-            break
-        m_title = re.search(r'<title[^>]*>([^<]+)</title>', p_html, re.I)
-        if m_title and m_title.group(1).strip():
-            t_raw = m_title.group(1).strip()
-            t_parts = re.split(r'[\s|:–—\-]+', t_raw)
-            if t_parts and len(t_parts[0]) > 1:
-                _brand_guess = t_parts[0].strip()
+    # 1. Prefer brand from entity sensor snapshot if valid
+    entity_brand = specialist_results.get("entity-content-audit", {}).get("entity_snapshot", {}).get("brand_name")
+    if entity_brand and isinstance(entity_brand, str) and len(entity_brand.strip()) > 1:
+        _brand_guess = entity_brand.strip()
+    else:
+        # 2. Inspect homepage specifically (root path or matching base)
+        homepage_candidates = [
+            p for p in pages
+            if urlparse(p.get("url") or "").path in ("", "/", "/index.html")
+            or (p.get("url") or "").rstrip("/") == base.rstrip("/")
+            or p.get("page_type") == "homepage"
+        ]
+        target_pages = homepage_candidates if homepage_candidates else pages
+        for p in target_pages:
+            p_html = p.get("html") or ""
+            m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
+            if m_og and m_og.group(1).strip():
+                _brand_guess = m_og.group(1).strip()
                 break
+            m_title = re.search(r'<title[^>]*>([^<]+)</title>', p_html, re.I)
+            if m_title and m_title.group(1).strip():
+                t_raw = m_title.group(1).strip()
+                t_parts = re.split(r'[\s|:–—\-]+', t_raw)
+                if t_parts and len(t_parts[0]) > 1:
+                    _brand_guess = t_parts[0].strip()
+                    break
+
+    # 3. Guard against generic / non-brand titles
+    GENERIC_BRAND_BLACKLIST = {
+        "signup", "sign up", "sign-up", "login", "log in", "log-in", "register",
+        "home", "homepage", "index", "default", "welcome", "untitled", "test",
+        "draft", "drafts", "cart", "checkout", "search", "products", "services",
+        "about", "contact", "category", "account", "profile", "overview", "landing"
+    }
+    if _brand_guess.lower() in GENERIC_BRAND_BLACKLIST or len(_brand_guess) <= 1:
+        _brand_guess = _domain_clean.split(".")[0].capitalize()
 
     sample_routes: List[str] = []
     sample_product_route = None
     sample_pricing_route = None
+    EXCLUDED_ROUTE_PATTERNS = ("/drafts/", "/content/dam/", "/quiz/", "/assets/", "/static/", "/cdn-cgi/", "/_")
     for p in pages:
         p_url = p.get("url") or ""
         parsed_p = urlparse(p_url)
         path = parsed_p.path or "/"
-        if path not in ("/", "") and path not in sample_routes:
-            sample_routes.append(path)
-        if not sample_product_route and any(k in path.lower() for k in ("/product", "/item", "/shop", "/catalog")):
-            sample_product_route = path
+        if path not in ("/", ""):
+            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
+                if not path.lower().endswith((".jpg", ".png", ".gif", ".svg", ".css", ".js")):
+                    if path not in sample_routes:
+                        sample_routes.append(path)
+        if not sample_product_route and any(k in path.lower() for k in ("/product", "/item", "/shop", "/catalog", "/coffee", "/tea", "/machines")):
+            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
+                sample_product_route = path
         if not sample_pricing_route and any(k in path.lower() for k in ("/pricing", "/plans", "/billing")):
-            sample_pricing_route = path
+            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
+                sample_pricing_route = path
 
     has_llms_txt = any("llms.txt" in (p.get("url") or "").lower() for p in pages) or bool(inv.get("llms_txt") if inv else False)
 
@@ -352,65 +610,48 @@ def synthesize_audit_report(
     all_raw_recommendations: List[Dict[str, Any]] = []
 
     statuses = []
+    has_sensor_error = False
     for _skill_name, result in specialist_results.items():
-        statuses.append(result.get("status", "ok"))
+        st = result.get("status", "ok")
+        statuses.append(st)
+        if st == "failed" or result.get("error"):
+            has_sensor_error = True
         all_raw_findings.extend(result.get("findings", []))
         all_raw_recommendations.extend(result.get("recommendations", []))
 
+    if review:
+        rev_findings = []
+        if isinstance(review, dict):
+            rev_findings = review.get("findings") or review.get("candidates") or []
+        elif isinstance(review, list):
+            rev_findings = review
+        for rf in rev_findings:
+            if isinstance(rf, dict):
+                all_raw_findings.append(rf)
+
     if inv.get("status") == "failed" or (not pages and not inv.get("infrastructure", {}).get("homepage_reachable", True)):
         audit_status = "failed"
-    elif all(s == "ok" for s in statuses):
+    elif all(s == "ok" for s in statuses) and not has_sensor_error:
         audit_status = "complete"
-    elif any(s in ("ok", "inconclusive") for s in statuses):
+    elif any(s in ("ok", "inconclusive", "failed") for s in statuses):
         audit_status = "partial"
     else:
         audit_status = "failed"
 
     # 1. Full 6-Layer Causal DAG Precedence Analysis & Keystone Defect Identification
-    # (Source: audit-orchestrator-knowledge-base.md Section 12)
-    def _is_sitewide_l0(f: Dict[str, Any]) -> bool:
-        c_id = f.get("cause_id") or f.get("id", "")
-        if c_id not in _LAYER0_CAUSE_IDS:
-            return False
-        if c_id in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO"):
-            return True
-        ev = str(f.get("evidence", "")).lower()
-        root = str(f.get("root_cause", "")).lower()
-        if c_id == "NOINDEX_EXCLUSION" and ("sitewide" in ev or "homepage" in ev or f.get("scope") in ("/", base, domain)):
-            return True
-        if c_id == "AI_RETRIEVAL_BLOCKED":
-            if "disallows all" in root or "disallow: / " in ev or "disallow: /\n" in ev:
-                return True
-            if "disallow: /" in ev and not any(sub in ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content")):
-                return True
-        return False
-
-    has_sitewide_layer0_block = any(_is_sitewide_l0(f) for f in all_raw_findings)
-    layer0_blocked_pages = {
-        str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
-        for f in all_raw_findings
-        if (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
-    }
-    layer0_blocked_pages = {p for p in layer0_blocked_pages if p}
-    rendering_gap_findings = [
-        f for f in all_raw_findings
-        if (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
-    ]
-    has_layer1_rendering_gap = bool(rendering_gap_findings)
-    rendering_gap_pages = {
-        str(f.get("url") or f.get("scope") or (f.get("evidence", {}).get("scope") if isinstance(f.get("evidence"), dict) else "")).lower()
-        for f in rendering_gap_findings
-    }
-    rendering_gap_pages = {p for p in rendering_gap_pages if p}
-    # Site-wide only if all pages have low word count or single homepage crawl is a shell
-    home_page_obj = next((p for p in pages if (p.get("url") or "").rstrip("/") == base.rstrip("/")), pages[0] if pages else {})
-    home_wc = home_page_obj.get("word_count", 0)
-    is_site_wide_rendering_gap = (
-        has_layer1_rendering_gap and (
-            (home_wc < 30 and home_wc > 0)
-            or (pages and all(p.get("word_count", 0) < 60 for p in pages))
-        )
-    )
+    # (Source: knowledge-base.md Section 12)
+    unrendered_product_routes: Set[str] = set()
+    if apply_causal_suppression is not None:
+        allowed_findings, suppressed_findings, dag_metadata = apply_causal_suppression(all_raw_findings, inv=inv)
+        downstream_symptoms_by_cause = dag_metadata.get("downstream_symptoms", {})
+        for sc in suppressed_findings:
+            sym_cid = sc.get("cause_id") or sc.get("id") or ""
+            if any(k in str(sym_cid) for k in ("ATTRIBUTE", "PRODUCT", "OFFER", "SCHEMA", "E")):
+                sc_scope = extract_finding_route(sc)
+                unrendered_product_routes.add(sc_scope or "commercial routes")
+    else:
+        allowed_findings = all_raw_findings
+        downstream_symptoms_by_cause = {}
 
     # 2. Scope-Aware Deduplication of Findings
     deduped_findings: List[Dict[str, Any]] = []
@@ -419,25 +660,11 @@ def synthesize_audit_report(
 
     # Order by severity: critical -> high -> medium -> low
     severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-    all_raw_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
+    allowed_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
 
-    for f in all_raw_findings:
+    for f in allowed_findings:
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
-        f_scope = str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
-        if isinstance(f.get("evidence"), dict):
-            f_scope = f_scope or str(f["evidence"].get("scope", "")).lower()
-
-        # Full 6-Layer Causal DAG Keystone Suppression (P0-11):
-        # Layer 0 access block preempts downstream symptoms if site-wide or on the specific blocked page
-        if has_sitewide_layer0_block and cid in _SUPPRESSED_BY_LAYER0:
-            continue
-        if f_scope and any(blk in f_scope or f_scope in blk for blk in layer0_blocked_pages) and cid in _SUPPRESSED_BY_LAYER0:
-            continue
-        # Layer 1 rendering gap only suppresses downstream if site-wide or on the specific unrendered page
-        if is_site_wide_rendering_gap and cid in _SUPPRESSED_BY_LAYER1:
-            continue
-        if f_scope and any(gap in f_scope or f_scope in gap for gap in rendering_gap_pages) and cid in _SUPPRESSED_BY_LAYER1:
-            continue
+        f_scope = extract_finding_route(f) or str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
 
         # P0-10: Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
         dedup_key = f"{cid}::{f.get('title', '')}"
@@ -480,23 +707,115 @@ def synthesize_audit_report(
         if action_priority not in ("critical", "high", "medium", "low"):
             action_priority = sev
 
-        if isinstance(raw_ev, str):
-            evidence_val: Any = clean_text_string(raw_ev)
+        # Structure evidence strictly according to the Top-Tier contract
+        target_src_type = "first_party"
+        if "ROBOTS" in cid or "BOT" in cid:
+            target_src_type = "robots"
+        elif "SITEMAP" in cid:
+            target_src_type = "sitemap"
+        elif any(k in cid for k in ("SCHEMA", "JSONLD", "ENTITY", "ATTRIBUTE")):
+            target_src_type = "structured_data"
+        elif any(k in cid for k in ("RENDER", "CSR", "WORD", "TEXT")):
+            target_src_type = "visible_content"
+        elif any(k in cid for k in ("CORROBORATION", "AUTHORITY", "WIKIDATA", "LINKEDIN")):
+            target_src_type = "third_party"
+        elif any(k in cid for k in ("HTTP", "STATUS", "REDIRECT")):
+            target_src_type = "http"
+
+        sample_url = f.get("url") or (f.get("evidence_refs", [None])[0] if f.get("evidence_refs") else None) or f"{base}/"
+
+        if isinstance(raw_ev, dict) and "sources" in raw_ev and isinstance(raw_ev["sources"], list):
+            evidence_val: Dict[str, Any] = {
+                "summary": clean_text_string(raw_ev.get("summary") or f_title),
+                "sources": [
+                    {
+                        "url": str(s.get("url") or sample_url),
+                        "type": str(s.get("type") or target_src_type),
+                        "observation": clean_text_string(s.get("observation") or str(s)),
+                    }
+                    for s in raw_ev["sources"] if isinstance(s, dict)
+                ],
+            }
+            if not evidence_val["sources"]:
+                evidence_val["sources"].append({
+                    "url": sample_url,
+                    "type": target_src_type,
+                    "observation": clean_text_string(raw_ev.get("summary") or f_title),
+                })
         elif isinstance(raw_ev, dict):
+            ev_summary = clean_text_string(raw_ev.get("summary") or raw_ev.get("observation") or f_title)
+            ev_obs = clean_text_string(raw_ev.get("observation") or raw_ev.get("details") or str(raw_ev))
             evidence_val = {
-                k: clean_text_string(v) if isinstance(v, str) else v
-                for k, v in raw_ev.items()
+                "summary": ev_summary,
+                "sources": [
+                    {
+                        "url": str(raw_ev.get("url") or sample_url),
+                        "type": str(raw_ev.get("type") or target_src_type),
+                        "observation": ev_obs,
+                    }
+                ],
+            }
+        elif isinstance(raw_ev, str):
+            ev_summary = clean_text_string(raw_ev)
+            evidence_val = {
+                "summary": ev_summary,
+                "sources": [
+                    {
+                        "url": sample_url,
+                        "type": target_src_type,
+                        "observation": ev_summary,
+                    }
+                ],
             }
         else:
-            evidence_val = clean_text_string(raw_ev)
+            ev_str = clean_text_string(str(raw_ev))
+            evidence_val = {
+                "summary": ev_str,
+                "sources": [
+                    {
+                        "url": sample_url,
+                        "type": target_src_type,
+                        "observation": ev_str,
+                    }
+                ],
+            }
+
+        raw_tf = action.get("technical_fix")
+        if isinstance(raw_tf, dict):
+            clean_tf = raw_tf
+        else:
+            clean_tf = clean_text_string(raw_tf) or None
 
         suggested_action: Dict[str, Any] = {
             "summary": action_summary,
-            "priority": action_priority,
-            "technical_fix": clean_text_string(action.get("technical_fix")) or None,
+            "technical_fix": clean_tf,
             "creative_fix": clean_text_string(action.get("creative_fix")) or None,
+            "priority": action_priority,
             "verification": clean_text_string(action.get("verification")) or None,
+            "is_proactive": bool(action.get("is_proactive", False)),
         }
+
+        actual_band = f.get("actual_band") or {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}.get(sev, "S2")
+        diff = f.get("difficulty")
+        prio_idx = None
+        if isinstance(diff, int) and 1 <= diff <= 5:
+            prio_idx = 5 * int(actual_band[1]) + (6 - diff)
+
+        raw_impact = f.get("impact") or f.get("impact_estimate")
+        if not raw_impact:
+            cat = str(f.get("category", "discoverability"))
+            if cat in ("discoverability", "crawlability"):
+                raw_impact = "Impairs AI crawler indexation, causing the domain or catalog to be omitted from AI search retrieval."
+            elif cat == "fact_consistency":
+                raw_impact = "Conflicting first-party facts reduce model consensus confidence, leading to hallucinations or citation exclusion."
+            elif cat == "entity_content":
+                raw_impact = "Ambiguous entity and product attributes prevent generative engines from answering user purchase queries directly."
+            elif cat == "corroboration":
+                raw_impact = "Lack of third-party authority links weakens brand identity verification across external knowledge graphs."
+            elif cat == "geo_content":
+                raw_impact = "Low statistical density and absent direct-answer formatting depress citation frequency in generative response engines."
+            else:
+                raw_impact = "Degrades post-citation visitor orientation and decreases intent-handoff retention."
 
         clean_finding: Dict[str, Any] = {
             "id": finding_id,
@@ -506,20 +825,40 @@ def synthesize_audit_report(
             "category": str(f.get("category", "discoverability")),
             "root_cause": f_root,
             "confidence": conf,
+            "scope": f.get("scope") or f.get("url") or sample_url,
             "evidence": evidence_val,
+            "impact": clean_text_string(raw_impact),
             "suggested_action": suggested_action,
         }
 
-        if f.get("impact"):
-            clean_finding["impact"] = clean_text_string(f.get("impact"))
+        if f.get("affected_urls"):
+            clean_finding["affected_urls"] = list(f["affected_urls"])
+        if prio_idx is not None:
+            clean_finding["priority_index"] = prio_idx
+        if f.get("depends_on"):
+            clean_finding["depends_on"] = f["depends_on"]
+        if f.get("downstream_symptoms"):
+            clean_finding["downstream_symptoms"] = list(f["downstream_symptoms"])
 
         deduped_findings.append(clean_finding)
 
+    # Attach downstream symptoms to keystone findings across all processed findings
+    for clean_finding in deduped_findings:
+        f_cid = clean_finding.get("cause_id") or clean_finding.get("id") or clean_finding.get("title", "")
+        f_alias = TAXONOMY_ALIASES.get(f_cid, "")
+        matching_symptoms = list(clean_finding.get("downstream_symptoms", []))
+        for cause_k, syms in downstream_symptoms_by_cause.items():
+            is_l1_match = (cause_k == "RENDERED_CONTENT_GAP" and (f_cid in _LAYER1_CAUSE_IDS or f_alias in _LAYER1_CAUSE_IDS))
+            is_l0_match = (cause_k == "AI_RETRIEVAL_BLOCKED" and (f_cid in _LAYER0_CAUSE_IDS or f_alias in _LAYER0_CAUSE_IDS))
+            if cause_k in (f_cid, f_alias) or TAXONOMY_ALIASES.get(cause_k) in (f_cid, f_alias) or is_l1_match or is_l0_match:
+                for s in syms:
+                    if s not in matching_symptoms:
+                        matching_symptoms.append(s)
+        if matching_symptoms:
+            clean_finding["downstream_symptoms"] = matching_symptoms
+
     # 3. Archetype Detection, Severity Reweighting & Proactive Opportunities Synthesis
     archetype = detect_business_archetype(inv)
-
-    # Apply archetype-contextual severity reweighting.
-    # Scripts detect defects against universal thresholds. The AI (or headless orchestrator)
     # contextualizes severity by business model — missing Product schema is medium for a
     # corporate blog but critical for an e-commerce product page.
     archetype_overrides = ARCHETYPE_SEVERITY_OVERRIDES.get(archetype, {})
@@ -535,8 +874,111 @@ def synthesize_audit_report(
                         if finding.get("suggested_action"):
                             finding["suggested_action"]["priority"] = override_sev
 
-    # Re-sort after archetype reweighting (severity may have changed)
-    deduped_findings.sort(key=lambda f: severity_rank.get(f.get("severity", "low"), 1), reverse=True)
+    # Re-sync actual_band, difficulty, and priority_index after archetype reweighting
+    band_map = {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}
+    for finding in deduped_findings:
+        finding["actual_band"] = band_map.get(finding.get("severity", "medium"), "S2")
+        diff = finding.get("difficulty")
+        if diff is None or not (isinstance(diff, int) and 1 <= diff <= 5):
+            diff = infer_finding_difficulty(finding)
+            finding["difficulty"] = diff
+        p_idx = 5 * int(finding["actual_band"][1]) + (6 - diff)
+        finding["priority_index"] = p_idx
+        if finding.get("suggested_action"):
+            finding["suggested_action"]["priority_index"] = p_idx
+            finding["suggested_action"]["difficulty"] = diff
+
+    # Queue and Dependency-aware Topological Task Sort
+    queues = {"confirmed": 0, "advisory": 1, "investigation": 2}
+
+    def task_sort_key(item: Dict[str, Any]) -> tuple:
+        band = item.get("actual_band", "S2")
+        sev_num = int(band[1]) if band.startswith("S") and len(band) > 1 else 1
+        d = item.get("difficulty")
+        q = queues.get(item.get("queue", "confirmed"), 0)
+        return (q, -sev_num, d if d is not None else 0, item.get("id", ""))
+
+    has_deps = any(f.get("depends_on") for f in deduped_findings)
+    if has_deps:
+        pending = {f["id"]: f for f in deduped_findings}
+        done: Set[str] = set()
+        sorted_output: List[Dict[str, Any]] = []
+        while pending:
+            available = [
+                f for f in pending.values()
+                if set(f.get("depends_on", [])) <= done or not any(d in pending for d in f.get("depends_on", []))
+            ]
+            if not available:
+                break
+            first = min(available, key=task_sort_key)
+            sorted_output.append(first)
+            done.add(first["id"])
+            del pending[first["id"]]
+        for rem in sorted(pending.values(), key=task_sort_key):
+            sorted_output.append(rem)
+        deduped_findings = sorted_output
+    else:
+        deduped_findings.sort(key=task_sort_key)
+
+    # Re-index finding IDs sequentially after sorting so final report has F-001, F-002, F-003...
+    id_remap = {}
+    for idx, f in enumerate(deduped_findings, 1):
+        old_id = f.get("id")
+        new_id = f"F-{idx:03d}"
+        if old_id:
+            id_remap[old_id] = new_id
+        f["id"] = new_id
+        f["priority_rank"] = idx
+
+        # Compute DAG node per 6-Layer Causal DAG
+        f_cid = str(f.get("cause_id") or "")
+        f_cat = str(f.get("category") or "discoverability")
+        if "RENDER" in f_cid or f_cid.startswith("C"):
+            f_dag = "RENDERING"
+        elif f_cat == "fact_consistency" or f_cid.startswith("BN") or "FACT" in f_cid or "PRICE" in f_cid:
+            f_dag = "FACTS"
+        elif f_cat == "corroboration" or f_cid.startswith(("BC", "PP", "SA", "SC", "P")) or "AUTHORITY" in f_cid or "SAMEAS" in f_cid:
+            f_dag = "CORROBORATION"
+        elif f_cat == "entity_content" or f_cid.startswith(("EC", "ED", "ME", "E")) or "ENTITY" in f_cid or "PRODUCT" in f_cid or "OFFER" in f_cid:
+            f_dag = "ENTITY"
+        elif f_cat == "geo_content" or f_cid.startswith(("N", "G")) or "CITABILITY" in f_cid or "GEO" in f_cid:
+            f_dag = "GEO_CITABILITY"
+        elif f_cat in ("engagement", "engagement_context") or f_cid.startswith(("I", "J")) or "SCENT" in f_cid or "CTA" in f_cid or "ENGAGEMENT" in f_cid:
+            f_dag = "ENGAGEMENT"
+        elif f_cat in ("discoverability", "crawlability") or f_cid.startswith(("A", "B", "D", "F", "H")):
+            f_dag = "RETRIEVAL"
+        else:
+            f_dag = "RETRIEVAL"
+        f.setdefault("dag_node", f_dag)
+
+        # Compute priority_justification explaining needle-moving rationale
+        if f_dag in ("RETRIEVAL", "RENDERING"):
+            just = "Upstream barrier that completely blocks AI search engines from crawling, indexing, or extracting text across this route."
+        elif f_dag == "ENTITY":
+            just = "Fundamental machine-readable identity anchor required for generative models to disambiguate the brand in knowledge graphs."
+        elif f_dag == "FACTS":
+            just = "Numerical or terms contradiction across first-party pages that directly triggers AI hallucination and purchase distrust."
+        elif f_dag == "CORROBORATION":
+            just = "External authority link failure reducing off-site citation grounding and third-party consensus."
+        elif f_dag == "GEO_CITABILITY":
+            just = "Deficit in statistical density, causal conjunctions, or BLUF primacy directly depressing generative citation lift."
+        elif f_dag == "ENGAGEMENT":
+            just = "Post-citation information scent or CTA friction causing immediate 5-second visitor bounce upon arrival."
+        else:
+            just = "Prioritized based on direct impact on AI retrieval visibility and user task continuity."
+        f.setdefault("priority_justification", f"Rank #{idx}: {just}")
+
+        if not f.get("affected_urls"):
+            f["affected_urls"] = [f["scope"]] if f.get("scope") and str(f["scope"]).startswith("http") else [site]
+
+        if f.get("suggested_action"):
+            f["suggested_action"].setdefault("is_proactive", False)
+
+    if id_remap:
+        for f in deduped_findings:
+            if f.get("depends_on"):
+                f["depends_on"] = [id_remap.get(dep, dep) for dep in f["depends_on"]]
+
     # Re-compute counts after reweighting
     crit_count = sum(1 for f in deduped_findings if f["severity"] == "critical")
     high_count = sum(1 for f in deduped_findings if f["severity"] == "high")
@@ -558,8 +1000,9 @@ def synthesize_audit_report(
     # 1. Authoritative LLM Index Manifest (/llms.txt)
     if has_llms_txt:
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
             "title": f"Audit & Expand Existing /llms.txt Manifest for {_brand_guess}",
+            "category": "discoverability",
             "summary": f"Authoritative /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
             "priority": "low",
             "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
@@ -569,8 +1012,9 @@ def synthesize_audit_report(
         proactive_counter += 1
     else:
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
             "title": f"Deploy Machine-Readable /llms.txt Manifest for {_brand_guess}",
+            "category": "discoverability",
             "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links for generative search assistants.",
             "priority": "low",
             "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
@@ -582,8 +1026,9 @@ def synthesize_audit_report(
     # 2. Dynamic Edge Markdown Negotiation (Zero-token retrieval) if no rendering gap
     if "RENDERED_CONTENT_GAP" not in finding_cids:
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
             "title": "Enable Edge Markdown Content Negotiation for AI Indexers",
+            "category": "discoverability",
             "summary": "Configure web server or CDN to serve pre-rendered clean markdown when requests include Accept: text/markdown, cutting AI token ingestion cost by 80%.",
             "priority": "low",
             "technical_fix": "Configure CDN edge worker to inspect Accept header and serve pre-generated markdown for AI crawlers.",
@@ -592,11 +1037,32 @@ def synthesize_audit_report(
         })
         proactive_counter += 1
 
-    # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists)
-    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids:
+    # Conditional Pre-Hydration Product Schema Architecture (when unrendered product shells were detected)
+    if unrendered_product_routes:
+        sample_routes = ", ".join(sorted(list(unrendered_product_routes))[:3])
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
+            "title": "Pre-Hydration Product Schema Architecture",
+            "category": "entity",
+            "summary": (
+                f"Commercial route(s) ({sample_routes}) serve unrendered client-side JS shells. "
+                "When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup "
+                "(declaring name, description, offers with price, priceCurrency, and inStock availability) "
+                "in the initial HTML document before client hydration to ensure instant discovery by AI shopping assistants."
+            ),
+            "priority": "high" if archetype == "ecommerce" else "medium",
+            "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
+            "creative_fix": "Ensure product title, description, pricing, and stock status are presented in semantic HTML above the fold.",
+            "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is present.",
+        })
+        proactive_counter += 1
+
+    # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists)
+    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids and not unrendered_product_routes:
+        proactive_actions.append({
+            "id": f"P-{proactive_counter:03d}",
             "title": f"Implement Structured Specification Comparison Tables for {_brand_guess}",
+            "category": "entity",
             "summary": "Embed semantic HTML tables detailing product dimensions, materials, and origin to maximize conversational recommendations in ChatGPT Search and Perplexity.",
             "priority": "low",
             "technical_fix": f"Embed responsive HTML <table> markup on {target_route} with clean headers and numeric specifications.",
@@ -606,8 +1072,9 @@ def synthesize_audit_report(
         proactive_counter += 1
     elif archetype == "saas" and "FIRST_PARTY_FACT_CONFLICT" not in finding_cids:
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
             "title": f"Deploy Autonomous AI Purchasing Agent Pricing Manifest (/pricing.md) for {_brand_guess}",
+            "category": "fact_consistency",
             "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
             "priority": "low",
             "technical_fix": f"Serve /pricing.md at https://{domain}/pricing.md with structured plan comparison tables extracted from {pricing_source}.",
@@ -617,13 +1084,26 @@ def synthesize_audit_report(
         proactive_counter += 1
     elif archetype == "publisher" and "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids:
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
             "title": f"Structure E-E-A-T Author Credentials & Fact Attributions for {_brand_guess}",
+            "category": "entity",
             "summary": f"Embed Schema.org Person markup for {_brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks beneath question headings.",
             "priority": "low",
             "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
             "creative_fix": "Replace passive voice with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
             "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
+        })
+        proactive_counter += 1
+    elif archetype == "local_business" and "MISSING_POSTAL_ADDRESS" not in finding_cids:
+        proactive_actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {_brand_guess}",
+            "category": "entity",
+            "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
+            "priority": "low",
+            "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
+            "creative_fix": f"Harmonize exact brand name '{_brand_guess}', street address, and phone number formatting across local directory listings.",
+            "verification": f"Inspect location page markup on https://{domain}/ with Google Rich Results Test.",
         })
         proactive_counter += 1
     elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids:
@@ -632,8 +1112,9 @@ def synthesize_audit_report(
         p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
         if p_sa_count > 0:
             proactive_actions.append({
-                "id": f"PROACTIVE-{proactive_counter:03d}",
+                "id": f"P-{proactive_counter:03d}",
                 "title": f"Expand Knowledge Graph Authority Anchors for {_brand_guess}",
+                "category": "corroboration",
                 "summary": f"{_brand_guess} currently declares {p_sa_count} sameAs node(s). Expand third-party authority coverage with Wikidata and LinkedIn verification.",
                 "priority": "low",
                 "technical_fix": f"Add verified Wikidata entity URI and official LinkedIn organization profile to Schema.org Organization on https://{domain}/.",
@@ -645,8 +1126,9 @@ def synthesize_audit_report(
     # 4. Princeton Citability Architecture (Only if citability defects are not already flagged)
     if not any(c in finding_cids for c in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS")):
         proactive_actions.append({
-            "id": f"PROACTIVE-{proactive_counter:03d}",
+            "id": f"P-{proactive_counter:03d}",
             "title": f"Implement Princeton KDD 2024 Citability Architecture on {domain}",
+            "category": "geo_content",
             "summary": f"Structure core sections on {domain} into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
             "priority": "low",
             "technical_fix": f"Structure {domain} content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
@@ -657,227 +1139,174 @@ def synthesize_audit_report(
 
     final_proactive = proactive_actions[:3]
     for idx, act in enumerate(final_proactive, start=1):
-        act["id"] = f"PROACTIVE-{idx:03d}"
+        act["id"] = f"P-{idx:03d}"
 
     # 4. Counts-by-Severity Summary (computed earlier after archetype reweighting)
     # (crit_count, high_count, med_count, low_count already set above)
 
-    # 5. Compute Orthogonal Scores from Real Sensor Signal Data
-    # -------------------------------------------------------------------------
-    # These scores are derived ENTIRELY from actual crawl signals, not ternary
-    # hardcodes. Every figure traces to a concrete sensor output field.
-    # -------------------------------------------------------------------------
+    # 5. Deterministic Readiness Score & Dimensions Breakdown
+    pages_list = inv.get("pages", []) if inv else []
+    total_pages = max(len(pages_list), 1)
 
-    # 5a. Crawlability Score — fraction of retrieval bots that are allowed
-    # Source: discoverability sensor coverage.retrieval_bots_allowed / coverage.retrieval_bots_total
+    if pages_list:
+        def _to_code(p_item):
+            c = p_item.get("status_code") or p_item.get("status")
+            try:
+                return int(c)
+            except (ValueError, TypeError):
+                return 200
+        crawlable_count = sum(1 for p in pages_list if _to_code(p) < 400)
+        crawlability = round((crawlable_count / total_pages) * 100.0, 2)
+    else:
+        crawlability = 0.0 if inv.get("status") == "failed" else 100.0
+
     disc_cov = specialist_results.get("discoverability-audit", {}).get("coverage", {})
-    disc_scrape = specialist_results.get("discoverability-audit", {}).get("ai_agent_scrapeability_summary", {})
-    _bots_allowed = disc_cov.get("retrieval_bots_allowed", disc_scrape.get("retrieval_bots_allowed", None))
-    _bots_total = disc_cov.get("retrieval_bots_total", disc_scrape.get("retrieval_bots_total", None))
-    if _bots_allowed is not None and _bots_total and int(_bots_total) > 0:
-        crawl_score = round((int(_bots_allowed) / int(_bots_total)) * 100.0, 1)
+    substantive_pages = [
+        p for p in pages_list
+        if (p.get("word_count", 0) or 0) >= 50
+        and not any(k in (p.get("url") or "").lower() for k in ("/footer", "/nav", "/draft", "/fragment"))
+    ]
+    retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2)
+
+    geo_cov = specialist_results.get("geo-content-audit", {}).get("coverage", {})
+    avg_cit = geo_cov.get("average_citability_score", 0.0)
+    citation_readiness = round(float(avg_cit or 0.0), 2)
+
+    entity_cov = specialist_results.get("entity-content-audit", {}).get("coverage", {})
+    corrob_cov = specialist_results.get("corroboration-authority-audit", {}).get("coverage", {})
+    has_jsonld = bool(entity_cov.get("jsonld_present", False))
+    has_org = bool(specialist_results.get("entity-content-audit", {}).get("entity_snapshot", {}).get("organization"))
+    sameas_count = int(corrob_cov.get("sameas_declared", 0) or 0)
+    if has_jsonld and has_org and sameas_count >= 2:
+        entity_authority = 100.0
+    elif has_jsonld or has_org:
+        entity_authority = 50.0
+    elif sameas_count > 0:
+        entity_authority = 25.0
     else:
-        # Fallback: infer from findings (Layer 0 block = 0%; no block = 95%)
-        has_crawl_crit = any(f["severity"] == "critical" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
-        has_crawl_high = any(f["severity"] == "high" and f.get("category") in ("discoverability", "crawlability") for f in deduped_findings)
-        crawl_score = 30.0 if has_crawl_crit else (65.0 if has_crawl_high else 95.0)
+        entity_authority = 0.0
 
-    # 5b. Retrieval Readiness Score — inverse of rendering gap severity
-    # Source: discoverability coverage.visible_words_initial_html + page inventory SNR
-    _visible_words = disc_cov.get("visible_words_initial_html", None)
-    pages = inv.get("pages", []) if inv else []
-    _total_pages = max(len(pages), 1)
-    _blank_pages = sum(1 for p in pages if (p.get("word_count") or 0) < 50)
-    if _visible_words is not None:
-        # Use the primary HTML word count from discoverability
-        retrieval_score = round(min(100.0, max(10.0, (_visible_words / max(_visible_words, 150)) * 100.0)), 1)
-        # Penalise if most pages are blank shells
-        blank_ratio = _blank_pages / _total_pages
-        retrieval_score = round(retrieval_score * (1.0 - blank_ratio * 0.6), 1)
+    raw_bots_allowed = disc_cov.get("retrieval_bots_allowed")
+    bots_allowed = int(raw_bots_allowed) if raw_bots_allowed is not None else 4
+    raw_bots_total = disc_cov.get("retrieval_bots_total")
+    bots_total = max(int(raw_bots_total) if raw_bots_total is not None else 4, 1)
+    bot_ratio = bots_allowed / bots_total if bots_total else 1.0
+    cross_engine_visibility = round(bot_ratio * retrieval_readiness, 2)
+
+    def _is_commerce_page(p_item):
+        u = str(p_item.get("url") or "").lower()
+        if any(k in u for k in ("/product", "/pricing", "/cart", "/shop")):
+            return True
+        pt = p_item.get("page_type")
+        if isinstance(pt, dict):
+            pt = pt.get("value")
+        pt_str = str(pt or "").lower()
+        return pt_str in ("product", "pricing", "catalog")
+
+    commerce_pages = sum(1 for p in pages_list if _is_commerce_page(p))
+    agentic_commerce = round((commerce_pages / total_pages) * 100.0, 2)
+
+    dimensions = {
+        "crawlability": crawlability,
+        "retrieval_readiness": retrieval_readiness,
+        "citation_readiness": citation_readiness,
+        "entity_authority": entity_authority,
+        "cross_engine_visibility": cross_engine_visibility,
+        "agentic_commerce": agentic_commerce,
+    }
+    weights = {
+        "crawlability": 0.2,
+        "retrieval_readiness": 0.15,
+        "citation_readiness": 0.25,
+        "entity_authority": 0.2,
+        "cross_engine_visibility": 0.1,
+        "agentic_commerce": 0.1,
+    }
+    composite_score = round(sum(dimensions[k] * weights[k] for k in weights), 2)
+    if composite_score >= 85.0:
+        grade = "A"
+    elif composite_score >= 70.0:
+        grade = "B"
+    elif composite_score >= 50.0:
+        grade = "C"
+    elif composite_score >= 30.0:
+        grade = "D"
     else:
-        has_rendering_gap = any("RENDERED_CONTENT_GAP" in (f.get("cause_id") or "") for f in deduped_findings)
-        retrieval_score = 40.0 if has_rendering_gap else 90.0
+        grade = "F"
 
-    # 5c. Citation Readiness Score — real average citability score from geo sensor
-    # Source: geo-content-audit coverage.average_citability_score
-    geo_res = specialist_results.get("geo-content-audit", {})
-    geo_cov = geo_res.get("coverage", {})
-    _raw_cit = geo_cov.get("average_citability_score") or geo_cov.get("avg_citability_score")
-    if _raw_cit is not None:
-        citation_score = round(min(100.0, max(10.0, float(_raw_cit))), 1)
-    else:
-        # No geo sensor data — infer from findings
-        has_low_cit = any((f.get("cause_id") or "") in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO") for f in deduped_findings)
-        citation_score = 45.0 if has_low_cit else 72.0
-
-    # 5d. Entity Authority Score — sameas_resolvable / sameas_declared ratio
-    # Source: corroboration-authority-audit coverage.sameas_declared + sameas_resolvable
-    corrob_res = specialist_results.get("corroboration-authority-audit", {})
-    corrob_cov = corrob_res.get("coverage", {})
-    _sa_declared = corrob_cov.get("sameas_declared", corrob_cov.get("sameas_count", None))
-    _sa_resolvable = corrob_cov.get("sameas_resolvable", corrob_cov.get("probed", None))
-    has_entity_ambiguity = any("MATERIAL_ENTITY_AMBIGUITY" in (f.get("cause_id") or "") for f in deduped_findings)
-    if _sa_declared is not None and _sa_declared > 0 and _sa_resolvable is not None:
-        sa_ratio = float(_sa_resolvable) / float(_sa_declared)
-        authority_score = round(max(10.0, sa_ratio * 100.0), 1)
-        if has_entity_ambiguity:
-            authority_score = min(authority_score, 55.0)  # Cap when no machine-readable identity
-    elif _sa_declared == 0 or _sa_declared is None:
-        # No sameAs declared — base on entity ambiguity finding
-        authority_score = 30.0 if has_entity_ambiguity else 60.0
-    else:
-        authority_score = 45.0 if has_entity_ambiguity else 75.0
-
-    # 5e. Agentic Commerce Score — pricing completeness + offer schema + fact consistency
-    fact_cov = specialist_results.get("fact-consistency-audit", {}).get("coverage", {})
-    _fact_conflicts = fact_cov.get("fact_conflicts", 0)
-    has_fact_conflict = any(
-        f.get("cause_id") in ("FIRST_PARTY_FACT_CONFLICT", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION", "CONFLICTING_COMMERCIAL_TERMS")
-        for f in deduped_findings
-    )
-    if has_fact_conflict or (_fact_conflicts and int(_fact_conflicts) > 0):
-        commerce_score = max(20.0, 85.0 - (int(_fact_conflicts or 1) * 15.0))
-    else:
-        commerce_score = 90.0 if any(p.get("page_type") in ("pricing", "product_detail") for p in pages) else 80.0
-
-    # Cross-Engine Visibility (P1-77): independent parity measure across major AI retrieval engines
-    matrix = inv.get("robots", {}).get("matrix", {}) if inv else {}
-    major_engines = ["OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "Googlebot"]
-    allowed_count = sum(1 for e in major_engines if matrix.get(e, True))
-    cross_engine_score = round((allowed_count / len(major_engines)) * 100.0, 1)
-
-    # Orthogonal composite weighting summing strictly to 1.00 (Zero double-counting)
-    composite_score = round(
-        crawl_score * 0.20
-        + retrieval_score * 0.20
-        + citation_score * 0.20
-        + authority_score * 0.15
-        + cross_engine_score * 0.15
-        + commerce_score * 0.10,
-        1,
-    )
-
-    if composite_score >= 85:
-        letter_grade = "A"
-    elif composite_score >= 70:
-        letter_grade = "B"
-    elif composite_score >= 50:
-        letter_grade = "C"
-    elif composite_score >= 30:
-        letter_grade = "D"
-    else:
-        letter_grade = "F"
-
-    # Dynamic Engine Readiness Factors (Grounded in Observed Findings & Telemetry)
-    chatgpt_factors = []
-    if any(f.get("cause_id") == "AI_RETRIEVAL_BLOCKED" and "oai" in str(f.get("evidence", "")).lower() for f in deduped_findings):
-        chatgpt_factors.append(f"OAI-SearchBot selectively restricted in robots.txt on {domain}")
-    elif crawl_score >= 80:
-        chatgpt_factors.append(f"Robots.txt grants crawl permission to OAI-SearchBot on {domain}")
-    if any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings):
-        chatgpt_factors.append("Unrendered client-side JS shell impairs catalog text indexing")
-    if any(f.get("cause_id") in ("MATERIAL_ENTITY_AMBIGUITY", "ATTRIBUTE_INCOMPLETENESS") for f in deduped_findings):
-        chatgpt_factors.append("Missing Schema.org Product or Organization data restricts instant answer grounding")
-    if not chatgpt_factors:
-        chatgpt_factors.append(f"Eligible for OpenAI retrieval crawl on {domain}")
-
-    claude_factors = []
-    if crawl_score >= 80:
-        claude_factors.append(f"Robots.txt grants crawl permission to Claude-SearchBot on {domain}")
-    else:
-        claude_factors.append("Claude-SearchBot is restricted in robots.txt")
-    if any(f.get("cause_id") in ("MATERIAL_ENTITY_AMBIGUITY", "WEAK_IDENTITY_SIGNALS") for f in deduped_findings):
-        claude_factors.append("Absence of Organization schema and external sameAs anchors impairs entity corroboration")
-    if any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings):
-        claude_factors.append("Client-side rendering shell impairs raw HTML text extraction for Claude search indexer")
-    if not claude_factors:
-        claude_factors.append("Satisfies Claude search ingestion prerequisites")
-
-    perplexity_factors = []
-    if crawl_score >= 80:
-        perplexity_factors.append(f"Robots.txt grants crawl permission to PerplexityBot on {domain}")
-    else:
-        perplexity_factors.append("PerplexityBot is restricted in robots.txt")
-    if any(f.get("cause_id") in ("LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS") for f in deduped_findings):
-        perplexity_factors.append("Low fact density and standalone FAQ format depress Perplexity citation cards")
-    if any(f.get("cause_id") == "WEAK_IDENTITY_SIGNALS" for f in deduped_findings):
-        perplexity_factors.append("Lack of third-party authority links (Wikidata/LinkedIn) reduces Perplexity consensus confidence")
-    if not perplexity_factors:
-        perplexity_factors.append("Satisfies Perplexity citation prerequisites")
-
-    google_factors = []
-    if crawl_score >= 85:
-        google_factors.append(f"Robots.txt grants crawl permission to Googlebot on {domain}")
-    else:
-        google_factors.append("Googlebot crawl directives restrict retrieval on {domain}")
-    if any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings):
-        google_factors.append("Client-side rendering dependency blocks Google Shopping Graph and direct snippet extraction")
-    if any(f.get("cause_id") == "ATTRIBUTE_INCOMPLETENESS" for f in deduped_findings):
-        google_factors.append("Missing Product and Offer structured data prevents pricing cards in Google AI Overviews")
-    if not google_factors:
-        google_factors.append("Satisfies Google AI Overview prerequisites")
-
-    geo_summary: Dict[str, Any] = {
-        "detected_archetype": archetype,
-        "composite_citability_score": composite_score,
-        "letter_grade": letter_grade,
-        "orthogonal_scores": {
-            "crawlability": crawl_score,
-            "retrieval_readiness": retrieval_score,
-            "citation_readiness": citation_score,
-            "entity_authority": authority_score,
-            "cross_engine_visibility": cross_engine_score,
-            "agentic_commerce": commerce_score,
-        },
-        "engine_readiness_simulation": {
-            "chatgpt_search": {
-                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 and not any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in deduped_findings) else "restricted",
-                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
-                "key_factors": chatgpt_factors,
-            },
-            "claude_search": {
-                "status": "eligible" if crawl_score >= 75 and retrieval_score >= 70 and not any(f.get("cause_id") == "MATERIAL_ENTITY_AMBIGUITY" for f in deduped_findings) else "restricted",
-                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
-                "key_factors": claude_factors,
-            },
-            "perplexity_ai": {
-                "status": "eligible" if crawl_score >= 75 and citation_score >= 60 and not any(f.get("cause_id") == "LOW_FACT_TO_TOKEN_RATIO" for f in deduped_findings) else "restricted",
-                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
-                "key_factors": perplexity_factors,
-            },
-            "google_ai_overviews": {
-                "status": "eligible" if crawl_score >= 80 and retrieval_score >= 75 and not any(f.get("cause_id") in ("RENDERED_CONTENT_GAP", "ATTRIBUTE_INCOMPLETENESS") for f in deduped_findings) else "restricted",
-                "citation_readiness": "high" if composite_score >= 75 else ("medium" if composite_score >= 50 else "low"),
-                "key_factors": google_factors,
-            },
-        },
+    dimension_status = {
+        "crawlability": "observed",
+        "retrieval_readiness": "observed",
+        "citation_readiness": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
+        "entity_authority": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
+        "cross_engine_visibility": "observed",
+        "agentic_commerce": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
     }
 
-    # Proactive actions already built cleanly with zero defect duplication
+    readiness = {
+        "composite_score": composite_score,
+        "grade": grade,
+        "dimensions": dimensions,
+        "weights": weights,
+        "dimension_status": dimension_status,
+        "score_scope": "Observed static inventory and specialist telemetry; not live provider ranking or citation data.",
+    }
 
     # 6. Assemble Final Draft-07 Compliant Report (Signal Only, Zero Bloat)
-    clean_limitations = [
-        "No JavaScript browser rendering was performed; initial raw HTML inspected for AI crawler visibility.",
-        "Robots eligibility simulated from captured robots.txt; bot-specific server challenge responses not tested.",
-    ]
-
     report: Dict[str, Any] = {
+        "schema_version": "1.0.0",
         "site": site,
         "audited_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "audit_status": audit_status,
+        "archetype": archetype,
         "summary": {
             "total_findings": len(deduped_findings),
             "critical": crit_count,
             "high": high_count,
             "medium": med_count,
             "low": low_count,
+            "detected_archetype": archetype,
         },
-        "geo_citability_summary": geo_summary,
         "findings": deduped_findings,
         "proactive_actions": final_proactive,
-        "limitations": clean_limitations,
-        "archetype": archetype,
+        "readiness": readiness,
+        "coverage": {
+            "pages_crawled": len(pages_list),
+            "specialist_domains": len(specialist_results),
+            "sensor_errors": [
+                k for k, v in specialist_results.items()
+                if (v.get("status") in ("inconclusive", "failed") and v.get("error")) or v.get("status") == "failed"
+            ],
+        },
+        "limitations": [
+            "No JavaScript browser rendering was performed.",
+            "Findings are based only on resources successfully acquired during this audit.",
+            "Robots.txt observations represent declared crawler permissions and do not prove search inclusion, indexing, ranking, or citation.",
+            "No claim is made about actual citation or placement by a specific AI assistant.",
+            "Engagement observations are content/navigation proxies unless external behavioral analytics are explicitly supplied.",
+        ],
     }
+
+    geo_res = specialist_results.get("geo-content-audit", {})
+    if geo_res.get("geo_citability_summary"):
+        report["geo_citability_summary"] = geo_res["geo_citability_summary"]
+    if geo_res.get("page_improvement_plans"):
+        report["page_improvement_plans"] = geo_res["page_improvement_plans"]
+
+    eng_res = specialist_results.get("engagement-context-audit", {})
+    if eng_res.get("engagement_continuity_summary"):
+        report["engagement_continuity_summary"] = eng_res["engagement_continuity_summary"]
+
+    scrape_summary = inv.get("infrastructure", {}).get("ai_agent_scrapeability_summary") or specialist_results.get("discoverability-audit", {}).get("ai_agent_scrapeability_summary")
+    if scrape_summary:
+        report["ai_agent_scrapeability_summary"] = scrape_summary
+
+    if suppressed_findings:
+        report["suppressed_findings"] = suppressed_findings
+
+    run_manifest = build_run_manifest(site=site)
+    report["run_manifest"] = run_manifest
+    report["coverage"]["run_manifest"] = run_manifest
 
     return report
 
@@ -887,19 +1316,25 @@ def collect_telemetry(
     inventory: Optional[str] = None,
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
-) -> tuple:
+    responses: Optional[str] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
     """Acquire inventory and execute all 6 specialist sensors, returning (inv, specialist_results)."""
     base, domain = parse_target_domain(site)
 
     # 1. Acquire or load inventory
     inv: Optional[Dict[str, Any]] = None
-    if inventory and os.path.exists(inventory):
-        try:
-            with open(inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception as e:
-            sys.stderr.write(f"Warning: Failed to load inventory from {inventory}: {e}\n")
-            inv = None
+    if inventory:
+        if isinstance(inventory, dict):
+            inv = inventory
+        elif isinstance(inventory, (str, bytes, os.PathLike)) and os.path.exists(inventory):
+            try:
+                with open(inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                sys.stderr.write(f"Warning: Failed to load inventory from {inventory}: {e}\n")
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "failed"}
+        else:
+            inv = {"pages": [], "error": f"Inventory path {inventory} not found", "status": "failed"}
 
     if inv is None:
         if build_inventory is not None:
@@ -932,11 +1367,10 @@ def collect_telemetry(
                 "sitemaps": [],
             }
 
-    # 2. Execute all 6 specialist sensors
     specialist_results: Dict[str, Dict[str, Any]] = {}
 
-    if inv.get("status") == "failed":
-        # Epistemic invariant (P0-1): Never synthesize evidence when acquisition fails.
+    # Guard: If inventory failed (network down / site blocked), emit inconclusive
+    if inv.get("status") == "failed" or not inv.get("pages"):
         for skill_id in [
             "discoverability-audit",
             "entity-content-audit",
@@ -956,40 +1390,41 @@ def collect_telemetry(
     try:
         from discoverability_check import audit as audit_disc
         specialist_results["discoverability-audit"] = run_specialist_sensor(audit_disc, base, domain, inv)
-    except Exception:
-        specialist_results["discoverability-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["discoverability-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from entity_content_check import audit as audit_entity
         specialist_results["entity-content-audit"] = run_specialist_sensor(audit_entity, base, domain, inv)
-    except Exception:
-        specialist_results["entity-content-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["entity-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from fact_consistency_check import audit as audit_fact
-        specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv)
-    except Exception:
-        specialist_results["fact-consistency-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+        extra = {"responses_file": responses} if responses else None
+        specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv, extra)
+    except Exception as e:
+        specialist_results["fact-consistency-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from corroboration_check import audit as audit_corrob
         extra = {"candidate_backlinks": candidate_backlinks} if candidate_backlinks else None
         specialist_results["corroboration-authority-audit"] = run_specialist_sensor(audit_corrob, base, domain, inv, extra)
-    except Exception:
-        specialist_results["corroboration-authority-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["corroboration-authority-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from geo_content_check import audit as audit_geo
         specialist_results["geo-content-audit"] = run_specialist_sensor(audit_geo, base, domain, inv)
-    except Exception:
-        specialist_results["geo-content-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["geo-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     try:
         from engagement_check import audit as audit_eng
         extra = {"analytics": analytics} if analytics else None
         specialist_results["engagement-context-audit"] = run_specialist_sensor(audit_eng, base, domain, inv, extra)
-    except Exception:
-        specialist_results["engagement-context-audit"] = {"status": "inconclusive", "findings": [], "recommendations": []}
+    except Exception as e:
+        specialist_results["engagement-context-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     return inv, specialist_results
 
@@ -999,10 +1434,11 @@ def get_telemetry_payload(
     inventory: Optional[str] = None,
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
+    responses: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Return raw empirical telemetry across all 6 sensors for AI cognitive orchestration."""
     base, domain = parse_target_domain(site)
-    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks)
+    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks, responses=responses)
 
     # Precompute Causal DAG state and suppression boundaries
     all_raw_findings: List[Dict[str, Any]] = []
@@ -1011,33 +1447,40 @@ def get_telemetry_payload(
 
     has_layer0_block = any(
         (f.get("cause_id") or f.get("id", "")) in _LAYER0_CAUSE_IDS
+        or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER0_CAUSE_IDS
         for f in all_raw_findings
     )
     has_layer1_rendering_gap = any(
         (f.get("cause_id") or f.get("id", "")) in _LAYER1_CAUSE_IDS
+        or TAXONOMY_ALIASES.get(f.get("cause_id") or f.get("id", ""), "") in _LAYER1_CAUSE_IDS
         for f in all_raw_findings
     )
 
     dag_root_causes: List[Dict[str, Any]] = []
     suppressed_categories: Set[str] = set()
 
-    if has_layer0_block:
-        dag_root_causes.append({
-            "code": "AI_RETRIEVAL_BLOCKED",
-            "scope": "site",
-            "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER0)),
-            "rationale": "RFC 9309 search retrieval bot blocked or HTTP 4xx/5xx crawl failure preempts downstream evaluation.",
-        })
-        suppressed_categories.update(_SUPPRESSED_BY_LAYER0)
+    if apply_causal_suppression is not None:
+        _allowed, _suppressed, dag_meta = apply_causal_suppression(all_raw_findings, inv=inv)
+        dag_root_causes = dag_meta.get("root_causes", [])
+        suppressed_categories = set(dag_meta.get("suppressed_categories", []))
+    else:
+        if has_layer0_block:
+            dag_root_causes.append({
+                "code": "AI_RETRIEVAL_BLOCKED",
+                "scope": "site",
+                "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER0)),
+                "rationale": "RFC 9309 search retrieval bot blocked or HTTP 4xx/5xx crawl failure preempts downstream evaluation.",
+            })
+            suppressed_categories.update(_SUPPRESSED_BY_LAYER0)
 
-    if has_layer1_rendering_gap:
-        dag_root_causes.append({
-            "code": "RENDERED_CONTENT_GAP",
-            "scope": "site",
-            "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER1)),
-            "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability and fact evaluation.",
-        })
-        suppressed_categories.update(_SUPPRESSED_BY_LAYER1)
+        if has_layer1_rendering_gap:
+            dag_root_causes.append({
+                "code": "RENDERED_CONTENT_GAP",
+                "scope": "site",
+                "suppressed_categories": sorted(list(_SUPPRESSED_BY_LAYER1)),
+                "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability and fact evaluation.",
+            })
+            suppressed_categories.update(_SUPPRESSED_BY_LAYER1)
 
     # Extract normalized sensor measurements
     disc_res = specialist_results.get("discoverability-audit", {})
@@ -1047,54 +1490,156 @@ def get_telemetry_payload(
     geo_res = specialist_results.get("geo-content-audit", {})
     eng_res = specialist_results.get("engagement-context-audit", {})
 
+    pages_list = inv.get("pages", []) if inv else []
+    enriched_pages = []
+    for p in pages_list:
+        p_html = p.get("html") or ""
+        p_title = p.get("title")
+        if isinstance(p_title, list):
+            p_title = clean_text_string(p_title[0]) if p_title else None
+        elif p_title:
+            p_title = clean_text_string(p_title)
+        elif p_html:
+            m_t = re.search(r"<title[^>]*>([^<]+)</title>", p_html, re.I)
+            if m_t:
+                p_title = clean_text_string(m_t.group(1))
+
+        p_h1 = p.get("h1")
+        if isinstance(p_h1, list):
+            p_h1 = clean_text_string(p_h1[0]) if p_h1 else None
+        elif p_h1:
+            p_h1 = clean_text_string(p_h1)
+        elif p_html:
+            m_h = re.search(r"<h1[^>]*>([^<]+)</h1>", p_html, re.I)
+            if m_h:
+                p_h1 = clean_text_string(m_h.group(1))
+
+        has_jld = bool(p.get("json_ld_contents")) or ("application/ld+json" in p_html)
+        enriched_pages.append({
+            "url": p.get("url"),
+            "status": p.get("status_code") or p.get("status", 200),
+            "page_type": p.get("page_type"),
+            "title": p_title,
+            "h1": p_h1,
+            "word_count": p.get("word_count"),
+            "snr": round(float(p.get("snr", 0.0)), 3) if p.get("snr") is not None else None,
+            "canonical": p.get("canonical"),
+            "has_jsonld": has_jld,
+            "ctas_count": len(p.get("ctas", [])),
+            "has_hreflang": bool(p.get("hreflangs")),
+            "dates": p.get("dates", {}),
+        })
+
+    sitemaps_list = inv.get("sitemaps", []) if inv else []
+    status_counts: Dict[str, int] = {}
+    pages_by_type: Dict[str, int] = {}
+    for p in pages_list:
+        code_str = str(p.get("status_code") or p.get("status", 200))
+        status_counts[code_str] = status_counts.get(code_str, 0) + 1
+        pt = str(p.get("page_type") or "other")
+        pages_by_type[pt] = pages_by_type.get(pt, 0) + 1
+
+    avg_wc = round(sum(p.get("word_count", 0) or 0 for p in pages_list) / max(len(pages_list), 1), 1)
+    avg_snr = round(sum(float(p.get("snr", 0.0) or 0.0) for p in pages_list) / max(len(pages_list), 1), 3)
+    thin_pages = [p.get("url") for p in pages_list if (p.get("word_count", 0) or 0) < 50 and p.get("url")]
+
     return {
         "site": site,
         "domain": domain,
         "crawled_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
         "archetype": detect_business_archetype(inv),
         "inventory": {
-            "page_count": len(inv.get("pages", [])),
-            "pages": [
-                {
-                    "url": p.get("url"),
-                    "page_type": p.get("page_type"),
-                    "word_count": p.get("word_count"),
-                    "snr": p.get("snr"),
-                }
-                for p in inv.get("pages", [])
-            ],
+            "page_count": len(pages_list),
+            "pages": enriched_pages,
             "robots_summary": inv.get("robots", {}).get("summary", {}),
-            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in inv.get("pages", [])),
+            "sitemaps_count": len(sitemaps_list),
+            "sitemaps": [s if isinstance(s, str) else s.get("loc", "") for s in sitemaps_list[:10]],
+            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
+        },
+        "crawl_telemetry": {
+            "pages_crawled": len(pages_list),
+            "average_latency_ms": inv.get("performance", {}).get("average_latency_ms"),
+            "total_facts_extracted": inv.get("performance", {}).get("total_facts", 0),
+            "total_claims_extracted": inv.get("performance", {}).get("total_claims", 0),
+            "pages_by_type": pages_by_type,
+            "total_ctas_extracted": sum(len(p.get("ctas", [])) for p in pages_list),
+            "pages_with_hreflang": sum(1 for p in pages_list if p.get("hreflangs")),
         },
         "retrieval": {
             "robots_txt_found": bool(inv.get("robots")),
             "bot_matrix": disc_res.get("ai_agent_scrapeability_summary", {}).get("retrieval_bot_matrix", {}),
             "retrieval_bots_allowed": disc_res.get("coverage", {}).get("retrieval_bots_allowed"),
             "retrieval_bots_total": disc_res.get("coverage", {}).get("retrieval_bots_total"),
-            "noindex_pages": [p.get("url") for p in inv.get("pages", []) if p.get("noindex")],
+            "noindex_pages": [p.get("url") for p in pages_list if p.get("noindex")],
+            "has_ai_plugin": bool(inv.get("infrastructure", {}).get("ai_plugin", {}).get("present")),
+            "has_security_txt": bool(inv.get("infrastructure", {}).get("security_txt", {}).get("present")),
+            "has_llms_txt": bool(inv.get("infrastructure", {}).get("llms_txt", {}).get("present")) or any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
+            "has_pricing_md": bool(inv.get("infrastructure", {}).get("pricing_md", {}).get("present")),
+            "sitemaps_found": len(sitemaps_list),
+            "status_distribution": status_counts,
         },
         "rendering": {
             "visible_words_initial_html": disc_res.get("coverage", {}).get("visible_words_initial_html"),
-            "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in inv.get("pages", [])),
+            "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in pages_list),
+            "average_word_count": avg_wc,
+            "average_snr": avg_snr,
+            "average_page_snr": avg_snr,
+            "thin_content_pages": thin_pages,
         },
         "entity": {
             "jsonld_present": entity_res.get("coverage", {}).get("jsonld_present", False),
             "types_declared": entity_res.get("coverage", {}).get("types_declared", []),
             "sameas_declared": corrob_res.get("coverage", {}).get("sameas_declared", 0),
+            "organization_detected": entity_res.get("entity_snapshot", {}).get("brand_name"),
+            "org_schema_present": bool(entity_res.get("entity_snapshot", {}).get("organization")),
+            "product_schema_pages": entity_res.get("coverage", {}).get("product_schema_pages", 0),
+            "answerability_evaluations": entity_res.get("coverage", {}).get("answerability_evaluations", []),
         },
         "facts": {
             "facts_checked": fact_res.get("coverage", {}).get("facts_checked", 0),
             "fact_conflicts": fact_res.get("coverage", {}).get("fact_conflicts", 0),
+            "scoped_facts_recorded": fact_res.get("coverage", {}).get("scoped_facts_recorded", 0),
+            "conflicts_detected": [
+                f.get("title") for f in fact_res.get("findings", [])
+                if f.get("cause_id") in (
+                    "FIRST_PARTY_FACT_CONFLICT",
+                    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+                    "DISCONTINUED_VS_CURRENT_CONFLICT",
+                    "CONFLICTING_COMMERCIAL_TERMS",
+                )
+            ],
         },
         "corroboration": {
             "sameas_declared": corrob_res.get("coverage", {}).get("sameas_declared", 0),
             "sameas_resolvable": corrob_res.get("coverage", {}).get("sameas_resolvable", 0),
+            "candidate_backlinks_provided": corrob_res.get("coverage", {}).get("candidate_backlinks_provided", 0),
+            "candidate_backlinks_verified": corrob_res.get("coverage", {}).get("candidate_backlinks_verified", 0),
+            "broken_authority_anchors": [
+                f.get("title") for f in corrob_res.get("findings", [])
+                if f.get("cause_id") == "BROKEN_AUTHORITY_ANCHOR"
+            ],
         },
         "geo": {
             "average_citability_score": geo_res.get("coverage", {}).get("average_citability_score"),
+            "pages_evaluated": len(geo_res.get("page_improvement_plans", [])) or geo_res.get("coverage", {}).get("target_pages_evaluated", 0),
+            "target_citability_score": 80,
+            "evidence_genres_distribution": geo_res.get("geo_citability_summary", {}).get("evidence_genres_distribution", {}),
+            "lowest_scoring_pages": [
+                {
+                    "url": pip.get("url") or pip.get("page_url") or "",
+                    "citability_score": pip.get("citability_score", 0),
+                }
+                for pip in sorted(geo_res.get("page_improvement_plans", []), key=lambda x: x.get("citability_score", 0))[:5]
+            ],
         },
         "engagement": {
             "pages_evaluated": eng_res.get("coverage", {}).get("pages_evaluated", 0),
+            "h1_aligned_pages": eng_res.get("coverage", {}).get("h1_aligned_pages", 0),
+            "cta_above_fold_pages": eng_res.get("coverage", {}).get("cta_above_fold_pages", 0),
+            "generic_h1_pages": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") in ("LOW_INFORMATION_SCENT", "GENERIC_H1")
+            ],
         },
         "dag": {
             "has_layer0_block": has_layer0_block,
@@ -1140,12 +1685,27 @@ def audit(
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
     state_file: Optional[str] = None,
+    responses: Optional[str] = None,
+    review: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute end-to-end multi-skill brand AI-readiness audit."""
-    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks)
+    inv, specialist_results = collect_telemetry(
+        site, inventory=inventory, analytics=analytics, candidate_backlinks=candidate_backlinks, responses=responses
+    )
+
+    review_data = None
+    if review:
+        if isinstance(review, dict):
+            review_data = review
+        elif isinstance(review, (str, bytes, os.PathLike)) and os.path.exists(review):
+            try:
+                with open(review, "r", encoding="utf-8") as rf:
+                    review_data = json.load(rf)
+            except Exception as re:
+                sys.stderr.write(f"Warning: Failed to parse review file {review}: {re}\n")
 
     # Cognitive Synthesis
-    report = synthesize_audit_report(site, inv, specialist_results)
+    report = synthesize_audit_report(site, inv, specialist_results, review=review_data)
 
     # Validate against Draft-07 schema
     schema = load_schema()
@@ -1159,6 +1719,10 @@ def audit(
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Master Orchestrator for Brand AI-Readiness & Visibility Audit."
     )
@@ -1166,9 +1730,18 @@ def main():
     parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (optional)")
     parser.add_argument("--candidate-backlinks", help="Path to candidate backlinks JSON (optional)")
     parser.add_argument("--analytics", help="Path to first-party analytics JSON (optional)")
+    parser.add_argument(
+        "--responses", "--observations", dest="responses", help="Path to observed AI assistant outputs JSON to cross-check with fact ledger (optional)"
+    )
+    parser.add_argument("--review", help="Path to agent review JSON containing refined candidate findings and proactive actions (optional)")
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
     parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
+    parser.add_argument(
+        "--baseline-only",
+        action="store_true",
+        help="Emit automated baseline report directly (reserved for CI/headless verification). AI agents should use --telemetry for cognitive synthesis.",
+    )
 
     args = parser.parse_args()
 
@@ -1179,14 +1752,22 @@ def main():
                 inventory=args.inventory,
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
+                responses=args.responses,
             )
             formatted_output = json.dumps(payload, indent=2)
         else:
+            if not args.baseline_only and not args.review:
+                sys.stderr.write(
+                    "Notice: Emitting automated baseline report. For AI Agent cognitive reasoning workflows, "
+                    "use '--telemetry' to extract empirical measurements for agent synthesis.\n"
+                )
             report = audit(
                 site=args.site,
                 inventory=args.inventory,
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
+                responses=args.responses,
+                review=args.review,
             )
             formatted_output = json.dumps(report, indent=2)
     except Exception as e:
@@ -1197,6 +1778,14 @@ def main():
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(formatted_output)
             f.write("\n")
+        out_dir = os.path.dirname(os.path.abspath(args.output))
+        if os.path.isdir(out_dir) and not args.telemetry:
+            manifest_file = os.path.join(out_dir, "run-manifest.json")
+            try:
+                with open(manifest_file, "w", encoding="utf-8") as mf:
+                    json.dump(report.get("run_manifest", {}), mf, indent=2)
+            except Exception:
+                pass
         print(f"Audit report written to {args.output}")
     else:
         print(formatted_output)

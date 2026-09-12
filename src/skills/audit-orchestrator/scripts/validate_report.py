@@ -43,6 +43,32 @@ def validate_type(instance, schema, path="root"):
             except ValueError:
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
 
+        if "string" in type_list and isinstance(instance, str) and schema.get("format") == "uri":
+            from urllib.parse import urlparse
+            parsed = urlparse(instance)
+            if not parsed.scheme or (parsed.scheme in ("http", "https") and not parsed.netloc):
+                return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
+
+    # Format checking when type is omitted but instance is string
+    if not expected_type and isinstance(instance, str) and "format" in schema:
+        fmt = schema["format"]
+        if fmt == "date-time":
+            import datetime
+            if not re.search(r"(Z|[+-]\d{2}:\d{2})$", instance):
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string (missing explicit timezone offset)"
+            try:
+                dt_str = instance.replace("Z", "+00:00")
+                dt = datetime.datetime.fromisoformat(dt_str)
+                if dt.tzinfo is None:
+                    return f"{path}: '{instance}' is missing timezone offset"
+            except ValueError:
+                return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
+        elif fmt == "uri":
+            from urllib.parse import urlparse
+            parsed = urlparse(instance)
+            if not parsed.scheme or (parsed.scheme in ("http", "https") and not parsed.netloc):
+                return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
+
     # P1-89: Disallow NaN and Infinity numeric values
     if isinstance(instance, (int, float)) and not isinstance(instance, bool):
         import math
@@ -55,8 +81,49 @@ def validate_type(instance, schema, path="root"):
     if "maximum" in schema and isinstance(instance, (int, float)) and instance > schema["maximum"]:
         return f"{path}: Value {instance} is greater than maximum {schema['maximum']}"
 
-    if "enum" in schema and instance not in schema["enum"]:
-        return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
+    if "enum" in schema:
+        matched = False
+        for item in schema["enum"]:
+            if instance == item and (type(instance) is bool) == (type(item) is bool):
+                matched = True
+                break
+        if not matched:
+            return f"{path}: Value {instance!r} not in allowed enum {schema['enum']}"
+
+    if "const" in schema:
+        c = schema["const"]
+        if instance != c or (type(instance) is bool) != (type(c) is bool):
+            return f"{path}: Value {instance!r} does not match const {c!r}"
+
+    if "allOf" in schema and isinstance(schema["allOf"], list):
+        for subschema in schema["allOf"]:
+            err = validate_type(instance, subschema, path=path)
+            if err:
+                return err
+
+    if "anyOf" in schema and isinstance(schema["anyOf"], list):
+        passed = False
+        any_errs = []
+        for subschema in schema["anyOf"]:
+            err = validate_type(instance, subschema, path=path)
+            if not err:
+                passed = True
+                break
+            any_errs.append(err)
+        if not passed:
+            return f"{path}: Value does not match any allowed schema in anyOf ({'; '.join(any_errs[:2])})"
+
+    if "oneOf" in schema and isinstance(schema["oneOf"], list):
+        matches = 0
+        one_errs = []
+        for subschema in schema["oneOf"]:
+            err = validate_type(instance, subschema, path=path)
+            if not err:
+                matches += 1
+            else:
+                one_errs.append(err)
+        if matches != 1:
+            return f"{path}: Value matched {matches} schemas in oneOf, expected exactly 1 ({'; '.join(one_errs[:2])})"
 
     if "minLength" in schema and isinstance(instance, str) and len(instance) < schema["minLength"]:
         return f"{path}: String too short, expected at least {schema['minLength']} chars"
@@ -99,7 +166,7 @@ def validate_type(instance, schema, path="root"):
 
 
 def verify_summary_counts(report):
-    """Verify summary total_findings and categorical counts match findings array."""
+    """Verify summary total_findings, categorical counts, and finding invariants."""
     errors = []
     findings = report.get("findings", [])
     summary = report.get("summary", {})
@@ -107,7 +174,13 @@ def verify_summary_counts(report):
     if not isinstance(findings, list) or not isinstance(summary, dict):
         return errors
 
-    if "total_findings" in summary and summary["total_findings"] != len(findings):
+    status = report.get("audit_status")
+    if status not in ("complete", "partial", "failed"):
+        errors.append(f"Invalid or missing audit_status '{status}'. Must be 'complete', 'partial', or 'failed'")
+
+    if "total_findings" not in summary:
+        errors.append("summary is missing required property 'total_findings'")
+    elif summary["total_findings"] != len(findings):
         errors.append(f"total_findings ({summary['total_findings']}) does not match findings count ({len(findings)})")
 
     expected = {
@@ -115,69 +188,149 @@ def verify_summary_counts(report):
         for sev in ("critical", "high", "medium", "low")
     }
     for sev, count in expected.items():
-        if sev in summary and summary[sev] != count:
+        if sev not in summary:
+            errors.append(f"summary is missing required severity count '{sev}'")
+        elif summary[sev] != count:
             errors.append(f"summary.{sev} ({summary[sev]}) does not match actual {sev} findings count ({count})")
 
+    # Invariant: Duplicate finding IDs across standardized findings
+    finding_ids = [
+        f.get("id")
+        for f in findings
+        if isinstance(f, dict) and isinstance(f.get("id"), str) and re.match(r"^F-\d+$", f.get("id", ""))
+    ]
+    if len(set(finding_ids)) != len(finding_ids):
+        errors.append("Duplicate finding ID detected in findings array")
+
+    # Invariant: Duplicate proactive action IDs
+    actions = report.get("proactive_actions", [])
+    if isinstance(actions, list):
+        action_ids = [a.get("id") for a in actions if isinstance(a, dict) and isinstance(a.get("id"), str)]
+        if len(set(action_ids)) != len(action_ids):
+            errors.append("Duplicate proactive action ID detected in proactive_actions array")
+
+    # Invariant: actual_band to severity mapping and priority_index formula
+    band_to_sev = {"S4": "critical", "S3": "high", "S2": "medium", "S1": "low", "S0": "info", "U": "unassessable"}
+    for f in findings:
+        if not isinstance(f, dict):
+            continue
+        band = f.get("actual_band")
+        if band in band_to_sev and f.get("severity") and f["severity"] != band_to_sev[band]:
+            errors.append(f"Finding {f.get('id')}: severity '{f.get('severity')}' does not match actual_band '{band}'")
+        score = f.get("priority_index")
+        d = f.get("difficulty")
+        if score is not None and (
+            band not in ("S1", "S2", "S3", "S4")
+            or not isinstance(d, int)
+            or not (1 <= d <= 5)
+            or score != 5 * int(band[1]) + 6 - d
+        ):
+            errors.append(f"Finding {f.get('id')}: invalid or unsupported priority_index '{score}'")
     return errors
 
 
+def validate_report_dict(report, schema_path=None):
+    """Validate a Python dict report against schema and summary invariants.
+
+    Returns:
+        (is_valid, list_of_errors)
+    """
+    errors = []
+    if not isinstance(report, dict):
+        return False, ["Report must be a JSON object (dict)"]
+
+    if schema_path is None:
+        schema_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
+        )
+    if not os.path.exists(schema_path):
+        return False, [f"Schema not found at {schema_path}"]
+
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+
+    err = validate_type(report, schema)
+    if err:
+        errors.append(f"Schema validation failed: {err}")
+
+    summary_errs = verify_summary_counts(report)
+    if summary_errs:
+        errors.extend(summary_errs)
+
+    return (len(errors) == 0, errors)
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
-        print("Usage: python3 validate_report.py [report.json | - < report.json]")
-        sys.exit(0)
-    if len(sys.argv) > 1 and sys.argv[1] != "-":
-        filepath = sys.argv[1]
-        if not os.path.exists(filepath):
-            print(f"File not found: {filepath}", file=sys.stderr)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Draft-07 JSON Schema validator for brand AI audit reports and telemetry."
+    )
+    parser.add_argument(
+        "input_file",
+        nargs="?",
+        default="-",
+        help="Path to report/payload JSON file or '-' for stdin (default: '-')",
+    )
+    parser.add_argument(
+        "--schema",
+        help="Path to Draft-07 schema JSON file (defaults to references/report-schema.json)",
+    )
+    args = parser.parse_args()
+
+    if args.input_file != "-":
+        if not os.path.exists(args.input_file):
+            print(f"File not found: {args.input_file}", file=sys.stderr)
             sys.exit(2)
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(args.input_file, "r", encoding="utf-8") as f:
             data = f.read()
     else:
         if sys.stdin.isatty():
-            print(
-                "Usage: python3 validate_report.py [report.json | - < report.json]",
-                file=sys.stderr,
-            )
+            parser.print_help(sys.stderr)
             sys.exit(2)
         data = sys.stdin.read()
 
     if not data.strip():
-        print(
-            "Usage: python3 validate_report.py [report.json | - < report.json]",
-            file=sys.stderr,
-        )
+        print("Error: Empty JSON input received.", file=sys.stderr)
         sys.exit(2)
 
     def _reject_constant(c):
         raise ValueError(f"Disallowed JSON constant '{c}' (NaN and Infinity are not valid JSON)")
 
     try:
-        report = json.loads(data, parse_constant=_reject_constant)
+        instance = json.loads(data, parse_constant=_reject_constant)
     except (json.JSONDecodeError, ValueError) as e:
         print(f"Invalid JSON input: {e}", file=sys.stderr)
         sys.exit(2)
 
-    schema_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
-    )
+    if args.schema:
+        schema_path = os.path.abspath(args.schema)
+    else:
+        schema_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "references", "report-schema.json"
+        )
+
     if not os.path.exists(schema_path):
         print(f"Schema not found at {schema_path}", file=sys.stderr)
         sys.exit(2)
 
-    with open(schema_path, "r") as f:
+    with open(schema_path, "r", encoding="utf-8") as f:
         schema = json.load(f)
 
-    err = validate_type(report, schema)
+    err = validate_type(instance, schema)
     if err:
         print(f"Schema validation failed: {err}", file=sys.stderr)
         sys.exit(2)
 
-    summary_errs = verify_summary_counts(report)
-    if summary_errs:
-        print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
-        sys.exit(2)
+    if schema_path.endswith("report-schema.json") and isinstance(instance, dict) and "summary" in instance:
+        summary_errs = verify_summary_counts(instance)
+        if summary_errs:
+            print(f"Summary validation failed: {'; '.join(summary_errs)}", file=sys.stderr)
+            sys.exit(2)
 
-    print(json.dumps(report, indent=2))
+    schema_name = os.path.basename(schema_path)
+    target_name = os.path.basename(args.input_file) if args.input_file != "-" else "stdin"
+    print(f"Valid: {target_name} conforms to {schema_name}")
     sys.exit(0)
 
 

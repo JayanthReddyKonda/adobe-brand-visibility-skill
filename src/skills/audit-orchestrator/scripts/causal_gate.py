@@ -15,8 +15,32 @@ Enforces monotonic dependency ordering:
 This module deterministically suppresses impossible downstream findings when
 upstream preconditions fail, ensuring zero false positives.
 """
-
+import json
+import re
 from typing import Any, Dict, List, Optional, Set, Tuple
+from urllib.parse import urlparse
+
+# Bidirectional Taxonomy Alias Mapping between Synthesis Keys and Sensor Output Keys
+TAXONOMY_ALIASES: Dict[str, str] = {
+    "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
+    "NOINDEX_EXCLUSION": "META_DIRECTIVE_CONFLICT",
+    "CANONICAL_TARGET_MISMATCH": "CANONICAL_FRAGMENTATION",
+    "CANONICAL_FRAGMENTATION": "CANONICAL_TARGET_MISMATCH",
+    "UNVERIFIED_AUTHORITY_GAP": "WEAK_IDENTITY_SIGNALS",
+    "WEAK_IDENTITY_SIGNALS": "UNVERIFIED_AUTHORITY_GAP",
+    "SUB_THRESHOLD_CITABILITY": "LOW_CITABILITY_SCORE",
+    "LOW_CITABILITY_SCORE": "SUB_THRESHOLD_CITABILITY",
+    "MISSING_BLUF_PRIMACY": "CONTEXT_PLACEMENT_DEGRADATION",
+    "CONTEXT_PLACEMENT_DEGRADATION": "MISSING_BLUF_PRIMACY",
+    "INTENT_SCENT_DILUTION": "LOW_INFORMATION_SCENT",
+    "LOW_INFORMATION_SCENT": "INTENT_SCENT_DILUTION",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY": "INTENT_TO_LANDING_MISMATCH",
+    "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
+    "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
+    "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
+    "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
+}
 
 # ---------------------------------------------------------------------------
 # Layer-Specific Root Cause Sets
@@ -24,6 +48,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 LAYER0_CAUSE_IDS: Set[str] = {
     "AI_RETRIEVAL_BLOCKED",
     "NOINDEX_EXCLUSION",
+    "META_DIRECTIVE_CONFLICT",
     "ROBOTS_5XX_FAIL_CLOSED",
     "ROBOTS_TXT_OVERSIZED",
     "DNS_UNREACHABLE",
@@ -35,6 +60,7 @@ LAYER1_CAUSE_IDS: Set[str] = {
     "NOSNIPPET_ON_CORE_CONTENT",
     "WAF_BOT_CHALLENGE",
     "CANONICAL_FRAGMENTATION",
+    "CANONICAL_TARGET_MISMATCH",
     "HTML_EMPTY",
     "JS_REQUIRED",
 }
@@ -43,48 +69,88 @@ LAYER1_CAUSE_IDS: Set[str] = {
 SUPPRESSED_BY_LAYER0: Set[str] = {
     # Layer 2 — Entity Resolution
     "MATERIAL_ENTITY_AMBIGUITY",
+    "MISSING_SAMEAS_VERIFICATION",
+    "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
     "SCHEMA_MISSING",
     "SCHEMA_INVALID",
     "BROKEN_AUTHORITY_ANCHOR",
     "CIRCULAR_SAMEAS_SELF_REFERENCE",
     "WEAK_IDENTITY_SIGNALS",
+    "UNVERIFIED_AUTHORITY_GAP",
     # Layer 3 — Fact Ledger
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
     "INCOMPLETE_OFFER_ATTRIBUTES",
     "STALE_AUTHORITATIVE_FACT",
     "ATTRIBUTE_INCOMPLETENESS",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
     # Layer 4 — Citability & Text Structure
     "MISSING_IN_DEPTH_MECHANISMS",
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
     "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
     # Layer 5 — Engine Selection & Referral Continuity
     "AI_CITATION_GAP",
     "AI_FACT_CONFLICT",
     "AI_REFERRAL_DISCONTINUITY",
     "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
     "DESTINATION_NAVIGATION_FRICTION",
 }
 
-# Findings at Layers 3-4 that are symptoms of Layer 1 unhydrated rendering gap
+# Findings at Layers 2-6 that are downstream symptoms of Layer 1 unhydrated rendering gap
 SUPPRESSED_BY_LAYER1: Set[str] = {
-    # Layer 3 — cannot read facts from an unrendered shell
-    "FIRST_PARTY_FACT_CONFLICT",
-    "INCOMPLETE_OFFER_ATTRIBUTES",
+    # Layer 2 — Entity & Answerability (Product/Catalog routes cannot resolve schema without hydration)
     "ATTRIBUTE_INCOMPLETENESS",
+    "INCOMPLETE_OFFER_ATTRIBUTES",
+    "SCHEMA_MISSING",
+    "SCHEMA_INVALID",
+    "MISSING_MATERIAL_FACT",
+    # Layer 3 — Fact Ledger (cannot read facts from an unrendered shell)
+    "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
-    # Layer 4 — cannot evaluate citation quality of an empty/unhydrated page
+    "CONFLICTING_COMMERCIAL_TERMS",
+    "DISCONTINUED_VS_CURRENT_CONFLICT",
+    "CONTENT_RECENCY_DEFICIT",
+    "TEMPORAL_DRIFT_DETECTED",
+    "STALE_AUTHORITATIVE_FACT",
+    # Layer 4 — Citability & Text Structure (cannot evaluate citation quality of an empty/unhydrated page)
     "LOW_FACT_TO_TOKEN_RATIO",
     "MISSING_IN_DEPTH_MECHANISMS",
+    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
+    "MISSING_BLUF_PRIMACY",
     "LOW_CITABILITY_SCORE",
+    "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
     "LOW_INFORMATION_SCENT",
+    "INTENT_SCENT_DILUTION",
+    "STANDALONE_FAQ_DEFICIT",
+    "EXCESSIVE_KEYWORD_DENSITY",
+    # Layer 5 & 6 — Engagement, Orientation & Referral Continuity (cannot measure CTAs or headings on unrendered DOM)
+    "CTA_REACHABILITY_FRICTION",
+    "ABOVE_FOLD_ACTION_DELAY",
+    "VIEWPORT_ANSWER_ABSENCE",
+    "AGENT_INTERACTION_BARRIER",
+    "INTENT_TO_LANDING_MISMATCH",
+    "COMMERCIAL_HANDOFF_DISCONTINUITY",
+    "DESTINATION_NAVIGATION_FRICTION",
+    "AI_REFERRAL_DISCONTINUITY",
+    "GENERIC_H1",
+    "HEADING_HIERARCHY_VACUUM",
 }
 
 
@@ -246,64 +312,269 @@ def build_evidence_index(
     return evidence_index
 
 
+def extract_finding_route(f: Dict[str, Any]) -> str:
+    """Extract and normalize route / URL from finding dict."""
+    if not isinstance(f, dict):
+        return ""
+    # 1. Direct url property
+    url = f.get("url")
+    if isinstance(url, dict):
+        url = url.get("url") or url.get("scope") or ""
+
+    # 2. Check scope if it looks like a URL or route path
+    scope = f.get("scope")
+    if isinstance(scope, dict):
+        scope = scope.get("url") or scope.get("scope") or ""
+    scope_str = str(scope or "").strip()
+    if not url and scope_str:
+        if scope_str.startswith(("/", "http://", "https://", "//")) or "." in scope_str.split("/")[0]:
+            url = scope_str
+
+    # 3. Check evidence sources
+    ev = f.get("evidence")
+    if not url and isinstance(ev, dict):
+        sources = ev.get("sources", [])
+        if isinstance(sources, list) and sources:
+            for s in sources:
+                if isinstance(s, dict) and s.get("url"):
+                    url = s["url"]
+                    break
+        if not url and ev.get("scope"):
+            ev_scope = str(ev["scope"]).strip()
+            if ev_scope.startswith(("/", "http://", "https://", "//")):
+                url = ev_scope
+
+    # 4. Check evidence string or dict summary regex
+    if not url and isinstance(ev, (str, dict)):
+        ev_text = json.dumps(ev) if isinstance(ev, dict) else str(ev)
+        m = re.search(r'https?://[^\s,\(\)\]"\']+', ev_text)
+        if m:
+            url = m.group(0)
+
+    # 5. Check root cause
+    if not url:
+        rc = str(f.get("root_cause") or "")
+        m = re.search(r'https?://[^\s,\(\)\]"\']+', rc)
+        if m:
+            url = m.group(0)
+
+    # Fallback to scope string if non-empty
+    if not url and scope_str:
+        url = scope_str
+
+    return str(url or "").strip().lower()
+
+
+def normalize_route_path(route: str) -> str:
+    """Extract normalized path from URL or route string."""
+    if not route:
+        return ""
+    r = route.strip().lower()
+    if "://" not in r and not r.startswith("//") and not r.startswith("/"):
+        r = "//" + r
+    parsed = urlparse(r)
+    path = parsed.path.rstrip("/")
+    return path if path else "/"
+
+
+def routes_match(r1: str, r2: str) -> bool:
+    """Check if two route/URL references match topologically without substring collision."""
+    if not r1 or not r2:
+        return False
+    r1_norm = r1.strip().lower()
+    r2_norm = r2.strip().lower()
+    if r1_norm == r2_norm:
+        return True
+
+    # Validate domain conflict if both specify network location
+    parsed1 = urlparse(r1_norm if "://" in r1_norm or r1_norm.startswith("//") else "//" + r1_norm)
+    parsed2 = urlparse(r2_norm if "://" in r2_norm or r2_norm.startswith("//") else "//" + r2_norm)
+    if parsed1.netloc and parsed2.netloc and parsed1.netloc != parsed2.netloc:
+        return False
+
+    p1 = normalize_route_path(r1)
+    p2 = normalize_route_path(r2)
+    if not p1 or not p2:
+        return False
+    return p1 == p2
+
+
 def apply_causal_suppression(
     all_raw_findings: List[Dict[str, Any]],
     inv: Optional[Dict[str, Any]] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
-    """Apply the Monotonic Causal DAG suppression rules.
+    """Apply the Monotonic 6-Layer Causal DAG suppression rules with route-level precision.
 
     Returns:
         (allowed_findings, suppressed_findings, dag_metadata)
     """
-    has_layer0_block = any(
-        (f.get("cause_id") or f.get("id", "")) in LAYER0_CAUSE_IDS
-        for f in all_raw_findings
-    )
-    has_layer1_rendering_gap = any(
-        (f.get("cause_id") or f.get("id", "")) in LAYER1_CAUSE_IDS
-        for f in all_raw_findings
-    )
+    def _extract_cids(f: Dict[str, Any]) -> Set[str]:
+        cids = {f.get(k) for k in ("cause_id", "id", "code", "root_cause_key", "check_id") if f.get(k)}
+        cids.update({TAXONOMY_ALIASES[c] for c in list(cids) if c in TAXONOMY_ALIASES})
+        return cids
+
+    layer0_findings = [f for f in all_raw_findings if bool(_extract_cids(f).intersection(LAYER0_CAUSE_IDS))]
+    has_layer0_block = bool(layer0_findings)
+
+    layer1_findings = [f for f in all_raw_findings if bool(_extract_cids(f).intersection(LAYER1_CAUSE_IDS))]
+    has_layer1_rendering_gap = bool(layer1_findings)
+
+    # Inspect inventory pages directly if available
+    inv_pages = inv.get("pages", []) if isinstance(inv, dict) else []
+    rendering_gap_pages: Set[str] = set()
+    for f in layer1_findings:
+        rt = extract_finding_route(f)
+        if rt:
+            rendering_gap_pages.add(rt)
+        for u in f.get("affected_urls", []):
+            if u:
+                rendering_gap_pages.add(str(u).strip().lower())
+        ev_str = str(f.get("evidence", ""))
+        for u in re.findall(r'https?://[^\s,\(\)\]"\']+', ev_str):
+            rendering_gap_pages.add(u.lower())
+
+    for p in inv_pages:
+        if isinstance(p, dict):
+            p_url = str(p.get("url", "")).strip().lower()
+            wc = p.get("word_count", 0)
+            snr = float(p.get("snr", 1.0) or 1.0)
+            html = str(p.get("html", "")).lower()
+            if (wc < 30 and wc > 0) or (snr < 0.05 and wc < 50) or (wc < 35 and any(m in html for m in ('id="root"', 'id="app"', 'type="module"', '<noscript>'))):
+                if p_url:
+                    rendering_gap_pages.add(p_url)
+
+    home_page = next((p for p in inv_pages if p.get("page_type") == "homepage" or p.get("url") in ("/", "") or normalize_route_path(p.get("url", "")) == "/"), inv_pages[0] if inv_pages else {})
+    home_wc = home_page.get("word_count", 0) if isinstance(home_page, dict) else 0
+
+    has_any_finding_scope = any(bool(extract_finding_route(f)) for f in all_raw_findings)
+
+    is_site_wide_l0 = False
+    if has_layer0_block:
+        for f in layer0_findings:
+            f_rt = extract_finding_route(f)
+            f_ev = str(f.get("evidence", "")).lower()
+            f_rc = str(f.get("root_cause", "")).lower()
+            cid_set = _extract_cids(f)
+            if any(c in cid_set for c in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO")):
+                is_site_wide_l0 = True
+                break
+            if f_rt in ("site", "site-wide", "sitewide") or "sitewide" in f_ev or "disallows all" in f_rc:
+                is_site_wide_l0 = True
+                break
+            if re.search(r"disallow:\s*/(?:\s|$)", f_ev):
+                is_site_wide_l0 = True
+                break
+            if cid_set.intersection({"NOINDEX_EXCLUSION", "META_DIRECTIVE_CONFLICT"}) and (
+                "sitewide" in f_ev or "homepage" in f_ev or f_rt in ("/", "", "site", "site-wide", "sitewide") or normalize_route_path(f_rt) == "/"
+            ):
+                is_site_wide_l0 = True
+                break
+            if not has_any_finding_scope and not f_rt:
+                if not any(sub in f_ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content", "/quiz", "/product")):
+                    is_site_wide_l0 = True
+                    break
+
+    is_site_wide_rendering_gap = False
+    if has_layer1_rendering_gap:
+        if not has_any_finding_scope:
+            is_site_wide_rendering_gap = True
+        elif inv_pages and (0 < home_wc < 30 or all(p.get("word_count", 0) < 60 for p in inv_pages)):
+            is_site_wide_rendering_gap = True
+        else:
+            for f in layer1_findings:
+                f_rt = extract_finding_route(f)
+                f_ev = str(f.get("evidence", "")).lower()
+                if f_rt in ("site", "site-wide", "sitewide") or "sitewide" in f_ev:
+                    is_site_wide_rendering_gap = True
+                    break
 
     allowed: List[Dict[str, Any]] = []
     suppressed: List[Dict[str, Any]] = []
     suppressed_categories: Set[str] = set()
     root_causes: List[Dict[str, Any]] = []
+    downstream_symptoms_by_cause: Dict[str, List[str]] = {}
 
     if has_layer0_block:
         root_causes.append({
             "code": "AI_RETRIEVAL_BLOCKED",
-            "scope": "site",
+            "scope": "site" if is_site_wide_l0 else "route",
             "suppressed_categories": sorted(list(SUPPRESSED_BY_LAYER0)),
             "rationale": "RFC 9309 search retrieval bot blocked or HTTP 4xx/5xx crawl failure preempts downstream evaluation.",
         })
         suppressed_categories.update(SUPPRESSED_BY_LAYER0)
 
-    if has_layer1_rendering_gap:
+    if has_layer1_rendering_gap or rendering_gap_pages:
         root_causes.append({
             "code": "RENDERED_CONTENT_GAP",
-            "scope": "site",
+            "scope": "site" if is_site_wide_rendering_gap else "route",
             "suppressed_categories": sorted(list(SUPPRESSED_BY_LAYER1)),
-            "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability and fact evaluation.",
+            "rationale": "Static plain text ratio below threshold with unhydrated SPA shell preempts citability, facts, and unhydrated engagement.",
         })
         suppressed_categories.update(SUPPRESSED_BY_LAYER1)
 
     for f in all_raw_findings:
-        cid = f.get("cause_id") or f.get("id") or f.get("title", "")
+        cids = _extract_cids(f)
+        if not cids and f.get("title"):
+            cids.add(f["title"])
 
-        if has_layer0_block and cid in SUPPRESSED_BY_LAYER0:
+        f_route = extract_finding_route(f)
+
+        # Evaluate Layer 0 suppression
+        suppress_l0 = False
+        if has_layer0_block and bool(cids.intersection(SUPPRESSED_BY_LAYER0)):
+            if is_site_wide_l0:
+                suppress_l0 = True
+            elif f_route and any(routes_match(f_route, extract_finding_route(l0_f)) for l0_f in layer0_findings if extract_finding_route(l0_f)):
+                suppress_l0 = True
+
+        if suppress_l0:
             suppressed.append(f)
+            primary_l0 = layer0_findings[0].get("cause_id") or "AI_RETRIEVAL_BLOCKED"
+            sym_cid0 = f.get("cause_id") or (f.get("id") if f.get("id") and not f.get("id", "").startswith("F-") else None) or next((c for c in cids if not c.startswith("F-")), list(cids)[0] if cids else "DEFECT")
+            symptom_label = f"{sym_cid0}: {f.get('title', '')}" + (f" on {f_route}" if f_route else "")
+            downstream_symptoms_by_cause.setdefault(primary_l0, []).append(symptom_label)
             continue
-        if has_layer1_rendering_gap and cid in SUPPRESSED_BY_LAYER1:
+
+        # Evaluate Layer 1 rendering gap suppression
+        suppress_l1 = False
+        if bool(cids.intersection(SUPPRESSED_BY_LAYER1)):
+            if is_site_wide_rendering_gap:
+                suppress_l1 = True
+            elif f_route and any(routes_match(f_route, gap_p) for gap_p in rendering_gap_pages):
+                suppress_l1 = True
+            elif not f_route and is_site_wide_rendering_gap:
+                suppress_l1 = True
+
+        if suppress_l1:
             suppressed.append(f)
+            primary_l1 = layer1_findings[0].get("cause_id") or "RENDERED_CONTENT_GAP" if layer1_findings else "RENDERED_CONTENT_GAP"
+            sym_cid1 = f.get("cause_id") or (f.get("id") if f.get("id") and not f.get("id", "").startswith("F-") else None) or next((c for c in cids if not c.startswith("F-")), list(cids)[0] if cids else "DEFECT")
+            symptom_label = f"{sym_cid1}: {f.get('title', '')}" + (f" on {f_route}" if f_route else "")
+            downstream_symptoms_by_cause.setdefault(primary_l1, []).append(symptom_label)
             continue
 
         allowed.append(f)
 
+    # Attach downstream symptoms to keystone findings in allowed
+    for f in allowed:
+        f_cids = _extract_cids(f)
+        for cause_key, symptoms in downstream_symptoms_by_cause.items():
+            is_l1 = (cause_key in LAYER1_CAUSE_IDS or cause_key == "RENDERED_CONTENT_GAP") and bool(f_cids.intersection(LAYER1_CAUSE_IDS))
+            is_l0 = (cause_key in LAYER0_CAUSE_IDS or cause_key == "AI_RETRIEVAL_BLOCKED") and bool(f_cids.intersection(LAYER0_CAUSE_IDS))
+            if cause_key in f_cids or TAXONOMY_ALIASES.get(cause_key, "") in f_cids or is_l1 or is_l0:
+                f_symptoms = f.setdefault("downstream_symptoms", [])
+                for s in symptoms:
+                    if s not in f_symptoms:
+                        f_symptoms.append(s)
+
     dag_metadata = {
         "has_layer0_block": has_layer0_block,
         "has_layer1_rendering_gap": has_layer1_rendering_gap,
+        "is_site_wide_rendering_gap": is_site_wide_rendering_gap,
+        "rendering_gap_pages": sorted(list(rendering_gap_pages)),
         "root_causes": root_causes,
         "suppressed_categories": sorted(list(suppressed_categories)),
+        "downstream_symptoms": downstream_symptoms_by_cause,
     }
 
     return allowed, suppressed, dag_metadata
@@ -459,13 +730,127 @@ def evaluate_causal_nodes(
         nodes["citability"] = "unknown"
 
     # Orientation & Engagement
-    eng_cov = (specialist_results or {}).get("engagement-context-audit", {}).get("coverage", {})
+    eng_res = (specialist_results or {}).get("engagement-context-audit", {})
+    eng_cov = eng_res.get("coverage", {})
     pages_eval = eng_cov.get("pages_evaluated", 0)
     if pages_eval > 0:
-        nodes["on_site_orientation"] = "confirmed_pass"
-        nodes["engagement_handoff"] = "confirmed_pass"
+        eng_findings = eng_res.get("findings", [])
+        finding_ids = set()
+        for f in eng_findings:
+            if isinstance(f, dict):
+                for key in ("cause_id", "id"):
+                    cid = f.get(key)
+                    if cid and isinstance(cid, str):
+                        finding_ids.add(cid)
+                        if cid in TAXONOMY_ALIASES:
+                            finding_ids.add(TAXONOMY_ALIASES[cid])
+            elif isinstance(f, str):
+                finding_ids.add(f)
+                if f in TAXONOMY_ALIASES:
+                    finding_ids.add(TAXONOMY_ALIASES[f])
+
+        orientation_fail_triggers = {
+            "LOW_INFORMATION_SCENT",
+            "GENERIC_H1",
+            "INTENT_SCENT_DILUTION",
+            "HEADING_HIERARCHY_VACUUM",
+        }
+        handoff_fail_triggers = {
+            "INTENT_TO_LANDING_MISMATCH",
+            "CTA_REACHABILITY_FRICTION",
+            "VIEWPORT_ANSWER_ABSENCE",
+            "AGENT_INTERACTION_BARRIER",
+            "AI_REFERRAL_DISCONTINUITY",
+            "COMMERCIAL_HANDOFF_DISCONTINUITY",
+            "ABOVE_FOLD_ACTION_DELAY",
+        }
+
+        if finding_ids.intersection(orientation_fail_triggers):
+            nodes["on_site_orientation"] = "confirmed_fail"
+        else:
+            nodes["on_site_orientation"] = "confirmed_pass"
+
+        if finding_ids.intersection(handoff_fail_triggers):
+            nodes["engagement_handoff"] = "confirmed_fail"
+        else:
+            nodes["engagement_handoff"] = "confirmed_pass"
     else:
         nodes["on_site_orientation"] = "unknown"
         nodes["engagement_handoff"] = "unknown"
 
     return nodes
+
+
+def main():
+    import argparse
+    import json
+    import os
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description="Deterministic Causal DAG & Epistemic Falsification Engine CLI."
+    )
+    parser.add_argument("--telemetry", help="Path to telemetry JSON file")
+    parser.add_argument("--findings", help="Path to findings JSON file (applies causal suppression)")
+    parser.add_argument("--inventory", help="Path to site inventory JSON file")
+    parser.add_argument("--output", help="Path to write output JSON (optional, defaults to stdout)")
+    args = parser.parse_args()
+
+    inv = {}
+    specialist_results = {}
+    findings_list = []
+
+    if args.telemetry:
+        if not os.path.exists(args.telemetry):
+            sys.stderr.write(f"Error: Telemetry file {args.telemetry} not found\n")
+            sys.exit(1)
+        with open(args.telemetry, "r", encoding="utf-8") as f:
+            t_data = json.load(f)
+        inv = t_data.get("inventory", {})
+        specialist_results = t_data.get("sensor_telemetry", {})
+        for res in specialist_results.values():
+            if isinstance(res, dict):
+                findings_list.extend(res.get("findings", []))
+
+    if args.inventory and os.path.exists(args.inventory):
+        with open(args.inventory, "r", encoding="utf-8") as f:
+            inv = json.load(f)
+
+    if args.findings:
+        if not os.path.exists(args.findings):
+            sys.stderr.write(f"Error: Findings file {args.findings} not found\n")
+            sys.exit(1)
+        with open(args.findings, "r", encoding="utf-8") as f:
+            f_data = json.load(f)
+        findings_list = f_data.get("findings", f_data) if isinstance(f_data, dict) else f_data
+
+    if not args.telemetry and not args.findings and not args.inventory:
+        parser.print_help()
+        return
+
+    epistemic_state = evaluate_epistemic_state(inv, specialist_results)
+    causal_nodes = evaluate_causal_nodes(inv, specialist_results)
+    surviving_findings, suppressed, dag_metadata = apply_causal_suppression(findings_list)
+
+    result = {
+        "epistemic_state": epistemic_state,
+        "causal_nodes": causal_nodes,
+        "total_findings_evaluated": len(findings_list),
+        "surviving_findings_count": len(surviving_findings),
+        "suppressed_findings_count": len(suppressed),
+        "suppressed_findings": suppressed,
+        "surviving_findings": surviving_findings,
+    }
+
+    formatted = json.dumps(result, indent=2)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(formatted)
+            f.write("\n")
+        print(f"Causal analysis written to {args.output}")
+    else:
+        print(formatted)
+
+
+if __name__ == "__main__":
+    main()

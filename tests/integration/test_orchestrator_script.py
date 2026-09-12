@@ -108,6 +108,88 @@ class TestOrchestratorScript(unittest.TestCase):
         self.assertIn("evidence_index", telemetry)
         self.assertIn("sensor_telemetry", telemetry)
 
+        # Validate with Draft-07 telemetry schema
+        schema_file = os.path.join(PROJECT_ROOT, "src", "skills", "audit-orchestrator", "references", "telemetry-schema.json")
+        val_res = run_validator(telemetry, schema_path=schema_file)
+        self.assertEqual(val_res.returncode, 0, f"Telemetry schema validation error: {val_res.stderr}")
+
+    def test_detect_business_archetype_list_handling(self):
+        """Verify archetype detection correctly handles list-wrapped title and h1 fields."""
+        orch_dir = os.path.join(PROJECT_ROOT, "src", "skills", "audit-orchestrator", "scripts")
+        if orch_dir not in sys.path:
+            sys.path.insert(0, orch_dir)
+        import orchestrator  # type: ignore
+
+        list_inv = {
+            "site": "https://store.example.com",
+            "pages": [
+                {
+                    "url": "https://store.example.com/items/shoe",
+                    "title": ["Acme Running Shoes - Add to Cart"],
+                    "h1": ["Acme High Performance Running Shoes"],
+                    "page_type": "product",
+                    "clean_text": "Buy now, add to cart, $99 sku-12345 in stock",
+                }
+            ],
+        }
+        arch = orchestrator.detect_business_archetype(list_inv)
+        self.assertEqual(arch, "ecommerce")
+
+    def test_causal_suppression_unscoped_finding_no_leak(self):
+        """Verify that an isolated Layer 0 finding on one route does not suppress downstream findings on other routes."""
+        orch_dir = os.path.join(PROJECT_ROOT, "src", "skills", "audit-orchestrator", "scripts")
+        if orch_dir not in sys.path:
+            sys.path.insert(0, orch_dir)
+        import orchestrator  # type: ignore
+
+        base = "https://example.com"
+        domain = "example.com"
+        inv = {
+            "site": base,
+            "pages": [
+                {"url": f"{base}/", "status": 200, "word_count": 500, "snr": 0.6, "page_type": "homepage"},
+                {"url": f"{base}/pricing", "status": 200, "word_count": 400, "snr": 0.5, "page_type": "pricing"},
+            ],
+        }
+        specialist_results = {
+            "discoverability-audit": {
+                "findings": [
+                    {
+                        "id": "F-001",
+                        "cause_id": "META_DIRECTIVE_CONFLICT",
+                        "severity": "high",
+                        "scope": f"{base}/blocked-route",
+                        "url": f"{base}/blocked-route",
+                        "title": "Blocked route",
+                        "root_cause": "Blocked",
+                        "evidence": "noindex on blocked-route",
+                        "suggested_action": {"summary": "Fix noindex", "technical_fix": "Fix", "creative_fix": "Fix", "priority": "high"},
+                    }
+                ]
+            },
+            "fact-consistency-audit": {
+                "findings": [
+                    {
+                        "id": "F-002",
+                        "cause_id": "FIRST_PARTY_FACT_CONFLICT",
+                        "severity": "medium",
+                        "scope": f"{base}/pricing",
+                        "url": f"{base}/pricing",
+                        "title": "Price conflict",
+                        "root_cause": "Conflict on pricing",
+                        "evidence": "Price is $10 vs $20",
+                        "suggested_action": {"summary": "Align price", "technical_fix": "Fix", "creative_fix": "Fix", "priority": "medium"},
+                    }
+                ]
+            },
+        }
+        report = orchestrator.synthesize_audit_report(base, inv, specialist_results)
+        findings = report.get("findings", [])
+        cids = [f.get("cause_id") or f.get("id") for f in findings]
+        self.assertIn("FIRST_PARTY_FACT_CONFLICT", cids)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

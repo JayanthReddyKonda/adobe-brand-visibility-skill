@@ -49,6 +49,10 @@ class SitemapParser:
 
         cleaned_content = content.strip()
 
+        # Reject DTD, ENTITY, and SYSTEM declarations before XML parsing (XXE prevention)
+        if re.search(r"<!(?:DOCTYPE|ENTITY)\b", cleaned_content, re.IGNORECASE):
+            return urls, child_sitemaps
+
         # Attempt structured XML parse first
         try:
             root = ET.fromstring(cleaned_content)
@@ -122,6 +126,9 @@ class SitemapParser:
     def _fallback_regex_parse(cls, content: str) -> Tuple[List[SitemapUrl], List[str]]:
         urls: List[SitemapUrl] = []
         child_sitemaps: List[str] = []
+
+        if re.search(r"<!(?:DOCTYPE|ENTITY)\b", content, re.IGNORECASE):
+            return urls, child_sitemaps
 
         is_index = "<sitemapindex" in content.lower() or "<sitemap>" in content.lower()
         loc_matches = cls._URL_LOC_REGEX.findall(content)

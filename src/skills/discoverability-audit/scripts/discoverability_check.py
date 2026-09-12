@@ -17,9 +17,10 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
-
+SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
+for _p in (SCRIPT_DIR, SCRAPER_DIR):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from safe_fetch import safe_fetch  # type: ignore
 
@@ -156,6 +157,9 @@ class Dom(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.text, self.skip = [], 0
         self.canonical, self.meta_robots = None, None
+        self.canonicals = []
+        self.jsonld_blocks = []
+        self.in_json_ld = False
         self.hreflangs = []
         self.links = []
         self.spa_root = False
@@ -197,6 +201,8 @@ class Dom(HTMLParser):
             self.body_content_elements += 1
         if t == "script":
             self.skip += 1
+            if "application/ld+json" in (a.get("type") or "").lower():
+                self.in_json_ld = True
             src = (a.get("src") or "").strip()
             if src and not THIRD_PARTY_SCRIPT_PATTERNS.search(src):
                 self.app_script_srcs.append(src)
@@ -209,6 +215,8 @@ class Dom(HTMLParser):
             self.hreflangs.append({"lang": a.get("hreflang"), "href": a.get("href")})
         if t == "link" and (a.get("rel") or "").lower() == "canonical":
             self.canonical = a.get("href")
+            if a.get("href"):
+                self.canonicals.append(a.get("href"))
         if t == "meta" and (a.get("name") or "").lower() == "robots":
             self.meta_robots = a.get("content", "")
 
@@ -245,6 +253,8 @@ class Dom(HTMLParser):
         t = tag.lower()
         if t in ("script", "style") and self.skip:
             self.skip -= 1
+            if t == "script":
+                self.in_json_ld = False
         elif t == "noscript" and self.skip:
             self.skip -= 1
             self.in_noscript = False
@@ -254,6 +264,8 @@ class Dom(HTMLParser):
 
     def handle_data(self, data):
         txt = data.strip()
+        if self.in_json_ld and txt:
+            self.jsonld_blocks.append(txt)
         if self.in_noscript and re.search(
             r"\b(enable javascript|requires javascript|javascript to run|javascript enabled)\b", data, re.IGNORECASE
         ):
@@ -347,8 +359,12 @@ def audit(base, domain, inv=None, state_file=None):
         )
         if not home_page and inv.get("pages"):
             home_page = inv["pages"][0]
-        status = home_page.get("status", 200 if (home_page and home_page.get("html")) else None) if home_page else None
-        html = home_page.get("html", "") if home_page else ""
+        status = (
+            home_page.get("status")
+            or home_page.get("status_code")
+            or (200 if (home_page and (home_page.get("html") or home_page.get("raw_html"))) else None)
+        ) if home_page else None
+        html = (home_page.get("html") or home_page.get("raw_html") or "") if home_page else ""
 
         headers = home_page.get("headers", {}) if home_page else {}
         if not headers and home_page and home_page.get("content_type"):
@@ -481,10 +497,61 @@ def audit(base, domain, inv=None, state_file=None):
             }
         )
 
-    # Hreflang Validation Check
-    if dom.hreflangs:
+    # Check crawled pages for noindex directives if inventory is present
+    if inv and inv.get("pages"):
+        sub_noindex = []
+        for p in inv.get("pages", []):
+            pu = p.get("url") or ""
+            if pu.rstrip("/") in (base.rstrip("/"), (base + "/").rstrip("/")):
+                continue
+            p_meta = p.get("robots_meta") or []
+            if isinstance(p_meta, str):
+                p_meta = [p_meta]
+            p_x = p.get("x_robots_tag") or []
+            if isinstance(p_x, str):
+                p_x = [p_x]
+            p_tokens = set()
+            for d in list(p_meta) + list(p_x):
+                for tok in re.split(r"[,;\s]+", str(d).lower()):
+                    if tok:
+                        p_tokens.add(tok)
+            if p.get("noindex") or ("noindex" in p_tokens or "none" in p_tokens):
+                sub_noindex.append(pu)
+        if sub_noindex and not any(f.get("cause_id") == "NOINDEX_EXCLUSION" for f in findings):
+            findings.append(
+                {
+                    "category": "indexability",
+                    "title": "Sub-pages explicitly exclude indexers (noindex/none directive)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": "Sub-pages contain noindex or none directives in robots meta tag or X-Robots-Tag header.",
+                    "cause_family": "DISCOVERY.ACCESS",
+                    "id": "NOINDEX_EXCLUSION",
+                    "cause_id": "NOINDEX_EXCLUSION",
+                    "impact": "AI retrieval searchbots cannot index these sub-pages, preventing specific product or content citation.",
+                    "evidence": f"Found noindex directive on: {', '.join(sub_noindex[:5])}",
+                    "suggested_action": {
+                        "summary": "Remove noindex from public pages intended for AI retrieval.",
+                        "technical_fix": "Remove <meta name='robots' content='noindex'> tag and X-Robots-Tag: noindex header from public sub-pages.",
+                        "creative_fix": "Verify CMS robots configuration for sub-page templates.",
+                        "priority": "high",
+                        "verification": "Inspect response headers and HTML markup to ensure noindex is absent.",
+                    },
+                }
+            )
+
+    # Hreflang Validation Check across homepage and inventory
+    all_hreflangs = list(dom.hreflangs)
+    if inv and inv.get("pages"):
+        for p in inv.get("pages", []):
+            for hl in p.get("hreflangs", []):
+                hl_dict = hl if isinstance(hl, dict) else {"lang": getattr(hl, "lang", ""), "href": getattr(hl, "href", "")}
+                if hl_dict not in all_hreflangs:
+                    all_hreflangs.append(hl_dict)
+
+    if all_hreflangs:
         invalid_langs = []
-        for hl in dom.hreflangs:
+        for hl in all_hreflangs:
             code = str(hl.get("lang", "")).lower().strip()
             if code and not is_valid_hreflang(code):
                 invalid_langs.append(code)
@@ -501,7 +568,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "id": "LOCALE_MISCONFIGURATION",
                     "cause_id": "LOCALE_MISCONFIGURATION",
                     "impact": "Search engines and AI indexers may misinterpret the language or regional targeting, surfacing the wrong locale.",
-                    "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(invalid_langs)}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
+                    "evidence": f"Found invalid hreflang code(s) on {domain}: {', '.join(sorted(set(invalid_langs)))}. (e.g. use 'en' instead of 'eng', 'ja' instead of 'jp', 'GB' instead of 'UK').",
                     "suggested_action": {
                         "summary": "Fix hreflang codes to strictly follow ISO 639-1 (language) and ISO 3166-1 Alpha-2 (region).",
                         "technical_fix": "Update all <link rel='alternate' hreflang='...'> tags to use valid two-letter ISO 639-1 language and ISO 3166-1 region codes.",
@@ -512,32 +579,185 @@ def audit(base, domain, inv=None, state_file=None):
                 }
             )
 
-    # Canonical Check
-    if dom.canonical:
-        c_parsed = urlparse(dom.canonical)
-        c_host = c_parsed.netloc.lower()
-        if c_host and c_host != domain.lower():
-            findings.append(
+    # AI Discovery & Machine Manifests Observation
+    infra = inv.get("infrastructure", {}) if inv else {}
+    if infra:
+        missing_manifests = []
+        if not infra.get("llms_txt", {}).get("present"):
+            missing_manifests.append("/llms.txt")
+        if not infra.get("pricing_md", {}).get("present"):
+            missing_manifests.append("/pricing.md")
+        if not infra.get("ai_plugin", {}).get("present"):
+            missing_manifests.append("/.well-known/ai-plugin.json")
+        if not infra.get("security_txt", {}).get("present"):
+            missing_manifests.append("/.well-known/security.txt")
+        if missing_manifests:
+            observations.append(
                 {
-                    "category": "canonicalization",
-                    "title": "Canonical link points to external domain",
-                    "severity": "medium",
-                    "confidence": "high",
-                    "root_cause": "The page's canonical tag points to a different host, fragmenting search authority.",
-                    "cause_family": "DISCOVERY.DISCOVERY_PATH",
-                    "id": "CANONICAL_FRAGMENTATION",
-                    "cause_id": "CANONICAL_FRAGMENTATION",
-                    "impact": "Search engines consolidate ranking signals and citations onto the external canonical domain.",
-                    "evidence": f"Page on {domain} specifies canonical target '{dom.canonical}'.",
-                    "suggested_action": {
-                        "summary": "Set the canonical URL to point to the authoritative URL on the current domain.",
-                        "technical_fix": "Update <link rel='canonical'> href attribute to reference the authoritative absolute URL on the current domain.",
-                        "creative_fix": "Ensure cross-domain brand syndication includes reciprocal citations and original brand attribution.",
-                        "priority": "medium",
-                        "verification": f"Verify the <link rel='canonical'> href matches the current domain ({domain}).",
-                    },
+                    "check_id": "G1",
+                    "title": "Machine discoverability manifests absent",
+                    "scope": base + "/",
+                    "observation": f"Site does not declare AI discoverability manifests: {', '.join(missing_manifests)}.",
+                    "actual_band": "U",
+                    "finding_kind": "informational_observation",
+                    "limitation": "Optional machine discoverability standard; improves direct AI agent citation and retrieval precision when present.",
                 }
             )
+
+    # Canonical Check & B3 Competing Canonicals
+    unique_canonicals = sorted(set(c.strip() for c in dom.canonicals if c and c.strip()))
+    if len(unique_canonicals) > 1:
+        findings.append(
+            {
+                "category": "canonicalization",
+                "title": "Competing HTML canonical declarations",
+                "severity": "high",
+                "confidence": "high",
+                "root_cause": "The page declares multiple competing canonical link tags pointing to different destinations.",
+                "cause_family": "DISCOVERY.DISCOVERY_PATH",
+                "id": "CANONICAL_FRAGMENTATION",
+                "cause_id": "CANONICAL_FRAGMENTATION",
+                "check_id": "B3",
+                "actual_band": "S3",
+                "impact": "Search crawlers and citation engines face conflicting canonical targets and cannot establish the preferred indexing URL.",
+                "evidence": f"Multiple competing canonical tags declared: {' | '.join(unique_canonicals)}",
+                "suggested_action": {
+                    "summary": "Consolidate multiple canonical declarations into a single authoritative URL.",
+                    "technical_fix": "Ensure the HTML <head> contains exactly one <link rel='canonical' href='...'> pointing to the definitive canonical URL.",
+                    "creative_fix": "Audit header templates, CMS plugins, and layout wrappers to eliminate duplicate canonical injections.",
+                    "priority": "high",
+                    "verification": "Inspect raw HTML output and confirm exactly one canonical element is present.",
+                },
+            }
+        )
+    elif len(unique_canonicals) == 1:
+        c_val = unique_canonicals[0]
+        c_parsed = urlparse(c_val)
+        c_host = c_parsed.netloc.lower()
+        if c_host and c_host != domain.lower() and not dom.meta_robots and "noindex" not in (dom.meta_robots or ""):
+            observations.append(
+                {
+                    "check_id": "B3",
+                    "title": "Cross-domain canonical observed",
+                    "scope": base + "/",
+                    "observation": f"Page specifies external canonical target '{c_val}'.",
+                    "actual_band": "U",
+                    "finding_kind": "informational_observation",
+                    "limitation": "External canonicalization may be intentional syndication; verify owner publication intent.",
+                }
+            )
+
+    # Check E5: Strict JSON-LD Syntax Check
+    pages_to_check = [p for p in inv.get("pages", [])] if inv and inv.get("pages") else [{"html": html, "url": base + "/"}]
+    for page_idx, page in enumerate(pages_to_check):
+        page_html = page.get("html") or page.get("raw_html") or ""
+        p_dom = Dom()
+        try:
+            p_dom.feed(page_html)
+        except Exception:
+            pass
+        for i, block in enumerate(getattr(p_dom, "jsonld_blocks", [])):
+            try:
+                def _constant(val):
+                    raise ValueError(f"Non-JSON numeric constant: {val}")
+                json.loads(block, parse_constant=_constant)
+            except (ValueError, json.JSONDecodeError) as exc:
+                findings.append(
+                    {
+                        "category": "structured_data",
+                        "title": "JSON-LD block cannot be parsed as JSON",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": "A script block declared as application/ld+json contains malformed JSON syntax failing RFC 8259 parsing.",
+                        "cause_family": "DISCOVERY.REPRESENTATION_AVAILABILITY",
+                        "id": f"E5_MALFORMED_JSONLD_{page_idx}_{i}",
+                        "cause_id": "MALFORMED_JSONLD_SYNTAX",
+                        "check_id": "E5",
+                        "actual_band": "S2",
+                        "finding_kind": "confirmed_problem",
+                        "impact": "AI search engines, schema extractors, and LLM grounding parsers cannot parse the structured data.",
+                        "evidence": f"JSON-LD syntax decode failure: {str(exc)[:160]}",
+                        "suggested_action": {
+                            "summary": "Repair the JSON syntax of the invalid JSON-LD block to conform to RFC 8259.",
+                            "technical_fix": "Validate JSON-LD template output with a strict JSON linter and fix unescaped characters or missing braces.",
+                            "creative_fix": "Ensure CMS and structured data plugins emit valid RFC 8259 JSON strings.",
+                            "priority": "medium",
+                            "verification": "Extract the script block and verify json.loads succeeds without errors.",
+                        },
+                    }
+                )
+
+    # Check B4: Repeated HTTP 404/5xx on observed URLs
+    if inv and inv.get("pages"):
+        for p in inv.get("pages", []):
+            p_status = p.get("status")
+            p_url = p.get("url", "")
+            if p_status in (404, 410, 500, 502, 504) and p_url:
+                findings.append(
+                    {
+                        "category": "crawlability",
+                        "title": f"Repeated HTTP {p_status} on an observed URL",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": f"Observed URL returned HTTP error status {p_status}.",
+                        "cause_family": "DISCOVERY.ACCESS",
+                        "id": f"B4_{p_status}",
+                        "cause_id": "REPEATED_RESOURCE_ERROR",
+                        "check_id": "B4",
+                        "actual_band": "S2",
+                        "finding_kind": "confirmed_problem",
+                        "impact": "Error status responses disrupt discovery and waste search engine crawl budgets.",
+                        "evidence": f"Observed HTTP {p_status} on {p_url}",
+                        "suggested_action": {
+                            "summary": f"For {p_url}: Propose a verified equivalent destination if one exists. Otherwise offer restore or remove-reference options.",
+                            "technical_fix": f"Repair server routing or set up a 301 permanent redirect for {p_url} to an active equivalent page.",
+                            "creative_fix": "Ensure 404 pages provide rich navigation and search affordances for lost visitors.",
+                            "priority": "medium",
+                            "verification": f"Send HTTP GET to {p_url} and verify HTTP 200 is returned.",
+                        },
+                    }
+                )
+
+    # Check D1: Declared sitemap XML validation
+    sitemaps = []
+    if inv:
+        sitemaps = inv.get("sitemaps", []) or (inv.get("infrastructure", {}) or {}).get("sitemaps", [])
+    for sm in sitemaps:
+        sm_text = sm.get("text", "") if isinstance(sm, dict) else ""
+        sm_url = sm.get("url", "") if isinstance(sm, dict) else (sm if isinstance(sm, str) else "")
+        if sm_text:
+            if "<!DOCTYPE" in sm_text.upper() or "<!ENTITY" in sm_text.upper():
+                continue
+            try:
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(sm_text)
+                if root.tag not in ("{http://www.sitemaps.org/schemas/sitemap/0.9}urlset", "{http://www.sitemaps.org/schemas/sitemap/0.9}sitemapindex"):
+                    raise ValueError(f"Unexpected root tag: {root.tag}")
+            except Exception as exc:
+                findings.append(
+                    {
+                        "category": "crawlability",
+                        "title": "Declared sitemap is not valid supported sitemap XML",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": f"Declared sitemap XML at {sm_url} failed parsing: {exc}",
+                        "cause_family": "DISCOVERY.ACCESS",
+                        "id": "D1_INVALID_SITEMAP",
+                        "cause_id": "INVALID_SITEMAP_SYNTAX",
+                        "check_id": "D1",
+                        "actual_band": "S2",
+                        "finding_kind": "confirmed_problem",
+                        "impact": "Search engine bots fail to parse the sitemap XML and cannot discover declared URLs.",
+                        "evidence": f"Sitemap XML parsing failure at {sm_url}: {str(exc)[:160]}",
+                        "suggested_action": {
+                            "summary": "Ensure the sitemap uses standard sitemap XML format (<urlset> or <sitemapindex> in namespace http://www.sitemaps.org/schemas/sitemap/0.9).",
+                            "technical_fix": "Fix sitemap generator to emit valid XML with root <urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>.",
+                            "creative_fix": "Ensure sitemap generator software is properly configured and outputs clean XML.",
+                            "priority": "medium",
+                            "verification": "Validate sitemap XML against standard schema at sitemaps.org.",
+                        },
+                    }
+                )
 
     # Initial HTML Text & Rendering Risk Check
     visible_words = len(" ".join(dom.text).split())
@@ -618,11 +838,41 @@ def audit(base, domain, inv=None, state_file=None):
                 unrendered_pages.append((p_url, p_words, p_type))
 
         if unrendered_pages:
+            def _rep_priority(item):
+                u, w, pt = item
+                u_lower = u.lower()
+                penalty = 0
+                if "/drafts/" in u_lower:
+                    penalty += 1000
+                if "/content/dam/" in u_lower or "/dam/" in u_lower:
+                    penalty += 500
+                if "/quiz/" in u_lower or "quiz" in u_lower:
+                    penalty += 300
+                if any(frag in u_lower for frag in ("/nav", "/footer", "/header", "/sidebar")):
+                    penalty += 200
+                type_rank = {
+                    "product_detail": 10,
+                    "product": 15,
+                    "pricing": 20,
+                    "category": 30,
+                    "catalog": 35,
+                    "article": 40,
+                    "general": 50,
+                }
+                base_prio = type_rank.get(pt, 60)
+                if any(k in u_lower for k in ("/product", "/shop", "/item", "/store")):
+                    base_prio -= 5
+                elif any(k in u_lower for k in ("/coffee", "/tea", "/machines", "/accessories")):
+                    base_prio -= 3
+                return (penalty, base_prio, len(u))
+
+            unrendered_pages.sort(key=_rep_priority)
             rep_url, rep_words, rep_type = unrendered_pages[0]
+            display_type = f"{rep_type} routes" if rep_type and rep_type not in ("general", "unknown") else "core routes"
             findings.append(
                 {
                     "category": "rendering",
-                    "title": f"Primary copy missing from initial raw HTML (client-side rendering gap on {rep_type or 'catalog'})",
+                    "title": f"Primary copy missing from initial raw HTML (client-side rendering gap on {display_type})",
                     "severity": "high",
                     "confidence": "high",
                     "root_cause": f"RENDERED_CONTENT_GAP: Page {rep_url} serves an unrendered client-side JavaScript shell containing only {rep_words} words.",
@@ -631,6 +881,7 @@ def audit(base, domain, inv=None, state_file=None):
                     "cause_id": "RENDERED_CONTENT_GAP",
                     "url": rep_url,
                     "scope": rep_url,
+                    "affected_urls": [u for u, _, _ in unrendered_pages],
                     "impact": "Non-JavaScript AI retrieval engines (SearchGPT, PerplexityBot) ingest an empty shell without product listings or catalog prose.",
                     "evidence": f"Initial HTML on {rep_url} contains only {rep_words} words before JavaScript execution across {len(unrendered_pages)} route(s).",
                     "suggested_action": {
@@ -960,6 +1211,7 @@ def audit(base, domain, inv=None, state_file=None):
         "raw_html_content_available": visible_words >= 60,
         "semantic_landmarks_present": has_semantic_landmarks,
         "signal_to_noise_ratio": snr,
+        "average_page_snr": snr,
     }
 
     if state_file:
@@ -1002,20 +1254,31 @@ def audit(base, domain, inv=None, state_file=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Access & discovery audit layer.")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Discoverability & Crawler Access Diagnostic Sensor.\n"
+            "Deterministically evaluates 37 research checks across RFC 9309 crawler matrices "
+            "(16 AI retrieval & training bots), HTTP response headers, meta robots directives, "
+            "canonical loops, XML sitemaps, and raw unrendered HTML extractability thresholds (< 25 words)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     base, domain = parse_domain(args.site)
     inv = None
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     res = audit(base, domain, inv=inv, state_file=args.state)
     print(json.dumps(res, indent=2))
 

@@ -49,13 +49,21 @@
             "type": "object",
             "properties": {
               "url": {"type": "string"},
+              "status": {"type": ["integer", "null"]},
               "page_type": {"type": ["string", "null"]},
+              "title": {"type": ["string", "null"]},
+              "h1": {"type": ["string", "null"]},
               "word_count": {"type": ["integer", "null"]},
-              "snr": {"type": ["number", "null"]}
+              "snr": {"type": ["number", "null"]},
+              "page_snr": {"type": ["number", "null"]},
+              "canonical": {"type": ["string", "null"]},
+              "has_jsonld": {"type": "boolean"}
             }
           }
         },
         "robots_summary": {"type": "object"},
+        "sitemaps_count": {"type": "integer", "minimum": 0},
+        "sitemaps": {"type": "array", "items": {"type": "string"}},
         "has_llms_txt": {"type": "boolean"}
       }
     },
@@ -67,7 +75,9 @@
         "bot_matrix": {"type": "object"},
         "retrieval_bots_allowed": {"type": ["integer", "null"]},
         "retrieval_bots_total": {"type": ["integer", "null"]},
-        "noindex_pages": {"type": "array", "items": {"type": "string"}}
+        "noindex_pages": {"type": "array", "items": {"type": "string"}},
+        "sitemaps_found": {"type": "integer", "minimum": 0},
+        "status_distribution": {"type": "object"}
       }
     },
     "rendering": {
@@ -75,7 +85,11 @@
       "required": ["visible_words_initial_html", "spa_root_markers_detected"],
       "properties": {
         "visible_words_initial_html": {"type": ["integer", "null"]},
-        "spa_root_markers_detected": {"type": "boolean"}
+        "spa_root_markers_detected": {"type": "boolean"},
+        "average_word_count": {"type": ["number", "null"]},
+        "average_snr": {"type": ["number", "null"]},
+        "average_page_snr": {"type": ["number", "null"]},
+        "thin_content_pages": {"type": "array", "items": {"type": "string"}}
       }
     },
     "entity": {
@@ -84,7 +98,11 @@
       "properties": {
         "jsonld_present": {"type": "boolean"},
         "types_declared": {"type": "array", "items": {"type": "string"}},
-        "sameas_declared": {"type": "integer"}
+        "sameas_declared": {"type": "integer"},
+        "organization_detected": {"type": ["string", "null"]},
+        "org_schema_present": {"type": "boolean"},
+        "product_schema_pages": {"type": "integer", "minimum": 0},
+        "answerability_evaluations": {"type": "array"}
       }
     },
     "facts": {
@@ -92,7 +110,9 @@
       "required": ["facts_checked", "fact_conflicts"],
       "properties": {
         "facts_checked": {"type": "integer", "minimum": 0},
-        "fact_conflicts": {"type": "integer", "minimum": 0}
+        "fact_conflicts": {"type": "integer", "minimum": 0},
+        "scoped_facts_recorded": {"type": "integer", "minimum": 0},
+        "conflicts_detected": {"type": "array", "items": {"type": "string"}}
       }
     },
     "corroboration": {
@@ -100,21 +120,40 @@
       "required": ["sameas_declared", "sameas_resolvable"],
       "properties": {
         "sameas_declared": {"type": "integer", "minimum": 0},
-        "sameas_resolvable": {"type": "integer", "minimum": 0}
+        "sameas_resolvable": {"type": "integer", "minimum": 0},
+        "candidate_backlinks_provided": {"type": "integer", "minimum": 0},
+        "candidate_backlinks_verified": {"type": "integer", "minimum": 0},
+        "broken_authority_anchors": {"type": "array", "items": {"type": "string"}}
       }
     },
     "geo": {
       "type": "object",
       "required": ["average_citability_score"],
       "properties": {
-        "average_citability_score": {"type": ["number", "null"]}
+        "average_citability_score": {"type": ["number", "null"]},
+        "pages_evaluated": {"type": "integer", "minimum": 0},
+        "target_citability_score": {"type": ["number", "null"]},
+        "evidence_genres_distribution": {"type": "object"},
+        "lowest_scoring_pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {"type": "string"},
+              "citability_score": {"type": "number"}
+            }
+          }
+        }
       }
     },
     "engagement": {
       "type": "object",
       "required": ["pages_evaluated"],
       "properties": {
-        "pages_evaluated": {"type": "integer", "minimum": 0}
+        "pages_evaluated": {"type": "integer", "minimum": 0},
+        "h1_aligned_pages": {"type": "integer", "minimum": 0},
+        "cta_above_fold_pages": {"type": "integer", "minimum": 0},
+        "generic_h1_pages": {"type": "array", "items": {"type": "string"}}
       }
     },
     "dag": {
@@ -137,7 +176,11 @@
         "facts": {"type": "string"},
         "corroboration": {"type": "string"},
         "geo": {"type": "string"},
-        "engagement": {"type": "string"}
+        "engagement": {"type": "string"},
+        "nodes": {"type": "object"},
+        "confirmed_root_causes": {"type": "array", "items": {"type": "string"}},
+        "suppressed_checks": {"type": "array", "items": {"type": "string"}},
+        "uncertainties": {"type": "array", "items": {"type": "string"}}
       }
     },
     "evidence_index": {

@@ -1,8 +1,9 @@
 # Benchmarks, Evals, and Quality Assurance Guide
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.0.0  
-**Status:** 264 Automated Tests Passing · 100% Green QA Pipeline  
+**Version:** 2.1.0  
+**Status:** 262 Automated Tests + 29 Subtests Passing — 100% Green QA Pipeline
+
 
 ---
 
@@ -33,6 +34,8 @@
 └──────┴─────────────────────────────┴──────────────────────────┴─────────────────────────────┘
 ```
 
+The 17-Rule Matrix represents the high-impact core evaluation benchmark subset. The comprehensive 134-check domain catalogue (`A1` through `J10`) is partitioned across specialist skill references in `src/skills/*/references/checks.md` and synthesized in `src/skills/audit-orchestrator/references/checks.json`.
+
 ---
 
 ## 2. The 0–30 CITE Citability Score Rubric
@@ -60,22 +63,42 @@ Every build and commit must cleanly pass all five automated stages:
 2. **Flake8 Style Checker:** Zero unused imports, clean indentation (`0 errors`).
 3. **MyPy Static Typing:** Strict type-checking across all 8 skills (`0 errors`).
 4. **JSON Schema Gate:** Draft-07 JSON Schema gate validating `report-schema.json` and all sample manifests (`0 errors`).
-5. **Pytest Unit Test Suite:** **264 automated unit tests** across 24 test modules running in under 60 seconds (`100% passing`).
+5. **Pytest Test Suite:** **260 automated tests and 29 subtests** across unit, integration, and system suites running in under 50 seconds (`100% passing`).
 
 ---
 
 ## 4. How to Execute Tests & Rebuild Submission
 
 ```bash
-# 1. Run full production QA pipeline
+# 1. Run full production QA pipeline (Ruff, Flake8, MyPy, Schema, Pytest)
 ./scripts/qa_check.sh
 
-# 2. Run specific test suite
-python3 -m unittest tests/test_geo_content.py
+# 2. Run scoped test suites
+pytest tests/unit/ -q
+pytest tests/integration/ -q
+pytest tests/system/ -q
 
-# 3. Verify zero emojis and LaTeX across all documentation
-./scripts/qa_check.sh
+# 3. Rebuild submission package and validate (cross-platform)
+python scripts/build.py
+python tests/validate_package.py brand-ai-readiness-audit.zip
 
-# 4. Rebuild submission package
-./scripts/build.sh
+# 4. Synchronize runtime mirror (cross-platform)
+python scripts/sync.py
 ```
+
+---
+
+## 5. Enriched Crawler & Diagnostic Sensor Benchmarks
+
+The suite includes dedicated unit suites in `tests/unit/test_crawler_components.py` verifying high-fidelity acquisition:
+
+| Module Under Test | Test Case | Assertion Criteria |
+| :--- | :--- | :--- |
+| `crawler/parser.py` | Streaming HTML Extraction | Parses titles, meta descriptions, headings (H1-H6), paragraphs, code blocks, tables, and lists in single pass. |
+| `crawler/parser.py` | Commercial CTA Detection | Captures `<button>`, `<input type="submit">`, `<a role="button">`, and `<div class="cta">` with commercial intent categorization (`is_commercial_cta`). |
+| `crawler/parser.py` | Internationalization (`hreflang`) | Extracts `<link rel="alternate" hreflang="...">` language-region mappings without lost routes. |
+| `crawler/parser.py` | Edge Header Directives | Parses `X-Robots-Tag` (`noindex`, `nofollow`, `noarchive`) and RFC 5988 `Link: rel="canonical"` from HTTP headers. |
+| `crawler/evidence.py` | Structured Contact Channels | Extracts RFC 5322 compliant emails and E.164 formatted phone numbers with zero false positives from prose. |
+| `crawler/evidence.py` | Social Authority Links | Matches DOM links against Tier-1 authority platforms (`LinkedIn`, `X/Twitter`, `GitHub`, `YouTube`, `Facebook`, `Instagram`). |
+| `crawler/engine.py` | AI Manifest Probing | Concurrently probes `/llms.txt`, `/llms-full.txt`, `/pricing.md`, `/.well-known/ai-plugin.json`, and `/.well-known/security.txt`. |
+| `crawler/models.py` | Serialization Completeness | `to_dict()` and `to_inventory_dict()` preserve all enriched fields for offline sensor execution. |

@@ -149,7 +149,10 @@ class SecurityPolicy:
         if not host:
             return False, "Missing hostname in URL", None
 
-        port = parsed.port or (443 if scheme == "https" else 80)
+        port = parsed.port
+        if port is not None and port not in (80, 443):
+            return False, f"Disallowed port: {port}. Only standard web ports (80, 443) are permitted", None
+        port = port or (443 if scheme == "https" else 80)
         return self.resolve_and_verify_host(host, port)
 
     def validate_redirect(

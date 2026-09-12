@@ -67,6 +67,15 @@ class TestEvidenceAndJsonLd(unittest.TestCase):
         gap_obs = [o for o in observations if o.type == "schema_gap"]
         self.assertEqual(len(gap_obs), 1)
 
+    def test_circular_reference_flattening(self):
+        """Resilience test: Circular data structures do not cause infinite recursion."""
+        circ_dict = {"@type": "Organization", "name": "CircularOrg"}
+        circ_list = [circ_dict]
+        circ_dict["@graph"] = circ_list
+        res = JsonLdExtractor._flatten_jsonld(circ_dict)
+        self.assertTrue(len(res) >= 1)
+        self.assertEqual(res[0]["name"], "CircularOrg")
+
 
 if __name__ == "__main__":
     unittest.main()

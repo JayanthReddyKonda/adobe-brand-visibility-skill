@@ -67,6 +67,10 @@ class WebAuditEngine:
         self.llms_full_txt_content: Optional[str] = None
         self.pricing_manifest_content: Optional[str] = None
         self.pricing_manifest_status: int = 404
+        self.ai_plugin_content: Optional[str] = None
+        self.ai_plugin_status: int = 404
+        self.security_txt_content: Optional[str] = None
+        self.security_txt_status: int = 404
 
     def crawl(self, seed_url: str) -> EvidenceModel:
         """Executes a full, bounded, prioritized audit crawl of the target website."""
@@ -240,7 +244,7 @@ class WebAuditEngine:
         )
 
     def _check_llms_txt(self, base_origin: str) -> None:
-        """Proactively checks for /llms.txt, /llms-full.txt, and machine-readable pricing manifests."""
+        """Proactively checks for /llms.txt, /llms-full.txt, pricing manifests, ai-plugin.json, and security.txt."""
         for path in ["/llms.txt", "/llms-full.txt"]:
             target = urljoin(base_origin, path)
             try:
@@ -265,24 +269,61 @@ class WebAuditEngine:
             except Exception:
                 pass
 
+        # Proactively probe OpenAI AI plugin manifest
+        ai_plugin_target = urljoin(base_origin, "/.well-known/ai-plugin.json")
+        try:
+            res = self.fetcher.fetch(ai_plugin_target, timeout=4.0)
+            if res.status == 200 and len(res.body_bytes) > 10:
+                self.ai_plugin_content = res.body_bytes.decode("utf-8", errors="replace")
+                self.ai_plugin_status = 200
+        except Exception:
+            pass
+
+        # Proactively probe RFC 9116 security.txt
+        for path in ["/.well-known/security.txt", "/security.txt"]:
+            target = urljoin(base_origin, path)
+            try:
+                res = self.fetcher.fetch(target, timeout=4.0)
+                if res.status == 200 and len(res.body_bytes) > 10:
+                    self.security_txt_content = res.body_bytes.decode("utf-8", errors="replace")
+                    self.security_txt_status = 200
+                    break
+            except Exception:
+                pass
+
     def _discover_sitemap_urls(self, seed_sitemaps: List[str]) -> List[str]:
-        """Collects URLs declared in XML sitemaps."""
+        """Collects URLs declared in XML sitemaps, validating same-origin to prevent external sitemap probing."""
         discovered: List[str] = []
+        base_parsed = urlparse(self.site_url)
+        base_host = (base_parsed.hostname or "").lower()
+
         for sm_url in seed_sitemaps[:3]:
+            sm_parsed = urlparse(sm_url)
+            if (sm_parsed.hostname or "").lower() != base_host:
+                continue
             try:
                 res = self.fetcher.fetch(sm_url, timeout=5.0)
                 if res.status == 200:
                     xml_text = res.body_bytes.decode("utf-8", errors="replace")
                     urls, child_sitemaps = SitemapParser.parse_sitemap(xml_text)
-                    discovered.extend([u.loc for u in urls[:100]])
-                    # Follow first 2 child sitemaps if index
+                    for u in urls[:100]:
+                        u_parsed = urlparse(u.loc)
+                        if (u_parsed.hostname or "").lower() == base_host:
+                            discovered.append(u.loc)
+                    # Follow first 2 child sitemaps if index (validating origin)
                     for child in child_sitemaps[:2]:
+                        c_parsed = urlparse(child)
+                        if (c_parsed.hostname or "").lower() != base_host:
+                            continue
                         try:
                             c_res = self.fetcher.fetch(child, timeout=5.0)
                             if c_res.status == 200:
                                 c_xml = c_res.body_bytes.decode("utf-8", errors="replace")
                                 c_urls, _ = SitemapParser.parse_sitemap(c_xml)
-                                discovered.extend([u.loc for u in c_urls[:50]])
+                                for u in c_urls[:50]:
+                                    u_parsed = urlparse(u.loc)
+                                    if (u_parsed.hostname or "").lower() == base_host:
+                                        discovered.append(u.loc)
                         except Exception:
                             continue
             except Exception:
@@ -302,8 +343,14 @@ class WebAuditEngine:
         if res.status != 200:
             return None
 
-        # Only parse HTML content
-        if "text/html" not in res.content_type.lower() and not res.url.endswith(".html"):
+        # Only parse genuine HTML content (prevent non-HTML binaries with .html suffix)
+        ct_lower = (res.content_type or "").lower()
+        is_html = any(t in ct_lower for t in ("text/html", "application/xhtml+xml"))
+        if not is_html:
+            sample_prefix = res.body_bytes[:512].lower()
+            if b"<html" in sample_prefix or b"<!doctype html" in sample_prefix:
+                is_html = True
+        if not is_html:
             return None
 
         # Multi-stage resilient HTML decoding with BOM stripping
@@ -347,6 +394,8 @@ class WebAuditEngine:
         except Exception:
             pass  # Resilient parsing continues on partial feeds
 
+        x_robots = parser.parse_http_headers(res.headers)
+
         # Step 2: Extract metadata and JSON-LD
         metadata, meta_obs = MetadataProcessor.process_metadata(parser.meta_tags, source_url=url)
         schemas, jsonld_facts, jsonld_obs = JsonLdExtractor.parse_blocks(
@@ -359,11 +408,12 @@ class WebAuditEngine:
         # Step 4: Links resolution
         resolved_links = LinkProcessor.resolve_and_filter_links(url, parser.raw_links)
 
-        # Step 5: Trafilatura boilerplate stripping and SNR
+        # Step 5: Trafilatura boilerplate stripping, SNR, and Contact/Social extraction
         clean_text = EvidenceExtractor.strip_boilerplate(html_text)
         snr = EvidenceExtractor.calculate_snr(clean_text, html_text)
         render_obs = EvidenceExtractor.detect_rendering_limitations(html_text, clean_text, source_url=url)
         text_facts, claims = EvidenceExtractor.extract_facts_and_claims(clean_text, source_url=url)
+        contact_info, social_links = EvidenceExtractor.extract_contact_and_social_info(clean_text, resolved_links)
 
         # Step 6: LLM-friendly Markdown
         clean_markdown = EvidenceExtractor.build_clean_markdown(
@@ -388,6 +438,7 @@ class WebAuditEngine:
         return PageModel(
             url=url,
             final_url=res.final_url,
+            redirect_chain=res.redirects,
             status=res.status,
             content_type=res.content_type,
             title=parser.title,
@@ -395,9 +446,15 @@ class WebAuditEngine:
             canonical=parser.canonical,
             canonicals=parser.canonicals,
             robots_meta=metadata.get("robots_directives", []),
+            x_robots_tag=x_robots,
             language=parser.language,
+            hreflangs=parser.hreflangs,
             headings=parser.headings,
             links=resolved_links,
+            ctas=parser.ctas,
+            social_links=social_links,
+            contact_info=contact_info,
+            dates=parser.dates,
             jsonld=schemas,
             metadata=metadata,
             clean_text=clean_text,
@@ -437,6 +494,7 @@ class WebAuditEngine:
         return {
             "total_crawled_pages": total_pages,
             "average_snr": round(avg_snr, 4),
+            "site_scrapeability_snr": round(avg_snr, 4),
             "snr_health": "good" if avg_snr >= 0.12 else "low",
             "semantic_landmarks_coverage_pct": round((pages_with_landmarks / total_pages) * 100, 1),
             "sparse_spa_shells_count": sparse_shells,
@@ -517,10 +575,13 @@ class WebAuditEngine:
                 "has_footer": "footer" in landmarks_set,
             }
 
+            is_spa = any(o.value == "server_html_appears_sparse" for o in p.observations) or (p.snr < 0.08 and p.word_count < 25)
+
             inv_pages.append(
                 {
                     "url": p.url,
                     "final_url": p.final_url,
+                    "redirect_chain": p.redirect_chain,
                     "status": p.status,
                     "resource_type": "html",
                     "content_type": p.content_type,
@@ -534,6 +595,8 @@ class WebAuditEngine:
                     "canonical": p.canonical,
                     "canonicals": p.canonicals,
                     "robots_meta": p.robots_meta,
+                    "x_robots_tag": p.x_robots_tag,
+                    "hreflangs": [h.to_dict() for h in p.hreflangs],
                     "h1": [h.text for h in p.headings if h.level == 1],
                     "h2": [h.text for h in p.headings if h.level == 2],
                     "jsonld": p.jsonld,
@@ -543,10 +606,18 @@ class WebAuditEngine:
                     "word_count": p.word_count,
                     "snr": p.snr,
                     "text_density_ratio": round(p.snr, 4),
+                    "is_sparse_spa": is_spa,
                     "semantic_landmarks": landmarks_dict,
                     "semantic_landmarks_list": p.semantic_landmarks,
                     "internal_links": [link.href for link in p.links if link.is_internal],
                     "external_links": [link.href for link in p.links if not link.is_internal],
+                    "ctas": [c.to_dict() for c in p.ctas],
+                    "social_links": p.social_links,
+                    "contact_info": p.contact_info,
+                    "dates": p.dates,
+                    "tables": [t.to_dict() for t in p.tables],
+                    "code_blocks": p.code_blocks,
+                    "images": p.images,
                     "html": p.raw_html,
                     "headers": p.headers,
                     "latency_ms": p.fetch_telemetry.get("latency_ms", 0.0),
@@ -570,6 +641,7 @@ class WebAuditEngine:
             "llms_txt": {
                 "status": 200 if self.llms_txt_content else 404,
                 "present": self.llms_txt_content is not None,
+                "is_spec_compliant": bool(re.search(r"^#\s+[^\n]+", self.llms_txt_content or "", re.MULTILINE)),
                 "snippet": (self.llms_txt_content[:400] if self.llms_txt_content else None),
             },
             "llms_full_txt": {
@@ -581,6 +653,16 @@ class WebAuditEngine:
                 "status": self.pricing_manifest_status,
                 "present": self.pricing_manifest_content is not None,
                 "snippet": (self.pricing_manifest_content[:400] if self.pricing_manifest_content else None),
+            },
+            "ai_plugin": {
+                "status": self.ai_plugin_status,
+                "present": self.ai_plugin_content is not None,
+                "snippet": (self.ai_plugin_content[:400] if self.ai_plugin_content else None),
+            },
+            "security_txt": {
+                "status": self.security_txt_status,
+                "present": self.security_txt_content is not None,
+                "snippet": (self.security_txt_content[:400] if self.security_txt_content else None),
             },
             "ai_agent_scrapeability_summary": self._compile_scrapeability_summary(),
         }
@@ -610,6 +692,8 @@ class WebAuditEngine:
             "robots_outcome": self.robots_auditor.outcome if self.robots_auditor else "robots_not_found",
             "llms_txt": self.llms_txt_content,
             "llms_full_txt": self.llms_full_txt_content,
+            "ai_plugin": self.ai_plugin_content,
+            "security_txt": self.security_txt_content,
             "ai_agent_scrapeability_summary": self._compile_scrapeability_summary(),
             "pages": inv_pages,
             "all_facts": [f.to_dict() for f in self.all_facts],
@@ -618,6 +702,9 @@ class WebAuditEngine:
                 "pages_crawled": len(self.pages),
                 "total_bytes": total_raw_bytes,
                 "elapsed_seconds": round(self.budget.elapsed_time(), 2),
+                "average_latency_ms": round(sum(p.fetch_telemetry.get("latency_ms", 0.0) for p in self.pages) / max(len(self.pages), 1), 2),
+                "total_facts": len(self.all_facts),
+                "total_claims": len(self.all_claims),
             },
             "limitations": [],
             "elapsed_seconds": round(self.budget.elapsed_time(), 1),

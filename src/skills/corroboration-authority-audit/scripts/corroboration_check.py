@@ -15,9 +15,10 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, SCRIPT_DIR)
-
+SCRAPER_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "web-scraper", "scripts"))
+for _p in (SCRIPT_DIR, SCRAPER_DIR):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from safe_fetch import safe_fetch  # type: ignore
 
@@ -52,8 +53,18 @@ def extract_sld(netloc: str) -> str:
     return clean
 
 
+def _walk_nodes(value):
+    if isinstance(value, dict):
+        yield value
+        for v in value.values():
+            yield from _walk_nodes(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _walk_nodes(v)
+
+
 def extract_sameas_links(html):
-    """Extract sameAs URLs from JSON-LD blocks, supporting strings and @id objects."""
+    """Extract sameAs URLs from JSON-LD blocks, supporting strings and @id objects at any nesting depth."""
     parser = SameAsExtractor()
     try:
         parser.feed(html)
@@ -63,10 +74,7 @@ def extract_sameas_links(html):
     for raw in parser.json_ld_contents:
         try:
             data = json.loads(raw)
-            objs = data if isinstance(data, list) else [data]
-            if isinstance(data, dict) and "@graph" in data:
-                objs = data["@graph"]
-            for o in objs:
+            for o in _walk_nodes(data):
                 if isinstance(o, dict) and "sameAs" in o:
                     s = o["sameAs"]
                     s_list = s if isinstance(s, list) else [s]
@@ -291,6 +299,38 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
         elif u_clean != base_netloc and not u_clean.endswith("." + base_netloc):
             external_authorities.append(u)
 
+    discovered_social = set()
+    if inv and inv.get("pages"):
+        for p in inv.get("pages", []):
+            for sl in p.get("social_links", []):
+                discovered_social.add(str(sl).strip())
+
+    unlinked_social = [
+        s for s in sorted(discovered_social)
+        if not any(s.lower().rstrip("/") == sa.lower().rstrip("/") for sa in sameas_urls)
+    ]
+    if unlinked_social:
+        findings.append(
+            {
+                "title": f"Unlinked high-authority social profiles ({len(unlinked_social)} profile(s))",
+                "severity": "medium",
+                "category": "corroboration",
+                "cause_family": "AUTHORITY.IDENTITY_CORROBORATION",
+                "id": "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
+                "cause_id": "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
+                "root_cause": "The brand links to external social/code profiles in HTML but omits them from Schema.org sameAs declarations.",
+                "confidence": "high",
+                "evidence": f"Found on-page social profiles missing from Schema.org sameAs: {', '.join(unlinked_social[:4])}.",
+                "suggested_action": {
+                    "summary": "Add discovered official social profiles to the Organization sameAs array in JSON-LD.",
+                    "technical_fix": f"Deploy updated sameAs array in Organization JSON-LD including {unlinked_social[:4]}.",
+                    "creative_fix": "Ensure official corporate profiles maintain consistent branding and verify reciprocity.",
+                    "priority": "medium",
+                    "verification": "Inspect homepage JSON-LD to confirm all profiles are declared in sameAs.",
+                },
+            }
+        )
+
     # If sameAs contains 2+ self-referential mirror domains, flag CIRCULAR_SAMEAS_SELF_REFERENCE
     if len(mirror_domains) >= 2:
         findings.append(
@@ -366,15 +406,15 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
     checked = []
     broken = []
 
-    # Probe external authorities (excluding internal mirror domains)
-    for u in external_authorities[:5]:
+    # Probe external authorities (excluding internal mirror domains, max 2 per SKILL.md invariant)
+    for u in external_authorities[:2]:
         checked.append(u)
-        status, ext_html, _, _ = safe_fetch(u, timeout=5, max_bytes=512 * 1024, method="GET")
-        if status in (404, 410) or (status and status >= 500) or status == 0:
+        status, ext_html, _, _ = safe_fetch(u, timeout=1.5, max_bytes=512 * 1024, method="GET")
+        if status in (404, 410) or (status and status >= 500):
             broken.append(f"{u} (HTTP {status})")
-        elif status in (401, 403, 429, 999):
+        elif status in (401, 403, 429, 999) or status == 0 or status is None:
             observations.append(
-                {"observation": f"Authority link {u} returned bot challenge/access restriction (HTTP {status}); not treated as broken anchor."}
+                {"observation": f"Authority link {u} returned status {status}; not treated as broken anchor."}
             )
 
         elif brand_name and ext_html:
@@ -484,8 +524,12 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
     intact_backlinks = []
 
     if candidate_list:
+        probe_deadline = time.monotonic() + 8.0
         # Bounded execution: max 10 candidates to respect latency budget
         for item in candidate_list[:10]:
+            if time.monotonic() >= probe_deadline:
+                observations.append({"observation": "External backlink probing halted at 8.0s cumulative deadline."})
+                break
             source_url = item.get("source_url") if isinstance(item, dict) else str(item)
             if not source_url or not source_url.startswith("http"):
                 continue
@@ -493,8 +537,11 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
             expected_target = item.get("expected_target") if isinstance(item, dict) else None
             domain_archetype = classify_referring_domain(source_url)
 
-            # SSRF-safe probe with 5s timeout and 512 KiB limit
-            s_status, s_html, _, s_err = safe_fetch(source_url, timeout=5, max_bytes=512 * 1024, method="GET")
+            # SSRF-safe probe with bounded timeout and deadline
+            rem_t = max(0.5, min(3.0, probe_deadline - time.monotonic()))
+            s_status, s_html, _, s_err = safe_fetch(
+                source_url, timeout=rem_t, max_bytes=512 * 1024, method="GET", deadline=probe_deadline
+            )
 
             if s_status != 200 or not s_html:
                 backlink_results.append(
@@ -690,16 +737,24 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cross-web authority & corroboration audit layer.")
-    parser.add_argument("--site", required=True)
-    parser.add_argument("--inventory", help="Path to shared site-inventory JSON")
-    parser.add_argument("--state", help="Path to global state JSON")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Cross-Web Authority & Identity Corroboration Diagnostic Sensor.\n"
+            "Deterministically extracts Schema.org sameAs links, probes external authority anchors "
+            "(Wikidata, Wikipedia, Crunchbase, LinkedIn) under zero-trust SSRF sandboxing, "
+            "evaluates knowledge graph identity substantiation, and verifies candidate inbound backlinks."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument(
         "--candidate-backlinks",
         dest="candidate_backlinks",
-        help="Path to candidate backlinks JSON/CSV or raw JSON string",
+        help="Path to candidate backlinks JSON/CSV or raw JSON string for bounded authority verification",
     )
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
     if not s.startswith("http"):
@@ -707,12 +762,15 @@ def main():
     p = urlparse(s)
     base = f"{p.scheme}://{p.netloc}"
     inv = None
-    if args.inventory and os.path.exists(args.inventory):
-        try:
-            with open(args.inventory, "r", encoding="utf-8") as f:
-                inv = json.load(f)
-        except Exception:
-            inv = None
+    if args.inventory:
+        if os.path.exists(args.inventory):
+            try:
+                with open(args.inventory, "r", encoding="utf-8") as f:
+                    inv = json.load(f)
+            except Exception as e:
+                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
+        else:
+            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     res = audit(base, p.netloc, inv=inv, state_file=args.state, candidate_backlinks=args.candidate_backlinks)
     print(json.dumps(res, indent=2))
 

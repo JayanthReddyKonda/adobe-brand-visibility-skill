@@ -4,6 +4,7 @@
   "description": "Production Draft-07 schema for Brand AI-Readiness, GEO, and Visibility Audit Reports, strictly conforming to Adobe Hackathon Round 3 requirements.",
   "type": "object",
   "required": [
+    "schema_version",
     "site",
     "audited_at",
     "audit_status",
@@ -11,6 +12,14 @@
     "findings"
   ],
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional URI or path to JSON Schema definition"
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "Report schema version (e.g. 1.0.0)"
+    },
     "site": {
       "type": "string",
       "description": "Target website domain or URL audited"
@@ -58,6 +67,22 @@
         "low": {
           "type": "integer",
           "minimum": 0
+        },
+        "info": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unassessable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confirmed_problems": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "detected_archetype": {
+          "type": "string",
+          "description": "Detected business archetype for contextualized diagnosis"
         }
       },
       "additionalProperties": false
@@ -74,7 +99,9 @@
           "category",
           "root_cause",
           "confidence",
+          "scope",
           "evidence",
+          "impact",
           "suggested_action"
         ],
         "properties": {
@@ -84,7 +111,7 @@
           },
           "cause_id": {
             "type": "string",
-            "description": "Root cause key matching audit-orchestrator-knowledge-base.md"
+            "description": "Root cause key matching knowledge-base.md"
           },
           "title": {
             "type": "string",
@@ -166,9 +193,16 @@
               "technical_fix": {
                 "type": [
                   "string",
+                  "object",
                   "null"
                 ],
-                "description": "Precise code, markup, or configuration snippet for developers"
+                "description": "Precise code, markup, or patch-applicable object for developers or downstream agents",
+                "properties": {
+                  "file_or_route": { "type": "string" },
+                  "change_type": { "type": "string", "enum": ["insert", "replace", "delete"] },
+                  "snippet": { "type": "string" },
+                  "anchor": { "type": "string" }
+                }
               },
               "creative_fix": {
                 "type": [
@@ -177,18 +211,52 @@
                 ],
                 "description": "Copywriting, UX, and content guidelines for editors and marketers"
               },
+              "is_proactive": {
+                "type": "boolean",
+                "description": "True if this action goes beyond a detected defect"
+              },
               "verification": {
                 "type": [
                   "string",
                   "null"
                 ],
                 "description": "Deterministic test or request to verify the fix"
+              },
+              "priority_index": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Task ranking index: 5 * severity + (6 - difficulty)"
+              },
+              "difficulty": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1,
+                "maximum": 5,
+                "description": "Remediation difficulty from 1 (trivial config/copy) to 5 (architectural refactor)"
               }
             }
           },
           "impact": {
             "type": "string",
             "description": "How the defect impacts AI search citation probability or visitor retention"
+          },
+          "scope": {
+            "type": [
+              "string",
+              "object"
+            ],
+            "description": "Granular defect scope (entity, page, route, or matrix)",
+            "properties": {
+              "type": { "type": "string" },
+              "entity": { "type": "string" },
+              "attribute": { "type": "string" },
+              "locale": { "type": "string" },
+              "url": { "type": "string" }
+            }
           },
           "confidence": {
             "type": "string",
@@ -197,6 +265,49 @@
               "medium",
               "low"
             ]
+          },
+          "downstream_symptoms": {
+            "type": "array",
+            "description": "Downstream consequential defects suppressed or subsumed by this keystone cause",
+            "items": {
+              "type": "string"
+            }
+          },
+          "affected_urls": {
+            "type": "array",
+            "description": "List of URLs or routes directly affected by this defect",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority_index": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Task ranking index: 5 * severity + (6 - difficulty)"
+          },
+          "difficulty": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Remediation difficulty from 1 (trivial config/copy) to 5 (architectural refactor)"
+          },
+          "priority_rank": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Global 1-N rank across ALL findings in this report, reflecting LLM ordering judgment"
+          },
+          "priority_justification": {
+            "type": "string",
+            "description": "One sentence explaining why this finding outranks the adjacent one(s) of equal severity"
+          },
+          "dag_node": {
+            "type": "string",
+            "description": "Which Causal DAG node produced this finding (e.g. RETRIEVAL, RENDERING, ENTITY, FACTS, CORROBORATION, GEO_CITABILITY, ENGAGEMENT)"
           }
         }
       }
@@ -306,8 +417,34 @@
     "evidence_classes": {
       "type": "object"
     },
-    "analytics_summary": {
-      "type": "object"
+    "coverage": {
+      "type": "object",
+      "description": "Assessment coverage across the 134-item research catalogue and execution environment capabilities"
+    },
+    "observations": {
+      "type": "array",
+      "description": "Non-actionable or unassessable informational observations outside defect counts",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dropped_findings": {
+      "type": "array",
+      "description": "Mechanically rejected findings that lacked verifiable evidence locators or violated schema constraints",
+      "items": {
+        "type": "object"
+      }
+    },
+    "suppressed_findings": {
+      "type": "array",
+      "description": "Evidence-backed findings suppressed as downstream symptoms by the 6-layer causal DAG",
+      "items": {
+        "type": "object"
+      }
+    },
+    "run_manifest": {
+      "type": "object",
+      "description": "Machine-readable execution provenance recording site, timestamps, references, and validation status"
     },
     "limitations": {
       "type": "array",
@@ -322,6 +459,40 @@
         "object"
       ],
       "description": "Detected business archetype and confidence"
+    },
+    "readiness": {
+      "type": "object",
+      "description": "Deterministic readiness score, grade, and dimension breakdown",
+      "properties": {
+        "composite_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "grade": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "F"
+          ]
+        },
+        "dimensions": {
+          "type": "object"
+        },
+        "weights": {
+          "type": "object"
+        },
+        "dimension_status": {
+          "type": "object",
+          "description": "Epistemic certainty status per dimension (e.g. observed, provisional, heuristic_only)"
+        },
+        "score_scope": {
+          "type": "string"
+        }
+      }
     }
   },
   "additionalProperties": false

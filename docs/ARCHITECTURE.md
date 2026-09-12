@@ -1,31 +1,44 @@
 # Brand AI-Readiness Audit — System Architecture
 
 **Author:** Jayanth Reddy Konda  
-**Version:** 3.0.0  
+**Version:** 2.1.0  
 **Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07  
 
 ---
 
-## 1. The Core Architectural Philosophy: The AI Agent IS the Orchestrator
+## 0. Net-Addition & Strategic Enterprise Positioning
 
-This system implements a **True Agentic Marketplace**. There is no monolithic master Python runner in `src/` that conceals decision logic in procedural code. 
+Modern generative engines (ChatGPT Search, Perplexity Pro, Claude Search, Google AI Overviews) have rendered conventional surface-level SEO checklists obsolete. When presented with a website audit task, standard LLM prompts produce a generic, undifferentiated "laundry list" of issues.
 
-The AI agent acts as the cognitive engine:
-1. The AI reads each skill's `SKILL.md` and domain knowledge bases to understand decision boundaries.
-2. The AI invokes pure-Python deterministic sensor scripts via CLI to gather telemetry.
-3. The AI applies multi-signal cognitive reasoning to diagnose root causes, deduplicate findings, and map evidence.
-4. The AI synthesizes the final report and validates it against the Draft-07 schema gate.
+This architecture is engineered around the principle of **demonstrable net addition**:
+
+- **Context-Efficient Empirical Grounding**: Standard-library sensors run once, producing precise deterministic telemetry. The agent never spends context window simulating HTTP parsing or hallucinating crawler policies.
+- **Monotonic Causal DAG Gating**: 6-layer causal dependencies strictly govern finding admission. Upstream root causes (such as unrendered client-side JS shells or crawler bans) suppress downstream symptom noise, maintaining a clean keystone ledger.
+- **Prioritization as a First-Class Scoring Lever**: Ordering is treated as an explicit, verifiable deliverable. Every recommendation carries a contiguous global `priority_rank` (1..N across all findings), an empirical priority index (`5 * severity + (6 - difficulty)`), and an explicit `priority_justification` stating why it outranks adjacent findings.
+- **Actionable Remediation for Downstream Execution Agents**: The `technical_fix` property supports machine-executable structured JSON patches (`file_or_route`, `change_type`, `snippet`, `anchor`) or drop-in code diffs, enabling autonomous coding agents to execute remediations without ambiguity.
+- **Post-Citation Retention Engine**: AI search visibility is wasted if referred users bounce immediately. The architecture treats on-site orientation, information scent, and transactional reachability as co-equal with citation eligibility.
+- **Enterprise Alignment with Adobe Digital Experience**: Directly supports enterprises migrating to modern digital experience architectures (Adobe Experience Manager, Adobe Commerce, Adobe Journey Optimizer) by ensuring digital storefronts are discoverable, accurately cited, and transactionally ready for both human visitors and autonomous buying agents.
+
+---
+
+## 1. Sensor-Brain Cognitive Orchestration Architecture
+
+The suite implements a modular, specification-compliant architecture operating under two complementary execution modalities:
+
+1. **Brain (Cognitive Agent):** An autonomous AI agent acts as the diagnostic reasoning engine, reading skill manifests (`SKILL.md`) and domain knowledge bases, ingesting empirical sensor telemetry via `orchestrator.py --telemetry`, applying the 6-Layer Causal DAG to isolate root causes and suppress downstream symptoms, classifying the business archetype (e-commerce, SaaS, publisher, local business), and synthesizing bespoke dual-track remediation.
+2. **Sensors (Deterministic Scripts):** Pure Python 3.9+ standard library CLI utilities provide raw empirical measurements: RFC 9309 crawler matrices, Schema.org entity extraction, cross-page fact ledgers, external identity probing, Princeton KDD 2024 citability heuristics, and post-citation orientation scoring. Sensors output structured JSON telemetry with zero qualitative judgment.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           AI AGENT (Reasoner)                           │
+│              COGNITIVE AGENT & ORCHESTRATION ENGINE                     │
+│  (audit-orchestrator: orchestrator.py / audit.py / SKILL.md)           │
 │                                                                         │
-│  1. Reads SKILL.md files & Knowledge Bases                             │
-│  2. Executes web-scraper (run_scraper.py) → Canonical inv.json snapshot │
-│  3. Executes Specialist Diagnostic Scripts → Collects pure telemetry   │
-│  4. Applies Multi-Signal Reasoning → Root-causes defects (HF-01 to W-08)│
-│  5. Computes 6 Orthogonal Scores & Wilson 95% Confidence Intervals      │
-│  6. Generates Final JSON Report → Validates with validate_report.py     │
+│  1. Single-Pass Acquisition → web-scraper (acquire_inventory.py)        │
+│  2. Offline Specialist Sensors → 6 Diagnostic check.py scripts          │
+│  3. Multi-Signal Reasoning & Causal Clustering → causal_gate.py         │
+│  4. Dual-Track Remediation → Technical fix + Creative fix               │
+│  5. 6 Orthogonal Scores & Wilson 95% Confidence Intervals               │
+│  6. Final Report Emission & Draft-07 Gate → validate_report.py          │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │
            ┌─────────────────────────┼────────────────────────┐
@@ -39,9 +52,17 @@ The AI agent acts as the cognitive engine:
                               engagement-context
 ```
 
-### Two-Layer Separation of Concerns
-- **AI Cognitive Layer (`SKILL.md`, Knowledge Bases):** Responsible for judgment, causal inference, dual-track remediation, and qualitative synthesis. Never executes unvalidated HTTP requests directly.
-- **Deterministic Sensor Layer (`_check.py`, `safe_fetch.py`):** Responsible for raw data extraction, RFC parsing, DOM evaluation, and mathematical calculations. Completely isolated, testable with unit tests, and 100% pure Python standard library.
+### The Anti-Shortcut Directive
+- **The AI Agent is the Brain:** It MUST ingest sensor telemetry via `orchestrator.py --telemetry`, reason over the measurements, apply 5-Whys causal analysis, classify business archetype, and author bespoke dual-track remediation customized to the brand's actual domain, products, and entity anchors.
+- **The Scripts are Sensors:** They provide raw deterministic measurements. The headless baseline mode (`orchestrator.py --format json --baseline-only`) is strictly reserved for CI/CD automated test suites, NEVER for agent-to-user delivery.
+
+### Unified Report Synthesis & Provenance Tracking
+Both `orchestrator.py --review <file>` and `audit.py finalize <file>` invoke the unified report synthesis engine (`assemble_report.py::assemble()`), guaranteeing:
+1. Multi-dimensional readiness scoring across 6 orthogonal dimensions (Crawlability, Retrieval Readiness, Citation Readiness, Entity Authority, Cross-Engine Visibility, Agentic Commerce).
+2. 6-Layer Causal DAG gating and downstream symptom suppression (`causal_gate.py`).
+3. Cryptographic execution provenance via `run_manifest` (SHA-256 hashes of references, engine version, and runtime platform).
+4. Strict Draft-07 JSON Schema validation against `report-schema.json`.
+
 
 ---
 
@@ -94,15 +115,38 @@ To avoid collapsing distinct technical vectors into a single misleading score, t
 
 ---
 
-## 4. The Canonical 16-Defect Taxonomy
+## 4. The Canonical 16-Defect Taxonomy & 6-Layer Causal DAG
 
-Findings must be classified into the canonical defect taxonomy:
+Findings are categorized and gated through the Monotonic 6-Layer Causal DAG in `causal_gate.py` to isolate root causes and suppress symptomatic downstream noise:
+
+```text
+Layer 0: Network & Crawler Access (RFC 9309, HTTP 4xx/5xx)
+    │
+    ▼ (Blocks Layer 1-5 evaluation if AI_RETRIEVAL_BLOCKED)
+Layer 1: Content Rendering & Delivery (CSR shell, SNR < 0.12, CAG > 0.15)
+    │
+    ▼ (Blocks Layer 4-5 citability evaluation if RENDERED_CONTENT_GAP)
+Layer 2: Machine Entity Identity & Structured Data (Organization, sameAs, Schema)
+    │
+    ▼
+Layer 3: Cross-Page Factual & Commercial Consistency (Fact ledger, trial terms)
+    │
+    ▼
+Layer 4: Generative Content Citability (Princeton KDD 2024, BLUF, E-E-A-T)
+    │
+    ▼
+Layer 5: Intent Handoff & Visitor Continuity (Orientation, CTA reachability)
+```
+
+### Keystone Root-Cause Suppression Invariants
+1. **Layer 0 Block (`AI_RETRIEVAL_BLOCKED`):** If search retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) are disallowed or pages return HTTP 4xx/5xx, all downstream defects across structured data, citability, factual consistency, and engagement are suppressed into the causal diagnostic record.
+2. **Layer 1 Gap (`RENDERED_CONTENT_GAP`):** If initial HTML lacks body content (unrendered single-page application shell), factual contradictions and citability scores are suppressed until server-side rendering is restored.
 
 ### Hard Failures (HF-01 to HF-08) — Deterministic Blocker Gate
 - `HF-01`: Target page unreachable or non-200 HTTP status.
-- `HF-02`: Contradictory, missing, or conflicting canonical declarations.
+- `HF-02`: Contradictory, missing, or conflicting canonical declarations (HTML vs HTTP Link header).
 - `HF-03`: AI search retrieval crawler disallowed in `robots.txt`.
-- `HF-04`: `noindex` directive active on indexable content.
+- `HF-04`: `noindex` directive active on indexable content (meta tag or `X-Robots-Tag`).
 - `HF-05`: `nosnippet` or restrictive `max-snippet` active on core text.
 - `HF-06`: Product price contradiction between visible HTML and JSON-LD `Offer.price`.
 - `HF-07`: Critical factual claims exist solely in images/PDF/JS without equivalent HTML.
@@ -111,7 +155,7 @@ Findings must be classified into the canonical defect taxonomy:
 ### High-Value Warnings (W-01 to W-08) — Probabilistic Quality Risks
 - `W-01`: Initial HTML extraction deficit (SSR content gap).
 - `W-02`: High-value claims lack independent source attribution.
-- `W-03`: Commercial pricing or stock drift across routes.
+- `W-03`: Commercial pricing, trial duration, or stock drift across routes.
 - `W-04`: Brand entity discordance across Organization schema and external nodes.
 - `W-05`: Excessive discovery depth (authoritative evidence requires > 3 hops).
 - `W-06`: `llms.txt` manifest contains broken or non-canonical links.
@@ -120,7 +164,24 @@ Findings must be classified into the canonical defect taxonomy:
 
 ---
 
-## 5. Security & SSRF Protection Architecture
+## 5. Multi-Archetype Answerability Architecture
+
+`entity_content_check.py` evaluates commercial answerability across four distinct business archetypes rather than forcing a monolithic e-commerce model:
+
+1. **E-Commerce Archetype:**
+   - Evaluates `Product` and `Offer` schema nodes.
+   - Inspects numeric `price`, ISO 4217 `priceCurrency`, `availability` (`InStock`), `hasMerchantReturnPolicy`, and `shippingDetails`.
+2. **SaaS & Subscription Archetype:**
+   - Evaluates structured pricing tables, tier names, monthly/annual billing cadences, cancellation terms, and interactive trial CTAs.
+   - Validates trial length and commercial refund term consistency across landing pages and pricing routes.
+3. **Professional & B2B Services Archetype:**
+   - Evaluates explicit service definitions, named deliverables, engagement models (fixed fee, retainer, hourly), and verified contact channels (phone, email).
+4. **Content & Publisher Archetype:**
+   - Evaluates credentialed author attribution (`Person` schema, professional degrees/titles), publication timestamps, and citation references.
+
+---
+
+## 6. Security & SSRF Protection Architecture
 
 The audit suite adheres to a zero-trust model when fetching external domains:
 - **RFC 1918 Private Address Blocking:** Blocks `10.0.0.0/8`, `172.16.0.0/12`, `169.254.0.0/16`, `192.168.0.0/16`.
@@ -131,24 +192,24 @@ The audit suite adheres to a zero-trust model when fetching external domains:
 
 ---
 
-## 6. Grounded Verification & Epistemic Boundaries
+## 7. Grounded Verification & Epistemic Boundaries
 
 To prevent misleading claims and preserve scientific integrity, the audit implements strict boundaries between static heuristics, declared metadata, and empirical evidence:
 
-### 6.1 Explicit Evidence Classes (Authority & Corroboration)
+### 7.1 Explicit Evidence Classes (Authority & Corroboration)
 The audit segregates identity and backlink evidence into two non-overlapping classes:
 1. `declared_identity_nodes`: Outbound identity assertions declared by the site itself via Schema.org `sameAs` (e.g., Wikidata, Wikipedia, LinkedIn, X, Crunchbase). Verifies that these identity endpoints are live (HTTP 200) and resolve to authoritative third-party knowledge graphs.
 2. `verified_candidate_backlinks`: Inbound citations from external third-party referring pages to the audited domain, verified via bounded, SSRF-safe HTTP probing.
 
 > **Common Crawl CDX Technical Reality**: The Common Crawl CDX API indexes *crawled URLs*, timestamps, byte offsets, and MIME types. It does **not** index an inverted link graph (which URL links to which target). Truthful backlink discovery from Common Crawl requires petabytes of WARC graph extraction. The audit enforces an honest **bounded candidate backlink verification contract** (`--candidate-backlinks`) rather than feigning instant web-wide discovery.
 
-### 6.2 Bounded Candidate Backlink Verification Contract
+### 7.2 Bounded Candidate Backlink Verification Contract
 - **Input Contract:** Takes candidate referring URLs via `--candidate-backlinks "url1,url2"` or newline-delimited file.
 - **SSRF Safe:** Strict IP resolution check against RFC 1918, loopbacks, link-local metadata addresses (`169.254.169.254`), and IPv6 private blocks prior to socket connection.
 - **Resource Bounds:** Capped at 10 candidate URLs per audit, 5.0-second socket timeout, and 512 KiB streaming limit per response body.
 - **Classification:** Categorizes referring domains by type (`academic_edu`, `government_gov`, `industry_news`, `standard_web`).
 
-### 6.3 Dual-Track Engagement Auditing (Analytics Ingestion)
+### 7.3 Dual-Track Engagement Auditing (Analytics Ingestion)
 The audit separates static UX proxies from observed engagement outcomes:
 - **Static UX Proxies:** Heuristic signals evaluated from raw HTML (H1 alignment, word count, CTA reachability in first 3 interactive elements, internal navigation scent).
 - **Observed Engagement Outcomes:** Optional empirical ingestion via `--analytics <file.csv|file.json|inline>` containing `{route, ai_referral_sessions, bounce_rate, avg_dwell_time_seconds, primary_referrer}`.
@@ -156,7 +217,7 @@ The audit separates static UX proxies from observed engagement outcomes:
 - **Heuristic Mitigation:** When analytics confirm healthy visitor retention (bounce <= 35%, dwell >= 60s), static heuristic defects are downgraded or suppressed with notes that empirical performance is satisfactory.
 - **Heuristic-Only Limitation:** In the absence of analytics, reports explicitly declare findings as *unverified static UX proxies* that have not been calibrated against real user telemetry.
 
-### 6.4 Deterministic Page-Level GEO Content Improvement Plans
+### 7.4 Deterministic Page-Level GEO Content Improvement Plans
 Derived algorithmically from the 9 Princeton KDD 2024 / AutoGEO citability dimensions in `geo_content_check.py`:
 - **Gap Analysis:** Identifies specific deficits on each audited page across causal mechanisms, statistical evidence, passage chunking, semantic tables, BLUF placement, hedge density, and quotation authority.
 - **Structural Actions:** Actionable blueprints for adding responsive comparison tables, step-by-step ordered lists, and Q&A blocks with FAQPage JSON-LD.
@@ -164,20 +225,20 @@ Derived algorithmically from the 9 Princeton KDD 2024 / AutoGEO citability dimen
 - **120–180 Word Passage Chunking Plan:** Reorganizes body content into standalone, self-contained semantic passages optimized for RAG chunk extraction.
 - **Epistemic Qualification:** Every plan explicitly states that recommendations are static heuristic optimizations grounded in empirical GEO research, **not** live citation log measurements or guarantees of search engine ranking.
 
-### 6.5 Empirical Evidence Genres & Standalone FAQ Deficit (Zhang et al. 2026)
+### 7.5 Empirical Evidence Genres & Standalone FAQ Deficit (Zhang et al. 2026)
 Research across 21,143 empirical citations demonstrates that citation absorption is non-uniform across presentation structures:
 - **High-Influence Genres:** Code blocks (+76.9%), Statistics (+61.6%), Definition copulas (+57.3%), Comparison tables (+55.3%), and Procedural steps (+41.2%).
 - **Standalone FAQ Penalty (-5.7%):** Using isolated question-and-answer formats without empirical data, code, or tables reduces citation probability. The sensor flags `STANDALONE_FAQ_DEFICIT` to mandate multi-genre reinforcement.
 
-### 6.6 Attention Primacy & Token Distribution
+### 7.6 Attention Primacy & Token Distribution
 - **BLUF Top-30% Attention Primacy:** Grounded in Stanford ("Lost in the Middle") and Zyppy 2026 findings proving that 44.2% of citations occur in the top 30% / first 250 words of a document. Answers delayed beyond this threshold suffer 30–40% retrieval degradation.
 - **Neural Perplexity Penalty:** Non-stopword token density exceeding 4.5% triggers `EXCESSIVE_KEYWORD_DENSITY`, reflecting the empirical -8.3% to -10% citation degradation caused by neural embedding reranker penalties on unnatural token repetition.
 
-### 6.7 Post-Citation Intent Handoff & CTA Reachability Index
+### 7.7 Post-Citation Intent Handoff & CTA Reachability Index
 Evaluates the arrival experience of high-intent citation traffic:
 - **Viewport Answer Anchoring:** The cited proposition must be visible within the top 600px viewport (first 150 words / 2 paragraphs) to prevent orientation shock and immediate bounce (`VIEWPORT_ANSWER_ABSENCE`).
 - **CTA Reachability Index:** Quantifies transactional continuation accessibility:
   ```text
-Reachability Index = 1 / (1 + Preceding Interactive Elements)
-```
+  Reachability Index = 1 / (1 + Preceding Interactive Elements)
+  ```
   If the primary commercial action is delayed behind > 3 auxiliary header/nav links, the sensor flags `CTA_REACHABILITY_FRICTION`.

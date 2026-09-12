@@ -99,6 +99,7 @@ class TestPartialFailureSemantics(unittest.TestCase):
     def test_inconclusive_audit_report_validates_in_schema(self):
         """Inconclusive state test: Inconclusive audit reports strictly validate under Draft-07 schema."""
         inconclusive_report = {
+            "schema_version": "1.0.0",
             "site": "https://offline-example.com",
             "audited_at": "2026-09-06T12:00:00Z",
             "audit_status": "failed",
@@ -117,6 +118,8 @@ class TestPartialFailureSemantics(unittest.TestCase):
                     "confidence": "high",
                     "category": "discoverability",
                     "root_cause": "DNS resolution failure or server timeout",
+                    "scope": "https://offline-example.com",
+                    "impact": "Impairs AI crawler indexation due to unreachable domain.",
                     "evidence": "Socket timeout connecting to https://offline-example.com",
                     "suggested_action": {
                         "summary": "Verify web server availability and firewall rules",
