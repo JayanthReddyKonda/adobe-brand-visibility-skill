@@ -30,12 +30,13 @@ except (ImportError, ValueError):
         from validate_report import validate_report_dict  # type: ignore
 
 try:
-    from .causal_gate import apply_causal_suppression  # type: ignore
+    from .causal_gate import apply_causal_suppression, detect_business_archetype  # type: ignore
 except (ImportError, ValueError):
     try:
-        from causal_gate import apply_causal_suppression  # type: ignore
+        from causal_gate import apply_causal_suppression, detect_business_archetype  # type: ignore
     except ImportError:
         apply_causal_suppression = None
+        detect_business_archetype = None
 
 
 def build_run_manifest(site: str, duration_sec: float = 0.0) -> Dict[str, Any]:
@@ -166,7 +167,132 @@ def validate_report(report: Dict[str, Any]) -> bool:
     valid, errors = validate_report_dict(report, str(schema_path))
     if not valid:
         raise ValueError("; ".join(errors))
-    return True
+def resolve_dag_node(cid: str, cat: str) -> str:
+    """Resolve exact Causal DAG layer (RETRIEVAL, RENDERING, ENTITY, FACTS, CORROBORATION, GEO_CITABILITY, ENGAGEMENT)."""
+    cid_u = str(cid or "").upper()
+    cat_l = str(cat or "").lower()
+
+    # Support 134-item catalogue check prefixes (e.g. E1, D1, J1, C1, N10)
+    if len(cid_u) <= 4 and cid_u and cid_u[0].isalpha():
+        if cid_u.startswith("BN"):
+            return "FACTS"
+        if cid_u.startswith(("BC", "PP", "SA", "SC")):
+            return "CORROBORATION"
+        if cid_u.startswith(("EC", "ED", "ME")):
+            return "ENTITY"
+        if len(cid_u) <= 3 and (len(cid_u) == 1 or cid_u[1:].isdigit()):
+            pfx = cid_u[0]
+            if pfx in ("A", "B", "D", "H"):
+                return "RETRIEVAL"
+            if pfx == "C":
+                return "RENDERING"
+            if pfx == "E":
+                return "ENTITY"
+            if pfx == "F":
+                return "FACTS"
+            if pfx in ("G", "N"):
+                return "GEO_CITABILITY"
+            if pfx in ("I", "J"):
+                return "ENGAGEMENT"
+            if pfx == "P":
+                return "CORROBORATION"
+
+    # Layer 1: RENDERING
+    if any(k in cid_u for k in ("RENDER", "HYDRAT", "SPA_SHELL", "UNRENDERED", "CSR_")):
+        return "RENDERING"
+
+    # Layer 0: RETRIEVAL
+    if any(k in cid_u for k in ("RETRIEVAL", "ROBOTS", "NOINDEX", "SITEMAP", "CANONICAL", "HTTP_", "STATUS_", "REDIRECT", "LOCALE_", "CRAWL")):
+        return "RETRIEVAL"
+    if cat_l in ("crawlability", "discoverability", "indexability", "locale", "canonicalization", "http"):
+        return "RETRIEVAL"
+
+    # Layer 2: ENTITY
+    if any(k in cid_u for k in ("ENTITY", "ORGANIZATION", "PRODUCT", "OFFER", "SCHEMA", "PRICE_METADATA", "LOCAL_BUSINESS", "SERVICE_SCHEMA", "COMMERCIAL_PRODUCT")):
+        return "ENTITY"
+    if cat_l in ("entity", "entity-identity", "structured-data", "structured_data", "commercial", "product-answerability", "entity-answerability", "schema-deprecation"):
+        return "ENTITY"
+
+    # Layer 3: FACTS
+    if any(k in cid_u for k in ("CROSS_PAGE", "CONTRADICTION", "DISCREPANCY", "DRIFT", "STALE_YEAR", "TERMS_CONFLICT")):
+        return "FACTS"
+    if cat_l in ("fact-consistency", "fact_consistency", "facts", "lifecycle", "freshness", "commercial_terms", "representation"):
+        return "FACTS"
+
+    # Layer 4: CORROBORATION
+    if any(k in cid_u for k in ("CORROBORATION", "SAMEAS", "AUTHORITY", "WIKIDATA", "WIKIPEDIA", "LINKEDIN", "ANCHOR", "MIRROR")):
+        return "CORROBORATION"
+    if cat_l in ("corroboration", "authority", "sameas"):
+        return "CORROBORATION"
+
+    # Layer 6: ENGAGEMENT
+    if any(k in cid_u for k in ("ORIENTATION", "PROOF_ARCHITECTURE", "FRICTION", "OBJECTION", "PATHWAY", "CTA_", "SCENT", "BOUNCE", "VIEWPORT_ANSWER", "INTENT_TO_LANDING")):
+        return "ENGAGEMENT"
+    if cat_l in ("engagement", "conversion-continuity", "user-experience", "extraction"):
+        return "ENGAGEMENT"
+
+    # Layer 5: GEO_CITABILITY
+    if any(k in cid_u for k in ("INFORMATION_GAIN", "QUOTATION", "MATRIX", "DEPTH", "CITABILITY", "FACT_TO_TOKEN", "FAQ_DEFICIT", "PASSAGE", "KEYWORD_DENSITY", "HEDGE", "BLUF", "EVIDENCE")):
+        return "GEO_CITABILITY"
+    if cat_l in ("geo_content", "geo-content", "content", "citability"):
+        return "GEO_CITABILITY"
+
+    return "RETRIEVAL"
+
+
+def generate_priority_justification(f: Dict[str, Any], idx: int) -> str:
+    """Generate needle-moving ordering judgment explaining why this finding is ranked at position #idx."""
+    cid = str(f.get("cause_id") or f.get("id") or f.get("check_id") or "").upper()
+    dag = str(f.get("dag_node") or "RETRIEVAL")
+
+    if cid in ("AI_RETRIEVAL_BLOCKED", "CRAWLER_ACCESS_DENIED"):
+        just = "Keystone Layer 0 defect. Without HTTP 200 accessibility, AI retrieval engines cannot crawl or index pages, rendering all downstream markup and content invisible."
+    elif "NOINDEX" in cid:
+        just = "Explicit indexability blocker. The noindex directive instructs retrieval bots to purge the route from search indexes, superseding all on-page structured data and citability optimizations."
+    elif "ROBOTS" in cid:
+        just = "Crawler access barrier. Disallow directives on verified AI search bots prevent modern generative answer engines from retrieving the brand's primary domain content."
+    elif "RENDER" in cid or dag == "RENDERING":
+        just = "Layer 1 rendering failure. Serving an unrendered client-side JavaScript shell starves non-executing AI scrapers of text, preventing downstream entity extraction and neural dense retrieval."
+    elif "MATERIAL_ENTITY_AMBIGUITY" in cid or "MISSING_ORGANIZATION" in cid:
+        just = "Upstream entity anchor. Machine-explicit Schema.org Organization markup is required for LLMs to resolve brand identity and anchor facts in global knowledge graphs before citability can be attributed."
+    elif "PRODUCT" in cid or "OFFER" in cid:
+        just = "Commercial answerability blocker. Incomplete or unrendered product and pricing schemas prevent AI shopping assistants from providing direct buy recommendations and accurate price comparisons."
+    elif "SAMEAS" in cid or "AUTHORITY" in cid or "KNOWLEDGE_GRAPH" in cid or dag == "CORROBORATION":
+        just = "Knowledge graph consensus gap. Omitting established third-party authority profiles from Schema.org sameAs prevents AI models from verifying external consensus and corroborating brand claims."
+    elif "CROSS_PAGE" in cid or "CONTRADICTION" in cid or dag == "FACTS":
+        just = "Hallucination catalyst. Conflicting numerical or commercial claims across first-party pages directly depress RAG consensus confidence and cause generative engines to withhold definitive brand answers."
+    elif "INFORMATION_GAIN" in cid:
+        just = "Primary LLM citation filter. Content lacking proprietary data or empirical benchmarks is filtered out during generative answer synthesis because frontier models prioritize net-new information gain over generic summaries."
+    elif "QUOTATION" in cid:
+        just = "Citability multiplier. Grounded in Princeton KDD 2024 empirical benchmarks, attributed quotations from domain experts deliver a +40.9% lift in AI citation selection over unattributed assertions."
+    elif "MATRIX" in cid or "COMPARATIVE" in cid:
+        just = "High-lift retrieval structure. Princeton KDD 2024 benchmarks prove comparative tables yield the highest single empirical citation boost (+55.3%) for competitive brand queries."
+    elif "FACT_TO_TOKEN" in cid:
+        just = "RAG density deficit. Low atomic fact-to-token ratio causes dense retrieval algorithms to score passages as low-information fluff, routing queries to denser third-party references."
+    elif "DEPTH" in cid:
+        just = "Mechanistic depth gap. Generative engines favor sources explaining 'how' and 'why' through causal conjunctions over shallow assertions when answering complex user prompts."
+    elif "ORIENTATION" in cid or "VALUE_PROPOSITION" in cid:
+        just = "Post-citation bounce vector. Visitors arriving from specific AI citations bounce within 5 seconds when the hero section fails the cognitive orientation test with vague marketing abstractions."
+    elif "PROOF" in cid:
+        just = "Skepticism hurdle. AI search evaluators require quantitative benchmarks, enterprise logos, or compliance attestations immediately upon arrival to validate the factual claims made in the citation."
+    elif "FRICTION" in cid or "GATE" in cid:
+        just = "Conversion bottleneck. Forcing high-intent visitors arriving from citations into mandatory sales meetings without self-service sandbox exploration causes immediate referral abandonment."
+    elif "PATHWAY" in cid:
+        just = "Conversion cul-de-sac. Informational content concluding without logical conversion or exploration pathways strands interested visitors arriving from AI search."
+    elif "CTA" in cid:
+        just = "Intent continuity failure. Delaying primary action buttons behind auxiliary navigation blocks breaks the user task handoff initiated by the AI assistant citation."
+    elif "LOCALE" in cid:
+        just = "Multi-region retrieval mismatch. Invalid hreflang directives prevent search engines from routing localized queries to the correct regional brand assets."
+    elif "FAQ" in cid:
+        just = "Empirical citation penalty. Standalone conversational FAQs without underlying data points or technical specifications suffer a documented -5.7% citation penalty in generative engines."
+    elif dag == "GEO_CITABILITY":
+        just = "Deficit in statistical density, causal conjunctions, or BLUF primacy reduces heuristic citability score based on empirical GEO benchmarks."
+    elif dag == "ENGAGEMENT":
+        just = "Post-citation information scent or navigation friction indicates early-document orientation friction upon arrival from AI search."
+    else:
+        just = "Prioritized based on direct impact on AI retrieval visibility and user task continuity."
+
+    return f"Rank #{idx}: {just}"
 
 
 def assemble(
@@ -207,12 +333,12 @@ def assemble(
                 reason="Suppressed by 6-Layer Causal DAG: downstream symptom of upstream blocker",
             ))
         candidates = surviving
-
+        detected_arch = detect_business_archetype({"pages": inv_pages, "site": site}) if detect_business_archetype else "corporate"
         unrendered_prod = [
             sc for sc in suppressed
-            if any(k in str(sc.get("cause_id") or sc.get("id") or sc.get("check_id", "")) for k in ("ATTRIBUTE", "PRODUCT", "OFFER", "SCHEMA", "E"))
+            if any(k in str(sc.get("cause_id") or sc.get("id") or sc.get("check_id", "")) for k in ("ATTRIBUTE_INCOMPLETENESS", "INCOMPLETE_OFFER_ATTRIBUTES", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION", "PRODUCT", "OFFER"))
         ]
-        if unrendered_prod:
+        if unrendered_prod and detected_arch == "ecommerce":
             sample_scope = unrendered_prod[0].get("scope", "commercial route")
             proactive_actions.append({
                 "id": "P-001",
@@ -289,7 +415,19 @@ def assemble(
     for idx, item in enumerate(findings, 1):
         item["severity"] = LABELS[item["actual_band"]]
         item["priority_rank"] = idx
-        item["evidence"] = "; ".join(f"{e['artifact']} at {e['locator']}: {e['quote'][:500]}" for e in item["evidence_refs"])
+        evidence_snippets = []
+        for e in item.get("evidence_refs", []):
+            art = e.get("artifact", "primary_source")
+            loc = e.get("locator", "text")
+            q = e.get("quote")
+            obs = e.get("structural_observation")
+            if q:
+                evidence_snippets.append(f"{art} at {loc}: {q[:500]}")
+            elif obs:
+                evidence_snippets.append(f"{art} at {loc} [structural]: {obs[:500]}")
+            else:
+                evidence_snippets.append(f"{art} at {loc} (verified absence)")
+        item["evidence"] = "; ".join(evidence_snippets) if evidence_snippets else str(item.get("observation") or "Empirical measurement")
         cid = str(item.get("cause_id") or item.get("check_id", ""))
         cat = "discoverability"
         if cid.startswith("E") or "ENTITY" in cid or "PRODUCT" in cid or "OFFER" in cid:
@@ -303,47 +441,23 @@ def assemble(
         elif cid.startswith(("I", "J")) or "ENGAGEMENT" in cid or "CTA" in cid or "SCENT" in cid:
             cat = "engagement"
         item.setdefault("category", cat)
-        item.setdefault("root_cause", item.get("severity_reason") or item.get("observation", "Defect identified"))
-        item.setdefault("confidence", "high")
+        # Root cause must be mechanistic cause, not severity reason
+        if not item.get("root_cause") or item.get("root_cause") == item.get("severity_reason"):
+            item["root_cause"] = item.get("root_cause") or (f"Defect mechanism for {cid}" if cid else "Unspecified defect mechanism")
+        # Confidence must not default unconditionally to high
+        if not item.get("confidence") or item.get("confidence") not in ("high", "medium", "low"):
+            item["confidence"] = "low"
 
         if not item.get("affected_urls"):
             item["affected_urls"] = [item["scope"]] if item.get("scope") and str(item["scope"]).startswith("http") else [site]
 
         # Compute DAG node per 6-Layer Causal DAG
-        if "RENDER" in cid or cid.startswith("C"):
-            dag_node = "RENDERING"
-        elif cat in ("discoverability", "crawlability") or cid.startswith(("A", "B", "D")):
-            dag_node = "RETRIEVAL"
-        elif cat == "entity_content":
-            dag_node = "ENTITY"
-        elif cat == "fact_consistency":
-            dag_node = "FACTS"
-        elif cat == "corroboration":
-            dag_node = "CORROBORATION"
-        elif cat == "geo_content":
-            dag_node = "GEO_CITABILITY"
-        elif cat == "engagement":
-            dag_node = "ENGAGEMENT"
-        else:
-            dag_node = "RETRIEVAL"
-        item.setdefault("dag_node", dag_node)
+        dag_node = resolve_dag_node(cid, cat)
+        item["dag_node"] = dag_node
 
         # Compute priority_justification explaining needle-moving rationale
-        if dag_node in ("RETRIEVAL", "RENDERING"):
-            just = "Upstream barrier that completely blocks AI search engines from crawling, indexing, or extracting text across this route."
-        elif dag_node == "ENTITY":
-            just = "Fundamental machine-readable identity anchor required for generative models to disambiguate the brand in knowledge graphs."
-        elif dag_node == "FACTS":
-            just = "Numerical or terms contradiction across first-party pages that directly triggers AI hallucination and purchase distrust."
-        elif dag_node == "CORROBORATION":
-            just = "External authority link failure reducing off-site citation grounding and third-party consensus."
-        elif dag_node == "GEO_CITABILITY":
-            just = "Deficit in statistical density, causal conjunctions, or BLUF primacy directly depressing generative citation lift."
-        elif dag_node == "ENGAGEMENT":
-            just = "Post-citation information scent or CTA friction causing immediate 5-second visitor bounce upon arrival."
-        else:
-            just = "Prioritized based on direct impact on AI retrieval visibility and user task continuity."
-        item.setdefault("priority_justification", f"Rank #{idx}: {just}")
+        just = generate_priority_justification(item, idx)
+        item["priority_justification"] = just
 
         # Synchronize difficulty and priority_index
         action = dict(item.get("suggested_action") or {})
@@ -424,19 +538,21 @@ def assemble(
         def _to_code(p_item):
             c = p_item.get("status_code") or p_item.get("status")
             try:
-                return int(c)
+                val = int(c)
+                return val if 100 <= val <= 599 else None
             except (ValueError, TypeError):
-                return 200
-        crawlable_count = sum(1 for p in pages_list if _to_code(p) < 400)
-        crawlability = round((crawlable_count / total_pages) * 100.0, 2)
-    else:
-        crawlability = 100.0
+                return None
+        crawlable_count = sum(1 for p in pages_list if _to_code(p) is not None and _to_code(p) < 400)
+        crawlability = round((crawlable_count / total_pages) * 100.0, 2) if total_pages > 0 else 0.0
 
-    substantive_pages = [
-        p for p in pages_list
-        if (len((p.get("text") or "").split()) if p.get("text") else p.get("word_count", 0)) >= 50
-    ]
-    retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2) if pages_list else 100.0
+        substantive_pages = [
+            p for p in pages_list
+            if (len((p.get("text") or "").split()) if p.get("text") else p.get("word_count", 0)) >= 50
+        ]
+        retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2) if total_pages > 0 else 0.0
+    else:
+        crawlability = 0.0
+        retrieval_readiness = 0.0
 
     geo_res = sensors.get("geo-content-audit", {})
     avg_cit = geo_res.get("coverage", {}).get("average_citability_score", 0.0)
@@ -467,7 +583,9 @@ def assemble(
 
     commerce_pages = sum(
         1 for p in pages_list
-        if any(k in str(p.get("url", "")).lower() for k in ("/product", "/pricing", "/cart", "/shop"))
+        if p.get("page_type") in ("product_detail", "product", "pricing")
+        or bool(p.get("has_product_schema"))
+        or any(k in str(p.get("url", "")).lower() for k in ("/product/", "/pricing", "/cart", "/checkout"))
     )
     agentic_commerce = round((commerce_pages / total_pages) * 100.0, 2) if pages_list else 0.0
 
@@ -502,11 +620,11 @@ def assemble(
     finding_cids = {str(f.get("cause_id") or f.get("id", "")) for f in findings}
     has_render_gap = "RENDERED_CONTENT_GAP" in finding_cids or any("RENDER" in c for c in finding_cids)
     dimension_status = {
-        "crawlability": "observed",
-        "retrieval_readiness": "observed",
+        "crawlability": "observed" if pages_list else "unmeasured",
+        "retrieval_readiness": "observed" if pages_list else "unmeasured",
         "citation_readiness": "provisional" if has_render_gap else "observed",
         "entity_authority": "provisional" if has_render_gap else "observed",
-        "cross_engine_visibility": "observed",
+        "cross_engine_visibility": "observed" if pages_list else "unmeasured",
         "agentic_commerce": "provisional" if has_render_gap else "observed",
     }
     readiness = {
@@ -515,11 +633,13 @@ def assemble(
         "dimensions": dimensions,
         "weights": weights,
         "dimension_status": dimension_status,
-        "score_scope": "Observed static inventory and specialist telemetry; not live provider ranking or citation data.",
+        "score_scope": "Observed static inventory and specialist telemetry; heuristic citation-readiness proxy, not live provider ranking or citation measurement.",
     }
 
     # Archetype detection
-    if commerce_pages > 0 or any("PRODUCT" in c or "OFFER" in c for c in finding_cids):
+    if detect_business_archetype is not None:
+        archetype = detect_business_archetype({"pages": pages_list})
+    elif commerce_pages > 0 or any("PRODUCT" in c or "OFFER" in c for c in finding_cids):
         archetype = "ecommerce"
     elif any("/pricing" in str(p.get("url", "")).lower() for p in pages_list):
         archetype = "saas"
@@ -531,11 +651,18 @@ def assemble(
     summary["detected_archetype"] = archetype
 
     cov_dict = dict(coverage) if coverage else {}
+    if cov_dict.get("sensor_errors"):
+        audit_status = "partial"
+    elif not pages_list:
+        audit_status = "failed"
+    else:
+        audit_status = "complete"
+
     report = dict(
         schema_version="1.0.0",
         site=site,
         audited_at=now(),
-        audit_status="partial" if cov_dict.get("sensor_errors") else "complete",
+        audit_status=audit_status,
         archetype=archetype,
         summary=summary,
         findings=findings,

@@ -16,9 +16,11 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-ORCH_SCRIPTS = os.path.join(PROJECT_ROOT, "src", "skills", "audit-orchestrator", "scripts")
-if ORCH_SCRIPTS not in sys.path:
-    sys.path.insert(0, ORCH_SCRIPTS)
+SKILLS_DIR = os.path.join(PROJECT_ROOT, "src", "skills")
+for skill in os.listdir(SKILLS_DIR):
+    scripts_path = os.path.join(SKILLS_DIR, skill, "scripts")
+    if os.path.isdir(scripts_path) and scripts_path not in sys.path:
+        sys.path.insert(0, scripts_path)
 
 from causal_gate import apply_causal_suppression  # noqa: E402
 from validate_report import validate_report_dict, validate_type  # noqa: E402

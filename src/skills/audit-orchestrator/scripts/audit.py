@@ -12,6 +12,7 @@ Python 3.9+ standard library ONLY. Zero runtime third-party pip dependencies.
 import argparse
 import json
 import multiprocessing
+import re
 import sys
 import time
 from pathlib import Path
@@ -105,12 +106,22 @@ def make_evidence_ref(
     pages_by_url: Dict[str, Tuple[str, str]],
 ) -> List[Dict[str, Any]]:
     clean_ev = str(ev_text or "").strip()
-    quote = clean_ev[:120] if clean_ev else "Empirical diagnostic telemetry observation."
     if cand_scope in pages_by_url:
         page_art, page_body = pages_by_url[cand_scope]
-        if quote and quote in page_body:
-            return [{"artifact": page_art, "locator": "text", "quote": quote}]
-    return [{"artifact": s_art, "locator": "text", "quote": quote}]
+        # Check if an exact quoted string from ev_text is present in the raw page body
+        quotes = re.findall(r'["\']([^"\']{4,100})["\']', clean_ev)
+        for q in quotes:
+            if q in page_body:
+                return [{"artifact": page_art, "locator": "text", "quote": q}]
+        # Structural locator on primary page artifact (never citing sensor summary as website quote)
+        return [{"artifact": page_art, "locator": "dom:document", "quote": None, "structural_observation": clean_ev[:160]}]
+
+    if "/robots.txt" in cand_scope or "robots" in cand_scope.lower():
+        return [{"artifact": "robots.txt", "locator": "directive", "quote": clean_ev[:120]}]
+    if "/sitemap" in cand_scope or "sitemap" in cand_scope.lower():
+        return [{"artifact": "sitemap.xml", "locator": "xml", "quote": clean_ev[:120]}]
+
+    return [{"artifact": "inv.json", "locator": "inventory:scope", "quote": None, "structural_observation": clean_ev[:160]}]
 
 
 def execute_audit_sensors(

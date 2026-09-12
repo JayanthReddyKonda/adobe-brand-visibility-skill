@@ -646,20 +646,25 @@ def audit(base, domain, inv=None, state_file=None):
         if inv and inv.get("pages"):
             for p in inv.get("pages", []):
                 for sl in p.get("social_links", []):
-                    discovered_social.add(str(sl).strip())
+                    m = re.search(r"https?://[^\s'\"\)]+", str(sl))
+                    if m:
+                        discovered_social.add(m.group(0).rstrip("/"))
 
         declared_sameas = set()
         s_raw = org_entity.get("sameAs") or []
         if isinstance(s_raw, str):
             s_raw = [s_raw]
         for s in s_raw:
-            declared_sameas.add(str(s).strip().lower())
+            m = re.search(r"https?://[^\s'\"\)]+", str(s))
+            if m:
+                declared_sameas.add(m.group(0).rstrip("/").lower())
 
         unlinked_social = [
             sl for sl in sorted(discovered_social)
-            if not any(sl.lower().rstrip("/") == ds.rstrip("/") for ds in declared_sameas)
+            if not any(sl.lower() == ds for ds in declared_sameas)
         ]
         if unlinked_social and not any(f.get("cause_id") == "MISSING_SAMEAS_VERIFICATION" for f in findings):
+            clean_examples = unlinked_social[:5]
             findings.append(
                 {
                     "category": "entity-identity",
@@ -671,10 +676,10 @@ def audit(base, domain, inv=None, state_file=None):
                     "id": "MISSING_SAMEAS_VERIFICATION",
                     "cause_id": "MISSING_SAMEAS_VERIFICATION",
                     "impact": "AI models cannot establish bidirectional Knowledge Graph corroboration between the domain and official external entities.",
-                    "evidence": f"Found on-page social profiles omitted from Organization sameAs: {', '.join(unlinked_social[:5])}",
+                    "evidence": f"Found on-page social profiles omitted from Organization sameAs: {', '.join(clean_examples)}",
                     "suggested_action": {
                         "summary": "Add discovered social profile URLs to the Organization sameAs array in JSON-LD.",
-                        "technical_fix": f"Update Organization JSON-LD on homepage to include 'sameAs': {json.dumps(unlinked_social[:5])}.",
+                        "technical_fix": f"Update Organization JSON-LD on homepage to include 'sameAs': {json.dumps(clean_examples)}.",
                         "creative_fix": "Ensure corporate marketing social profiles are maintained and aligned across all platforms.",
                         "priority": "medium",
                         "verification": "Inspect homepage JSON-LD and verify sameAs links match external brand profiles.",

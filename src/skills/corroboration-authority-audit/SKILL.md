@@ -22,8 +22,9 @@ allowed-tools:
 | **Direct Standalone Authority Probe** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json` | `{status, evidence_classes, findings, recommendations}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `corroboration_check.py` parses declared `sameAs` links from `inv.json` offline, and only probes external authority links (Wikidata, LinkedIn) and candidate backlinks under strict socket-level SSRF sandboxing (`safe_fetch.py`). You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) on the audited target.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests corroboration signals, tests identity-matching hypotheses (matching brand title and Organization attributes), and synthesizes actionable knowledge graph substantiation paths.
+> - **Clean Skill Isolation:** This skill is strictly isolated to external identity corroboration, knowledge graph anchors, and backlink integrity. Only this skill invokes `scripts/corroboration_check.py`.
+> - **Helper Sensor (Problem Telemetry Only):** `corroboration_check.py` is an empirical helper sensor. It parses declared `sameAs` links from `inv.json` offline, and probes external authority links (Wikidata, LinkedIn) and candidate backlinks under strict socket-level SSRF sandboxing (`safe_fetch.py`). It reports only factual link resolution statuses, HTTP response codes, and canonical redirect paths without doing the cognitive work.
+> - **LLM Cognitive Generation:** The AI Agent reads `references/knowledge-base.md` and `references/checks.md`, queries the script for relevant authority telemetry, and dynamically authors knowledge graph substantiation roadmaps and verified sameAs anchor implementations with zero hardcoded boilerplate.
 
 Evaluates external entity authority by verifying that declared identity links (`sameAs` in Organization JSON-LD pointing to Wikidata, Crunchbase, Wikipedia, and official social channels) resolve cleanly with HTTP 200 without broken redirect loops or 4xx/5xx HTTP errors.
 

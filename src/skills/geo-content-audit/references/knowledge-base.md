@@ -58,20 +58,39 @@ Empirical research on 10,000 queries (Aggarwal et al., Princeton University / KD
 
 ---
 
-### Check 2: `LACK_OF_SPECIFIC_EVIDENCE`
+### Check 2: `INFORMATION_GAIN_DEFICIT`
 - **Skill:** `geo-content-audit`
-- **Family:** `CONTENT.RETRIEVAL_OPTIMIZATION`
-- **Purpose:** Encourage empirical substantiation of marketing statements with concrete figures.
-- **Input:** Regular expression extraction of numerical metrics (`\b\d+(\.\d+)?(%|USD|€|£|x|ms|s|min|hr|gb|tb|k|m|b)\b`).
-- **Decision:** Proactive recommendation emitted IF a substantive page contains zero numerical or statistical evidence.
-- **Severity:** `low` (proactive action, never an error defect).
-- **Remediation:** Add concrete benchmark numbers, performance metrics, SLA percentages, or pricing figures.
+- **Family:** `CONTENT.SHALLOW_COVERAGE`
+- **Purpose:** Detect content that repeats generic parametric LLM knowledge without net-new proprietary data points, benchmarks, or novel observations.
+- **Input:** Tokenized visible text across substantive `article`, `product_detail`, `content`, and `guide` pages (word count >= 150).
+- **Decision:** Finding triggered IF page contains 0 quantifiable metrics, benchmark figures, or empirical measurements. Generative engines synthesize generic answers from internal weights and bypass URLs lacking net-new information gain.
+- **Severity:** `high`.
+- **Confidence:** `high`.
+- **Remediation:** Inject proprietary benchmark metrics, quantifiable performance statistics, or unique empirical research data into core sections.
 
 ---
 
-### Check 3: Semantic Structure & Answer Blocks (Advisory)
-- **Product Pages:** Check for presence of `<table>`, `<dl>`, or structured `<ul>`/`<ol>` elements. LLM retrieval parsers prioritize structured tabular elements over unstructured prose for attribute extraction.
-- **Article Pages:** Check for question-form headings (`<h2>What is...</h2>`, `<h2>How do I...</h2>`). Direct answer paragraphs (20–70 words) immediately following question headings maximize rich snippet extraction in conversational search.
+### Check 3: `PRIMARY_AUTHORITY_QUOTATION_GAP`
+- **Skill:** `geo-content-audit`
+- **Family:** `CONTENT.SHALLOW_COVERAGE`
+- **Purpose:** Ensure authoritative claims are substantiated with attributed quotations from credentialed domain experts (+40.9% citation lift, Princeton KDD 2024).
+- **Input:** Substantive `article`, `content`, and `guide` pages (word count >= 200).
+- **Decision:** Finding triggered IF substantive assertions are made without attributed quotes from named domain specialists or recognized industry authorities.
+- **Severity:** `medium`.
+- **Confidence:** `high`.
+- **Remediation:** Integrate attributed quotations from credentialed domain experts or named leaders inside `<blockquote>` elements with explicit author attribution.
+
+---
+
+### Check 4: `COMPARATIVE_ANSWERABILITY_MATRIX`
+- **Skill:** `geo-content-audit`
+- **Family:** `CONTENT.SHALLOW_COVERAGE`
+- **Purpose:** Ensure comparative and alternative-evaluation queries provide structured comparison tables (Zhang et al. 2026: +55.3% citation lift).
+- **Input:** Comparative routes (URL or heading containing `vs`, `versus`, `compare`, `comparison`, `alternative`).
+- **Decision:** Finding triggered IF comparative route evaluates options without structured HTML `<table>` markup.
+- **Severity:** `medium`.
+- **Confidence:** `high`.
+- **Remediation:** Render a multi-dimensional comparison table comparing core features, pricing, and capabilities side-by-side.
 
 ---
 

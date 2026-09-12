@@ -155,7 +155,10 @@ class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
             raise urllib.error.URLError("Too many redirects")
         parsed = urllib.parse.urlparse(newurl)
         if parsed.scheme not in ("http", "https"):
-            raise urllib.error.URLError(f"Disallowed redirect scheme: {parsed.scheme}")
+            raise urllib.error.URLError(f"SSRF blocked: Disallowed redirect scheme: {parsed.scheme}")
+        port = parsed.port
+        if port is not None and port not in (80, 443):
+            raise urllib.error.URLError(f"SSRF blocked: Disallowed redirect port: {port}")
 
         is_safe, err, _ = _is_safe_host(parsed.hostname)
         if not is_safe:
@@ -216,16 +219,17 @@ def safe_fetch(
 
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in ("http", "https"):
-        return None, "", {}, f"Disallowed scheme: {parsed.scheme}"
+        return None, "", {}, f"SSRF blocked: Disallowed scheme: {parsed.scheme}"
     if not parsed.hostname or parsed.username is not None or parsed.password is not None:
-        return None, "", {}, "Malformed URL: credentials and missing host are disallowed"
+        return None, "", {}, "SSRF blocked: Malformed URL: credentials and missing host are disallowed"
     port = parsed.port
     if port is not None and port not in (80, 443):
-        return None, "", {}, f"Disallowed port: {port}. Only standard web ports (80, 443) are permitted."
+        return None, "", {}, f"SSRF blocked: Disallowed port: {port}. Only standard web ports (80, 443) are permitted."
     if max_bytes < 0:
         return None, "", {}, "Invalid max_bytes: must be non-negative"
 
     opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),  # Explicitly disable ambient environment proxies
         SafeHTTPHandler(),
         SafeHTTPSHandler(),
         SafeRedirectHandler(max_redirects=5),

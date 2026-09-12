@@ -26,18 +26,19 @@ allowed-tools:
 | **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or non-zero (fail) (exit code 2 on failure) | Verification Gate |
 
 > [!IMPORTANT]
-> **ANTI-SHORTCUT DIRECTIVE: AGENT REASONING SUPREMACY**
-> Under NO circumstances should the AI Agent run the script in headless baseline mode (`orchestrator.py --site ... --format json` or `--baseline-only`) and blindly forward its output to the user.
-> The Python tools are deterministic telemetry sensors, NOT the cognitive diagnostic brain. The baseline runner without `--telemetry` is strictly reserved for headless CI/CD automated test suites.
-> As a senior enterprise AI consultant, you MUST execute the 7-Step Cognitive Reasoning Protocol:
-> 1. **Acquire Inventory**: Run `acquire_inventory.py` under zero-trust SSRF protection to build canonical `inv.json`.
-> 2. **Collect Empirical Telemetry**: Run `orchestrator.py --telemetry` to extract un-truncated measurements across all 6 sensors and causal DAG nodes.
-> 3. **Compile Tailored Context**: Run `bundle_context.py --site <url> --inventory inv.json` to extract archetype-specific code templates and research heuristics.
-> 4. **Targeted Deep-Dive Invocations**: When telemetry indicates specific anomalies (e.g. blocked bots, missing schema, price conflicts, broken sameAs, low citability, bounce friction), invoke the relevant specialist script directly with custom parameters.
-> 5. **Apply 6-Layer Causal DAG**: Suppress downstream symptoms when upstream blockers exist (Layer 0 access blocks preempt downstream; Layer 1 unhydrated shells preempt citability/facts).
-> 6. **Author Bespoke Dual-Track Remediations**: Write exact, copy-pasteable technical code diffs (`technical_fix`) and concrete editorial copywriting guidance (`creative_fix`), ranking tasks with `plan.py`.
-> 7. **Validate & Deliver**: Validate report against `report-schema.json` via `validate_report.py` and deliver both an executive briefing and the validated Draft-07 JSON deliverable.
-
+> **ANTI-SHORTCUT DIRECTIVE: AGENT REASONING SUPREMACY & SENSOR-BRAIN CONTRACT**
+> - **Clean Skill Isolation & Orchestrator Role**: `audit-orchestrator` is the entrypoint coordinator. It does nothing else but declare what all other skills can do, coordinate single-pass inventory acquisition, aggregate problem telemetry across isolated specialist sensors, and assemble the validated Draft-07 report from the agent's cognitive review. Every specialist skill is cleanly isolated and owns its domain references and scripts.
+> - **Helper Sensors (Problem Telemetry Only)**: Diagnostic scripts in `scripts/` across all skills are strictly empirical telemetry helpers. They gather objective facts, measurements, HTTP headers, robots directives, schema objects, DOM structures, and evidence. They do NOT do the cognitive work or output canned recommendations.
+> - **LLM Cognitive Reasoning Brain**: The AI Agent is the diagnostic brain. The agent reads the relevant skill's `SKILL.md` and `references/`, asks the scripts to get problem information, applies the 6-Layer Causal DAG, and dynamically authors 100% of the findings, root causes, technical code fixes, creative copywriting guidance, and proactive actions tailored to the specific website with zero hardcoded boilerplate.
+> - **Seven-Step Cognitive Reasoning Protocol**:
+>   1. **Acquire Inventory**: Run `acquire_inventory.py` under zero-trust SSRF protection to build canonical `inv.json`.
+>   2. **Collect Empirical Telemetry**: Run `orchestrator.py --telemetry` to extract un-truncated measurements across all sensors and causal DAG nodes.
+>   3. **Compile Tailored Context**: Run `bundle_context.py --site <url> --inventory inv.json` to extract archetype-specific code templates and research heuristics.
+>   4. **Targeted Specialist Invocations**: When telemetry indicates specific anomalies (e.g. blocked bots, missing schema, price conflicts, broken sameAs, low citability, bounce friction), invoke the relevant specialist skill's sensor directly with custom parameters.
+>   5. **Apply 6-Layer Causal DAG**: Suppress downstream symptoms when upstream blockers exist (Layer 0 access blocks preempt downstream; Layer 1 unhydrated shells preempt citability/facts).
+>   6. **Author Bespoke Dual-Track Remediations**: Write exact, copy-pasteable technical code diffs (`technical_fix`) and concrete editorial copywriting guidance (`creative_fix`), ranking tasks with `plan.py`.
+>   7. **Validate & Deliver**: Validate report against `report-schema.json` via `validate_report.py` and deliver both an executive briefing and the validated Draft-07 JSON deliverable.
+>
 > **Cognitive Multi-Skill Orchestration Protocol & 134-Check Standard:**
 > 1. **Deterministic Telemetry Engine:** Outbound crawling and network measurements strictly use Python standard library tools under socket-level zero-trust SSRF protection. Downstream sensors measure crawler matrices, HTML SNR, Schema.org coverage, citability heuristics, and deep-link continuity against `inv.json`. Bounded collection finishes within 160s (worker hard limit), reserving at least 80s for semantic analysis before the 290s wall-clock ceiling.
 > 2. **134-Check Domain Catalogue & Evidence Invariants:** All 134 research checks (`checks.json`) are preserved with exact detection conditions, reference bands (S1–S4), feasibility rules, and V/C/E/X solution levels. Every emitted finding strictly cites immutable evidence (`artifact`, `locator`, `quote`). Unsubstantiated claims are rejected into `dropped_findings`.

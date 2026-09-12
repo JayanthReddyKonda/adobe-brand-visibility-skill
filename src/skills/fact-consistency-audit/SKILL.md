@@ -22,9 +22,9 @@ allowed-tools:
 | **Direct Standalone Fact Probe** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json` | `{status, findings, recommendations, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `fact_consistency_check.py` constructs a normalized first-party fact ledger across all crawled routes, isolating strictly scoped commercial and operational attributes (prices, specs, contact info). When provided with observed AI assistant outputs (`--responses`), it detects discrepancies between first-party truth and AI hallucinated answers. It does not guess which conflicting first-party fact is true.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected contradictions, applies epistemic falsification (ruling out billing cycles or feature tiering), and synthesizes a single-source-of-truth factual reconciliation runbook.
+> - **Clean Skill Isolation:** This skill is strictly isolated to cross-page factual consistency, commercial terms, and lifecycle drift. Only this skill invokes `scripts/fact_consistency_check.py`.
+> - **Helper Sensor (Problem Telemetry Only):** `fact_consistency_check.py` is an empirical helper sensor. It constructs a normalized first-party fact ledger across crawled routes, isolating strictly scoped commercial and operational attributes (prices, specs, contact info). When provided with observed AI assistant outputs (`--responses`), it detects factual divergence between first-party truth and AI hallucinated answers. It reports only factual discrepancy data without guessing which claim is true.
+> - **LLM Cognitive Generation:** The AI Agent reads `references/knowledge-base.md` and `references/checks.md`, queries the script for relevant fact ledger telemetry, and dynamically authors single-source-of-truth reconciliation runbooks and commercial copy updates with zero hardcoded boilerplate.
 
 Constructs a multi-attribute first-party fact ledger across sampled website pages. Detects verified commercial contradictions, product lifecycle conflicts (discontinued vs current), and legacy fact propagation.
 

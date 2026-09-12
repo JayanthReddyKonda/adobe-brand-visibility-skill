@@ -6,6 +6,7 @@ tailored reference briefing from the knowledge base in a single pass without too
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -20,10 +21,10 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 try:
-    from orchestrator import detect_business_archetype
+    from causal_gate import detect_business_archetype
 except ImportError:
     try:
-        from .orchestrator import detect_business_archetype
+        from orchestrator import detect_business_archetype
     except ImportError:
         detect_business_archetype = None
 
@@ -369,7 +370,6 @@ def build_bundle(site: str, data: Optional[Dict[str, Any]] = None) -> str:
 
 def verify_reference_integrity() -> Dict[str, Any]:
     """Verify presence and calculate SHA-256 checksums of core knowledge base and schema references."""
-    import hashlib
     ref_files = [
         "checks.json",
         "knowledge-base.md",

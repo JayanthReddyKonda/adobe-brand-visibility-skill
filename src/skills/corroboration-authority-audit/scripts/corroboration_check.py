@@ -10,6 +10,7 @@ Causal Root Causes:
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from html.parser import HTMLParser
@@ -244,8 +245,6 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
 
     # 2. Extract Brand Name Claim for Corroboration
     brand_name = None
-    import re
-
     title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
     if title_match:
         brand_name = title_match.group(1).split("|")[0].replace(" - ", "|").replace(" | ", "|").split("|")[0].strip()
@@ -304,13 +303,17 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
     if inv and inv.get("pages"):
         for p in inv.get("pages", []):
             for sl in p.get("social_links", []):
-                discovered_social.add(str(sl).strip())
+                m = re.search(r"https?://[^\s'\"\)]+", str(sl))
+                if m:
+                    u_clean = m.group(0).rstrip("/")
+                    discovered_social.add(u_clean)
 
     unlinked_social = [
         s for s in sorted(discovered_social)
-        if not any(s.lower().rstrip("/") == sa.lower().rstrip("/") for sa in sameas_urls)
+        if not any(s.lower() == sa.lower().rstrip("/") for sa in sameas_urls)
     ]
     if unlinked_social:
+        clean_examples = unlinked_social[:4]
         findings.append(
             {
                 "title": f"Unlinked high-authority social profiles ({len(unlinked_social)} profile(s))",
@@ -321,10 +324,10 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
                 "cause_id": "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
                 "root_cause": "The brand links to external social/code profiles in HTML but omits them from Schema.org sameAs declarations.",
                 "confidence": "high",
-                "evidence": f"Found on-page social profiles missing from Schema.org sameAs: {', '.join(unlinked_social[:4])}.",
+                "evidence": f"Found on-page social profiles missing from Schema.org sameAs: {', '.join(clean_examples)}.",
                 "suggested_action": {
                     "summary": "Add discovered official social profiles to the Organization sameAs array in JSON-LD.",
-                    "technical_fix": f"Deploy updated sameAs array in Organization JSON-LD including {unlinked_social[:4]}.",
+                    "technical_fix": f"Deploy updated sameAs array in Organization JSON-LD including {json.dumps(clean_examples)}.",
                     "creative_fix": "Ensure official corporate profiles maintain consistent branding and verify reciprocity.",
                     "priority": "medium",
                     "verification": "Inspect homepage JSON-LD to confirm all profiles are declared in sameAs.",

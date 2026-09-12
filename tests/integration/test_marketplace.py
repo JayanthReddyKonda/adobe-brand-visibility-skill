@@ -1,5 +1,4 @@
-"""
-test_marketplace.py - Manifest integrity and check ownership validation.
+"""test_marketplace.py - Manifest integrity and check ownership validation.
 
 Validates:
 - marketplace.json has a "version" field
@@ -12,7 +11,7 @@ import json
 import os
 import unittest
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC_ROOT = os.path.join(REPO_ROOT, "src")
 MARKETPLACE_PATH = os.path.join(SRC_ROOT, "marketplace.json")
 CHECKS_PATH = os.path.join(

@@ -224,15 +224,26 @@ A page can achieve a 95/100 technical SEO score and still fail completely in AI 
 - **Strong Value-Driven CTAs:** `Start Free Trial`, `See Live Pricing`, `Explore Documentation`, `Download Architecture PDF`.
 - **Formula:** `[Action Verb] + [Specific Desired Outcome/Asset]`.
 
-### The 7 Post-Citation Bounce Mechanisms (The 5-Second Abandonment Filter):
-When visitors click through from AI assistant citations (ChatGPT, Perplexity, Claude), up to 70% bounce within 5 seconds if the destination violates intent continuity:
-1. **`VIEWPORT_ANSWER_ABSENCE`**: The primary claim, product, or price quoted by the AI assistant does not appear in the top 600px viewport. The visitor cannot confirm what the AI told them and leaves immediately.
-2. **`LOW_INFORMATION_SCENT` (`GENERIC_H1`)**: The page title or H1 displays generic marketing copy ("Innovating Together", "Welcome") rather than echoing the specific entity or topic cited.
-3. **`CTA_REACHABILITY_FRICTION`**: The transaction or next-step action is hidden behind multi-level menus, modal popups, or deep scrolling (>3 interaction actions).
-4. **`COMMERCIAL_HANDOFF_DISCONTINUITY`**: The AI summary promised a commercial solution or pricing, but the destination page offers no transparent purchasing or self-serve checkout mechanism.
-5. **`AGENT_INTERACTION_BARRIER`**: Actions rely on non-semantic `<div onclick>` handlers, locking out autonomous purchasing agents and keyboard users.
-6. **`LOCALE_MISCONFIGURATION`**: Destination page delivers mismatched language, wrong currency, or missing locale indicators, causing instant regional bounce.
-7. **`COGNITIVE_READABILITY_FRICTION`**: Overly dense text (ARI > 14) or heavy buzzwords delay the visitor's ability to verify the answer.
+### The 6 Masterclass Post-Citation Retention Vectors (Why Arriving AI Referral Visitors Leave):
+When visitors click through from AI assistant citations (ChatGPT Search, Perplexity, Claude, Google AI Overviews), they are skeptical, high-intent evaluators verifying a specific claim. If the destination violates behavioral continuity, up to 75% bounce within 5 seconds:
+
+1. **`VALUE_PROPOSITION_ORIENTATION_VACUUM` (Orientation Shock / 5-Second Test Failure):**
+   The hero viewport leads with abstract marketing platitudes ("Empowering enterprise agility", "Welcome to our portal") instead of immediately defining what the product does, for whom, and its concrete outcome within 50 words. The visitor cannot confirm they are in the right place and bounces.
+
+2. **`PROOF_ARCHITECTURE_DEFICIT` (The Skepticism Deficit):**
+   AI search users know generative models hallucinate. When they visit to verify claims, the absence of empirical proof anchors (verifiable benchmark metrics, customer case studies with quantified results, or SOC2/HIPAA security credentials) causes immediate dismissal of the brand's claims.
+
+3. **`FRICTION_TO_VALUE_BARRIER` (Forced Sales Gates vs. Self-Service):**
+   Technical and product buyers arriving from AI search seek immediate product utility. Forcing an unskippable "Book a 30-Minute Sales Call" gate with zero self-service entry points (documentation, interactive sandbox, transparent pricing tiers) drives evaluators directly to self-service competitors.
+
+4. **`OBJECTION_COVERAGE_VOID` (Purchase Decision Stall):**
+   High-intent commercial traffic stalls when essential buyer hesitations are unaddressed above conversion triggers: pricing transparency, implementation and migration timelines, integration compatibility (APIs/SDKs), and security compliance terms.
+
+5. **`DECISION_PATHWAY_DEAD_END` (Experiential Terminal Abandonment):**
+   Informational and technical guides that conclude abruptly without logical next-step pathways (related deep-dives, sandbox environment, implementation checklist, or free tier signup) cause 100% of satisfied readers to exit the site without converting.
+
+6. **`CITATION_PROMISE_DELIVERY_GAP` (Expectation-Delivery Mismatch):**
+   The AI assistant cited a specific product feature, price, or capability. If the landing page buries or omits that specific proposition behind auxiliary banners or deep navigation, the visitor experiences broken expectation scent and returns to the AI search engine.
 
 ---
 

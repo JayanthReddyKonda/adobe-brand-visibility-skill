@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ORCH_DIR = ROOT / "src/skills/audit-orchestrator/scripts"
 SCRAPER_DIR = ROOT / "src/skills/web-scraper/scripts"
 DISC_DIR = ROOT / "src/skills/discoverability-audit/scripts"

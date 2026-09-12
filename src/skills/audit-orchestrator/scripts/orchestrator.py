@@ -8,6 +8,7 @@ strictly validated Draft-07 JSON report.
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -21,130 +22,6 @@ from urllib.parse import urlparse
 # ClaudeBot) is a governance decision — NOT an AI search defect.
 # ---------------------------------------------------------------------------
 RETRIEVAL_BOTS: Set[str] = {"OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "anthropic-ai"}
-
-# Bidirectional Taxonomy Alias Mapping between Synthesis Keys and Sensor Output Keys
-TAXONOMY_ALIASES: Dict[str, str] = {
-    "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
-    "NOINDEX_EXCLUSION": "META_DIRECTIVE_CONFLICT",
-    "CANONICAL_TARGET_MISMATCH": "CANONICAL_FRAGMENTATION",
-    "CANONICAL_FRAGMENTATION": "CANONICAL_TARGET_MISMATCH",
-    "UNVERIFIED_AUTHORITY_GAP": "WEAK_IDENTITY_SIGNALS",
-    "WEAK_IDENTITY_SIGNALS": "UNVERIFIED_AUTHORITY_GAP",
-    "SUB_THRESHOLD_CITABILITY": "LOW_CITABILITY_SCORE",
-    "LOW_CITABILITY_SCORE": "SUB_THRESHOLD_CITABILITY",
-    "MISSING_BLUF_PRIMACY": "CONTEXT_PLACEMENT_DEGRADATION",
-    "CONTEXT_PLACEMENT_DEGRADATION": "MISSING_BLUF_PRIMACY",
-    "INTENT_SCENT_DILUTION": "LOW_INFORMATION_SCENT",
-    "LOW_INFORMATION_SCENT": "INTENT_SCENT_DILUTION",
-    "COMMERCIAL_HANDOFF_DISCONTINUITY": "INTENT_TO_LANDING_MISMATCH",
-    "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
-    "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
-    "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
-    "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
-    "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
-}
-
-# ---------------------------------------------------------------------------
-# Full 6-Layer Causal DAG — Keystone suppression tables
-# Source: knowledge-base.md Section 12
-# Layer 0 defects preempt everything below. Layer 1 defects preempt Layers 2-4.
-# ---------------------------------------------------------------------------
-_LAYER0_CAUSE_IDS: Set[str] = {
-    "AI_RETRIEVAL_BLOCKED",
-    "NOINDEX_EXCLUSION",
-    "META_DIRECTIVE_CONFLICT",
-    "ROBOTS_5XX_FAIL_CLOSED",
-    "ROBOTS_TXT_OVERSIZED",
-}
-_LAYER1_CAUSE_IDS: Set[str] = {
-    "RENDERED_CONTENT_GAP",
-    "NOSNIPPET_ON_CORE_CONTENT",
-    "WAF_BOT_CHALLENGE",
-    "CANONICAL_FRAGMENTATION",
-    "CANONICAL_TARGET_MISMATCH",
-}
-# Findings at Layers 2-5 that are symptoms of Layer 0 (access block)
-_SUPPRESSED_BY_LAYER0: Set[str] = {
-    # Layer 2 — Entity Resolution
-    "MATERIAL_ENTITY_AMBIGUITY",
-    "MISSING_SAMEAS_VERIFICATION",
-    "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
-    "BROKEN_AUTHORITY_ANCHOR",
-    "CIRCULAR_SAMEAS_SELF_REFERENCE",
-    "WEAK_IDENTITY_SIGNALS",
-    "UNVERIFIED_AUTHORITY_GAP",
-    # Layer 3 — Fact Ledger
-    "FIRST_PARTY_FACT_CONFLICT",
-    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
-    "CONFLICTING_COMMERCIAL_TERMS",
-    "DISCONTINUED_VS_CURRENT_CONFLICT",
-    "INCOMPLETE_OFFER_ATTRIBUTES",
-    "STALE_AUTHORITATIVE_FACT",
-    "ATTRIBUTE_INCOMPLETENESS",
-    "CONTENT_RECENCY_DEFICIT",
-    "TEMPORAL_DRIFT_DETECTED",
-    # Layer 4 — Citability
-    "MISSING_IN_DEPTH_MECHANISMS",
-    "STANDALONE_FAQ_DEFICIT",
-    "LOW_FACT_TO_TOKEN_RATIO",
-    "EXCESSIVE_KEYWORD_DENSITY",
-    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
-    "CONTEXT_PLACEMENT_DEGRADATION",
-    "MISSING_BLUF_PRIMACY",
-    "LOW_INFORMATION_SCENT",
-    "INTENT_SCENT_DILUTION",
-    "LOW_CITABILITY_SCORE",
-    "SUB_THRESHOLD_CITABILITY",
-    # Layer 5 — Engine selection (full suppression only when entire domain is blocked)
-    "AI_CITATION_GAP",
-    "AI_FACT_CONFLICT",
-    "AI_REFERRAL_DISCONTINUITY",
-    "INTENT_TO_LANDING_MISMATCH",
-    "COMMERCIAL_HANDOFF_DISCONTINUITY",
-    "CTA_REACHABILITY_FRICTION",
-    "ABOVE_FOLD_ACTION_DELAY",
-}
-# Findings at Layers 2-6 that are symptoms of Layer 1 (rendering gap)
-_SUPPRESSED_BY_LAYER1: Set[str] = {
-    # Layer 2 — Entity & Answerability (Product/Catalog routes cannot resolve schema without hydration)
-    "ATTRIBUTE_INCOMPLETENESS",
-    "INCOMPLETE_OFFER_ATTRIBUTES",
-    "SCHEMA_MISSING",
-    "SCHEMA_INVALID",
-    "MISSING_MATERIAL_FACT",
-    # Layer 3 — Fact Ledger (cannot read facts from an unrendered shell)
-    "FIRST_PARTY_FACT_CONFLICT",
-    "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
-    "CONFLICTING_COMMERCIAL_TERMS",
-    "DISCONTINUED_VS_CURRENT_CONFLICT",
-    "CONTENT_RECENCY_DEFICIT",
-    "TEMPORAL_DRIFT_DETECTED",
-    "STALE_AUTHORITATIVE_FACT",
-    # Layer 4 — Citability & Text Structure (cannot evaluate citation quality of an empty page)
-    "LOW_FACT_TO_TOKEN_RATIO",
-    "MISSING_IN_DEPTH_MECHANISMS",
-    "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
-    "CONTEXT_PLACEMENT_DEGRADATION",
-    "MISSING_BLUF_PRIMACY",
-    "LOW_CITABILITY_SCORE",
-    "SUB_THRESHOLD_CITABILITY",
-    "LACK_OF_SPECIFIC_EVIDENCE",
-    "LOW_INFORMATION_SCENT",
-    "INTENT_SCENT_DILUTION",
-    "STANDALONE_FAQ_DEFICIT",
-    "EXCESSIVE_KEYWORD_DENSITY",
-    # Layer 5 & 6 — Engagement, Orientation & Referral Continuity (cannot measure CTAs or headings on unrendered DOM)
-    "CTA_REACHABILITY_FRICTION",
-    "ABOVE_FOLD_ACTION_DELAY",
-    "VIEWPORT_ANSWER_ABSENCE",
-    "AGENT_INTERACTION_BARRIER",
-    "INTENT_TO_LANDING_MISMATCH",
-    "COMMERCIAL_HANDOFF_DISCONTINUITY",
-    "DESTINATION_NAVIGATION_FRICTION",
-    "AI_REFERRAL_DISCONTINUITY",
-    "GENERIC_H1",
-    "HEADING_HIERARCHY_VACUUM",
-}
 
 # ---------------------------------------------------------------------------
 # Archetype-Specific Severity Reweighting
@@ -220,16 +97,250 @@ try:
 except ImportError:
     validate_type = None  # type: ignore
 
-try:
-    from plan import infer_finding_difficulty, calculate_priority_index
-except ImportError:
-    try:
-        from .plan import infer_finding_difficulty, calculate_priority_index
-    except ImportError:
-        def infer_finding_difficulty(f: Dict[str, Any]) -> int:
-            return 2
-        def calculate_priority_index(sev: int, diff: int) -> int:
-            return 5 * sev + (6 - diff)
+LABELS: Dict[str, str] = {
+    "S4": "critical",
+    "S3": "high",
+    "S2": "medium",
+    "S1": "low",
+    "S0": "info",
+    "U": "unassessable",
+}
+
+
+def calculate_priority_index(severity: int, difficulty: int) -> int:
+    """Calculate task ranking index: priority_index = 5 * severity + (6 - difficulty)."""
+    if not (1 <= severity <= 4):
+        raise ValueError(f"severity must be in 1..4, got {severity}")
+    if not (1 <= difficulty <= 5):
+        raise ValueError(f"difficulty must be in 1..5, got {difficulty}")
+    return 5 * severity + (6 - difficulty)
+
+
+def infer_finding_difficulty(f: Dict[str, Any]) -> int:
+    """Infer remediation difficulty (1=easiest, 5=hardest) from solution level or category."""
+    d = f.get("difficulty")
+    if isinstance(d, int) and 1 <= d <= 5:
+        return d
+    sol_level = str(f.get("solution_level", "")).upper()
+    if sol_level == "E":  # Editorial copy update
+        return 2
+    if sol_level == "V":  # Mechanical validation / config / robots.txt
+        return 2
+    if sol_level == "C":  # Code / structured data / server template
+        return 3
+    if sol_level == "X":  # External platform claim / third-party profile
+        return 4
+
+    cat = str(f.get("category", "")).lower()
+    cid = str(f.get("cause_id") or f.get("id") or "").lower()
+    if "robots" in cat or "robots" in cid or "sitemap" in cid:
+        return 2
+    if "entity" in cat or "schema" in cat:
+        return 2
+    if "geo" in cat or "citability" in cat:
+        return 2
+    if "engagement" in cat:
+        return 2
+    if "fact" in cat or "drift" in cid:
+        return 3
+    if "corroboration" in cat or "authority" in cat or "backlink" in cid:
+        return 4
+    return 3
+
+
+def resolve_dag_node(cid: str, cat: str) -> str:
+    """Resolve exact Causal DAG layer (RETRIEVAL, RENDERING, ENTITY, FACTS, CORROBORATION, GEO_CITABILITY, ENGAGEMENT)."""
+    cid_u = str(cid or "").upper()
+    cat_l = str(cat or "").lower()
+
+    # Support 134-item catalogue check prefixes (e.g. E1, D1, J1, C1, N10)
+    if len(cid_u) <= 4 and cid_u and cid_u[0].isalpha():
+        if cid_u.startswith("BN"):
+            return "FACTS"
+        if cid_u.startswith(("BC", "PP", "SA", "SC")):
+            return "CORROBORATION"
+        if cid_u.startswith(("EC", "ED", "ME")):
+            return "ENTITY"
+        if len(cid_u) <= 3 and (len(cid_u) == 1 or cid_u[1:].isdigit()):
+            pfx = cid_u[0]
+            if pfx in ("A", "B", "D", "H"):
+                return "RETRIEVAL"
+            if pfx == "C":
+                return "RENDERING"
+            if pfx == "E":
+                return "ENTITY"
+            if pfx == "F":
+                return "FACTS"
+            if pfx in ("G", "N"):
+                return "GEO_CITABILITY"
+            if pfx in ("I", "J"):
+                return "ENGAGEMENT"
+            if pfx == "P":
+                return "CORROBORATION"
+
+    # Layer 1: RENDERING
+    if any(k in cid_u for k in ("RENDER", "HYDRAT", "SPA_SHELL", "UNRENDERED", "CSR_")):
+        return "RENDERING"
+
+    # Layer 0: RETRIEVAL
+    if any(k in cid_u for k in ("RETRIEVAL", "ROBOTS", "NOINDEX", "SITEMAP", "CANONICAL", "HTTP_", "STATUS_", "REDIRECT", "LOCALE_", "CRAWL")):
+        return "RETRIEVAL"
+    if cat_l in ("crawlability", "discoverability", "indexability", "locale", "canonicalization", "http"):
+        return "RETRIEVAL"
+
+    # Layer 2: ENTITY
+    if any(k in cid_u for k in ("ENTITY", "ORGANIZATION", "PRODUCT", "OFFER", "SCHEMA", "PRICE_METADATA", "LOCAL_BUSINESS", "SERVICE_SCHEMA", "COMMERCIAL_PRODUCT")):
+        return "ENTITY"
+    if cat_l in ("entity", "entity-identity", "structured-data", "structured_data", "commercial", "product-answerability", "entity-answerability", "schema-deprecation"):
+        return "ENTITY"
+
+    # Layer 3: FACTS
+    if any(k in cid_u for k in ("CROSS_PAGE", "CONTRADICTION", "DISCREPANCY", "DRIFT", "STALE_YEAR", "TERMS_CONFLICT")):
+        return "FACTS"
+    if cat_l in ("fact-consistency", "fact_consistency", "facts", "lifecycle", "freshness", "commercial_terms", "representation"):
+        return "FACTS"
+
+    # Layer 4: CORROBORATION
+    if any(k in cid_u for k in ("CORROBORATION", "SAMEAS", "AUTHORITY", "WIKIDATA", "WIKIPEDIA", "LINKEDIN", "ANCHOR", "MIRROR")):
+        return "CORROBORATION"
+    if cat_l in ("corroboration", "authority", "sameas"):
+        return "CORROBORATION"
+
+    # Layer 6: ENGAGEMENT
+    if any(k in cid_u for k in ("ORIENTATION", "PROOF_ARCHITECTURE", "FRICTION", "OBJECTION", "PATHWAY", "CTA_", "SCENT", "BOUNCE", "VIEWPORT_ANSWER", "INTENT_TO_LANDING")):
+        return "ENGAGEMENT"
+    if cat_l in ("engagement", "conversion-continuity", "user-experience", "extraction"):
+        return "ENGAGEMENT"
+
+    # Layer 5: GEO_CITABILITY
+    if any(k in cid_u for k in ("INFORMATION_GAIN", "QUOTATION", "MATRIX", "DEPTH", "CITABILITY", "FACT_TO_TOKEN", "FAQ_DEFICIT", "PASSAGE", "KEYWORD_DENSITY", "HEDGE", "BLUF", "EVIDENCE")):
+        return "GEO_CITABILITY"
+    if cat_l in ("geo_content", "geo-content", "content", "citability"):
+        return "GEO_CITABILITY"
+
+    return "RETRIEVAL"
+
+
+def generate_priority_justification(f: Dict[str, Any], idx: int) -> str:
+    """Generate needle-moving ordering judgment explaining why this finding is ranked at position #idx."""
+    cid = str(f.get("cause_id") or f.get("id") or "").upper()
+    dag = str(f.get("dag_node") or "RETRIEVAL")
+
+    if cid in ("AI_RETRIEVAL_BLOCKED", "CRAWLER_ACCESS_DENIED"):
+        just = "Keystone Layer 0 defect. Without HTTP 200 accessibility, AI retrieval engines cannot crawl or index pages, rendering all downstream markup and content invisible."
+    elif "NOINDEX" in cid:
+        just = "Explicit indexability blocker. The noindex directive instructs retrieval bots to purge the route from search indexes, superseding all on-page structured data and citability optimizations."
+    elif "ROBOTS" in cid:
+        just = "Crawler access barrier. Disallow directives on verified AI search bots prevent modern generative answer engines from retrieving the brand's primary domain content."
+    elif "RENDER" in cid or dag == "RENDERING":
+        just = "Layer 1 rendering failure. Serving an unrendered client-side JavaScript shell starves non-executing AI scrapers of text, preventing downstream entity extraction and neural dense retrieval."
+    elif "MATERIAL_ENTITY_AMBIGUITY" in cid or "MISSING_ORGANIZATION" in cid:
+        just = "Upstream entity anchor. Machine-explicit Schema.org Organization markup is required for LLMs to resolve brand identity and anchor facts in global knowledge graphs before citability can be attributed."
+    elif "PRODUCT" in cid or "OFFER" in cid:
+        just = "Commercial answerability blocker. Incomplete or unrendered product and pricing schemas prevent AI shopping assistants from providing direct buy recommendations and accurate price comparisons."
+    elif "SAMEAS" in cid or "AUTHORITY" in cid or "KNOWLEDGE_GRAPH" in cid or dag == "CORROBORATION":
+        just = "Knowledge graph consensus gap. Omitting established third-party authority profiles from Schema.org sameAs prevents AI models from verifying external consensus and corroborating brand claims."
+    elif "CROSS_PAGE" in cid or "CONTRADICTION" in cid or dag == "FACTS":
+        just = "Hallucination catalyst. Conflicting numerical or commercial claims across first-party pages directly depress RAG consensus confidence and cause generative engines to withhold definitive brand answers."
+    elif "INFORMATION_GAIN" in cid:
+        just = "Primary LLM citation filter. Content lacking proprietary data or empirical benchmarks is filtered out during generative answer synthesis because frontier models prioritize net-new information gain over generic summaries."
+    elif "QUOTATION" in cid:
+        just = "Citability multiplier. Grounded in Princeton KDD 2024 empirical benchmarks, attributed quotations from domain experts deliver a +40.9% lift in AI citation selection over unattributed assertions."
+    elif "MATRIX" in cid or "COMPARATIVE" in cid:
+        just = "High-lift retrieval structure. Princeton KDD 2024 benchmarks prove comparative tables yield the highest single empirical citation boost (+55.3%) for competitive brand queries."
+    elif "FACT_TO_TOKEN" in cid:
+        just = "RAG density deficit. Low atomic fact-to-token ratio causes dense retrieval algorithms to score passages as low-information fluff, routing queries to denser third-party references."
+    elif "DEPTH" in cid:
+        just = "Mechanistic depth gap. Generative engines favor sources explaining 'how' and 'why' through causal conjunctions over shallow assertions when answering complex user prompts."
+    elif "ORIENTATION" in cid or "VALUE_PROPOSITION" in cid:
+        just = "Post-citation bounce vector. Visitors arriving from specific AI citations bounce within 5 seconds when the hero section fails the cognitive orientation test with vague marketing abstractions."
+    elif "PROOF" in cid:
+        just = "Skepticism hurdle. AI search evaluators require quantitative benchmarks, enterprise logos, or compliance attestations immediately upon arrival to validate the factual claims made in the citation."
+    elif "FRICTION" in cid or "GATE" in cid:
+        just = "Conversion bottleneck. Forcing high-intent visitors arriving from citations into mandatory sales meetings without self-service sandbox exploration causes immediate referral abandonment."
+    elif "PATHWAY" in cid:
+        just = "Conversion cul-de-sac. Informational content concluding without logical conversion or exploration pathways strands interested visitors arriving from AI search."
+    elif "CTA" in cid:
+        just = "Intent continuity failure. Delaying primary action buttons behind auxiliary navigation blocks breaks the user task handoff initiated by the AI assistant citation."
+    elif "LOCALE" in cid:
+        just = "Multi-region retrieval mismatch. Invalid hreflang directives prevent search engines from routing localized queries to the correct regional brand assets."
+    elif "FAQ" in cid:
+        just = "Empirical citation penalty. Standalone conversational FAQs without underlying data points or technical specifications suffer a documented -5.7% citation penalty in generative engines."
+    elif dag == "GEO_CITABILITY":
+        just = "Deficit in statistical density, causal conjunctions, or BLUF primacy reduces heuristic citability score based on empirical GEO benchmarks."
+    elif dag == "ENGAGEMENT":
+        just = "Post-citation information scent or navigation friction indicates early-document orientation friction upon arrival from AI search."
+    else:
+        just = "Prioritized based on direct impact on AI retrieval visibility and user task continuity."
+
+    return f"Rank #{idx}: {just}"
+
+
+def plan(item: Dict[str, Any], rule: Dict[str, Any]) -> Dict[str, Any]:
+    """Calculate disposition, queue, remedy readiness, and priority index for an audit item."""
+    item = dict(item)
+    level = rule.get("solution_level", "C")
+    item["solution_level"] = level
+    item["reference_band"] = rule.get("reference_band", "S2")
+    item["benefit_area"] = {"G": ["geo"], "E": ["engagement"], "B": ["geo", "engagement"]}.get(
+        rule.get("benefit_area", "G"), ["geo"]
+    )
+    kind = item.get("finding_kind", "confirmed_problem")
+    if kind == "informational_observation":
+        return item
+    ready = item.get("remedy_readiness") == "ready"
+    if level == "X":
+        item.update(disposition="insufficient_evidence", remedy_readiness="not_possible")
+        ready = False
+    elif level == "E":
+        item.update(disposition="editorial_draft", finding_kind="advisory")
+    elif ready and level == "V" and item.get("candidate") and item.get("validation_results"):
+        item["disposition"] = "validated_candidate"
+    else:
+        item["disposition"] = "conditional_proposal"
+        item["remedy_readiness"] = "needs_context"
+        ready = False
+    if level == "C" and item.get("resolved_context") and item.get("validation_results") and item.get("suggested_action"):
+        ready = True
+        item["remedy_readiness"] = "ready"
+    item["queue"] = "advisory" if item.get("finding_kind") == "advisory" else "confirmed" if ready else "investigation"
+    item.setdefault("difficulty", None)
+    item.setdefault("difficulty_range", None)
+    item.setdefault("depends_on", [])
+    if not ready:
+        item["difficulty"] = None
+    band = item.get("actual_band", "S2")
+    d = item.get("difficulty")
+    item["priority_index"] = (
+        5 * int(band[1]) + (6 - d)
+        if band in ("S1", "S2", "S3", "S4") and isinstance(d, int) and 1 <= d <= 5 and ready
+        else None
+    )
+    if item.get("difficulty_range") and ready and band in ("S1", "S2", "S3", "S4"):
+        lo, hi = item["difficulty_range"]
+        item["priority_index_range"] = [5 * int(band[1]) + 6 - hi, 5 * int(band[1]) + 6 - lo]
+    severity = LABELS.get(band, "medium")
+    action = dict(item.get("suggested_action") or {})
+    action.setdefault("summary", f"For {item.get('scope', '')}: {rule.get('solution', '')}")
+    action.setdefault("technical_fix", f"Remediate {item.get('check_id', '')} according to technical specifications.")
+    action.setdefault("creative_fix", None)
+    action.setdefault("verification", "Inspect live response to confirm remediation.")
+    action["priority"] = severity if severity in ("critical", "high", "medium", "low") else "medium"
+    action.setdefault(
+        "acceptance_tests",
+        [
+            "Recollect the exact cited scope after an owner-approved change.",
+            "Verify the original predicate and unaffected contexts; no live change is applied by this audit.",
+        ],
+    )
+    action.setdefault(
+        "missing_context",
+        []
+        if ready
+        else ["Owner intent, correct source values, implementation location and representative regression environment as specified in this check"],
+    )
+    item["suggested_action"] = action
+    return item
 
 try:
     from causal_gate import (
@@ -239,10 +350,12 @@ try:
         ROOT_CAUSE_PRECEDENCE,
         SUPPRESSED_BY_LAYER0,
         SUPPRESSED_BY_LAYER1,
+        TAXONOMY_ALIASES,
         apply_causal_suppression,
         build_evidence_index,
         compute_archetype_confidence,
         compute_severity_score,
+        detect_business_archetype,
         evaluate_causal_nodes,
         evaluate_epistemic_state,
         extract_finding_route,
@@ -251,74 +364,135 @@ try:
         severity_from_score,
     )
 except ImportError:
-    apply_causal_suppression = None  # type: ignore
-    build_evidence_index = None  # type: ignore
-    evaluate_epistemic_state = None  # type: ignore
-    evaluate_causal_nodes = None  # type: ignore
-    compute_severity_score = None  # type: ignore
-    compute_archetype_confidence = None  # type: ignore
-    severity_from_score = None  # type: ignore
+    try:
+        from .causal_gate import (  # type: ignore
+            DEFAULT_LIMITATIONS,
+            LAYER0_CAUSE_IDS,
+            LAYER1_CAUSE_IDS,
+            ROOT_CAUSE_PRECEDENCE,
+            SUPPRESSED_BY_LAYER0,
+            SUPPRESSED_BY_LAYER1,
+            TAXONOMY_ALIASES,
+            apply_causal_suppression,
+            build_evidence_index,
+            compute_archetype_confidence,
+            compute_severity_score,
+            detect_business_archetype,
+            evaluate_causal_nodes,
+            evaluate_epistemic_state,
+            extract_finding_route,
+            normalize_route_path,
+            routes_match,
+            severity_from_score,
+        )
+    except ImportError:
+        apply_causal_suppression = None  # type: ignore
+        build_evidence_index = None  # type: ignore
+        evaluate_epistemic_state = None  # type: ignore
+        evaluate_causal_nodes = None  # type: ignore
+        compute_severity_score = None  # type: ignore
+        compute_archetype_confidence = None  # type: ignore
+        severity_from_score = None  # type: ignore
+        detect_business_archetype = lambda inv: "corporate"  # type: ignore
 
-    def extract_finding_route(f: Dict[str, Any]) -> str:
-        if not isinstance(f, dict):
-            return ""
-        url = f.get("url") or f.get("scope")
-        if isinstance(url, dict):
-            url = url.get("url") or url.get("scope") or ""
-        if not url and isinstance(f.get("evidence"), dict):
-            url = f["evidence"].get("scope") or ""
-        if not url and isinstance(f.get("evidence"), str):
-            m = re.search(r'https?://[^\s,\(\)\]"\']+', f["evidence"])
-            if m:
-                url = m.group(0)
-        return str(url or "").strip().lower()
+        TAXONOMY_ALIASES = {
+            "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
+            "NOINDEX_EXCLUSION": "META_DIRECTIVE_CONFLICT",
+            "CANONICAL_TARGET_MISMATCH": "CANONICAL_FRAGMENTATION",
+            "CANONICAL_FRAGMENTATION": "CANONICAL_TARGET_MISMATCH",
+            "UNVERIFIED_AUTHORITY_GAP": "WEAK_IDENTITY_SIGNALS",
+            "WEAK_IDENTITY_SIGNALS": "UNVERIFIED_AUTHORITY_GAP",
+            "SUB_THRESHOLD_CITABILITY": "LOW_CITABILITY_SCORE",
+            "LOW_CITABILITY_SCORE": "SUB_THRESHOLD_CITABILITY",
+            "MISSING_BLUF_PRIMACY": "CONTEXT_PLACEMENT_DEGRADATION",
+            "CONTEXT_PLACEMENT_DEGRADATION": "MISSING_BLUF_PRIMACY",
+            "INTENT_SCENT_DILUTION": "LOW_INFORMATION_SCENT",
+            "LOW_INFORMATION_SCENT": "INTENT_SCENT_DILUTION",
+            "COMMERCIAL_HANDOFF_DISCONTINUITY": "INTENT_TO_LANDING_MISMATCH",
+            "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+            "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
+            "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
+            "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
+            "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
+        }
+        LAYER0_CAUSE_IDS = {
+            "AI_RETRIEVAL_BLOCKED",
+            "NOINDEX_EXCLUSION",
+            "META_DIRECTIVE_CONFLICT",
+            "ROBOTS_5XX_FAIL_CLOSED",
+            "ROBOTS_TXT_OVERSIZED",
+        }
+        LAYER1_CAUSE_IDS = {
+            "RENDERED_CONTENT_GAP",
+            "NOSNIPPET_ON_CORE_CONTENT",
+            "WAF_BOT_CHALLENGE",
+            "CANONICAL_FRAGMENTATION",
+            "CANONICAL_TARGET_MISMATCH",
+        }
+        SUPPRESSED_BY_LAYER0 = set()
+        SUPPRESSED_BY_LAYER1 = set()
 
-    def normalize_route_path(route: str) -> str:
-        if not route:
-            return ""
-        r = route.strip().lower()
-        parsed = urlparse(r)
-        path = parsed.path if parsed.scheme else r
-        path = path.rstrip("/")
-        return path if path else "/"
+        def extract_finding_route(f: Dict[str, Any]) -> str:
+            if not isinstance(f, dict):
+                return ""
+            url = f.get("url") or f.get("scope")
+            if isinstance(url, dict):
+                url = url.get("url") or url.get("scope") or ""
+            if not url and isinstance(f.get("evidence"), dict):
+                url = f["evidence"].get("scope") or ""
+            if not url and isinstance(f.get("evidence"), str):
+                m = re.search(r'https?://[^\s,\(\)\]"\']+', f["evidence"])
+                if m:
+                    url = m.group(0)
+            return str(url or "").strip().lower()
 
-    def routes_match(r1: str, r2: str) -> bool:
-        if not r1 or not r2:
+        def normalize_route_path(route: str) -> str:
+            if not route:
+                return ""
+            r = route.strip().lower()
+            parsed = urlparse(r)
+            path = parsed.path if parsed.scheme else r
+            path = path.rstrip("/")
+            return path if path else "/"
+
+        def routes_match(r1: str, r2: str) -> bool:
+            if not r1 or not r2:
+                return False
+            r1_norm = r1.strip().lower()
+            r2_norm = r2.strip().lower()
+            if r1_norm == r2_norm:
+                return True
+            p1 = normalize_route_path(r1)
+            p2 = normalize_route_path(r2)
+            if p1 != "/" and p2 != "/" and p1 == p2:
+                return True
+            if p1 != "/" and len(p1) > 2 and (p1 in r2_norm or r2_norm in p1):
+                return True
+            if p2 != "/" and len(p2) > 2 and (p2 in r1_norm or r1_norm in p2):
+                return True
             return False
-        r1_norm = r1.strip().lower()
-        r2_norm = r2.strip().lower()
-        if r1_norm == r2_norm:
-            return True
-        p1 = normalize_route_path(r1)
-        p2 = normalize_route_path(r2)
-        if p1 != "/" and p2 != "/" and p1 == p2:
-            return True
-        if p1 != "/" and len(p1) > 2 and (p1 in r2_norm or r2_norm in p1):
-            return True
-        if p2 != "/" and len(p2) > 2 and (p2 in r1_norm or r1_norm in p2):
-            return True
-        return False
 
-    LAYER0_CAUSE_IDS = _LAYER0_CAUSE_IDS
-    LAYER1_CAUSE_IDS = _LAYER1_CAUSE_IDS
-    SUPPRESSED_BY_LAYER0 = _SUPPRESSED_BY_LAYER0
-    SUPPRESSED_BY_LAYER1 = _SUPPRESSED_BY_LAYER1
-    DEFAULT_LIMITATIONS = [
-        "No JavaScript browser rendering was performed.",
-        "Robots eligibility was simulated from the captured robots.txt; bot-specific server responses were not tested.",
-        "No external analytics were supplied, so engagement findings are content and navigation proxies rather than observed bounce rates.",
-        "No claim is made about actual citation by any specific AI assistant.",
-    ]
-    ROOT_CAUSE_PRECEDENCE = [
-        "SITE_UNAVAILABLE_OR_BLOCKED",
-        "AI_RETRIEVAL_BLOCKED",
-        "INDEXING_DISABLED",
-        "CLIENT_RENDERING_DEPENDENCY",
-        "ENTITY_AMBIGUITY",
-        "FACT_CONTRADICTION",
-        "LOW_CITABILITY",
-        "ENGAGEMENT_HANDOFF_FRICTION",
-    ]
+        DEFAULT_LIMITATIONS = [
+            "No JavaScript browser rendering was performed.",
+            "Robots eligibility was simulated from the captured robots.txt; bot-specific server responses were not tested.",
+            "No external analytics were supplied, so engagement findings are content and navigation proxies rather than observed bounce rates.",
+            "No claim is made about actual citation by any specific AI assistant.",
+        ]
+        ROOT_CAUSE_PRECEDENCE = [
+            "SITE_UNAVAILABLE_OR_BLOCKED",
+            "AI_RETRIEVAL_BLOCKED",
+            "INDEXING_DISABLED",
+            "CLIENT_RENDERING_DEPENDENCY",
+            "ENTITY_AMBIGUITY",
+            "FACT_CONTRADICTION",
+            "LOW_CITABILITY",
+            "ENGAGEMENT_HANDOFF_FRICTION",
+        ]
+
+_LAYER0_CAUSE_IDS = LAYER0_CAUSE_IDS
+_LAYER1_CAUSE_IDS = LAYER1_CAUSE_IDS
+_SUPPRESSED_BY_LAYER0 = SUPPRESSED_BY_LAYER0
+_SUPPRESSED_BY_LAYER1 = SUPPRESSED_BY_LAYER1
 
 
 def parse_target_domain(site: str) -> tuple:
@@ -378,108 +552,6 @@ def run_specialist_sensor(sensor_func, base: str, domain: str, inv: Dict[str, An
         }
 
 
-def detect_business_archetype(inv: Dict[str, Any]) -> str:
-    """Classifies website into primary business archetype from crawl inventory."""
-    if not inv or not isinstance(inv, dict):
-        return "corporate"
-
-    # Explicit archetype in inventory if declared and valid
-    explicit_arch = inv.get("archetype") or (inv.get("metadata", {}).get("archetype") if isinstance(inv.get("metadata"), dict) else None)
-    if explicit_arch in ("ecommerce", "saas", "publisher", "local_business", "corporate"):
-        return explicit_arch
-
-    pages = inv.get("pages", []) if inv else []
-    if not pages:
-        return "corporate"
-
-    ecomm_score = 0
-    saas_score = 0
-    publisher_score = 0
-    local_score = 0
-
-    for p in pages:
-        if not isinstance(p, dict):
-            continue
-        ptype = (p.get("page_type") or "")
-        if isinstance(ptype, dict):
-            ptype = str(ptype.get("value", "")).lower()
-        else:
-            ptype = str(ptype).lower()
-
-        url = (p.get("url") or "").lower()
-        html = (p.get("html") or "").lower()
-        text = (p.get("clean_text") or p.get("clean_markdown") or "").lower()
-        title_val = p.get("title")
-        if isinstance(title_val, list):
-            title = (title_val[0] if title_val else "").lower()
-        else:
-            title = (title_val or "").lower()
-
-        h1_val = p.get("h1")
-        if isinstance(h1_val, list):
-            h1 = (h1_val[0] if h1_val else "").lower()
-        else:
-            h1 = (h1_val or "").lower()
-
-        jld_str = json.dumps(p.get("jsonld", []) or p.get("json_ld_contents", []) or []).lower()
-        content = f"{html} {text} {title} {h1} {jld_str}"
-
-        # 1. Ecommerce
-        if ptype in ("product_detail", "product", "product_listing", "category", "cart", "checkout", "subscription") or any(
-            k in url for k in ("/product", "/shop", "/item", "/store", "/collection", "/catalog", "/cart", "/checkout", "/subscription")
-        ):
-            ecomm_score += 2
-        if any(k in content for k in (
-            "schema.org/product", "schema.org/offer", '"@type": "product"',
-            "add to cart", "buy now", "comprar", "shopping cart", "in stock",
-            "free shipping", "envío gratis", "pricecurrency", "bagged-coffee",
-            "coffee-machines"
-        )):
-            ecomm_score += 3
-
-        # 2. SaaS
-        if ptype in ("pricing", "subscription_flow", "documentation") or any(
-            k in url for k in ("/pricing", "/plans", "/docs", "/api", "/billing", "/features")
-        ):
-            saas_score += 2
-        if "softwareapplication" in content or '"@type": "softwareapplication"' in content or "per user" in content or "api docs" in content:
-            saas_score += 3
-
-        # 3. Publisher
-        if ptype in ("article", "blog", "news") or any(k in url for k in ("/blog", "/news", "/article", "/post", "/journal")):
-            publisher_score += 2
-        if "newsarticle" in content or "blogposting" in content or '"@type": "article"' in content:
-            publisher_score += 3
-
-        # 4. Local Business
-        # Physical store presence indicators: store locators, branch directories, physical locations
-        # (Exclude generic contact-us pages which exist on every corporate, ecomm, and saas website)
-        if ptype in ("store_locator", "branches", "local_business") or any(
-            k in url for k in ("/store-locator", "/our-stores", "/branches")
-        ):
-            local_score += 2
-        elif any(k in url for k in ("/locations", "/location")):
-            local_score += 1
-
-        if "localbusiness" in content or "postaladdress" in content or "openinghours" in content:
-            local_score += 3
-
-    # If active ecommerce transactional signals exist, prioritize ecommerce over local storefront listings
-    if ecomm_score >= 4 and ecomm_score >= local_score:
-        return "ecommerce"
-
-    candidates = [
-        (ecomm_score, "ecommerce"),
-        (saas_score, "saas"),
-        (publisher_score, "publisher"),
-        (local_score, "local_business"),
-    ]
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    if candidates[0][0] >= 2:
-        return candidates[0][1]
-    return "corporate"
-
-
 def build_run_manifest(
     site: str,
     pipeline_stages: Optional[List[str]] = None,
@@ -490,7 +562,6 @@ def build_run_manifest(
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build a machine-readable execution provenance manifest recording site, timestamps, references, and validation status."""
-    import hashlib
     ref_dir = os.path.join(SCRIPT_DIR, "..", "references")
     reference_hashes = {}
     for ref_name in ("checks.json", "knowledge-base.md", "core-synthesis-digest.md", "report-schema.json", "telemetry-schema.json"):
@@ -535,6 +606,180 @@ def build_run_manifest(
     return manifest
 
 
+def _build_default_proactive_actions(
+    domain: str,
+    brand_guess: str,
+    route_refs: str,
+    target_route: str,
+    pricing_source: str,
+    has_llms_txt: bool,
+    finding_cids: Set[str],
+    pages: List[Dict[str, Any]],
+    unrendered_product_routes: Set[str],
+    archetype: str,
+    specialist_results: Dict[str, Dict[str, Any]],
+    base: str,
+) -> List[Dict[str, Any]]:
+    actions: List[Dict[str, Any]] = []
+    proactive_counter = 1
+
+    # 1. Authoritative LLM Index Manifest (/llms.txt)
+    if has_llms_txt:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Audit & Expand Existing /llms.txt Manifest for {brand_guess}",
+            "category": "discoverability",
+            "summary": f"Authoritative /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
+            "priority": "low",
+            "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
+            "creative_fix": f"Author first-100-word executive overviews for every core {brand_guess} product and documentation guide.",
+            "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
+        })
+        proactive_counter += 1
+    else:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Deploy Machine-Readable /llms.txt Manifest for {brand_guess}",
+            "category": "discoverability",
+            "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links for generative search assistants.",
+            "priority": "low",
+            "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
+            "creative_fix": f"Author first-100-word executive overviews for every core {brand_guess} service guide.",
+            "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
+        })
+        proactive_counter += 1
+
+    # 2. Dynamic Edge Markdown Negotiation (Zero-token retrieval) if accessible and no rendering gap
+    if "RENDERED_CONTENT_GAP" not in finding_cids and pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": "Enable Edge Markdown Content Negotiation for AI Indexers",
+            "category": "discoverability",
+            "summary": "Configure web server or CDN to serve pre-rendered clean markdown when requests include Accept: text/markdown, cutting AI token ingestion cost by 80%.",
+            "priority": "low",
+            "technical_fix": "Configure CDN edge worker to inspect Accept header and serve pre-generated markdown for AI crawlers.",
+            "creative_fix": "Author clean markdown equivalents of core landing pages stripped of layout markup and navigation chrome.",
+            "verification": f"Request curl -H 'Accept: text/markdown' https://{domain}/ and verify HTTP 200 with text/markdown Content-Type.",
+        })
+        proactive_counter += 1
+
+    # Conditional Pre-Hydration Product Schema Architecture (when unrendered product shells were detected ON ECOMMERCE ROUTES ONLY)
+    if unrendered_product_routes and archetype == "ecommerce" and pages:
+        sample_routes = ", ".join(sorted(list(unrendered_product_routes))[:3])
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": "Pre-Hydration Product Schema Architecture",
+            "category": "entity",
+            "summary": (
+                f"Commercial route(s) ({sample_routes}) serve unrendered client-side JS shells. "
+                "When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup "
+                "(declaring name, description, offers with price, priceCurrency, and inStock availability) "
+                "in the initial HTML document before client hydration to ensure instant discovery by AI shopping assistants."
+            ),
+            "priority": "high",
+            "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
+            "creative_fix": "Ensure product title, description, pricing, and stock status are presented in semantic HTML above the fold.",
+            "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is present.",
+        })
+        proactive_counter += 1
+
+    # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists and site is accessible)
+    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids and not unrendered_product_routes and pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Implement Structured Specification Comparison Tables for {brand_guess}",
+            "category": "entity",
+            "summary": "Embed semantic HTML tables detailing product dimensions, materials, and origin to maximize conversational recommendations in ChatGPT Search and Perplexity.",
+            "priority": "low",
+            "technical_fix": f"Embed responsive HTML <table> markup on {target_route} with clean headers and numeric specifications.",
+            "creative_fix": "Structure product feature specifications into quantitative rows (dimensions, materials, technical specifications, performance benchmarks).",
+            "verification": f"Verify presence of semantic table elements in HTML of {target_route}.",
+        })
+        proactive_counter += 1
+    elif archetype == "saas" and "FIRST_PARTY_FACT_CONFLICT" not in finding_cids and pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Deploy Autonomous AI Purchasing Agent Pricing Manifest (/pricing.md) for {brand_guess}",
+            "category": "fact_consistency",
+            "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
+            "priority": "low",
+            "technical_fix": f"Serve /pricing.md at https://{domain}/pricing.md with structured plan comparison tables extracted from {pricing_source}.",
+            "creative_fix": f"Standardize plan names across {pricing_source} with transparent feature contrast rows.",
+            "verification": f"Request GET https://{domain}/pricing.md and verify HTTP 200 with text/markdown Content-Type.",
+        })
+        proactive_counter += 1
+    elif archetype == "publisher" and "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Structure E-E-A-T Author Credentials & Fact Attributions for {brand_guess}",
+            "category": "entity",
+            "summary": f"Embed Schema.org Person markup for {brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks beneath question headings.",
+            "priority": "low",
+            "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
+            "creative_fix": "Replace passive voice with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
+            "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
+        })
+        proactive_counter += 1
+    elif archetype == "local_business" and "MISSING_POSTAL_ADDRESS" not in finding_cids and pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {brand_guess}",
+            "category": "entity",
+            "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
+            "priority": "low",
+            "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
+            "creative_fix": f"Harmonize exact brand name '{brand_guess}', street address, and phone number formatting across local directory listings.",
+            "verification": f"Inspect location page markup on https://{domain}/ with Google Rich Results Test.",
+        })
+        proactive_counter += 1
+    elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids and pages:
+        corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
+        corrob_cov_p = corrob_res_p.get("coverage", {})
+        p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
+        if p_sa_count > 0:
+            actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Expand Knowledge Graph Authority Anchors for {brand_guess}",
+                "category": "corroboration",
+                "summary": f"{brand_guess} currently declares {p_sa_count} sameAs node(s). Expand third-party authority coverage with Wikidata and LinkedIn verification.",
+                "priority": "low",
+                "technical_fix": f"Add verified Wikidata entity URI and official LinkedIn organization profile to Schema.org Organization on https://{domain}/.",
+                "creative_fix": f"Maintain identical legal name '{brand_guess}' and contact details across all registered external profiles.",
+                "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
+            })
+            proactive_counter += 1
+
+    # 4. Princeton Citability Architecture (Only if citability defects are not already flagged and site is accessible)
+    if not any(c in finding_cids for c in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS")) and pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Implement Princeton KDD 2024 Citability Architecture on {domain}",
+            "category": "geo_content",
+            "summary": f"Structure core sections on {domain} into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
+            "priority": "low",
+            "technical_fix": f"Structure {domain} content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
+            "creative_fix": f"Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity name '{brand_guess}' directly.",
+            "verification": f"Audit {domain} section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
+        })
+        proactive_counter += 1
+
+    # 5. Upstream Crawler Whitelisting Action for Blocked / Unreachable sites
+    if not pages:
+        actions.append({
+            "id": f"P-{proactive_counter:03d}",
+            "title": f"Authorize Verified AI Search Crawlers in WAF & Edge Security for {brand_guess}",
+            "category": "discoverability",
+            "summary": f"Target host on {domain} blocked automated crawler probes during inventory acquisition. Configure edge security rules (Cloudflare, AWS WAF, Akamai) to permit verified AI retrieval engines.",
+            "priority": "critical",
+            "technical_fix": "Update WAF/CDN security policies to permit User-Agents: OAI-SearchBot, Claude-SearchBot, PerplexityBot with verified ASN IP validation.",
+            "creative_fix": "Deploy challenge bypass rules for recognized AI retrieval bots rather than blanket interstitial blocks.",
+            "verification": f"Probe {base}/ with OAI-SearchBot user-agent and confirm HTTP 200 is returned.",
+        })
+        proactive_counter += 1
+
+    return actions
+
+
 def synthesize_audit_report(
     site: str,
     inv: Dict[str, Any],
@@ -560,28 +805,39 @@ def synthesize_audit_report(
             or p.get("page_type") == "homepage"
         ]
         target_pages = homepage_candidates if homepage_candidates else pages
+        CHALLENGE_TITLE_PATTERNS = (
+            "just a moment", "attention required", "security challenge", "security check",
+            "access denied", "403 forbidden", "cloudflare", "ddos-guard", "robot or human",
+            "verify you are human", "please enable javascript", "bot challenge", "checking your browser"
+        )
         for p in target_pages:
             p_html = p.get("html") or ""
             m_og = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)["\']', p_html, re.I)
             if m_og and m_og.group(1).strip():
-                _brand_guess = m_og.group(1).strip()
-                break
+                og_cand = m_og.group(1).strip()
+                if not any(cp in og_cand.lower() for cp in CHALLENGE_TITLE_PATTERNS):
+                    _brand_guess = og_cand
+                    break
             m_title = re.search(r'<title[^>]*>([^<]+)</title>', p_html, re.I)
             if m_title and m_title.group(1).strip():
                 t_raw = m_title.group(1).strip()
+                if any(cp in t_raw.lower() for cp in CHALLENGE_TITLE_PATTERNS):
+                    continue
                 t_parts = re.split(r'[\s|:–—\-]+', t_raw)
-                if t_parts and len(t_parts[0]) > 1:
+                if t_parts and len(t_parts[0]) > 1 and not any(cp in t_parts[0].lower() for cp in CHALLENGE_TITLE_PATTERNS):
                     _brand_guess = t_parts[0].strip()
                     break
 
-    # 3. Guard against generic / non-brand titles
+    # 3. Guard against generic / non-brand titles and challenge artifacts
     GENERIC_BRAND_BLACKLIST = {
         "signup", "sign up", "sign-up", "login", "log in", "log-in", "register",
         "home", "homepage", "index", "default", "welcome", "untitled", "test",
         "draft", "drafts", "cart", "checkout", "search", "products", "services",
-        "about", "contact", "category", "account", "profile", "overview", "landing"
+        "about", "contact", "category", "account", "profile", "overview", "landing",
+        "just", "moment", "attention", "required", "security", "challenge", "denied",
+        "forbidden", "cloudflare", "just a moment...", "just a moment", "attention required!"
     }
-    if _brand_guess.lower() in GENERIC_BRAND_BLACKLIST or len(_brand_guess) <= 1:
+    if _brand_guess.lower() in GENERIC_BRAND_BLACKLIST or len(_brand_guess) <= 1 or any(cp in _brand_guess.lower() for cp in ("just a moment", "attention required", "cloudflare")):
         _brand_guess = _domain_clean.split(".")[0].capitalize()
 
     sample_routes: List[str] = []
@@ -597,7 +853,7 @@ def synthesize_audit_report(
                 if not path.lower().endswith((".jpg", ".png", ".gif", ".svg", ".css", ".js")):
                     if path not in sample_routes:
                         sample_routes.append(path)
-        if not sample_product_route and any(k in path.lower() for k in ("/product", "/item", "/shop", "/catalog", "/coffee", "/tea", "/machines")):
+        if not sample_product_route and any(k in path.lower() for k in ("/product", "/products", "/item", "/items", "/shop", "/store", "/collection", "/collections", "/catalog", "/catalogue", "/goods")):
             if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
                 sample_product_route = path
         if not sample_pricing_route and any(k in path.lower() for k in ("/pricing", "/plans", "/billing")):
@@ -625,9 +881,9 @@ def synthesize_audit_report(
             rev_findings = review.get("findings") or review.get("candidates") or []
         elif isinstance(review, list):
             rev_findings = review
-        for rf in rev_findings:
-            if isinstance(rf, dict):
-                all_raw_findings.append(rf)
+        if rev_findings:
+            # When the AI Agent provides cognitive review findings, they become the primary findings
+            all_raw_findings = [rf for rf in rev_findings if isinstance(rf, dict)]
 
     if inv.get("status") == "failed" or (not pages and not inv.get("infrastructure", {}).get("homepage_reachable", True)):
         audit_status = "failed"
@@ -666,10 +922,15 @@ def synthesize_audit_report(
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
         f_scope = extract_finding_route(f) or str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
 
-        # P0-10: Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
+        # Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
         dedup_key = f"{cid}::{f.get('title', '')}"
         if dedup_key in seen_dedup_keys:
             continue
+        # Unify sameAs authority defect variants: keep one canonical anchor finding
+        if cid in ("MISSING_SAMEAS_VERIFICATION", "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR", "WEAK_IDENTITY_SIGNALS"):
+            if "SAMEAS_DEFICIT" in seen_dedup_keys:
+                continue
+            seen_dedup_keys.add("SAMEAS_DEFICIT")
         seen_dedup_keys.add(dedup_key)
 
         # P0-15: Never fabricate synthetic evidence text. Discard findings without observable proof.
@@ -784,7 +1045,12 @@ def synthesize_audit_report(
         if isinstance(raw_tf, dict):
             clean_tf = raw_tf
         else:
-            clean_tf = clean_text_string(raw_tf) or None
+            clean_tf_str = clean_text_string(raw_tf) or None
+            if clean_tf_str and ("('http" in clean_tf_str or '("http' in clean_tf_str):
+                urls = re.findall(r"https?://[^\s'\"\)]+", clean_tf_str)
+                if urls:
+                    clean_tf_str = f"Update Organization JSON-LD on homepage to include 'sameAs': {json.dumps(urls[:5])}."
+            clean_tf = clean_tf_str
 
         suggested_action: Dict[str, Any] = {
             "summary": action_summary,
@@ -858,7 +1124,10 @@ def synthesize_audit_report(
             clean_finding["downstream_symptoms"] = matching_symptoms
 
     # 3. Archetype Detection, Severity Reweighting & Proactive Opportunities Synthesis
-    archetype = detect_business_archetype(inv)
+    if review and isinstance(review, dict) and review.get("archetype"):
+        archetype = review["archetype"]
+    else:
+        archetype = detect_business_archetype(inv)
     # contextualizes severity by business model — missing Product schema is medium for a
     # corporate blog but critical for an e-commerce product page.
     archetype_overrides = ARCHETYPE_SEVERITY_OVERRIDES.get(archetype, {})
@@ -920,6 +1189,50 @@ def synthesize_audit_report(
     else:
         deduped_findings.sort(key=task_sort_key)
 
+    # Synthesis of Keystone Layer 0 finding for blocked or unreachable crawls
+    if not deduped_findings and not pages:
+        crawl_limits = inv.get("limitations", []) if inv else []
+        failure_note = crawl_limits[0] if crawl_limits else "Target web server or firewall blocked automated crawler requests (0 pages acquired)."
+        blocked_finding = {
+            "id": "F-001",
+            "cause_id": "AI_RETRIEVAL_BLOCKED",
+            "title": "Crawler access completely blocked by target host (0 pages acquired)",
+            "severity": "critical",
+            "category": "crawlability",
+            "root_cause": f"Target host rejected or timed out automated crawler probes ({failure_note}), preventing AI search engines from indexing site content.",
+            "confidence": "high",
+            "scope": base,
+            "evidence": {
+                "summary": f"Single-pass inventory acquisition for {domain} acquired 0 usable HTML pages. {failure_note}",
+                "sources": [
+                    {
+                        "url": f"{base}/",
+                        "type": "http",
+                        "observation": f"Automated crawl returned 0 pages. {failure_note}",
+                    }
+                ],
+            },
+            "impact": "Real-time AI search assistants (ChatGPT Search, Perplexity, Claude) cannot crawl, extract, or index any site content, causing total search engine invisibility.",
+            "suggested_action": {
+                "summary": "Configure WAF/CDN security rules to whitelist verified AI search crawlers and restore server accessibility.",
+                "technical_fix": "Update WAF/firewall rules (Cloudflare, AWS WAF, Akamai) to allow verified AI search User-Agents (OAI-SearchBot, Claude-SearchBot, PerplexityBot) and ensure root URL returns HTTP 200.",
+                "creative_fix": "Deploy targeted rate limiting instead of blanket IP or User-Agent challenge blocks for autonomous search assistance bots.",
+                "priority": "critical",
+                "verification": f"Probe {base}/ with honest audit user-agent and confirm HTTP 200 is returned with initial HTML.",
+                "is_proactive": False,
+                "priority_index": 20,
+                "difficulty": 1,
+            },
+            "actual_band": "S3",
+            "difficulty": 1,
+            "priority_index": 20,
+            "priority_rank": 1,
+            "dag_node": "RETRIEVAL",
+            "priority_justification": "Rank #1: Upstream barrier that completely blocks AI search engines from crawling, indexing, or extracting text across this route.",
+            "affected_urls": [f"{base}/"],
+        }
+        deduped_findings = [blocked_finding]
+
     # Re-index finding IDs sequentially after sorting so final report has F-001, F-002, F-003...
     id_remap = {}
     for idx, f in enumerate(deduped_findings, 1):
@@ -933,40 +1246,12 @@ def synthesize_audit_report(
         # Compute DAG node per 6-Layer Causal DAG
         f_cid = str(f.get("cause_id") or "")
         f_cat = str(f.get("category") or "discoverability")
-        if "RENDER" in f_cid or f_cid.startswith("C"):
-            f_dag = "RENDERING"
-        elif f_cat == "fact_consistency" or f_cid.startswith("BN") or "FACT" in f_cid or "PRICE" in f_cid:
-            f_dag = "FACTS"
-        elif f_cat == "corroboration" or f_cid.startswith(("BC", "PP", "SA", "SC", "P")) or "AUTHORITY" in f_cid or "SAMEAS" in f_cid:
-            f_dag = "CORROBORATION"
-        elif f_cat == "entity_content" or f_cid.startswith(("EC", "ED", "ME", "E")) or "ENTITY" in f_cid or "PRODUCT" in f_cid or "OFFER" in f_cid:
-            f_dag = "ENTITY"
-        elif f_cat == "geo_content" or f_cid.startswith(("N", "G")) or "CITABILITY" in f_cid or "GEO" in f_cid:
-            f_dag = "GEO_CITABILITY"
-        elif f_cat in ("engagement", "engagement_context") or f_cid.startswith(("I", "J")) or "SCENT" in f_cid or "CTA" in f_cid or "ENGAGEMENT" in f_cid:
-            f_dag = "ENGAGEMENT"
-        elif f_cat in ("discoverability", "crawlability") or f_cid.startswith(("A", "B", "D", "F", "H")):
-            f_dag = "RETRIEVAL"
-        else:
-            f_dag = "RETRIEVAL"
-        f.setdefault("dag_node", f_dag)
+        f_dag = resolve_dag_node(f_cid, f_cat)
+        f["dag_node"] = f_dag
 
         # Compute priority_justification explaining needle-moving rationale
-        if f_dag in ("RETRIEVAL", "RENDERING"):
-            just = "Upstream barrier that completely blocks AI search engines from crawling, indexing, or extracting text across this route."
-        elif f_dag == "ENTITY":
-            just = "Fundamental machine-readable identity anchor required for generative models to disambiguate the brand in knowledge graphs."
-        elif f_dag == "FACTS":
-            just = "Numerical or terms contradiction across first-party pages that directly triggers AI hallucination and purchase distrust."
-        elif f_dag == "CORROBORATION":
-            just = "External authority link failure reducing off-site citation grounding and third-party consensus."
-        elif f_dag == "GEO_CITABILITY":
-            just = "Deficit in statistical density, causal conjunctions, or BLUF primacy directly depressing generative citation lift."
-        elif f_dag == "ENGAGEMENT":
-            just = "Post-citation information scent or CTA friction causing immediate 5-second visitor bounce upon arrival."
-        else:
-            just = "Prioritized based on direct impact on AI retrieval visibility and user task continuity."
-        f.setdefault("priority_justification", f"Rank #{idx}: {just}")
+        just = generate_priority_justification(f, idx)
+        f["priority_justification"] = just
 
         if not f.get("affected_urls"):
             f["affected_urls"] = [f["scope"]] if f.get("scope") and str(f["scope"]).startswith("http") else [site]
@@ -995,147 +1280,173 @@ def synthesize_audit_report(
     route_refs = ", ".join(sample_routes[:3]) if sample_routes else (f"https://{domain}/" if domain else "core routes")
 
     proactive_actions: List[Dict[str, Any]] = []
-    proactive_counter = 1
+    if review and isinstance(review, dict) and review.get("proactive_actions"):
+        for p_idx, pa in enumerate(review["proactive_actions"], 1):
+            if isinstance(pa, dict) and pa.get("title") and pa.get("summary"):
+                pa_clean = dict(pa)
+                if not pa_clean.get("id"):
+                    pa_clean["id"] = f"P-{p_idx:03d}"
+                if not pa_clean.get("priority"):
+                    pa_clean["priority"] = "medium"
+                proactive_actions.append(pa_clean)
 
-    # 1. Authoritative LLM Index Manifest (/llms.txt)
-    if has_llms_txt:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Audit & Expand Existing /llms.txt Manifest for {_brand_guess}",
-            "category": "discoverability",
-            "summary": f"Authoritative /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
-            "priority": "low",
-            "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
-            "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} product and documentation guide.",
-            "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
-        })
-        proactive_counter += 1
-    else:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Deploy Machine-Readable /llms.txt Manifest for {_brand_guess}",
-            "category": "discoverability",
-            "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links for generative search assistants.",
-            "priority": "low",
-            "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
-            "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} service guide.",
-            "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
-        })
-        proactive_counter += 1
+    if not proactive_actions:
+        proactive_counter = 1
 
-    # 2. Dynamic Edge Markdown Negotiation (Zero-token retrieval) if no rendering gap
-    if "RENDERED_CONTENT_GAP" not in finding_cids:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": "Enable Edge Markdown Content Negotiation for AI Indexers",
-            "category": "discoverability",
-            "summary": "Configure web server or CDN to serve pre-rendered clean markdown when requests include Accept: text/markdown, cutting AI token ingestion cost by 80%.",
-            "priority": "low",
-            "technical_fix": "Configure CDN edge worker to inspect Accept header and serve pre-generated markdown for AI crawlers.",
-            "creative_fix": "Author clean markdown equivalents of core landing pages stripped of layout markup and navigation chrome.",
-            "verification": f"Request curl -H 'Accept: text/markdown' https://{domain}/ and verify HTTP 200 with text/markdown Content-Type.",
-        })
-        proactive_counter += 1
-
-    # Conditional Pre-Hydration Product Schema Architecture (when unrendered product shells were detected)
-    if unrendered_product_routes:
-        sample_routes = ", ".join(sorted(list(unrendered_product_routes))[:3])
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": "Pre-Hydration Product Schema Architecture",
-            "category": "entity",
-            "summary": (
-                f"Commercial route(s) ({sample_routes}) serve unrendered client-side JS shells. "
-                "When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup "
-                "(declaring name, description, offers with price, priceCurrency, and inStock availability) "
-                "in the initial HTML document before client hydration to ensure instant discovery by AI shopping assistants."
-            ),
-            "priority": "high" if archetype == "ecommerce" else "medium",
-            "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
-            "creative_fix": "Ensure product title, description, pricing, and stock status are presented in semantic HTML above the fold.",
-            "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is present.",
-        })
-        proactive_counter += 1
-
-    # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists)
-    if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids and not unrendered_product_routes:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Implement Structured Specification Comparison Tables for {_brand_guess}",
-            "category": "entity",
-            "summary": "Embed semantic HTML tables detailing product dimensions, materials, and origin to maximize conversational recommendations in ChatGPT Search and Perplexity.",
-            "priority": "low",
-            "technical_fix": f"Embed responsive HTML <table> markup on {target_route} with clean headers and numeric specifications.",
-            "creative_fix": "Structure product feature specifications into quantitative rows (weight, extraction ratio, temperature).",
-            "verification": f"Verify presence of semantic table elements in HTML of {target_route}.",
-        })
-        proactive_counter += 1
-    elif archetype == "saas" and "FIRST_PARTY_FACT_CONFLICT" not in finding_cids:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Deploy Autonomous AI Purchasing Agent Pricing Manifest (/pricing.md) for {_brand_guess}",
-            "category": "fact_consistency",
-            "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
-            "priority": "low",
-            "technical_fix": f"Serve /pricing.md at https://{domain}/pricing.md with structured plan comparison tables extracted from {pricing_source}.",
-            "creative_fix": f"Standardize plan names across {pricing_source} with transparent feature contrast rows.",
-            "verification": f"Request GET https://{domain}/pricing.md and verify HTTP 200 with text/markdown Content-Type.",
-        })
-        proactive_counter += 1
-    elif archetype == "publisher" and "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Structure E-E-A-T Author Credentials & Fact Attributions for {_brand_guess}",
-            "category": "entity",
-            "summary": f"Embed Schema.org Person markup for {_brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks beneath question headings.",
-            "priority": "low",
-            "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
-            "creative_fix": "Replace passive voice with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
-            "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
-        })
-        proactive_counter += 1
-    elif archetype == "local_business" and "MISSING_POSTAL_ADDRESS" not in finding_cids:
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {_brand_guess}",
-            "category": "entity",
-            "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
-            "priority": "low",
-            "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
-            "creative_fix": f"Harmonize exact brand name '{_brand_guess}', street address, and phone number formatting across local directory listings.",
-            "verification": f"Inspect location page markup on https://{domain}/ with Google Rich Results Test.",
-        })
-        proactive_counter += 1
-    elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids:
-        corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
-        corrob_cov_p = corrob_res_p.get("coverage", {})
-        p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
-        if p_sa_count > 0:
+        # 1. Authoritative LLM Index Manifest (/llms.txt)
+        if has_llms_txt:
             proactive_actions.append({
                 "id": f"P-{proactive_counter:03d}",
-                "title": f"Expand Knowledge Graph Authority Anchors for {_brand_guess}",
-                "category": "corroboration",
-                "summary": f"{_brand_guess} currently declares {p_sa_count} sameAs node(s). Expand third-party authority coverage with Wikidata and LinkedIn verification.",
+                "title": f"Audit & Expand Existing /llms.txt Manifest for {_brand_guess}",
+                "category": "discoverability",
+                "summary": f"Authoritative /llms.txt detected on {domain}. Audit section anchors and BLUF summaries to ensure comprehensive alignment with core guides.",
                 "priority": "low",
-                "technical_fix": f"Add verified Wikidata entity URI and official LinkedIn organization profile to Schema.org Organization on https://{domain}/.",
-                "creative_fix": f"Maintain identical legal name '{_brand_guess}' and contact details across all registered external profiles.",
-                "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
+                "technical_fix": f"Validate https://{domain}/llms.txt against llmstxt.org specification, linking directly to: {route_refs}.",
+                "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} product and documentation guide.",
+                "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
+            })
+            proactive_counter += 1
+        else:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Deploy Machine-Readable /llms.txt Manifest for {_brand_guess}",
+                "category": "discoverability",
+                "summary": f"Deploy an authoritative /llms.txt manifest at https://{domain}/llms.txt with BLUF summaries and clean markdown links for generative search assistants.",
+                "priority": "low",
+                "technical_fix": f"Serve /llms.txt at https://{domain}/llms.txt over HTTPS with Content-Type: text/plain and links to primary routes: {route_refs}.",
+                "creative_fix": f"Author first-100-word executive overviews for every core {_brand_guess} service guide.",
+                "verification": f"Request GET https://{domain}/llms.txt and verify HTTP 200 with non-empty plain-text markdown.",
             })
             proactive_counter += 1
 
-    # 4. Princeton Citability Architecture (Only if citability defects are not already flagged)
-    if not any(c in finding_cids for c in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS")):
-        proactive_actions.append({
-            "id": f"P-{proactive_counter:03d}",
-            "title": f"Implement Princeton KDD 2024 Citability Architecture on {domain}",
-            "category": "geo_content",
-            "summary": f"Structure core sections on {domain} into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
-            "priority": "low",
-            "technical_fix": f"Structure {domain} content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
-            "creative_fix": f"Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity name '{_brand_guess}' directly.",
-            "verification": f"Audit {domain} section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
-        })
-        proactive_counter += 1
+        # 2. Dynamic Edge Markdown Negotiation (Zero-token retrieval) if accessible and no rendering gap
+        if "RENDERED_CONTENT_GAP" not in finding_cids and pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": "Enable Edge Markdown Content Negotiation for AI Indexers",
+                "category": "discoverability",
+                "summary": "Configure web server or CDN to serve pre-rendered clean markdown when requests include Accept: text/markdown, cutting AI token ingestion cost by 80%.",
+                "priority": "low",
+                "technical_fix": "Configure CDN edge worker to inspect Accept header and serve pre-generated markdown for AI crawlers.",
+                "creative_fix": "Author clean markdown equivalents of core landing pages stripped of layout markup and navigation chrome.",
+                "verification": f"Request curl -H 'Accept: text/markdown' https://{domain}/ and verify HTTP 200 with text/markdown Content-Type.",
+            })
+            proactive_counter += 1
+
+        # Conditional Pre-Hydration Product Schema Architecture (when unrendered product shells were detected ON ECOMMERCE ROUTES ONLY)
+        if unrendered_product_routes and archetype == "ecommerce" and pages:
+            sample_routes = ", ".join(sorted(list(unrendered_product_routes))[:3])
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": "Pre-Hydration Product Schema Architecture",
+                "category": "entity",
+                "summary": (
+                    f"Commercial route(s) ({sample_routes}) serve unrendered client-side JS shells. "
+                    "When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup "
+                    "(declaring name, description, offers with price, priceCurrency, and inStock availability) "
+                    "in the initial HTML document before client hydration to ensure instant discovery by AI shopping assistants."
+                ),
+                "priority": "high",
+                "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
+                "creative_fix": "Ensure product title, description, pricing, and stock status are presented in semantic HTML above the fold.",
+                "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is present.",
+            })
+            proactive_counter += 1
+
+        # 3. Archetype Strategic Enhancements (Only if NO corresponding defect exists and site is accessible)
+        if archetype == "ecommerce" and "ATTRIBUTE_INCOMPLETENESS" not in finding_cids and not unrendered_product_routes and pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Implement Structured Specification Comparison Tables for {_brand_guess}",
+                "category": "entity",
+                "summary": "Embed semantic HTML tables detailing product dimensions, materials, and origin to maximize conversational recommendations in ChatGPT Search and Perplexity.",
+                "priority": "low",
+                "technical_fix": f"Embed responsive HTML <table> markup on {target_route} with clean headers and numeric specifications.",
+                "creative_fix": "Structure product feature specifications into quantitative rows (dimensions, materials, technical specifications, performance benchmarks).",
+                "verification": f"Verify presence of semantic table elements in HTML of {target_route}.",
+            })
+            proactive_counter += 1
+        elif archetype == "saas" and "FIRST_PARTY_FACT_CONFLICT" not in finding_cids and pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Deploy Autonomous AI Purchasing Agent Pricing Manifest (/pricing.md) for {_brand_guess}",
+                "category": "fact_consistency",
+                "summary": "Expose an un-gated, machine-readable /pricing.md endpoint detailing plan tiers, token limits, seat costs, and API overage rates for autonomous AI purchasing agents.",
+                "priority": "low",
+                "technical_fix": f"Serve /pricing.md at https://{domain}/pricing.md with structured plan comparison tables extracted from {pricing_source}.",
+                "creative_fix": f"Standardize plan names across {pricing_source} with transparent feature contrast rows.",
+                "verification": f"Request GET https://{domain}/pricing.md and verify HTTP 200 with text/markdown Content-Type.",
+            })
+            proactive_counter += 1
+        elif archetype == "publisher" and "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Structure E-E-A-T Author Credentials & Fact Attributions for {_brand_guess}",
+                "category": "entity",
+                "summary": f"Embed Schema.org Person markup for {_brand_guess} editorial staff linking to verified LinkedIn/Wikidata profiles and structure 40–60 word BLUF answer blocks beneath question headings.",
+                "priority": "low",
+                "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
+                "creative_fix": "Replace passive voice with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
+                "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
+                "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
+            })
+            proactive_counter += 1
+        elif archetype == "local_business" and "MISSING_POSTAL_ADDRESS" not in finding_cids and pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {_brand_guess}",
+                "category": "entity",
+                "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
+                "priority": "low",
+                "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
+                "creative_fix": f"Harmonize exact brand name '{_brand_guess}', street address, and phone number formatting across local directory listings.",
+                "verification": f"Inspect location page markup on https://{domain}/ with Google Rich Results Test.",
+            })
+            proactive_counter += 1
+        elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids and pages:
+            corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
+            corrob_cov_p = corrob_res_p.get("coverage", {})
+            p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
+            if p_sa_count > 0:
+                proactive_actions.append({
+                    "id": f"P-{proactive_counter:03d}",
+                    "title": f"Expand Knowledge Graph Authority Anchors for {_brand_guess}",
+                    "category": "corroboration",
+                    "summary": f"{_brand_guess} currently declares {p_sa_count} sameAs node(s). Expand third-party authority coverage with Wikidata and LinkedIn verification.",
+                    "priority": "low",
+                    "technical_fix": f"Add verified Wikidata entity URI and official LinkedIn organization profile to Schema.org Organization on https://{domain}/.",
+                    "creative_fix": f"Maintain identical legal name '{_brand_guess}' and contact details across all registered external profiles.",
+                    "verification": f"Inspect root HTML JSON-LD on https://{domain}/ with Google Rich Results Test or Schema.org Validator.",
+                })
+                proactive_counter += 1
+
+        # 4. Princeton Citability Architecture (Only if citability defects are not already flagged and site is accessible)
+        if not any(c in finding_cids for c in ("LOW_CITABILITY_SCORE", "LOW_FACT_TO_TOKEN_RATIO", "STANDALONE_FAQ_DEFICIT", "MISSING_IN_DEPTH_MECHANISMS")) and pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Implement Princeton KDD 2024 Citability Architecture on {domain}",
+                "category": "geo_content",
+                "summary": f"Structure core sections on {domain} into 134-167 word standalone passages under conversational question headings to maximize RAG snippet absorption.",
+                "priority": "low",
+                "technical_fix": f"Structure {domain} content under H2/H3 question headers with 40-60 word BLUF answers and semantic bullet lists.",
+                "creative_fix": f"Eliminate exophoric pronouns in section leads ('It', 'They', 'We'); state canonical entity name '{_brand_guess}' directly.",
+                "verification": f"Audit {domain} section word counts and verify presence of causal conjunctions ('because', 'therefore', 'enables').",
+            })
+            proactive_counter += 1
+
+        # 5. Upstream Crawler Whitelisting Action for Blocked / Unreachable sites
+        if not pages:
+            proactive_actions.append({
+                "id": f"P-{proactive_counter:03d}",
+                "title": f"Authorize Verified AI Search Crawlers in WAF & Edge Security for {_brand_guess}",
+                "category": "discoverability",
+                "summary": f"Target host on {domain} blocked automated crawler probes during inventory acquisition. Configure edge security rules (Cloudflare, AWS WAF, Akamai) to permit verified AI retrieval engines.",
+                "priority": "critical",
+                "technical_fix": "Update WAF/CDN security policies to permit User-Agents: OAI-SearchBot, Claude-SearchBot, PerplexityBot with verified ASN IP validation.",
+                "creative_fix": "Deploy challenge bypass rules for recognized AI retrieval bots rather than blanket interstitial blocks.",
+                "verification": f"Probe {base}/ with OAI-SearchBot user-agent and confirm HTTP 200 is returned.",
+            })
+            proactive_counter += 1
 
     final_proactive = proactive_actions[:3]
     for idx, act in enumerate(final_proactive, start=1):
@@ -1152,13 +1463,14 @@ def synthesize_audit_report(
         def _to_code(p_item):
             c = p_item.get("status_code") or p_item.get("status")
             try:
-                return int(c)
+                val = int(c)
+                return val if 100 <= val <= 599 else None
             except (ValueError, TypeError):
-                return 200
-        crawlable_count = sum(1 for p in pages_list if _to_code(p) < 400)
-        crawlability = round((crawlable_count / total_pages) * 100.0, 2)
+                return None
+        crawlable_count = sum(1 for p in pages_list if _to_code(p) is not None and _to_code(p) < 400)
+        crawlability = round((crawlable_count / total_pages) * 100.0, 2) if total_pages > 0 else 0.0
     else:
-        crawlability = 0.0 if inv.get("status") == "failed" else 100.0
+        crawlability = 0.0
 
     disc_cov = specialist_results.get("discoverability-audit", {}).get("coverage", {})
     substantive_pages = [
@@ -1166,7 +1478,7 @@ def synthesize_audit_report(
         if (p.get("word_count", 0) or 0) >= 50
         and not any(k in (p.get("url") or "").lower() for k in ("/footer", "/nav", "/draft", "/fragment"))
     ]
-    retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2)
+    retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2) if pages_list else 0.0
 
     geo_cov = specialist_results.get("geo-content-audit", {}).get("coverage", {})
     avg_cit = geo_cov.get("average_citability_score", 0.0)
@@ -1195,16 +1507,16 @@ def synthesize_audit_report(
 
     def _is_commerce_page(p_item):
         u = str(p_item.get("url") or "").lower()
-        if any(k in u for k in ("/product", "/pricing", "/cart", "/shop")):
+        if any(k in u for k in ("/product/", "/pricing", "/cart", "/checkout", "/shop")):
             return True
         pt = p_item.get("page_type")
         if isinstance(pt, dict):
             pt = pt.get("value")
         pt_str = str(pt or "").lower()
-        return pt_str in ("product", "pricing", "catalog")
+        return pt_str in ("product", "pricing", "catalog", "product_detail")
 
     commerce_pages = sum(1 for p in pages_list if _is_commerce_page(p))
-    agentic_commerce = round((commerce_pages / total_pages) * 100.0, 2)
+    agentic_commerce = round((commerce_pages / total_pages) * 100.0, 2) if pages_list else 0.0
 
     dimensions = {
         "crawlability": crawlability,
@@ -1235,11 +1547,11 @@ def synthesize_audit_report(
         grade = "F"
 
     dimension_status = {
-        "crawlability": "observed",
-        "retrieval_readiness": "observed",
+        "crawlability": "observed" if pages_list else "unmeasured",
+        "retrieval_readiness": "observed" if pages_list else "unmeasured",
         "citation_readiness": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
         "entity_authority": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
-        "cross_engine_visibility": "observed",
+        "cross_engine_visibility": "observed" if pages_list else "unmeasured",
         "agentic_commerce": "provisional" if "RENDERED_CONTENT_GAP" in finding_cids else "observed",
     }
 
@@ -1249,7 +1561,7 @@ def synthesize_audit_report(
         "dimensions": dimensions,
         "weights": weights,
         "dimension_status": dimension_status,
-        "score_scope": "Observed static inventory and specialist telemetry; not live provider ranking or citation data.",
+        "score_scope": "Observed static inventory and specialist telemetry; heuristic citation-readiness proxy, not live provider ranking or citation measurement.",
     }
 
     # 6. Assemble Final Draft-07 Compliant Report (Signal Only, Zero Bloat)
@@ -1517,7 +1829,7 @@ def get_telemetry_payload(
         has_jld = bool(p.get("json_ld_contents")) or ("application/ld+json" in p_html)
         enriched_pages.append({
             "url": p.get("url"),
-            "status": p.get("status_code") or p.get("status", 200),
+            "status": p.get("status_code") or p.get("status") or "unknown",
             "page_type": p.get("page_type"),
             "title": p_title,
             "h1": p_h1,
@@ -1534,7 +1846,7 @@ def get_telemetry_payload(
     status_counts: Dict[str, int] = {}
     pages_by_type: Dict[str, int] = {}
     for p in pages_list:
-        code_str = str(p.get("status_code") or p.get("status", 200))
+        code_str = str(p.get("status_code") or p.get("status") or "unknown")
         status_counts[code_str] = status_counts.get(code_str, 0) + 1
         pt = str(p.get("page_type") or "other")
         pages_by_type[pt] = pages_by_type.get(pt, 0) + 1
@@ -1580,7 +1892,7 @@ def get_telemetry_payload(
         },
         "rendering": {
             "visible_words_initial_html": disc_res.get("coverage", {}).get("visible_words_initial_html"),
-            "spa_root_markers_detected": any(p.get("snr", 1.0) < 0.05 for p in pages_list),
+            "spa_root_markers_detected": any(float(p.get("snr") or 1.0) < 0.05 for p in pages_list if isinstance(p, dict)),
             "average_word_count": avg_wc,
             "average_snr": avg_snr,
             "average_page_snr": avg_snr,
@@ -1624,6 +1936,18 @@ def get_telemetry_payload(
             "pages_evaluated": len(geo_res.get("page_improvement_plans", [])) or geo_res.get("coverage", {}).get("target_pages_evaluated", 0),
             "target_citability_score": 80,
             "evidence_genres_distribution": geo_res.get("geo_citability_summary", {}).get("evidence_genres_distribution", {}),
+            "information_gain_deficits": [
+                f.get("url") for f in geo_res.get("findings", [])
+                if f.get("cause_id") == "INFORMATION_GAIN_DEFICIT"
+            ],
+            "authority_quotation_gaps": [
+                f.get("url") for f in geo_res.get("findings", [])
+                if f.get("cause_id") == "PRIMARY_AUTHORITY_QUOTATION_GAP"
+            ],
+            "comparative_matrix_gaps": [
+                f.get("url") for f in geo_res.get("findings", [])
+                if f.get("cause_id") == "COMPARATIVE_ANSWERABILITY_MATRIX"
+            ],
             "lowest_scoring_pages": [
                 {
                     "url": pip.get("url") or pip.get("page_url") or "",
@@ -1636,6 +1960,28 @@ def get_telemetry_payload(
             "pages_evaluated": eng_res.get("coverage", {}).get("pages_evaluated", 0),
             "h1_aligned_pages": eng_res.get("coverage", {}).get("h1_aligned_pages", 0),
             "cta_above_fold_pages": eng_res.get("coverage", {}).get("cta_above_fold_pages", 0),
+            "orientation_clarity_score": eng_res.get("engagement_continuity_summary", {}).get("average_information_scent_score", 1.0),
+            "cta_reachability_score": eng_res.get("engagement_continuity_summary", {}).get("average_cta_reachability_score", 1.0),
+            "proof_architecture_deficits": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") == "PROOF_ARCHITECTURE_DEFICIT"
+            ],
+            "orientation_vacuums": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") in ("VALUE_PROPOSITION_ORIENTATION_VACUUM", "LOW_INFORMATION_SCENT", "GENERIC_H1")
+            ],
+            "friction_barriers": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") in ("FRICTION_TO_VALUE_BARRIER", "CTA_REACHABILITY_FRICTION")
+            ],
+            "objection_coverage_voids": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") == "OBJECTION_COVERAGE_VOID"
+            ],
+            "dead_end_routes": [
+                f.get("url") for f in eng_res.get("findings", [])
+                if f.get("cause_id") == "DECISION_PATHWAY_DEAD_END"
+            ],
             "generic_h1_pages": [
                 f.get("url") for f in eng_res.get("findings", [])
                 if f.get("cause_id") in ("LOW_INFORMATION_SCENT", "GENERIC_H1")

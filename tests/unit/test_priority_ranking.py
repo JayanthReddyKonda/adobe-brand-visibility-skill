@@ -1,5 +1,4 @@
-"""
-test_priority_ranking.py - Exhaustive priority ranking verification.
+"""test_priority_ranking.py - Exhaustive priority ranking verification.
 
 Tests the mathematical invariant:
     priority_index = 5 * severity + (6 - difficulty)

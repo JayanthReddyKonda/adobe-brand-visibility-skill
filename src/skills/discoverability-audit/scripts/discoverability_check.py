@@ -862,7 +862,7 @@ def audit(base, domain, inv=None, state_file=None):
                 base_prio = type_rank.get(pt, 60)
                 if any(k in u_lower for k in ("/product", "/shop", "/item", "/store")):
                     base_prio -= 5
-                elif any(k in u_lower for k in ("/coffee", "/tea", "/machines", "/accessories")):
+                elif any(k in u_lower for k in ("/collection", "/collections", "/catalog", "/catalogue", "/goods", "/merchandise", "/category", "/detail", "/p/")):
                     base_prio -= 3
                 return (penalty, base_prio, len(u))
 

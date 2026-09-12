@@ -14,9 +14,13 @@ Optimization research (Princeton KDD 2024, CMU AutoGEO, and C-SEO Bench):
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
+import zlib
+from collections import Counter
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -149,9 +153,6 @@ def count_atomic_facts(text: str) -> int:
     return sum(len(p.findall(text)) for p in _AFDH_PATTERNS)
 
 
-import math
-
-
 def wilson_confidence_interval(successes: int, total: int, z: float = 1.96) -> tuple[float, float]:
     """Compute Wilson 95% score confidence interval for empirical citation rates."""
     if total <= 0:
@@ -162,11 +163,6 @@ def wilson_confidence_interval(successes: int, total: int, z: float = 1.96) -> t
     center = (p_hat + (z2 / (2.0 * total))) / denom
     spread = (z * math.sqrt((p_hat * (1.0 - p_hat) / total) + (z2 / (4.0 * total * total)))) / denom
     return (round(max(0.0, center - spread), 4), round(min(1.0, center + spread), 4))
-
-
-import zlib
-from collections import Counter
-from datetime import datetime, timezone
 
 
 def parse_date_string(date_str: str) -> datetime | None:
@@ -677,9 +673,9 @@ def audit(base, domain, inv=None, state_file=None):
                     "evidence": f"Page {url} lacks causal conjunctions or explanatory depth markers (depth score: {depth_score}/10).",
                     "impact": "Generative Engines prefer to cite sources that offer deep explanatory context rather than surface-level assertions.",
                     "suggested_action": {
-                        "summary": "Expand the content to explain the underlying mechanisms and context ('how' and 'why').",
-                        "technical_fix": "Incorporate FAQ structured schema explaining product value propositions.",
-                        "creative_fix": "Rewrite product descriptions to use causal conjunctions ('because', 'due to', 'enables').",
+                        "summary": "Expand explanatory content to demonstrate underlying mechanisms, causality, and context ('how' and 'why').",
+                        "technical_fix": "Incorporate structured Q&A or FAQ schema detailing underlying processes, specifications, or core principles.",
+                        "creative_fix": "Rewrite explanatory sections to incorporate causal conjunctions ('because', 'due to', 'enables', 'as a result') demonstrating 'how' and 'why' mechanisms.",
                         "priority": "medium",
                         "verification": "Scan text for causal depth markers and ensure depth score >= 3.",
                     },
@@ -980,7 +976,30 @@ def audit(base, domain, inv=None, state_file=None):
 
         # 2. Princeton Vector: Quantifiable Evidence & Statistics - +37.1% boost
         stat_matches = _STAT_RE.findall(full_text)
-        if len(stat_matches) == 0 and total_words > 100:
+        if len(stat_matches) == 0 and total_words >= 150 and ptype in ("article", "content", "product_detail", "product", "guide", "pricing"):
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Content suffers from Information Gain Deficit (High LLM Citation Bypass Risk)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": "INFORMATION_GAIN_DEFICIT: Page contains 0 quantifiable metrics, benchmark figures, or empirical measurements. Generative search engines (Perplexity, ChatGPT Search) synthesize generic answers from pre-trained weights and bypass URLs lacking net-new information gain.",
+                    "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                    "id": "INFORMATION_GAIN_DEFICIT",
+                    "cause_id": "INFORMATION_GAIN_DEFICIT",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Substantive page {url} ({total_words} words) contains 0 verifiable numerical metrics, benchmark figures, or proprietary data points.",
+                    "suggested_action": {
+                        "summary": "Inject proprietary benchmark metrics, quantifiable performance statistics, or unique empirical research data into core sections.",
+                        "technical_fix": "Incorporate structured performance tables or empirical data points into the document body.",
+                        "creative_fix": "Replace generic conceptual explanations with concrete quantitative results (e.g. 'reduced latency by 45%', 'measured across 10,000 requests').",
+                        "priority": "high",
+                        "verification": "Confirm presence of at least 2 quantifiable statistics or benchmark figures in the page body.",
+                    },
+                }
+            )
+        elif len(stat_matches) == 0 and total_words > 100:
             recommendations.append(
                 {
                     "id": "PROACTIVE.GEO.STATISTICAL_EVIDENCE.001",
@@ -991,6 +1010,65 @@ def audit(base, domain, inv=None, state_file=None):
                     "technical_fix": "Add verified numerical benchmarks and percentage metrics into specification tables.",
                     "creative_fix": "Include quantified performance gains or case study statistics in body paragraphs.",
                     "verification": "Confirm numbers and percentage metrics are visible in the body text.",
+                }
+            )
+
+        # 2.1 Primary Authority Quotation Gap (Princeton KDD 2024: +40.9% citation lift)
+        if (
+            ptype in ("article", "content", "product_detail", "guide")
+            and total_words >= 200
+            and attributed_quotes_data["attributed_quotes"] == 0
+            and not attributed_quotes_data["has_named_expert"]
+        ):
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Lack of attributed domain authority quotations (+40.9% GEO citation gap)",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": "PRIMARY_AUTHORITY_QUOTATION_GAP: Page makes factual assertions without attributing insights to named domain experts or credentialed authorities. Princeton KDD 2024 empirical research demonstrated that Attributed Quotations yield a +40.9% citation lift, outperforming raw statistical claims alone.",
+                    "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                    "id": "PRIMARY_AUTHORITY_QUOTATION_GAP",
+                    "cause_id": "PRIMARY_AUTHORITY_QUOTATION_GAP",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Substantive page {url} ({total_words} words) contains no attributed quotations from named industry specialists or recognized experts.",
+                    "suggested_action": {
+                        "summary": "Integrate attributed quotations from credentialed domain experts or named leaders.",
+                        "technical_fix": "Incorporate <blockquote> elements with <cite> tags attributing direct insights to credentialed industry specialists.",
+                        "creative_fix": "Quote internal or external domain authorities with their title and organization (e.g., 'according to Dr. Jane Doe, Chief Scientist...').",
+                        "priority": "medium",
+                        "verification": "Confirm quotation is explicitly attributed to a named individual with professional credentials.",
+                    },
+                }
+            )
+
+        # 2.2 Comparative Answerability Matrix
+        is_comparative = any(
+            k in url.lower() or k in (parser.headings[0].lower() if parser.headings else "")
+            for k in ("vs", "versus", "compare", "comparison", "alternative")
+        )
+        if is_comparative and parser.tables == 0 and total_words >= 150:
+            findings.append(
+                {
+                    "category": "content",
+                    "title": "Comparative evaluation route lacks structured comparison matrix",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": "COMPARATIVE_ANSWERABILITY_MATRIX: The page evaluates alternatives or comparative dimensions without a structured HTML comparison table. LLMs heavily prioritize structured tables for multi-entity comparison queries (Zhang et al. 2026: +55.3% citation lift).",
+                    "cause_family": "CONTENT.SHALLOW_COVERAGE",
+                    "id": "COMPARATIVE_ANSWERABILITY_MATRIX",
+                    "cause_id": "COMPARATIVE_ANSWERABILITY_MATRIX",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Comparative route {url} lacks structured <table> markup to present multi-dimensional feature comparisons.",
+                    "suggested_action": {
+                        "summary": "Render a multi-dimensional comparison table comparing core features, pricing, and capabilities side-by-side.",
+                        "technical_fix": "Implement an accessible HTML5 <table> with <thead> and <tbody> comparing evaluated options.",
+                        "creative_fix": "Highlight clear differentiation criteria and concrete trade-offs in structured columns.",
+                        "priority": "medium",
+                        "verification": "Verify presence of structured <table> element with clear column headers.",
+                    },
                 }
             )
 

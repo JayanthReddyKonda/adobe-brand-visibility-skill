@@ -30,3 +30,4 @@ ADOBE-Hackathon
 *.zip
 *.sha256
 *.audit-report.json
+audit_scans/

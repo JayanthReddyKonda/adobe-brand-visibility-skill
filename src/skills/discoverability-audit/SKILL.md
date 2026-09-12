@@ -21,9 +21,9 @@ allowed-tools:
 | **Direct Standalone Discoverability Probe** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json` | `{status, findings, recommendations, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `discoverability_check.py` is a pure measurement sensor. It inspects RFC 9309 crawler matrices across 16 AI retrieval and training bots, HTTP response codes, meta directives (`noindex`, `nofollow`, `noarchive`), canonical chains, XML sitemaps, and raw HTML extractability. It outputs observed empirical evidence without canned recommendation prose.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests this sensor's output, applies Layer 0 causal gating (suppressing downstream schema/GEO complaints if retrieval is blocked), simulates query strategies, and synthesizes bespoke dual-track fixes.
+> - **Clean Skill Isolation:** This skill is strictly isolated to discoverability, crawlability, and rendering extractability. Only this skill invokes `scripts/discoverability_check.py`.
+> - **Helper Sensor (Problem Telemetry Only):** `discoverability_check.py` is an empirical helper sensor. It inspects RFC 9309 crawler matrices across 16 AI retrieval and training bots, HTTP response codes, meta directives (`noindex`, `nofollow`, `noarchive`), canonical chains, XML sitemaps, and raw HTML extractability. It outputs only factual problem information and observed evidence without doing the cognitive work or generating canned fixes.
+> - **LLM Cognitive Generation:** The AI Agent reads `references/knowledge-base.md` and `references/checks.md`, queries the script for relevant discoverability telemetry, and dynamically authors tailored, site-specific remediations and robots/server configurations with zero hardcoded boilerplate.
 
 Evaluates the accessibility and indexing pipeline of a website for AI retrieval engines (ChatGPT Search, Claude Search, Perplexity AI, Google Search). Determines whether AI crawlers can fetch the site's content and whether initial HTML payloads carry extractable text.
 

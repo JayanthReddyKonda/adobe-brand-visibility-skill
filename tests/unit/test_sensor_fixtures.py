@@ -1,5 +1,4 @@
-"""
-test_sensor_fixtures.py / fixture_audit.py - Synthetic HTML/robots/schema fixtures.
+"""test_sensor_fixtures.py / fixture_audit.py - Synthetic HTML/robots/schema fixtures.
 
 Implements two deterministic suites with known correct answers:
 1. Should-fire fixtures:
@@ -20,7 +19,7 @@ import os
 import sys
 import unittest
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SKILLS_DIR = os.path.join(REPO_ROOT, "src", "skills")
 
 # Add all sensor scripts to sys.path

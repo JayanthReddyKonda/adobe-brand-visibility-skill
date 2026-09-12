@@ -21,9 +21,9 @@ allowed-tools:
 | **Direct Standalone GEO Probe** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --format json` | `{status, findings, recommendations, page_improvement_plans}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `geo_content_check.py` measures text quotability, answer density, heading/chunk alignment, statistical metrics, attributed quotes, and causal conjunction density across the 9 empirical Princeton KDD 2024 / AutoGEO vectors. It generates deterministic `page_improvement_plans` with 120–180 word passage chunking models without calling LLMs.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests citability metrics, executes simulated assistant query strategies, and synthesizes bespoke, information-dense passage chunking and explanatory rewrites.
+> - **Clean Skill Isolation:** This skill is strictly isolated to Generative Engine Optimization (GEO), citability heuristics, and passage chunking. Only this skill invokes `scripts/geo_content_check.py`.
+> - **Helper Sensor (Problem Telemetry Only):** `geo_content_check.py` is an empirical helper sensor. It measures text quotability, answer density, heading/chunk alignment, statistical metrics, attributed quotes, and causal conjunction density across the 9 empirical Princeton KDD 2024 / AutoGEO vectors. It reports only objective citability metrics and structural passage data without doing the cognitive work.
+> - **LLM Cognitive Generation:** The AI Agent reads `references/knowledge-base.md` and `references/checks.md`, queries the script for relevant citability telemetry, and dynamically authors information-dense, 40-60 word BLUF answers, causal conjunction rewrites, and comparative HTML specification matrices with zero hardcoded boilerplate.
 
 Evaluates HTML content for AI citation and retrieval-augmented generation (RAG) extractability based on empirical Generative Engine Optimization research (Aggarwal et al., Princeton KDD 2024, arXiv:2311.09735; and Wu et al., CMU AutoGEO, arXiv:2510.11438 preprint). Determines whether content provides the causal mechanisms, statistical evidence, and structured definitions required for LLM citation.
 

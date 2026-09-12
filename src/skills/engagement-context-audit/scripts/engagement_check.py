@@ -10,10 +10,15 @@ Enforces strict Resource Invariant: Only genuine HTML pages enter engagement aud
 """
 
 import argparse
+import csv
+import glob
+import io
 import json
+import math
 import os
 import re
 import sys
+from collections import Counter
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 
@@ -166,7 +171,6 @@ class SemanticIntentEngine:
     def _load_intents(self):
         if not self.references_dir or not os.path.exists(self.references_dir):
             return
-        import glob
 
         yaml_files = glob.glob(os.path.join(self.references_dir, "*.json"))
         for f in yaml_files:
@@ -504,6 +508,54 @@ WEAK_CTA_PATTERNS = re.compile(
     r"^(submit|click here|learn more|read more|continue|see more|view more|go)$", re.IGNORECASE
 )
 
+# Elite Behavioral & Post-Citation Engagement Patterns
+PROOF_BENCHMARK_PATTERNS = re.compile(
+    r"\b(?:"
+    r"\d+(?:\.\d+)?\s*%\s*(?:reduction|increase|faster|improvement|uptime|latency|saving|growth|lift|sla|speed)"
+    r"|\d+(?:\.\d+)?\s*(?:ms|milliseconds|seconds|req/sec|tps|iops|gb/s|tb/s|qps)"
+    r"|99\.\d+%\s*(?:uptime|sla|availability)"
+    r"|\$\s*\d+(?:\.\d+)?\s*[kmbKMB]?\s*(?:saved|revenue|cost)"
+    r"|benchmark|latency benchmark|throughput benchmark|empirical results|performance test"
+    r")\b",
+    re.IGNORECASE,
+)
+
+COMPLIANCE_PATTERNS = re.compile(
+    r"\b(soc\s*2(?:\s*type\s*(?:i|ii))?|iso\s*27001|hipaa|gdpr|pci[- ]dss|fedramp|ccpa|csa\s*star)\b",
+    re.IGNORECASE,
+)
+
+CUSTOMER_PROOF_PATTERNS = re.compile(
+    r"\b(?:"
+    r"case study|customer story|customer success|trusted by|used by|loved by|client results"
+    r"|testimonial|quote from|director of|vp of|cto|ciso|head of engineering"
+    r"|reduced\s+[\w\s]+by\s+\d+%|increased\s+[\w\s]+by\s+\d+%"
+    r")\b",
+    re.IGNORECASE,
+)
+
+FORCED_SALES_GATE_PATTERNS = re.compile(
+    r"\b(book\s+(?:a\s+)?demo|request\s+(?:a\s+)?demo|talk\s+to\s+sales|contact\s+sales|schedule\s+(?:a\s+)?call|speak\s+with\s+sales)\b",
+    re.IGNORECASE,
+)
+
+SELF_SERVICE_PATTERNS = re.compile(
+    r"\b(start\s+(?:a\s+)?(?:free\s+)?trial|try\s+free|free\s+tier|sign\s+up(?:\s+free)?|get\s+started(?:\s+free)?|explore\s+docs|interactive\s+demo|sandbox|live\s+demo|deploy|pricing)\b",
+    re.IGNORECASE,
+)
+
+OBJECTION_PATTERNS = {
+    "pricing_transparency": re.compile(r"\b(price|pricing|tier|cost|per\s+month|annual|cancel\s+anytime|refund|no\s+hidden\s+fees|free\s+tier)\b", re.IGNORECASE),
+    "security_compliance": re.compile(r"\b(soc\s*2|iso\s*27001|hipaa|gdpr|encryption|data\s+privacy|security|single\s+sign-on|sso|saml)\b", re.IGNORECASE),
+    "integration_compatibility": re.compile(r"\b(integrat\w+|api|sdk|connect\w*|webhook|plugin|slack|github|kubernetes|aws|postgresql|zapier)\b", re.IGNORECASE),
+    "migration_onboarding": re.compile(r"\b(migrat\w+|switch\w*|import\w*|onboarding|setup\s+time|export|transition)\b", re.IGNORECASE),
+}
+
+GENERIC_ORIENTATION_PATTERNS = re.compile(
+    r"\b(welcome\s+to\s+(?:our\s+)?(?:website|service|site|portal|platform|the\s+knowledge\s+base)|empower\s+your\s+journey|next-generation\s+solutions?|reimagine\s+workflows?|transforming\s+the\s+future|unleash\s+innovation|delivering\s+excellence)\b",
+    re.IGNORECASE,
+)
+
 VALID_CONTACT_TERMS = {
     "contact",
     "contact us",
@@ -521,9 +573,6 @@ VALID_CONTACT_TERMS = {
 }
 
 
-import math
-from collections import Counter
-
 # Elite Pre-computed TF-IDF Centroids for Zero-Dependency Semantic Intent Mapping
 SITE_TYPE_CENTROIDS = {
     "ecommerce_retail": {
@@ -536,7 +585,7 @@ SITE_TYPE_CENTROIDS = {
         "store": 0.2,
         "buy": 0.3,
         "apparel": 0.2,
-        "coffee": 0.1,
+        "catalog": 0.2,
     },
     "saas_developer": {
         "api": 0.5,
@@ -635,9 +684,6 @@ def parse_analytics_data(arg_val, inv=None):
                 try:
                     raw_data = json.loads(content)
                 except json.JSONDecodeError:
-                    import csv
-                    import io
-
                     reader = csv.DictReader(io.StringIO(content))
                     raw_data = list(reader)
             except Exception:
@@ -803,91 +849,196 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                 }
             )
 
-    # 2. Entity-to-Heading Anchor (Information Scent)
-    if not dom.h1_list:
-        recommendations.append(
-            {
-                "title": "Add descriptive H1 heading for visitor orientation",
-                "category": "engagement",
-                "rationale": f"Page {url} is missing an H1 heading.",
-                "summary": "Ensure every page provides a clear <h1> describing its specific value proposition or content.",
-                "suggested_action": "Ensure every page provides a clear <h1> describing its specific value proposition or content.",
-            }
-        )
-    elif state and "entities" in state and url in state["entities"]:
-        entities = state["entities"][url]
-        h1_text = " ".join(dom.h1_list).lower()
-        anchor_found = any(ent.lower() in h1_text for ent in entities if len(ent) > 2)
-        if entities and not anchor_found:
-            findings.append(
-                {
-                    "category": "engagement",
-                    "title": "Broken Information Scent: Entity not anchored in primary heading",
-                    "severity": "medium",
-                    "confidence": "high",
-                    "root_cause": "The page's primary <h1> does not contain the name of the canonical entity, leading to user disorientation upon arrival.",
-                    "cause_family": "EXPERIENCE.CONTINUITY",
-                    "id": "LOW_INFORMATION_SCENT",
-                    "cause_id": "LOW_INFORMATION_SCENT",
-                    "url": url,
-                    "scope": url,
-                    "evidence": f"Entities {entities} not found in H1 '{dom.h1_list[0]}'.",
-                    "suggested_action": {
-                        "summary": "Rewrite the <h1> to explicitly include the primary entity name.",
-                        "technical_fix": "Update template <h1> element to explicitly mention canonical brand entity name.",
-                        "creative_fix": "Craft descriptive hero headline combining brand entity name with unique value proposition.",
-                        "priority": "medium",
-                        "verification": "Inspect rendered HTML to ensure <h1> contains primary brand entity name.",
-                    },
-                }
-            )
+    total_body_words = len(" ".join(dom.body_text).split())
+    full_text = " ".join(dom.body_text)
+    opening_text = " ".join(dom.paragraphs[:3]) if dom.paragraphs else " ".join(dom.body_text[:200])
+    opening_lower = opening_text.lower()
+    lead_h1 = dom.h1_list[0] if dom.h1_list else ""
+    lead_h1_lower = lead_h1.lower()
 
-    # 3. Agent UX & Accessibility Barrier (<div onclick> vs semantic buttons)
-    div_onclicks = len(re.findall(r"<div\b[^>]*\bonclick\s*=", html_content, re.IGNORECASE))
-    if div_onclicks >= 3:
+    # 2. The 5-Second Cognitive Orientation & Value Proposition Test
+    # Visitors arriving from AI search decide within 3-5 seconds whether to stay or bounce.
+    # An orientation vacuum occurs when the hero/opening section relies on generic slogans
+    # or fails to define what the product/service is, for whom, and what it solves.
+    is_generic_orientation = bool(
+        GENERIC_ORIENTATION_PATTERNS.search(opening_text)
+        or GENERIC_ORIENTATION_PATTERNS.search(lead_h1)
+        or any(lead_h1_lower == t or lead_h1_lower.startswith(t + " ") for t in GENERIC_H1_TERMS)
+    )
+    has_concrete_value = any(
+        kw in opening_lower
+        for kw in (
+            "provides", "enables", "platform for", "software for", "solution for",
+            "infrastructure for", "designed for", "built for", "accelerates", "automates",
+            "helps you", "allows you", "tool for", "system for"
+        )
+    )
+    if (is_generic_orientation or (not lead_h1 and not has_concrete_value)) and total_body_words >= 30:
         findings.append(
             {
                 "category": "engagement",
-                "title": "Interactive elements implemented as non-semantic div-onclick widgets",
-                "severity": "medium",
+                "title": "Value proposition orientation vacuum in primary viewport (5-Second Bounce Risk)",
+                "severity": "high",
                 "confidence": "high",
-                "root_cause": "AGENT_INTERACTION_BARRIER: Interactive buttons and CTAs are rendered using <div onclick> rather than semantic <button> or <a> tags.",
+                "root_cause": (
+                    "VALUE_PROPOSITION_ORIENTATION_VACUUM: The above-the-fold hero section fails the 5-second orientation test. "
+                    f"Arriving visitors encounter generic copy ('{lead_h1 or opening_text[:80]}') without a concrete definition of the offering, "
+                    "target audience, or primary mechanism, triggering immediate cognitive abandonment."
+                ),
                 "cause_family": "EXPERIENCE.CONTINUITY",
-                "id": "AGENT_INTERACTION_BARRIER",
-                "cause_id": "AGENT_INTERACTION_BARRIER",
+                "id": "VALUE_PROPOSITION_ORIENTATION_VACUUM",
+                "cause_id": "VALUE_PROPOSITION_ORIENTATION_VACUUM",
                 "url": url,
                 "scope": url,
-                "evidence": f"Page {url} contains {div_onclicks} non-semantic <div onclick> element(s).",
-                "impact": "Autonomous AI agents and browser automation assistants cannot discover, tab through, or trigger non-semantic onclick divs.",
+                "evidence": f"Opening viewport on {url} lacks concrete capability nouns or audience positioning ('{lead_h1 or opening_text[:100]}').",
                 "suggested_action": {
-                    "summary": "Replace <div onclick> elements with native <button> or <a href> tags.",
-                    "technical_fix": "Refactor interactive div handlers to semantic HTML5 <button type='button'> or <a href> elements with keyboard focusability.",
-                    "creative_fix": "Ensure all call-to-action buttons have accessible, human-readable text labels rather than icon-only divs.",
-                    "priority": "medium",
-                    "verification": "Confirm grep for '<div[^>]*onclick' returns 0 matches in HTML.",
+                    "summary": "Invert hero copy: explicitly define what the product does, for whom, and its primary concrete outcome within the first 50 words.",
+                    "technical_fix": "Restructure the hero DOM section to place a direct capability definition immediately below the primary heading.",
+                    "creative_fix": "Adopt the [Action Verb] + [Specific Capability] + [Quantified Outcome] headline pattern.",
+                    "priority": "high",
+                    "verification": "Confirm opening viewport contains explicit domain nouns and solution positioning.",
                 },
             }
         )
 
-    # 4. Semantic Landmarks (<main>, <article>, <nav>)
-    has_landmarks = bool(re.search(r"<(main|article|nav|aside|header|footer)\b", html_content, re.IGNORECASE))
-    if not has_landmarks and len(" ".join(dom.body_text).split()) > 150:
-        recommendations.append(
-            {
-                "id": "PROACTIVE.ENGAGEMENT.SEMANTIC_LANDMARKS.001",
-                "title": "Implement HTML5 semantic landmarks (<main>, <article>, <nav>)",
-                "category": "engagement",
-                "summary": f"Page {url} lacks HTML5 semantic landmarks. AI browsing agents and screen readers use landmarks to orient and extract core content without header/footer noise.",
-                "priority": "low",
-                "technical_fix": "Wrap primary content in <main> and navigational blocks in <nav>.",
-                "creative_fix": "Organize page layout into clear hierarchical sections with distinctive headings.",
-                "verification": "Verify HTML contains <main> and <nav> landmarks.",
-            }
-        )
+    # 3. Proof Architecture & Skepticism Deficit
+    # AI search users are inherently skeptical because LLMs hallucinate. When they click through to verify,
+    # the absence of empirical proof anchors (benchmarks, verifiable metrics, case studies, security credentials)
+    # causes them to dismiss the claims and bounce.
+    if page_type in ("product_detail", "product", "pricing", "homepage", "subscription_flow") and total_body_words >= 80:
+        has_benchmarks = bool(PROOF_BENCHMARK_PATTERNS.search(full_text))
+        has_compliance = bool(COMPLIANCE_PATTERNS.search(full_text))
+        has_customer_proof = bool(CUSTOMER_PROOF_PATTERNS.search(full_text))
 
-    # 5. Value-Driven CTA Copy Check (CRO & SXO best practices)
+        if not (has_benchmarks or has_compliance or has_customer_proof):
+            findings.append(
+                {
+                    "category": "engagement",
+                    "title": "Critical proof architecture deficit on commercial offering (Skepticism Deficit)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": (
+                        "PROOF_ARCHITECTURE_DEFICIT: The commercial page makes value claims but provides zero empirical proof anchors "
+                        "(0 benchmark figures, 0 verifiable customer outcome metrics, 0 compliance/security badges). Skeptical visitors arriving "
+                        "from AI citations cannot verify claims and abandon the session."
+                    ),
+                    "cause_family": "EXPERIENCE.TRUST",
+                    "id": "PROOF_ARCHITECTURE_DEFICIT",
+                    "cause_id": "PROOF_ARCHITECTURE_DEFICIT",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Commercial page {url} ({page_type}, {total_body_words} words) provides zero empirical benchmarks, customer outcome metrics, or compliance certifications.",
+                    "suggested_action": {
+                        "summary": "Anchor primary claims with empirical proof: publish verified benchmark figures, customer metrics, and compliance credentials.",
+                        "technical_fix": "Embed structured performance metrics, customer metric cards, and verifiable security certification badges adjacent to core claims.",
+                        "creative_fix": "Replace unverified superlatives ('fastest', 'most reliable') with concrete measurements ('sub-10ms P99 latency across 100M queries').",
+                        "priority": "high",
+                        "verification": "Verify presence of at least 2 empirical proof elements (metrics, case data, compliance seals) within the page body.",
+                    },
+                }
+            )
+
+    # 4. Friction-to-Value & Conversion Obstacles (Forced Sales Gate)
+    # Technical evaluators and developers arriving from AI citations bounce immediately if forced into
+    # a 30-minute sales meeting rather than experiencing immediate product value.
+    if page_type in ("pricing", "product_detail", "product") and total_body_words >= 60:
+        has_sales_gate = bool(FORCED_SALES_GATE_PATTERNS.search(all_action_text))
+        has_self_serve = bool(SELF_SERVICE_PATTERNS.search(all_action_text))
+        if has_sales_gate and not has_self_serve:
+            findings.append(
+                {
+                    "category": "conversion-continuity",
+                    "title": "High-friction conversion barrier on commercial route (Forced Sales Gate)",
+                    "severity": "high",
+                    "confidence": "high",
+                    "root_cause": (
+                        "FRICTION_TO_VALUE_BARRIER: The primary conversion trigger enforces a high-friction sales consultation gate "
+                        "with zero self-service onboarding, interactive sandbox, or transparent documentation for technical evaluators."
+                    ),
+                    "cause_family": "EXPERIENCE.CONTINUITY",
+                    "id": "FRICTION_TO_VALUE_BARRIER",
+                    "cause_id": "FRICTION_TO_VALUE_BARRIER",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Page {url} ({page_type}) requires scheduled sales interaction with no self-service entry point.",
+                    "suggested_action": {
+                        "summary": "Implement a dual-track conversion architecture: provide self-service trial or interactive sandbox alongside sales contact.",
+                        "technical_fix": "Add secondary self-service CTA ('Try Sandbox', 'Explore Documentation', 'Start Free Tier') adjacent to primary enterprise sales CTA.",
+                        "creative_fix": "Allow visitors to experience immediate product utility before requiring identity disclosure or scheduled meetings.",
+                        "priority": "high",
+                        "verification": "Confirm presence of an un-gated self-service pathway alongside enterprise sales contact.",
+                    },
+                }
+            )
+
+    # 5. Objection Pre-emption & Decision Velocity
+    # Unaddressed buyer hesitations (pricing opacity, integration gaps, migration friction) stall conversions.
+    if page_type in ("product_detail", "product", "pricing", "subscription_flow") and total_body_words >= 150:
+        objections_covered = sum(1 for _, pat in OBJECTION_PATTERNS.items() if pat.search(full_text))
+        if objections_covered <= 1:
+            findings.append(
+                {
+                    "category": "engagement",
+                    "title": "Commercial route leaves core buyer objections unaddressed",
+                    "severity": "medium",
+                    "confidence": "high",
+                    "root_cause": (
+                        "OBJECTION_COVERAGE_VOID: Commercial page lacks structured objection handling (pricing clarity, migration pathways, "
+                        f"integration compatibility, or security compliance — only {objections_covered}/4 covered), stalling purchase decisions."
+                    ),
+                    "cause_family": "EXPERIENCE.TRUST",
+                    "id": "OBJECTION_COVERAGE_VOID",
+                    "cause_id": "OBJECTION_COVERAGE_VOID",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Commercial page {url} addresses only {objections_covered} of 4 essential buyer objection categories.",
+                    "suggested_action": {
+                        "summary": "Deploy an Objection Pre-emption module addressing pricing transparency, migration ease, integration stack, and security compliance.",
+                        "technical_fix": "Add structured FAQ or comparison matrix addressing top buyer hesitations directly above final conversion triggers.",
+                        "creative_fix": "Provide explicit risk-reversal answers: 'Can I cancel anytime?', 'How do I migrate my data?', 'Where is data stored?'.",
+                        "priority": "medium",
+                        "verification": "Verify page provides explicit answers regarding pricing terms, integrations, and data security.",
+                    },
+                }
+            )
+
+    # 6. Informational Decision Pathway & Dead-End Avoidance
+    # Informational and guide pages that terminate without logical next steps cause 100% of satisfied readers to bounce.
+    if page_type in ("article", "documentation", "guide") and total_body_words >= 250:
+        has_continuation = any(
+            re.search(pat, all_action_text)
+            for pat in [r"next", r"continue", r"guide", r"tutorial", r"related", r"read more", r"explore", r"try", r"docs", r"download"]
+        )
+        if not has_continuation:
+            findings.append(
+                {
+                    "category": "engagement",
+                    "title": "Informational route creates an experiential dead-end",
+                    "severity": "medium",
+                    "confidence": "medium",
+                    "root_cause": (
+                        "DECISION_PATHWAY_DEAD_END: The informational page delivers content but provides zero logical next steps, "
+                        "interactive tools, or conversion pathways, causing visitors to bounce after reading."
+                    ),
+                    "cause_family": "EXPERIENCE.CONTINUITY",
+                    "id": "DECISION_PATHWAY_DEAD_END",
+                    "cause_id": "DECISION_PATHWAY_DEAD_END",
+                    "url": url,
+                    "scope": url,
+                    "evidence": f"Informational page {url} ({total_body_words} words) contains no forward navigational or conversion pathways.",
+                    "suggested_action": {
+                        "summary": "Add intent-tailored next-step pathways (related guides, interactive sandbox, tool download, or free trial) at document conclusion.",
+                        "technical_fix": "Insert a contextually relevant next-step component or related resources block at the bottom of the article layout.",
+                        "creative_fix": "Guide the reader from learning into doing: provide a concrete implementation checklist or sandbox environment.",
+                        "priority": "medium",
+                        "verification": "Confirm presence of purposeful next-action pathways at the article footer.",
+                    },
+                }
+            )
+
+    # 7. Value-Driven CTA Copy Check (CRO & SXO best practices)
     weak_ctas = [txt for txt in dom.cta_texts if WEAK_CTA_PATTERNS.match(txt.strip())]
-    if weak_ctas and len(" ".join(dom.body_text).split()) > 100:
+    if weak_ctas and total_body_words >= 100:
         if not any(f.get("cause_id") == "CTA_REACHABILITY_FRICTION" for f in findings):
             findings.append(
                 {
@@ -905,27 +1056,13 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                     "evidence": f"Found generic CTA trigger ('{weak_ctas[0]}') on {url}.",
                     "suggested_action": {
                         "summary": f"Replace generic '{weak_ctas[0]}' CTA with specific outcome copy.",
-                        "technical_fix": "Update CTA button markup to state the delivered value (e.g. 'Explore Fresh Roasts', 'Claim Coffee Rewards').",
+                        "technical_fix": "Update CTA button markup to state the delivered value (e.g. 'Start Free Trial', 'Explore Product Catalog', 'View Documentation').",
                         "creative_fix": "Align CTA verbs with the exact recommendation made by AI search engines.",
                         "priority": "medium",
                         "verification": "Confirm CTA text contains descriptive benefit nouns.",
                     },
                 }
             )
-        recommendations.append(
-            {
-                "id": "PROACTIVE.ENGAGEMENT.VALUE_DRIVEN_CTA.001",
-                "title": "Replace generic action-verb CTAs with outcome-oriented value copy",
-                "category": "engagement",
-                "summary": f"Found generic CTA button/link copy ('{weak_ctas[0]}') on {url}. AI search visitors arrive with high intent; value-driven CTAs ('Start Free Trial', 'See Live Pricing', 'Explore Documentation') preserve context scent and elevate conversion rates.",
-                "priority": "low",
-                "technical_fix": "Update button and anchor text to state the specific value or asset delivered upon click.",
-                "creative_fix": "Adopt the [Action Verb] + [Specific Value] pattern: 'Get Instant Access', 'Compare All Plans', 'Download Integration Guide'.",
-                "verification": "Confirm CTA buttons contain descriptive value nouns rather than isolated action verbs.",
-            }
-        )
-
-    total_body_words = len(" ".join(dom.body_text).split())
 
     # Deep Post-Citation Engagement Sensors
     viewport_data = compute_viewport_answer_anchoring(dom, " ".join(dom.body_text), page_type, facts)

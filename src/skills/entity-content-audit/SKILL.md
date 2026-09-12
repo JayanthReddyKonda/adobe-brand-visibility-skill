@@ -21,9 +21,9 @@ allowed-tools:
 | **Direct Standalone Entity Probe** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `entity_content_check.py` deterministically parses initial HTML DOM trees, extracts Schema.org JSON-LD nodes, resolves nested `@graph` hierarchies, and scores the 7-attribute Answerability Index. It reports empirical observations without generating boilerplate schema snippets.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests observed entities, validates archetype alignment (suppressing e-commerce Product penalties on SaaS/B2B sites), and synthesizes tailored, copy-pasteable Schema.org `@graph` blocks matching verified domain attributes.
+> - **Clean Skill Isolation:** This skill is strictly isolated to machine-explicit entity identity, Schema.org structured data, and commercial answerability. Only this skill invokes `scripts/entity_content_check.py`.
+> - **Helper Sensor (Problem Telemetry Only):** `entity_content_check.py` is an empirical helper sensor. It deterministically parses initial HTML DOM trees, extracts Schema.org JSON-LD nodes, resolves nested `@graph` hierarchies, and scores the 7-attribute Answerability Index. It reports only factual problem information and observed structural gaps without doing the cognitive work or outputting canned schema snippets.
+> - **LLM Cognitive Generation:** The AI Agent reads `references/knowledge-base.md` and `references/checks.md`, queries the script for relevant entity telemetry, and dynamically authors bespoke, site-specific Schema.org `@graph` JSON-LD blocks tailored to the brand's verified domain, offerings, and tech stack with zero hardcoded boilerplate.
 
 Evaluates whether an AI search system can resolve the brand's entity identity (`Organization`) and extract its commercial offerings (`Product`, `Offer`, `Service`). Computes the mathematically reproducible weighted **Answerability Index** across sampled HTML pages.
 

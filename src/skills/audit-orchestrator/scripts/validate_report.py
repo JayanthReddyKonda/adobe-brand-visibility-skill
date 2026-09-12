@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+import datetime
 import json
+import math
 import os
 import re
 import sys
+from urllib.parse import urlparse
 
 
 def validate_type(instance, schema, path="root"):
@@ -30,8 +33,6 @@ def validate_type(instance, schema, path="root"):
             return f"{path}: Expected {type_list}, got {type(instance).__name__}"
 
         if "string" in type_list and isinstance(instance, str) and schema.get("format") == "date-time":
-            import datetime
-
             # P1-88: Strict timezone qualification requirement (e.g. 'Z' or '+00:00' / '-05:00')
             if not re.search(r"(Z|[+-]\d{2}:\d{2})$", instance):
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string (missing explicit timezone offset)"
@@ -44,7 +45,6 @@ def validate_type(instance, schema, path="root"):
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
 
         if "string" in type_list and isinstance(instance, str) and schema.get("format") == "uri":
-            from urllib.parse import urlparse
             parsed = urlparse(instance)
             if not parsed.scheme or (parsed.scheme in ("http", "https") and not parsed.netloc):
                 return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
@@ -53,7 +53,6 @@ def validate_type(instance, schema, path="root"):
     if not expected_type and isinstance(instance, str) and "format" in schema:
         fmt = schema["format"]
         if fmt == "date-time":
-            import datetime
             if not re.search(r"(Z|[+-]\d{2}:\d{2})$", instance):
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string (missing explicit timezone offset)"
             try:
@@ -64,14 +63,12 @@ def validate_type(instance, schema, path="root"):
             except ValueError:
                 return f"{path}: '{instance}' is not a valid ISO 8601 date-time string"
         elif fmt == "uri":
-            from urllib.parse import urlparse
             parsed = urlparse(instance)
             if not parsed.scheme or (parsed.scheme in ("http", "https") and not parsed.netloc):
                 return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
 
     # P1-89: Disallow NaN and Infinity numeric values
     if isinstance(instance, (int, float)) and not isinstance(instance, bool):
-        import math
         if math.isnan(instance) or math.isinf(instance):
             return f"{path}: Disallowed NaN or Infinity numeric value"
 

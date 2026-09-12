@@ -25,8 +25,9 @@ allowed-tools:
 | **Zero-Trust URL & SSRF Probe** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com --check-only` | Status code, latency, and SSRF safety verdict | Direct URL & Network Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Acquisition:** `web-scraper` executes bounded, single-pass website acquisition (`run_scraper.py` and `acquire_inventory.py` emitting `inv.json`). It enforces pre-connect zero-trust SSRF validation, parses RFC 9309 crawler matrices across 16 AI bots, traverses XML sitemaps, and extracts Trafilatura-grade clean Markdown. It **must not** recommend fixes, assign severities, or call LLMs.
-> - **Cognitive Orchestrator:** All downstream diagnostic sensors and the Master Orchestrator run offline against `inv.json`, eliminating redundant crawls and ensuring single-pass efficiency.
+> - **Clean Skill Isolation:** This skill is strictly isolated to single-pass inventory acquisition and zero-trust SSRF fetching. Only this skill invokes `scripts/acquire_inventory.py`, `scripts/run_scraper.py`, and `scripts/safe_fetch.py`.
+> - **Helper Sensor (Acquisition Telemetry Only):** `web-scraper` executes bounded, single-pass website acquisition emitting canonical `inv.json`. It enforces socket-level SSRF validation, parses robots.txt across 16 AI bots, traverses sitemaps, and extracts clean markdown. It reports only acquisition telemetry and does NOT recommend fixes, assign severities, or perform cognitive reasoning.
+> - **LLM Cognitive Generation:** All downstream specialist skills and the Master Orchestrator run offline against `inv.json`, requesting relevant telemetry from sensors while the LLM generates the complete audit report.
 
 > [!NOTE]
 > **Scale Architecture and Context Boundary (`inv.json`):**
@@ -79,22 +80,8 @@ Every script and reference in this skill serves a distinct, critical role:
 | `scripts/acquire_inventory.py` | Standalone Script | Canonical entrypoint used by `audit-orchestrator` to acquire `inv.json` with infrastructure stats. |
 | `scripts/run_scraper.py` | CLI Tool | Autonomous crawler with custom arguments (`--max-pages`, `--max-depth`, `--strict-robots`, `--format`). |
 | `scripts/safe_fetch.py` | Network Core | Shared zero-trust SSRF network engine enforcing DNS pre-resolution, private IP blocking, streaming chunk caps, and redirect re-validation. |
-| `scripts/crawler/engine.py` | Internal Module | Streaming single-pass crawl orchestrator managing the link frontier, rate limiting, and response preservation. |
-| `scripts/crawler/robots.py` | Internal Module | RFC 9309 parser evaluating 16 AI bots, octet-level UTF-8 matching, and terminal wildcards. |
-| `scripts/crawler/sitemap.py` | Internal Module | XML sitemap parser with safe subset DTD rejection (XXE defense) and recursive index traversal. |
-| `scripts/crawler/frontier.py` | Internal Module | Priority queue frontier scoring high-value commercial routes (`/pricing`, `/products`, `/about`). |
-| `scripts/crawler/parser.py` | Internal Module | HTML DOM parser computing Signal-to-Noise Ratio (SNR) and extracting Trafilatura-grade clean Markdown. |
-| `scripts/crawler/jsonld.py` | Internal Module | Schema.org extractor flattening `@graph` hierarchies and normalizing entity objects. |
-| `scripts/crawler/evidence.py` | Internal Module | Response payload archiving and SHA-256 evidence hashing for reproducible audit trails. |
-| `scripts/crawler/classify.py` | Internal Module | Page archetype classifier (homepage, product, pricing, article, docs, legal). |
-| `scripts/crawler/canonical.py` | Internal Module | Canonical URL resolution and cross-origin traversal prevention. |
-| `scripts/crawler/budget.py` | Internal Module | Monotonic crawl deadline and byte limit enforcement. |
-| `scripts/crawler/policy.py` | Internal Module | Safe query string filtering and mutating route sanitization. |
-| `scripts/crawler/models.py` | Dataclasses | Data schemas for `Page`, `Inventory`, `RobotsDirective`, and `CrawledResource`. |
-| `scripts/crawler/fetch.py` | Internal Module | Streaming fetch wrapper coordinating zero-trust SSRF safe fetching within the crawl loop. |
-| `scripts/crawler/links.py` | Internal Module | HTML link parser extracting internal links, stripping URL fragments, and filtering tracking parameters. |
-| `scripts/crawler/metadata.py` | Internal Module | Extraction engine for title, meta tags, OpenGraph, Twitter cards, and edge HTTP headers. |
-| `scripts/crawler/cli.py` | Internal Module | CLI option parser and configuration builder for the autonomous crawler. |
+| `scripts/crawler/engine.py` | Engine Core | Consolidated high-performance crawl engine uniting RFC 9309 robots auditing, XML sitemap traversal, streaming HTML parsing, Trafilatura-grade Markdown extraction, Schema.org JSON-LD normalization, frontier management, and evidence modeling. |
+| `scripts/crawler/__init__.py` | Package API | Re-exports public crawler API and provides dynamic module virtualization for full backwards compatibility. |
 | `references/bot-registry.json` | Reference JSON | Authoritative catalogue of 16 AI retrieval and training bots, user agents, provider roles, and functions. |
 | `references/knowledge-base.md` | Reference KB | Comprehensive technical specification covering SSRF blocked subnets, RFC 9309 rules, and SNR math. |
 | `evals/evals.json` | Verification Fixtures | Single-pass acquisition test fixtures validating RFC 9309 crawler matrices, SNR scoring, and SSRF prevention. |

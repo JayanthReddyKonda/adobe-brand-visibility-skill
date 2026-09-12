@@ -40,6 +40,7 @@ TAXONOMY_ALIASES: Dict[str, str] = {
     "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
     "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
     "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
+    "ROBOTS_SITEWIDE_DISALLOW": "AI_RETRIEVAL_BLOCKED",
 }
 
 # ---------------------------------------------------------------------------
@@ -47,6 +48,7 @@ TAXONOMY_ALIASES: Dict[str, str] = {
 # ---------------------------------------------------------------------------
 LAYER0_CAUSE_IDS: Set[str] = {
     "AI_RETRIEVAL_BLOCKED",
+    "ROBOTS_SITEWIDE_DISALLOW",
     "NOINDEX_EXCLUSION",
     "META_DIRECTIVE_CONFLICT",
     "ROBOTS_5XX_FAIL_CLOSED",
@@ -67,10 +69,16 @@ LAYER1_CAUSE_IDS: Set[str] = {
 
 # Findings at Layers 2-5 that are symptoms of Layer 0 access block
 SUPPRESSED_BY_LAYER0: Set[str] = {
+    # Layer 1 — Rendering (cannot evaluate client rendering if access is blocked)
+    "RENDERED_CONTENT_GAP",
+    "NOSNIPPET_ON_CORE_CONTENT",
+    "JS_REQUIRED",
+    "HTML_EMPTY",
     # Layer 2 — Entity Resolution
     "MATERIAL_ENTITY_AMBIGUITY",
     "MISSING_SAMEAS_VERIFICATION",
     "UNLINKED_KNOWLEDGE_GRAPH_ANCHOR",
+    "CLAIM_CORROBORATION_GAP",
     "SCHEMA_MISSING",
     "SCHEMA_INVALID",
     "BROKEN_AUTHORITY_ANCHOR",
@@ -92,6 +100,8 @@ SUPPRESSED_BY_LAYER0: Set[str] = {
     "STANDALONE_FAQ_DEFICIT",
     "LOW_FACT_TO_TOKEN_RATIO",
     "EXCESSIVE_KEYWORD_DENSITY",
+    "EXCESSIVE_HEDGE_LANGUAGE",
+    "LOCALE_MISCONFIGURATION",
     "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT",
     "CONTEXT_PLACEMENT_DEGRADATION",
     "MISSING_BLUF_PRIMACY",
@@ -100,7 +110,13 @@ SUPPRESSED_BY_LAYER0: Set[str] = {
     "LOW_CITABILITY_SCORE",
     "SUB_THRESHOLD_CITABILITY",
     "LACK_OF_SPECIFIC_EVIDENCE",
-    # Layer 5 — Engine Selection & Referral Continuity
+    "VIEWPORT_ANSWER_ABSENCE",
+    "GENERIC_H1",
+    "HEADING_HIERARCHY_VACUUM",
+    "INFORMATION_GAIN_DEFICIT",
+    "PRIMARY_AUTHORITY_QUOTATION_GAP",
+    "COMPARATIVE_ANSWERABILITY_MATRIX",
+    # Layer 5 & 6 — Engine Selection, Trust & Referral Continuity
     "AI_CITATION_GAP",
     "AI_FACT_CONFLICT",
     "AI_REFERRAL_DISCONTINUITY",
@@ -109,6 +125,11 @@ SUPPRESSED_BY_LAYER0: Set[str] = {
     "CTA_REACHABILITY_FRICTION",
     "ABOVE_FOLD_ACTION_DELAY",
     "DESTINATION_NAVIGATION_FRICTION",
+    "VALUE_PROPOSITION_ORIENTATION_VACUUM",
+    "PROOF_ARCHITECTURE_DEFICIT",
+    "FRICTION_TO_VALUE_BARRIER",
+    "OBJECTION_COVERAGE_VOID",
+    "DECISION_PATHWAY_DEAD_END",
 }
 
 # Findings at Layers 2-6 that are downstream symptoms of Layer 1 unhydrated rendering gap
@@ -119,6 +140,7 @@ SUPPRESSED_BY_LAYER1: Set[str] = {
     "SCHEMA_MISSING",
     "SCHEMA_INVALID",
     "MISSING_MATERIAL_FACT",
+    "CLAIM_CORROBORATION_GAP",
     # Layer 3 — Fact Ledger (cannot read facts from an unrendered shell)
     "FIRST_PARTY_FACT_CONFLICT",
     "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
@@ -140,6 +162,11 @@ SUPPRESSED_BY_LAYER1: Set[str] = {
     "INTENT_SCENT_DILUTION",
     "STANDALONE_FAQ_DEFICIT",
     "EXCESSIVE_KEYWORD_DENSITY",
+    "EXCESSIVE_HEDGE_LANGUAGE",
+    "LOCALE_MISCONFIGURATION",
+    "INFORMATION_GAIN_DEFICIT",
+    "PRIMARY_AUTHORITY_QUOTATION_GAP",
+    "COMPARATIVE_ANSWERABILITY_MATRIX",
     # Layer 5 & 6 — Engagement, Orientation & Referral Continuity (cannot measure CTAs or headings on unrendered DOM)
     "CTA_REACHABILITY_FRICTION",
     "ABOVE_FOLD_ACTION_DELAY",
@@ -151,6 +178,11 @@ SUPPRESSED_BY_LAYER1: Set[str] = {
     "AI_REFERRAL_DISCONTINUITY",
     "GENERIC_H1",
     "HEADING_HIERARCHY_VACUUM",
+    "VALUE_PROPOSITION_ORIENTATION_VACUUM",
+    "PROOF_ARCHITECTURE_DEFICIT",
+    "FRICTION_TO_VALUE_BARRIER",
+    "OBJECTION_COVERAGE_VOID",
+    "DECISION_PATHWAY_DEAD_END",
 }
 
 
@@ -199,8 +231,12 @@ def evaluate_epistemic_state(
 
     # 2. Rendering
     visible_words = disc_cov.get("visible_words_initial_html", None)
-    has_spa_gap = any(p.get("snr", 1.0) < 0.05 and (p.get("word_count", 0) < 30) for p in pages)
-    if has_spa_gap or (visible_words is not None and visible_words < 50):
+    has_spa_gap = any(
+        float(p.get("snr") or 1.0) < 0.05 and int(p.get("word_count") or 0) < 30
+        for p in pages
+        if isinstance(p, dict)
+    )
+    if has_spa_gap or (isinstance(visible_words, (int, float)) and visible_words < 50):
         state["rendering"] = "gap"
         state["geo"] = "suppressed"
         state["facts"] = "suppressed"
@@ -263,8 +299,8 @@ def build_evidence_index(
     # 2. Pages & Rendering Evidence
     for p in inv.get("pages", [])[:10]:
         url = p.get("url", "/")
-        wc = p.get("word_count", 0)
-        snr = round(float(p.get("snr", 0.0)), 2)
+        wc = int(p.get("word_count") or 0)
+        snr = round(float(p.get("snr") or 0.0), 2)
         evidence_index.append({
             "id": f"EV-{counter:03d}",
             "route": url,
@@ -436,15 +472,16 @@ def apply_causal_suppression(
     for p in inv_pages:
         if isinstance(p, dict):
             p_url = str(p.get("url", "")).strip().lower()
-            wc = p.get("word_count", 0)
-            snr = float(p.get("snr", 1.0) or 1.0)
+            wc = int(p.get("word_count") or 0)
+            snr = float(p.get("snr") or 1.0)
             html = str(p.get("html", "")).lower()
-            if (wc < 30 and wc > 0) or (snr < 0.05 and wc < 50) or (wc < 35 and any(m in html for m in ('id="root"', 'id="app"', 'type="module"', '<noscript>'))):
+            # High-confidence SPA shell detection requiring BOTH structural markers AND ultra-thin content
+            has_spa_marker = any(m in html for m in ('id="root"', 'id="app"')) and ('type="module"' in html or '<noscript>' in html)
+            if (wc < 25 and wc > 0 and has_spa_marker) or (snr < 0.03 and wc < 30 and has_spa_marker):
                 if p_url:
                     rendering_gap_pages.add(p_url)
 
     home_page = next((p for p in inv_pages if p.get("page_type") == "homepage" or p.get("url") in ("/", "") or normalize_route_path(p.get("url", "")) == "/"), inv_pages[0] if inv_pages else {})
-    home_wc = home_page.get("word_count", 0) if isinstance(home_page, dict) else 0
 
     has_any_finding_scope = any(bool(extract_finding_route(f)) for f in all_raw_findings)
 
@@ -455,9 +492,15 @@ def apply_causal_suppression(
             f_ev = str(f.get("evidence", "")).lower()
             f_rc = str(f.get("root_cause", "")).lower()
             cid_set = _extract_cids(f)
-            if any(c in cid_set for c in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO")):
+            if any(c in cid_set for c in ("ROBOTS_5XX_FAIL_CLOSED", "ROBOTS_TXT_OVERSIZED", "DNS_UNREACHABLE", "HTTP_RETRIEVAL_ZERO", "ROBOTS_SITEWIDE_DISALLOW")):
                 is_site_wide_l0 = True
                 break
+            if "AI_RETRIEVAL_BLOCKED" in cid_set:
+                has_route_subpath = any(sub in f_ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content", "/quiz", "/product", "/item", "/news")) or (f_rt and normalize_route_path(f_rt) != "/")
+                if not has_route_subpath:
+                    if normalize_route_path(f_rt) == "/" or f_rt in ("site", "site-wide", "sitewide", "") or "root" in f_ev or "root url" in str(f.get("title", "")).lower() or "403" in f_ev or not inv_pages:
+                        is_site_wide_l0 = True
+                        break
             if f_rt in ("site", "site-wide", "sitewide") or "sitewide" in f_ev or "disallows all" in f_rc:
                 is_site_wide_l0 = True
                 break
@@ -478,15 +521,19 @@ def apply_causal_suppression(
     if has_layer1_rendering_gap:
         if not has_any_finding_scope:
             is_site_wide_rendering_gap = True
-        elif inv_pages and (0 < home_wc < 30 or all(p.get("word_count", 0) < 60 for p in inv_pages)):
-            is_site_wide_rendering_gap = True
         else:
-            for f in layer1_findings:
-                f_rt = extract_finding_route(f)
-                f_ev = str(f.get("evidence", "")).lower()
-                if f_rt in ("site", "site-wide", "sitewide") or "sitewide" in f_ev:
-                    is_site_wide_rendering_gap = True
-                    break
+            # Site-wide rendering gap requires explicit site-wide declaration or confirmed universal failure across all crawled HTML pages
+            html_pages = [p for p in inv_pages if isinstance(p, dict) and p.get("html")]
+            all_pages_unrendered = len(html_pages) >= 3 and all(str(p.get("url", "")).strip().lower() in rendering_gap_pages for p in html_pages)
+            if all_pages_unrendered:
+                is_site_wide_rendering_gap = True
+            else:
+                for f in layer1_findings:
+                    f_rt = extract_finding_route(f)
+                    f_ev = str(f.get("evidence", "")).lower()
+                    if f_rt in ("site", "site-wide", "sitewide") or "sitewide" in f_ev:
+                        is_site_wide_rendering_gap = True
+                        break
 
     allowed: List[Dict[str, Any]] = []
     suppressed: List[Dict[str, Any]] = []
@@ -660,6 +707,146 @@ def compute_archetype_confidence(
     return round(0.40 * rs + 0.25 * vs + 0.20 * sd + 0.15 * ce, 4)
 
 
+def detect_business_archetype(inv: Dict[str, Any]) -> str:
+    """Classifies website into primary business archetype from crawl inventory."""
+    if not inv or not isinstance(inv, dict):
+        return "corporate"
+
+    # Explicit archetype in inventory if declared and valid
+    explicit_arch = inv.get("archetype") or (inv.get("metadata", {}).get("archetype") if isinstance(inv.get("metadata"), dict) else None)
+    if explicit_arch in ("ecommerce", "saas", "publisher", "local_business", "corporate"):
+        return explicit_arch
+
+    pages = inv.get("pages", []) if inv else []
+    if not pages:
+        return "corporate"
+
+    ecomm_score = 0
+    saas_score = 0
+    publisher_score = 0
+    local_score = 0
+
+    for p in pages:
+        if not isinstance(p, dict):
+            continue
+        ptype = (p.get("page_type") or "")
+        if isinstance(ptype, dict):
+            ptype = str(ptype.get("value", "")).lower()
+        else:
+            ptype = str(ptype).lower()
+
+        url = (p.get("url") or "").lower()
+        html = (p.get("html") or "").lower()
+        text = (p.get("clean_text") or p.get("clean_markdown") or "").lower()
+        title_val = p.get("title")
+        if isinstance(title_val, list):
+            title = (title_val[0] if title_val else "").lower()
+        else:
+            title = (title_val or "").lower()
+
+        h1_val = p.get("h1")
+        if isinstance(h1_val, list):
+            h1 = (h1_val[0] if h1_val else "").lower()
+        else:
+            h1 = (h1_val or "").lower()
+
+        jld_str = json.dumps(p.get("jsonld", []) or p.get("json_ld_contents", []) or []).lower()
+        visible_text = f"{text} {title} {h1}".lower()
+
+        # 1. Ecommerce (Retail, consumer products, shopping carts)
+        if ptype in ("product_detail", "product", "product_listing", "category", "cart", "checkout") or any(
+            k in url for k in (
+                "/product", "/products", "/shop", "/item", "/items", "/store",
+                "/collection", "/collections", "/catalog", "/catalogue", "/cart",
+                "/checkout", "/goods", "/merchandise"
+            )
+        ):
+            ecomm_score += 3
+        if any(k in visible_text for k in (
+            "add to cart", "shopping cart", "free shipping", "envío gratis",
+            "in stock", "out of stock", "shipping & returns", "item in stock",
+            "add to basket", "buy now", "order summary", "item total",
+            "pickup & delivery", "same day delivery", "order pickup",
+            "weekly ad", "registry & wish list"
+        )):
+            ecomm_score += 3
+        elif any(k in jld_str for k in ("schema.org/product", "schema.org/offer", '"@type": "product"')):
+            ecomm_score += 2
+
+        # 2. SaaS & Developer Platforms (Cloud services, subscription software, APIs)
+        if ptype in ("pricing", "subscription_flow", "documentation") or any(
+            k in url for k in (
+                "/pricing", "/plans", "/docs", "/api", "/billing", "/features",
+                "/integrations", "/developers", "/solutions", "/platform",
+                "/demo", "/contact-sales", "/request-demo", "/product-tour"
+            )
+        ):
+            saas_score += 3
+        if any(k in visible_text for k in (
+            "per user", "per seat", "api docs", "rest api", "free tier",
+            "enterprise plan", "monthly billing", "annual billing", "developer platform",
+            "cloud platform", "git repository", "start free trial", "request demo",
+            "watch demo", "request a demo", "work platform", "productivity tools",
+            "ci/cd", "source code management", "devops", "contact sales"
+        )) or any(k in jld_str for k in ("softwareapplication", '"@type": "softwareapplication"')):
+            saas_score += 3
+        elif any(k in visible_text for k in ("pricing", "plans", "documentation", "plugins", "sdk", "workspace")):
+            saas_score += 1
+
+        # 3. Publisher & Editorial (News wires, media, articles, journalism, blogs)
+        if ptype in ("article", "blog", "news") or any(
+            k in url for k in (
+                "/blog", "/news", "/article", "/articles", "/posts/", "/journal",
+                "/story", "/stories", "/world", "/tech", "/tag/", "/tags/", "/opinion",
+                "/editorial", "/culture", "/entertainment"
+            )
+        ):
+            publisher_score += 3
+        if any(k in visible_text for k in (
+            "headline", "byline", "author:", "editor:", "published on", "breaking news",
+            "top stories", "latest news", "journalism", "broadcasting", "press release", "news wire"
+        )) or any(k in jld_str for k in ("newsarticle", "blogposting", '"@type": "article"', '"@type": "newsarticle"')):
+            publisher_score += 3
+
+        # 4. Local Business (Physical storefronts, branches, local service providers)
+        # Require physical location routes or explicit LocalBusiness schema.
+        # Corporate headquarters PostalAddress in footers must NEVER trigger local business!
+        if ptype in ("store_locator", "branches", "local_business") or any(
+            k in url for k in ("/store-locator", "/our-stores", "/branches", "/find-a-store", "/find-stores")
+        ):
+            local_score += 4
+        elif any(k in url for k in ("/locations", "/location")):
+            local_score += 1
+
+        if "localbusiness" in jld_str or '"@type": "localbusiness"' in jld_str:
+            local_score += 4
+        elif "openinghours" in visible_text and any(k in visible_text for k in ("store hours", "branch", "visit our store", "menu")):
+            local_score += 2
+
+    # Publisher precedence: If editorial/news/article signals are prominent
+    if publisher_score >= 3 and publisher_score >= saas_score and publisher_score >= ecomm_score:
+        return "publisher"
+
+    # SaaS precedence: If strong developer/API/pricing signals exist, classify as SaaS over retail ecomm
+    if saas_score >= 3 and saas_score >= ecomm_score:
+        return "saas"
+
+    # Ecommerce precedence: If explicit cart/retail transactional signals exist
+    if ecomm_score >= 3 and ecomm_score > saas_score and ecomm_score >= local_score:
+        return "ecommerce"
+
+    candidates = [
+        (publisher_score, "publisher"),
+        (saas_score, "saas"),
+        (ecomm_score, "ecommerce"),
+        (local_score, "local_business"),
+    ]
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    if candidates[0][0] >= 3:
+        return candidates[0][1]
+    return "corporate"
+
+
 def evaluate_causal_nodes(
     inv: Optional[Dict[str, Any]] = None,
     specialist_results: Optional[Dict[str, Dict[str, Any]]] = None,
@@ -704,7 +891,11 @@ def evaluate_causal_nodes(
         nodes["retrieval_access"] = "confirmed_pass"
 
     # Static Readability
-    has_spa_shell = any(p.get("snr", 1.0) < 0.05 and p.get("word_count", 0) < 30 for p in pages)
+    has_spa_shell = any(
+        float(p.get("snr") or 1.0) < 0.05 and int(p.get("word_count") or 0) < 30
+        for p in pages
+        if isinstance(p, dict)
+    )
     nodes["static_readability"] = "confirmed_fail" if has_spa_shell else "confirmed_pass"
 
     # Entity Explicitness

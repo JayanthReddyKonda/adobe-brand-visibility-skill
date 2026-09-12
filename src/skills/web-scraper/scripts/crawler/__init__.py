@@ -1,61 +1,198 @@
 """Zero-Dependency Audit Web Engine for Brand AI-Readiness & Visibility.
 
-Pure Python standard library web acquisition, streaming HTML parsing,
+Consolidated Pure Python standard library web acquisition, streaming HTML parsing,
 robots/sitemap discovery, Trafilatura boilerplate stripping, and agent query API.
 """
 
-from .budget import Budget, BudgetExhaustedError
-from .canonical import CanonicalValidator
-from .classify import PageClassifier
-from .engine import WebAuditEngine
-from .evidence import EvidenceExtractor
-from .fetch import SafeFetcher
-from .frontier import Frontier, FrontierItem
-from .jsonld import JsonLdExtractor
-from .links import LinkProcessor
-from .metadata import MetadataProcessor
-from .models import (
+from __future__ import annotations
+
+import sys
+import types
+
+from .engine import (
+    AI_CRAWLER_BOTS,
+    BOT_TAXONOMY,
+    COMMERCIAL_CTA_REGEX,
+    IGNORED_EXTENSIONS,
+    MAX_ROBOTS_BYTES,
+    NON_HTTP_SCHEMES,
+    TRACKING_PARAMS,
+    JUNK_PATH_PATTERNS,
+    UNSAFE_PATH_REGEX,
+    Budget,
+    BudgetExhaustedError,
+    CTA,
+    CanonicalValidator,
     ClaimCandidate,
+    EvidenceExtractor,
     EvidenceModel,
     FactCandidate,
+    Frontier,
+    FrontierItem,
     Heading,
+    HreflangLink,
+    JsonLdExtractor,
     Link,
+    LinkProcessor,
+    MetadataProcessor,
     Observation,
+    PageClassifier,
     PageModel,
+    PinnedConnectionPool,
+    PinnedHTTPConnection,
+    PinnedHTTPHandler,
+    PinnedHTTPSConnection,
+    PinnedHTTPSHandler,
     Resource,
+    Robots,
+    RobotsAuditor,
+    RobotsGroup,
+    RobotsOutcome,
+    RobotsRule,
+    SafeFetcher,
+    SafeRedirectHandler,
+    SecurityPolicy,
+    SecurityValidationError,
+    SitemapDiscovery,
+    SitemapParser,
+    SitemapUrl,
+    StreamingHTMLParser,
     TableData,
+    WebAuditEngine,
+    load_bot_registry,
+    main,
+    normalize,
+    parse_retry_after,
+    robot_octets,
+    safe_path,
 )
-from .policy import SecurityPolicy, SecurityValidationError
-from .robots import RobotsAuditor, RobotsOutcome
-from .sitemap import SitemapDiscovery, SitemapParser, SitemapUrl
 
 __all__ = [
-    "WebAuditEngine",
+    "AI_CRAWLER_BOTS",
+    "BOT_TAXONOMY",
     "Budget",
     "BudgetExhaustedError",
-    "SecurityPolicy",
-    "SecurityValidationError",
-    "SafeFetcher",
-    "RobotsAuditor",
-    "RobotsOutcome",
-    "SitemapParser",
-    "SitemapDiscovery",
-    "SitemapUrl",
-    "Frontier",
-    "FrontierItem",
-    "LinkProcessor",
-    "JsonLdExtractor",
-    "MetadataProcessor",
-    "PageClassifier",
     "CanonicalValidator",
+    "ClaimCandidate",
+    "CTA",
     "EvidenceExtractor",
-    "Resource",
-    "PageModel",
     "EvidenceModel",
     "FactCandidate",
-    "ClaimCandidate",
-    "Observation",
+    "Frontier",
+    "FrontierItem",
     "Heading",
+    "HreflangLink",
+    "IGNORED_EXTENSIONS",
+    "JUNK_PATH_PATTERNS",
+    "JsonLdExtractor",
     "Link",
+    "LinkProcessor",
+    "MAX_ROBOTS_BYTES",
+    "MetadataProcessor",
+    "NON_HTTP_SCHEMES",
+    "Observation",
+    "PageClassifier",
+    "PageModel",
+    "PinnedConnectionPool",
+    "PinnedHTTPConnection",
+    "PinnedHTTPHandler",
+    "PinnedHTTPSConnection",
+    "PinnedHTTPSHandler",
+    "Resource",
+    "Robots",
+    "RobotsAuditor",
+    "RobotsGroup",
+    "RobotsOutcome",
+    "RobotsRule",
+    "SafeFetcher",
+    "SafeRedirectHandler",
+    "SecurityPolicy",
+    "SecurityValidationError",
+    "SitemapDiscovery",
+    "SitemapParser",
+    "SitemapUrl",
+    "StreamingHTMLParser",
     "TableData",
+    "TRACKING_PARAMS",
+    "UNSAFE_PATH_REGEX",
+    "WebAuditEngine",
+    "load_bot_registry",
+    "main",
+    "normalize",
+    "parse_retry_after",
+    "robot_octets",
+    "safe_path",
 ]
+
+# Backward-compatibility submodule virtualization for legacy imports
+# (e.g. `from crawler.policy import SecurityPolicy`, `from crawler.links import normalize`)
+_this_mod = sys.modules[__name__]
+
+_SUBMODULE_MAP: dict[str, list[str]] = {
+    "budget": ["Budget", "BudgetExhaustedError"],
+    "canonical": ["CanonicalValidator"],
+    "classify": ["PageClassifier"],
+    "cli": ["main"],
+    "evidence": ["EvidenceExtractor"],
+    "fetch": [
+        "PinnedConnectionPool",
+        "PinnedHTTPConnection",
+        "PinnedHTTPHandler",
+        "PinnedHTTPSConnection",
+        "PinnedHTTPSHandler",
+        "SafeFetcher",
+        "SafeRedirectHandler",
+        "parse_retry_after",
+    ],
+    "frontier": ["Frontier", "FrontierItem"],
+    "jsonld": ["JsonLdExtractor"],
+    "links": [
+        "IGNORED_EXTENSIONS",
+        "JUNK_PATH_PATTERNS",
+        "LinkProcessor",
+        "NON_HTTP_SCHEMES",
+        "TRACKING_PARAMS",
+        "UNSAFE_PATH_REGEX",
+        "normalize",
+        "safe_path",
+    ],
+    "metadata": ["MetadataProcessor"],
+    "models": [
+        "CTA",
+        "ClaimCandidate",
+        "EvidenceModel",
+        "FactCandidate",
+        "Heading",
+        "HreflangLink",
+        "Link",
+        "Observation",
+        "PageModel",
+        "Resource",
+        "TableData",
+    ],
+    "parser": ["COMMERCIAL_CTA_REGEX", "StreamingHTMLParser"],
+    "policy": ["SecurityPolicy", "SecurityValidationError"],
+    "robots": [
+        "AI_CRAWLER_BOTS",
+        "BOT_TAXONOMY",
+        "MAX_ROBOTS_BYTES",
+        "Robots",
+        "RobotsAuditor",
+        "RobotsGroup",
+        "RobotsOutcome",
+        "RobotsRule",
+        "load_bot_registry",
+        "robot_octets",
+    ],
+    "sitemap": ["SitemapDiscovery", "SitemapParser", "SitemapUrl"],
+}
+
+for _sub_name, _symbols in _SUBMODULE_MAP.items():
+    _full_name = f"crawler.{_sub_name}"
+    _mod = types.ModuleType(_full_name)
+    _mod.__file__ = __file__
+    for _sym in _symbols:
+        if hasattr(_this_mod, _sym):
+            setattr(_mod, _sym, getattr(_this_mod, _sym))
+    sys.modules[_full_name] = _mod
+    setattr(_this_mod, _sub_name, _mod)

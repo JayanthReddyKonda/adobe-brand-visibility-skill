@@ -22,9 +22,9 @@ allowed-tools:
 | **Direct Standalone Engagement Probe** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --format json` | `{status, findings, recommendations, engagement_mode, coverage}` | Standalone Direct Probe |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Deterministic Read-Only Sensor:** `engagement_check.py` measures orientation proxies, H1 semantic scent, viewport answer anchoring, and CTA reachability friction. When supplied with `--analytics` (first-party analytics JSON/CSV), it correlates static UX friction against observed bounce rate, dwell time, and exit rate data. Without analytics, it operates strictly on structural UX proxies and never fabricates empirical bounce rates.
-> - **Offline Sensor Execution:** Operates offline against the canonical `inv.json` site inventory. You must NEVER use built-in URL reading tools (`read_url_content`, `open_browser_url`) or issue redundant requests to the audited host.
-> - **Cognitive Orchestrator:** The Master Orchestrator (`audit-orchestrator`) ingests detected friction, correlates UX signals with simulated user intent handoffs, and synthesizes actionable orientation and continuity fixes.
+> - **Clean Skill Isolation:** This skill is strictly isolated to post-citation visitor orientation, information scent, and intent-handoff continuity. Only this skill invokes `scripts/engagement_check.py`.
+> - **Helper Sensor (Problem Telemetry Only):** `engagement_check.py` is an empirical helper sensor. It measures orientation proxies, H1 semantic scent, viewport answer anchoring, and CTA reachability friction. When supplied with `--analytics`, it correlates static UX friction against observed bounce rate and dwell time data. It reports only objective layout measurements and friction points without doing the cognitive work.
+> - **LLM Cognitive Generation:** The AI Agent reads `references/knowledge-base.md` and `references/checks.md`, queries the script for relevant engagement telemetry, and dynamically authors above-the-fold orientation fixes, hero heading rewrites, and frictionless value-discovery paths with zero hardcoded boilerplate.
 
 Evaluates the above-the-fold visitor experience, heading information scent, destination reachability, and intent continuity for visitors referred from AI search answers. Detects content and navigation friction that causes visitor bounce.
 
