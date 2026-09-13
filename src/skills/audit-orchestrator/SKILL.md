@@ -30,14 +30,15 @@ allowed-tools:
 > - **Clean Skill Isolation & Orchestrator Role**: `audit-orchestrator` is the entrypoint coordinator. It does nothing else but declare what all other skills can do, coordinate single-pass inventory acquisition, aggregate problem telemetry across isolated specialist sensors, and assemble the validated Draft-07 report from the agent's cognitive review. Every specialist skill is cleanly isolated and owns its domain references and scripts.
 > - **Helper Sensors (Problem Telemetry Only)**: Diagnostic scripts in `scripts/` across all skills are strictly empirical telemetry helpers. They gather objective facts, measurements, HTTP headers, robots directives, schema objects, DOM structures, and evidence. They do NOT do the cognitive work or output canned recommendations.
 > - **LLM Cognitive Reasoning Brain**: The AI Agent is the diagnostic brain. The agent reads the relevant skill's `SKILL.md` and `references/`, asks the scripts to get problem information, applies the 6-Layer Causal DAG, and dynamically authors 100% of the findings, root causes, technical code fixes, creative copywriting guidance, and proactive actions tailored to the specific website with zero hardcoded boilerplate.
-> - **Seven-Step Cognitive Reasoning Protocol**:
+> - **Eight-Step Cognitive Reasoning Protocol**:
 >   1. **Acquire Inventory**: Run `acquire_inventory.py` under zero-trust SSRF protection to build canonical `inv.json`.
 >   2. **Collect Empirical Telemetry**: Run `orchestrator.py --telemetry` to extract un-truncated measurements across all sensors and causal DAG nodes.
->   3. **Direct Specialist Knowledge Consultation**: Read the relevant specialist skills (`SKILL.md` and `references/knowledge-base.md`) directly using native file reading tools to acquire domain rules, schema patterns, and Princeton KDD 2024 copy structures.
+>   3. **Direct Specialist Knowledge Consultation**: Read the relevant specialist skills (`SKILL.md` and `references/knowledge-base.md`) directly using native file reading tools to acquire domain rules, schema patterns, and GEO copy structures.
 >   4. **Targeted Specialist Invocations**: When telemetry indicates specific anomalies (e.g. blocked bots, missing schema, price conflicts, broken sameAs, low citability, bounce friction), invoke the relevant specialist skill's sensor directly with custom parameters.
->   5. **Apply 6-Layer Causal DAG**: Suppress downstream symptoms when upstream blockers exist (Layer 0 access blocks preempt downstream; Layer 1 unhydrated shells preempt citability/facts).
+>   5. **Apply 6-Layer Causal DAG**: Suppress downstream symptoms when upstream blockers exist (Layer 0 access blocks preempt downstream; Layer 1 unhydrated shells preempt citability/facts; Layer 2 missing Organization subsumes sameAs gaps).
 >   6. **Author Bespoke Dual-Track Remediations**: Write exact, copy-pasteable technical code diffs (`technical_fix`) and concrete editorial copywriting guidance (`creative_fix`), ranking tasks with `plan.py`.
->   7. **Validate & Deliver**: Validate report against `report-schema.json` via `validate_report.py` and deliver both an executive briefing and the validated Draft-07 JSON deliverable.
+>   7. **Strict Pre-Flight Deduplication & Verification Pass**: Execute the mandatory pre-flight verification checklist: confirm zero duplicate defects across routes, verify every problem physically exists in `inv.json`, ensure strict causal preemption, deduplicate proactive actions, and verify summary count exactness.
+>   8. **Validate & Deliver**: Validate report against `report-schema.json` via `validate_report.py` and deliver the validated Draft-07 JSON deliverable.
 >
 > **Cognitive Multi-Skill Orchestration Protocol & 134-Check Standard:**
 > 1. **Deterministic Telemetry Engine:** Outbound crawling and network measurements strictly use Python standard library tools under socket-level zero-trust SSRF protection. Downstream sensors measure crawler matrices, HTML SNR, Schema.org coverage, citability heuristics, and deep-link continuity against `inv.json`. Bounded collection finishes within 160s (worker hard limit), reserving at least 80s for semantic analysis before the 290s wall-clock ceiling.
@@ -99,7 +100,7 @@ Every script and reference in this skill serves a distinct, critical orchestrati
 | `scripts/validate_report.py` | CLI Tool | Strict Draft-07 JSON Schema validator supporting `--schema` for both `report-schema.json` and `telemetry-schema.json`. |
 | `references/checks.json` | Master Catalogue | Authoritative 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels. |
 | `references/checks.md` | Reference Catalogue | Human-readable master diagnostic check procedures across all 8 AI visibility domains. |
-| `references/core-synthesis-digest.md` | Reference Digest | Concise executive reference (< 2,500 tokens) on the 6-Layer Causal DAG, scoring math, and 9 Princeton GEO vectors. |
+| `references/core-synthesis-digest.md` | Reference Digest | Concise executive reference (< 2,500 tokens) on the 6-Layer Causal DAG, scoring math, and 9 GEO vectors. |
 | `references/knowledge-base.md` | Master KB | Definitive master specification covering 17 root causes, Draft-07 schemas, severity scales (S0-S4/U), and GEO benchmarks. |
 | `references/report-schema.json` | Draft-07 Schema | Schema defining exact required fields, enums, non-negative integer summary counts, and optional properties (`$schema`, `priority_index`, `difficulty`, `dimension_status`, `run_manifest`). |
 | `references/telemetry-schema.json` | Draft-07 Schema | Schema defining empirical sensor telemetry emitted by `orchestrator.py --telemetry`, supporting disambiguated average_page_snr. |
@@ -114,7 +115,7 @@ Read these before synthesizing findings. They define your cognitive reasoning ru
 ### Core Knowledge Bases & Synthesis (Load First — MANDATORY)
 - [134-Check Domain Catalogue (JSON)](references/checks.json): Canonical 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels.
 - [134-Check Domain Catalogue (Markdown)](references/checks.md): Human-readable master diagnostic check procedures across all 8 AI visibility domains.
-- [Core Synthesis Digest](references/core-synthesis-digest.md): Fast executive briefing (< 2,500 tokens) covering the 6-Layer Causal DAG, composite scoring weights, 9 Princeton GEO vectors, and keystone taxonomy.
+- [Core Synthesis Digest](references/core-synthesis-digest.md): Fast executive briefing (< 2,500 tokens) covering the 6-Layer Causal DAG, composite scoring weights, 9 GEO vectors, and keystone taxonomy.
 - [Orchestrator Knowledge Base](references/knowledge-base.md): Definitive master reference containing the 17 root cause definitions, Draft-07 contracts, epistemic reasoning policy, shared zero-trust SSRF standards, normalized vocabulary, severity scales (S0-S4/U), solution levels (V/C/E/X), and SOTA GEO benchmarks.
 
 ### Specialist Skill Guides & Domain References (Consult by Anomaly)
@@ -233,7 +234,7 @@ Then invoke the specialist sensor directly with custom parameters for granular d
   python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --url https://example.com/about
   # Deterministic 120-180 word passage improvement plan extraction
   python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --page-plan-only https://example.com/features
-  # Live Princeton KDD 2024 citability scoring on raw text or draft markdown
+  # Live GEO citability scoring on raw text or draft markdown
   python3 skills/geo-content-audit/scripts/geo_content_check.py --analyze-text "According to our 2025 benchmark, performance improved by 42%..."
   ```
 - **Visitor Continuity & Intent Scent (generic H1, above-fold CTA friction):**
@@ -289,13 +290,13 @@ Then invoke the specialist sensor directly with custom parameters for granular d
      - `suggested_action`:
        - `summary`: One-sentence fix summary.
        - `technical_fix`: Copy-pasteable code diff, config snippet, or Schema.org JSON-LD `@graph` customized to the real domain name. Emitted as a clean, high-density 1-2 sentence string.
-       - `creative_fix`: Concrete copywriting or information architecture guidance grounded in Princeton KDD 2024 / AutoGEO research.
+       - `creative_fix`: Concrete copywriting or information architecture guidance grounded in Generative Engine Optimization (GEO) research.
        - `priority`: Matching severity tier.
        - `verification`: Deterministic test command or validation step.
 
 4. **Authoring Forward-Looking Proactive Actions (`proactive_actions`)**:
    - Propose strategic architectural enhancements even where no explicit defect was flagged.
-   - Examples: Authoritative `/llms.txt` manifest, machine-readable purchasing manifest (`/pricing.md`), E-E-A-T author credentials with external Wikidata/LinkedIn anchors, and Princeton citability passage structuring.
+   - Examples: Authoritative `/llms.txt` manifest, machine-readable purchasing manifest (`/pricing.md`), E-E-A-T author credentials with external Wikidata/LinkedIn anchors, and GEO citability passage structuring.
    - Every item must include all 4 required fields: `id` (`P-001`, `P-002`), `title`, `summary`, and `priority`.
    - **Topic Deduplication Standard**: Every proactive action must cover a distinct strategic capability. Never emit duplicate initiatives (e.g., maximum one `/llms.txt` action, one `/pricing.md` action, one edge markdown negotiation action).
 
@@ -321,7 +322,7 @@ Then invoke the specialist sensor directly with custom parameters for granular d
 
 3. **Author Bespoke Dual-Track Remediations (Machine-Actionable for Downstream Agents):**
    - **`technical_fix`**: Craft precise, patch-applicable code, config, or Schema.org JSON-LD `@graph` snippets customized to the brand's actual domain name, real product names, currency, and entity anchors. May be emitted as a clean code string or a structured `{file_or_route, change_type, snippet, anchor}` object designed for direct consumption by a downstream execution agent.
-   - **`creative_fix`**: Provide concrete, actionable copywriting and architecture guidance grounded in Princeton KDD 2024 / AutoGEO research (+40.9% quotation lift, +40.0% statistics lift, +28.2% causal conjunction lift, 40-60 word BLUF answers).
+   - **`creative_fix`**: Provide concrete, actionable copywriting and architecture guidance grounded in Generative Engine Optimization (GEO) research (+40.9% quotation lift, +40.0% statistics lift, +28.2% causal conjunction lift, 40-60 word BLUF answers).
    - **`verification`**: Provide a deterministic test command or validation step to verify remediation.
 
 4. **Enforce Strict Descending Priority-Ranked Ordering (`priority_rank` & `priority_justification`):**
@@ -413,18 +414,41 @@ Then invoke the specialist sensor directly with custom parameters for granular d
 
 ---
 
-### Stage 4 — Schema Validation Gate
+### Stage 4 — Strict Deduplication, Problem Verification & Schema Validation Gate
 
-**Step 5: Validate Synthesized Report**
-Ensure the final report validates against `report-schema.json`:
-```bash
-python3 skills/audit-orchestrator/scripts/validate_report.py < report.json
-```
-Or validate using file path:
-```bash
-python3 skills/audit-orchestrator/scripts/validate_report.py report.json
-```
-Ensure exit code is 0 (pass).
+> [!IMPORTANT]
+> **MANDATORY PRE-DELIVERY VERIFICATION CHECKLIST (BEFORE PRESENTING FINAL REPORT)**
+> Before finalizing, presenting, or outputting any report, the AI Agent must strictly verify each of the following points:
+>
+> 1. **Zero Duplicate Findings**:
+>    - Scan all candidate findings. If two or more findings describe the same defect (e.g. `EXCESSIVE_KEYWORD_DENSITY` for the same keyword on different routes, `RENDERED_CONTENT_GAP` on multiple routes, or multiple CTA reachability findings), strictly merge them into a single canonical finding.
+>    - Populate `affected_urls` with all impacted routes and combine evidence sources without repeating observations.
+>    - Use generalized titles (e.g., `"Excessive keyword density for 'storefront' across affected routes"`).
+>
+> 2. **Clean Evidence Verification Against `inv.json`**:
+>    - Cross-reference every single finding against the raw page inventory (`inv.json`).
+>    - Verify that the quoted evidence, HTML tags, or metrics physically exist on the cited routes.
+>    - Drop any speculative finding that cannot be substantiated from the raw crawl data.
+>
+> 3. **Monotonic 6-Layer Causal DAG Preemption**:
+>    - **Layer 1 Unrendered CSR Shells**: If routes have `RENDERED_CONTENT_GAP` (< 25 words or SNR < 0.08), strictly verify that Layer 5/6 on-site engagement and CTA findings (`INERT_CTA_TARGET`, `DELAYED_COMMERCIAL_CALL_TO_ACTION`, `VALUE_PROPOSITION_ORIENTATION_VACUUM`) on those unrendered routes are suppressed or recorded under `downstream_symptoms`, NOT emitted as standalone primary defects.
+>    - **Layer 2 Missing Organization**: If the site lacks Schema.org `Organization` sitewide (`MATERIAL_ENTITY_AMBIGUITY`), verify that `sameAs` corroboration gaps (`CLAIM_CORROBORATION_GAP`, `MISSING_SAMEAS_VERIFICATION`) are subsumed into the Organization finding rather than emitted as duplicate primary defects.
+>
+> 4. **Strict Proactive Actions Deduplication**:
+>    - Ensure every item in `proactive_actions` represents a distinct strategic capability (maximum one `/llms.txt` initiative, one `/pricing.md` manifest, one edge markdown negotiation). Zero duplicate initiatives.
+>    - Confirm all 4 Draft-07 required fields are present: `id`, `title`, `summary`, and `priority`.
+>
+> 5. **Summary Count & ID Integrity**:
+>    - Number findings sequentially: `F-001`, `F-002`, `F-003`... in strict descending priority order.
+>    - Number proactive actions sequentially: `P-001`, `P-002`, `P-003`...
+>    - Verify that `summary.total_findings` exactly matches `len(findings)` and that counts by severity (`critical`, `high`, `medium`, `low`) are 100% accurate.
+>
+> 6. **Draft-07 Schema Validation Gate**:
+>    - Validate the report using `validate_report.py`:
+>      ```bash
+>      python3 skills/audit-orchestrator/scripts/validate_report.py report.json
+>      ```
+>    - Confirm exit code 0 and zero schema violations.
 
 ---
 
