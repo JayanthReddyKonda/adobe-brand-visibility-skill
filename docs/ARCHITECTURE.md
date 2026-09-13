@@ -31,7 +31,7 @@ The suite implements a modular, specification-compliant architecture operating u
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │              COGNITIVE AGENT & ORCHESTRATION ENGINE                     │
-│  (audit-orchestrator: orchestrator.py / audit.py / SKILL.md)           │
+│  (audit-orchestrator: orchestrator.py / SKILL.md)                       │
 │                                                                         │
 │  1. Single-Pass Acquisition → web-scraper (acquire_inventory.py)        │
 │  2. Offline Specialist Sensors → 6 Diagnostic check.py scripts          │
@@ -62,7 +62,7 @@ The crawler performs a single acquisition pass under zero-trust socket-level SSR
 - **LLM Context Isolation:** Because raw HTML across 15-25 pages can consume megabytes, `inv.json` is strictly an intermediate machine artifact on disk and MUST NEVER be fed directly into the AI agent's context window. The agent ingests only distilled empirical telemetry (`orchestrator.py --telemetry`) and filtered context (`bundle_context.py`), preserving 100% evidence fidelity without risk of token overflow.
 
 ### Unified Report Synthesis & Provenance Tracking
-Both `orchestrator.py --review <file>` and `audit.py finalize <file>` invoke the unified report synthesis engine (`assemble_report.py::assemble()`), guaranteeing:
+Both `orchestrator.py --review <file>` and `orchestrator.py --deliverable` invoke the unified report synthesis engine (`orchestrator.py::synthesize_audit_report()`), guaranteeing:
 1. Multi-dimensional readiness scoring across 6 orthogonal dimensions (Crawlability, Retrieval Readiness, Citation Readiness, Entity Authority, Cross-Engine Visibility, Agentic Commerce).
 2. 6-Layer Causal DAG gating and downstream symptom suppression (`causal_gate.py`).
 3. Cryptographic execution provenance via `run_manifest` (SHA-256 hashes of references, engine version, and runtime platform).

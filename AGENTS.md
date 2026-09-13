@@ -82,7 +82,7 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
    - All network operations must flow through `src/skills/web-scraper/scripts/safe_fetch.py`.
    - Target IPs are resolved and validated before socket creation. Immediate abort on private (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`), cloud metadata (`169.254.169.254`), and carrier-grade NAT subnets.
 4. **Single-Pass Acquisition Architecture:**
-   - Crawling is performed strictly once by `web-scraper` (`acquire_inventory.py` / `run_scraper.py`), saving `inv.json`. All diagnostic sensors run offline against `inv.json` with zero redundant network overhead.
+   - Crawling is performed strictly once by `web-scraper` (`acquire_inventory.py`), saving `inv.json`. All diagnostic sensors run offline against `inv.json` with zero redundant network overhead.
 5. **Canonical Import Resolution:**
    - Specialist sensors locate the canonical `safe_fetch.py` dynamically via self-resolving path discovery:
 
@@ -117,7 +117,7 @@ When modifying or adding code to `src/skills/`, adhere strictly to these archite
 
 The suite consists of 8 modular skills coordinated by `audit-orchestrator`:
 
-- **`audit-orchestrator`**: Master coordinator, causal synthesis, and Draft-07 report emission (`orchestrator.py`, `audit.py`, `assemble_report.py`, `causal_gate.py`, `validate_report.py`). Supports `--telemetry` mode for AI agent cognitive synthesis and `--baseline-only` for automated CI/CD.
+- **`audit-orchestrator`**: Master coordinator, causal synthesis, and Draft-07 report emission (`orchestrator.py`, `causal_gate.py`, `validate_report.py`, `bundle_context.py`, `plan.py`). Supports `--telemetry` mode for AI agent cognitive synthesis and `--baseline-only` for automated CI/CD.
 - **`web-scraper`**: Single-pass acquisition and zero-trust SSRF fetcher (`safe_fetch.py`, `acquire_inventory.py`, `crawler/`).
 - **Specialist Diagnostic Sensors (6)**: `discoverability-audit`, `entity-content-audit`, `fact-consistency-audit`, `corroboration-authority-audit`, `geo-content-audit`, `engagement-context-audit`.
 

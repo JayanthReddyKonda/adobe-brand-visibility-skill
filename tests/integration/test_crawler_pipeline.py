@@ -30,13 +30,13 @@ class TestCrawlerPipeline(unittest.TestCase):
         self.assertIn("infrastructure", inv)
         self.assertIsInstance(inv["pages"], list)
 
-    def test_run_scraper_cli_output(self):
+    def test_acquire_inventory_cli_output(self):
         """Integration test: CLI invocation produces structured inventory."""
         temp_inv = os.path.join(tempfile.gettempdir(), "test_pipeline_run.json")
         try:
             res = run_skill_script(
                 "web-scraper",
-                "run_scraper.py",
+                "acquire_inventory.py",
                 [
                     "--site",
                     "https://example.com",

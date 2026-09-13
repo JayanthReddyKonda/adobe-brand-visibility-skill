@@ -362,6 +362,424 @@ def plan(item: Dict[str, Any], rule: Dict[str, Any]) -> Dict[str, Any]:
     return item
 
 
+def make_evidence_ref(
+    ev_text: str,
+    cand_scope: str,
+    s_art: str,
+    pages_by_url: Dict[str, Tuple[str, str]],
+) -> List[Dict[str, Any]]:
+    """Resolve evidence text to primary document artifacts or infrastructure quotes."""
+    clean_ev = str(ev_text or "").strip()
+    if cand_scope in pages_by_url:
+        page_art, page_body = pages_by_url[cand_scope]
+        quotes = re.findall(r'["\']([^"\']{4,100})["\']', clean_ev)
+        for q in quotes:
+            if q in page_body:
+                return [{"artifact": page_art, "locator": "text", "quote": q}]
+        return [{"artifact": page_art, "locator": "dom:document", "quote": None, "structural_observation": clean_ev[:160]}]
+
+    if "/robots.txt" in cand_scope or "robots" in cand_scope.lower():
+        return [{"artifact": "robots.txt", "locator": "directive", "quote": clean_ev[:120]}]
+    if "/sitemap" in cand_scope or "sitemap" in cand_scope.lower():
+        return [{"artifact": "sitemap.xml", "locator": "xml", "quote": clean_ev[:120]}]
+
+    return [{"artifact": "inv.json", "locator": "inventory:scope", "quote": None, "structural_observation": clean_ev[:160]}]
+
+
+def execute_audit_sensors(
+    base: str,
+    domain: str,
+    inv: Dict[str, Any],
+    sensor_errors: Optional[List[Dict[str, Any]]] = None,
+    sensor_results: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """Run specialist sensors offline against inventory and extract candidates."""
+    candidates: List[Dict[str, Any]] = []
+    band_map = {"critical": "S4", "high": "S3", "medium": "S2", "low": "S1"}
+
+    pages = inv.get("pages", []) if isinstance(inv, dict) and isinstance(inv.get("pages"), list) else []
+    pages_by_url: Dict[str, Tuple[str, str]] = {}
+    for i, p in enumerate(pages):
+        if isinstance(p, dict):
+            art_id = f"response-{i + 1:04d}"
+            body = str(p.get("html") or p.get("raw_html") or p.get("clean_text") or "")
+            u = p.get("url") or ""
+            if u:
+                pages_by_url[u] = (art_id, body)
+
+    # 1. Discoverability sensor
+    try:
+        import discoverability_check  # type: ignore
+        disc_res = discoverability_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["discoverability-audit"] = disc_res
+        findings_list = disc_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                raw_cid = str(f.get("check_id") or f.get("cause_id") or f.get("id") or "B1")
+                cid = raw_cid.split("-")[0] if "-" in raw_cid else raw_cid
+                if not (len(cid) in (2, 3) and cid[0].isalpha() and cid[1:].isdigit()):
+                    cid = "B1"
+                cand_scope = f.get("url") or f.get("scope") or (pages[0].get("url", base) if pages else base)
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
+                candidates.append({
+                    "check_id": cid,
+                    "cause_id": str(f.get("cause_id") or f.get("id") or cid),
+                    "url": str(f.get("url") or cand_scope),
+                    "title": str(f.get("title", "Discoverability observation")),
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
+                    "scope": cand_scope,
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-discoverability-audit", pages_by_url),
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Resolve discoverability barrier",
+                        "priority": sev if sev in band_map else "medium",
+                    }),
+                })
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "discoverability-audit", "error": str(e), "error_type": type(e).__name__})
+
+    # 2. Entity & Content sensor
+    try:
+        import entity_content_check  # type: ignore
+        ent_res = entity_content_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["entity-content-audit"] = ent_res
+        findings_list = ent_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                raw_cid = str(f.get("check_id") or f.get("cause_id") or f.get("id") or "E1")
+                cid = raw_cid.split("-")[0] if "-" in raw_cid else raw_cid
+                if not (len(cid) in (2, 3) and cid[0].isalpha() and cid[1:].isdigit()):
+                    cid = "E1"
+                cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
+                candidates.append({
+                    "check_id": cid,
+                    "cause_id": str(f.get("cause_id") or f.get("id") or cid),
+                    "url": str(f.get("url") or cand_scope),
+                    "title": str(f.get("title", "Entity schema observation")),
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
+                    "scope": cand_scope,
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-entity-content-audit", pages_by_url),
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Implement Schema.org structured data",
+                        "priority": sev if sev in band_map else "medium",
+                    }),
+                })
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "entity-content-audit", "error": str(e), "error_type": type(e).__name__})
+
+    # 3. Fact consistency sensor
+    try:
+        import fact_consistency_check  # type: ignore
+        fact_res = fact_consistency_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["fact-consistency-audit"] = fact_res
+        findings_list = fact_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3, 4) and raw_cid.startswith("BN") and raw_cid[2:].isdigit()):
+                    fact_map = {
+                        "COMMERCIAL_PRODUCT_DATA_CONTRADICTION": "BN3",
+                        "LEGACY_FACT_PROPAGATION": "BN9",
+                        "STALE_AUTHORITATIVE_FACT": "BN9",
+                        "DISCONTINUED_VS_CURRENT_CONFLICT": "BN4",
+                        "FIRST_PARTY_FACT_CONFLICT": "BN1",
+                        "CONFLICTING_COMMERCIAL_TERMS": "BN3",
+                    }
+                    raw_cid = fact_map.get(cause, "BN1")
+                cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
+                candidates.append({
+                    "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
+                    "title": str(f.get("title", "Fact consistency observation")),
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
+                    "scope": cand_scope,
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-fact-consistency-audit", pages_by_url),
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Reconcile first-party claims",
+                        "priority": sev if sev in band_map else "medium",
+                    }),
+                })
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "fact-consistency-audit", "error": str(e), "error_type": type(e).__name__})
+
+    # 4. Corroboration sensor
+    try:
+        import corroboration_check  # type: ignore
+        corr_res = corroboration_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["corroboration-authority-audit"] = corr_res
+        findings_list = corr_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3, 4) and raw_cid[:2].isalpha()):
+                    corrob_map = {
+                        "CIRCULAR_SAMEAS_SELF_REFERENCE": "BC1",
+                        "WEAK_IDENTITY_SIGNALS": "BC2",
+                        "CANDIDATE_BACKLINK_UNREACHABLE": "BC3",
+                        "BROKEN_AUTHORITY_ANCHOR": "BC6",
+                        "CLAIM_CORROBORATION_GAP": "PP1",
+                    }
+                    raw_cid = corrob_map.get(cause, "BC6")
+                cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "low")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
+                candidates.append({
+                    "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
+                    "title": str(f.get("title", "Authority anchor observation")),
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
+                    "scope": cand_scope,
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-corroboration-authority-audit", pages_by_url),
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Link reciprocal authoritative sameAs anchors",
+                        "priority": sev if sev in band_map else "low",
+                    }),
+                })
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "corroboration-authority-audit", "error": str(e), "error_type": type(e).__name__})
+
+    # 5. GEO Content sensor
+    try:
+        import geo_content_check  # type: ignore
+        geo_res = geo_content_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["geo-content-audit"] = geo_res
+        findings_list = geo_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3) and raw_cid[0] == "N" and raw_cid[1:].isdigit()):
+                    geo_map = {
+                        "LOW_CITABILITY_SCORE": "N1",
+                        "CONTEXT_PLACEMENT_DEGRADATION": "N2",
+                        "LACK_OF_SPECIFIC_EVIDENCE": "N3",
+                        "COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT": "N7",
+                        "MISSING_IN_DEPTH_MECHANISMS": "N10",
+                        "STANDALONE_FAQ_DEFICIT": "N11",
+                        "EXCESSIVE_KEYWORD_DENSITY": "N12",
+                        "LOW_FACT_TO_TOKEN_RATIO": "N13",
+                        "EXCESSIVE_HEDGE_LANGUAGE": "N14",
+                        "CONTENT_RECENCY_DEFICIT": "N15",
+                    }
+                    raw_cid = geo_map.get(cause, "N1")
+                cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
+                candidates.append({
+                    "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
+                    "title": str(f.get("title", "GEO citability observation")),
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
+                    "scope": cand_scope,
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-geo-content-audit", pages_by_url),
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Optimize text structure and statistical density for generative engine extraction",
+                        "priority": sev if sev in band_map else "medium",
+                    }),
+                })
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "geo-content-audit", "error": str(e), "error_type": type(e).__name__})
+
+    # 6. Engagement & Bridge sensor
+    try:
+        import engagement_check  # type: ignore
+        eng_res = engagement_check.audit(base, domain, inv=inv)
+        if sensor_results is not None:
+            sensor_results["engagement-context-audit"] = eng_res
+        findings_list = eng_res.get("findings", [])
+        if isinstance(findings_list, list):
+            for f in findings_list:
+                if not isinstance(f, dict):
+                    continue
+                raw_cid = str(f.get("check_id") or "")
+                cause = str(f.get("cause_id") or f.get("id") or "")
+                if not (len(raw_cid) in (2, 3) and raw_cid[0] in ("I", "J") and raw_cid[1:].isdigit()):
+                    eng_map = {
+                        "LOW_INFORMATION_SCENT": "J1",
+                        "GENERIC_H1": "J1",
+                        "DESTINATION_NAVIGATION_FRICTION": "J2",
+                        "VIEWPORT_ANSWER_ABSENCE": "J3",
+                        "CTA_REACHABILITY_FRICTION": "J4",
+                        "COMMERCIAL_HANDOFF_DISCONTINUITY": "J4",
+                        "AI_REFERRAL_DISCONTINUITY": "J5",
+                        "INTENT_TO_LANDING_MISMATCH": "J8",
+                        "AGENT_INTERACTION_BARRIER": "J10",
+                    }
+                    raw_cid = eng_map.get(cause, "J1")
+                cand_scope = f.get("url") or f.get("scope") or base
+                sev = f.get("severity", "medium")
+                band = f.get("actual_band") or band_map.get(sev, "S2")
+                ev_str = str(f.get("evidence", ""))
+                candidates.append({
+                    "check_id": raw_cid,
+                    "cause_id": cause or raw_cid,
+                    "url": str(f.get("url") or cand_scope),
+                    "title": str(f.get("title", "Visitor engagement observation")),
+                    "actual_band": band,
+                    "finding_kind": "confirmed_problem" if band in ("S3", "S4") else "advisory",
+                    "scope": cand_scope,
+                    "observation": ev_str,
+                    "evidence_refs": make_evidence_ref(ev_str, cand_scope, "sensor-engagement-context-audit", pages_by_url),
+                    "collection_complete_for_scope": True,
+                    "severity_reason": str(f.get("title", "")),
+                    "suggested_action": f.get("suggested_action", {
+                        "summary": "Improve post-citation intent scent and CTA reachability",
+                        "priority": sev if sev in band_map else "medium",
+                    }),
+                })
+    except Exception as e:
+        if sensor_errors is not None:
+            sensor_errors.append({"sensor": "engagement-context-audit", "error": str(e), "error_type": type(e).__name__})
+
+    return candidates
+
+
+def verify_evidence(item: Dict[str, Any], artifacts: Dict[str, Any]) -> None:
+    """Gate every candidate finding through strict immutable evidence verification."""
+    refs = item.get("evidence_refs", [])
+    if not refs:
+        raise ValueError("Missing evidence references")
+    for ref in refs:
+        artifact = artifacts.get(ref.get("artifact"))
+        if artifact is None:
+            raise ValueError("Evidence artifact not found")
+        quote = ref.get("quote")
+        if not isinstance(quote, str) or not quote or not ref.get("locator"):
+            raise ValueError("Exact quote and locator required")
+        locator = ref["locator"]
+        if locator in ("response body", "response"):
+            locator = "text"
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*(?:\[\d+\])?(?:\.[A-Za-z_][A-Za-z_0-9]*(?:\[\d+\])?)*", locator):
+            raise ValueError("Unsupported evidence locator grammar")
+        selected: Any = artifact
+        try:
+            for part in locator.split("."):
+                m = re.fullmatch(r"([A-Za-z_][A-Za-z_0-9]*)(?:\[(\d+)\])?", part)
+                if not m:
+                    raise ValueError("Malformed locator")
+                selected = selected[m.group(1)]
+                if m.group(2) is not None:
+                    selected = selected[int(m.group(2))]
+        except (KeyError, TypeError, IndexError):
+            raise ValueError("Evidence locator does not resolve")
+        haystack = selected if isinstance(selected, str) else json.dumps(selected, ensure_ascii=False)
+        if (
+            quote not in haystack
+            and json.dumps(quote, ensure_ascii=False)[1:-1] not in haystack
+            and not (locator == "source.canonicals" and all(q in haystack for q in quote.split(" | ")))
+        ):
+            raise ValueError("Quote not found at cited locator")
+    if item.get("finding_kind") == "confirmed_problem" and not item.get("collection_complete_for_scope"):
+        raise ValueError("Confirmed problem lacks complete evidence for its narrow scope")
+    if not item.get("severity_reason") or not item.get("scope"):
+        raise ValueError("Scope and activated severity reason required")
+
+
+def sort_tasks(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Sort audit tasks topologically by dependency DAG, lane queues, severity, and difficulty."""
+    queues = {"confirmed": 0, "advisory": 1, "investigation": 2}
+
+    def key(item: Dict[str, Any]) -> tuple:
+        band = item.get("actual_band", "S2")
+        severity = int(band[1]) if band.startswith("S") and len(band) > 1 and band[1].isdigit() else -1
+        d = item.get("difficulty")
+        return (
+            queues.get(item.get("queue", "confirmed"), 0),
+            -severity,
+            d if d is not None else 0,
+            -len(set(item.get("affected_urls", [item.get("scope", "")]))),
+            -int(item.get("established_importance", 0)),
+            item.get("id", ""),
+        )
+
+    pending = {i["id"]: i for i in items}
+    done: set = set()
+    output: List[Dict[str, Any]] = []
+    for item in items:
+        for dep in (item.get("depends_on") or []):
+            if dep not in pending:
+                raise ValueError("Unknown prerequisite: " + dep)
+            if queues.get(pending[dep].get("queue", "confirmed"), 0) > queues.get(item.get("queue", "confirmed"), 0):
+                raise ValueError("Unresolved cross-queue prerequisite; move dependent to investigation")
+
+    while pending:
+        available = [i for i in pending.values() if set(i.get("depends_on") or []) <= done]
+        if not available:
+            raise ValueError("Dependency cycle")
+        first = min(available, key=key)
+        output.append(first)
+        done.add(first["id"])
+        del pending[first["id"]]
+    return output
+
+
+def validate_report(report: Dict[str, Any]) -> bool:
+    """Validate report dictionary against schema and count invariants."""
+    schema_path = os.path.join(os.path.dirname(SCRIPT_DIR), "references", "report-schema.json")
+    try:
+        from validate_report import validate_report_dict
+        valid, errors = validate_report_dict(report, schema_path)
+        if not valid:
+            raise ValueError("; ".join(errors))
+        return True
+    except ImportError:
+        return True
+
+
 try:
     from causal_gate import (
         DEFAULT_LIMITATIONS,
@@ -1670,6 +2088,409 @@ def synthesize_audit_report(
     return report
 
 
+def assemble(
+    site: str,
+    candidates: Any = None,
+    records: Any = None,
+    checks: Any = None,
+    coverage: Any = None,
+    browser: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """Assemble final synthesized report from candidate findings or inv/specialist results."""
+    if isinstance(candidates, dict) and isinstance(records, dict):
+        return synthesize_audit_report(site, candidates, records, review=checks)
+
+    records_list = records if isinstance(records, list) else []
+    candidates_list = list(candidates) if isinstance(candidates, list) else []
+    checks_list = checks if isinstance(checks, list) else []
+    cov_dict = dict(coverage) if isinstance(coverage, dict) else {}
+
+    artifacts = {a["artifact"]: a for a in records_list if isinstance(a, dict) and a.get("artifact")}
+    artifacts.update({a["artifact"]: a for a in ((browser or {}).get("captures") or []) if isinstance(a, dict) and a.get("artifact")})
+    catalogue = {c["check_id"]: c for c in checks_list if isinstance(c, dict) and c.get("check_id")}
+    observations: List[Dict[str, Any]] = []
+    dropped: List[Dict[str, Any]] = []
+    merged: Dict[Any, Dict[str, Any]] = {}
+    proactive_actions: List[Dict[str, Any]] = []
+
+    if apply_causal_suppression is not None and candidates_list:
+        inv_pages = []
+        for r in records_list:
+            if isinstance(r, dict) and r.get("url"):
+                text_str = r.get("text") or ""
+                wc = len(text_str.split()) if text_str else r.get("word_count", 0)
+                inv_pages.append({
+                    "url": r["url"],
+                    "word_count": wc,
+                    "status": r.get("status", 200),
+                    "html": text_str[:2000] if text_str else "",
+                })
+        orig_candidates = list(candidates_list)
+        surviving, suppressed, _dag_meta = apply_causal_suppression(candidates_list, inv={"pages": inv_pages})
+        for sc in suppressed:
+            dropped.append(dict(
+                candidate_index=orig_candidates.index(sc) if sc in orig_candidates else -1,
+                check_id=sc.get("check_id"),
+                reason="Suppressed by 6-Layer Causal DAG: downstream symptom of upstream blocker",
+            ))
+        candidates_list = surviving
+        detected_arch = detect_business_archetype({"pages": inv_pages, "site": site}) if detect_business_archetype else "corporate"
+        unrendered_prod = [
+            sc for sc in suppressed
+            if any(k in str(sc.get("cause_id") or sc.get("id") or sc.get("check_id", "")) for k in ("ATTRIBUTE_INCOMPLETENESS", "INCOMPLETE_OFFER_ATTRIBUTES", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION", "PRODUCT", "OFFER"))
+        ]
+        if unrendered_prod and detected_arch == "ecommerce":
+            sample_scope = unrendered_prod[0].get("scope", "commercial route")
+            proactive_actions.append({
+                "id": "P-001",
+                "title": "Pre-Hydration Product Schema Architecture",
+                "category": "entity",
+                "summary": f"Commercial routes (e.g. {sample_scope}) serve unrendered client-side JS shells. When implementing SSR or pre-rendering, embed complete Schema.org Product and Offer markup in initial HTML to prevent downstream answerability gaps.",
+                "priority": "high",
+                "technical_fix": "Pre-render Schema.org Product JSON-LD in the server response before client bundle execution.",
+                "creative_fix": "Ensure core product specs, pricing, and availability are visible above the fold in semantic HTML.",
+                "verification": "Fetch raw HTML without executing JavaScript and confirm Schema.org Product markup is detected.",
+            })
+
+    for index, item in enumerate(candidates_list):
+        try:
+            item = dict(item)
+            check = catalogue.get(item["check_id"])
+            if not check:
+                raise ValueError(f"Unknown check_id: {item.get('check_id')}")
+            if item.get("actual_band") not in LABELS:
+                raise ValueError("Invalid actual band")
+            if item.get("finding_kind") not in ("confirmed_problem", "advisory", "investigation", "informational_observation"):
+                raise ValueError("Unknown finding kind")
+            if item.get("finding_kind") == "confirmed_problem" and item.get("actual_band") in ("S0", "U"):
+                raise ValueError("Unassessable/no-change item cannot be a confirmed problem")
+            if item.get("finding_kind") == "confirmed_problem" and check.get("feasibility", "").startswith(("Not possible", "Exclude")):
+                raise ValueError("Check cannot support automated confirmed failure")
+            if item.get("difficulty") is not None and (
+                not isinstance(item["difficulty"], int) or not 1 <= item["difficulty"] <= 5 or not item.get("difficulty_reason")
+            ):
+                raise ValueError("Difficulty requires D1-D5 and a justification")
+            if item.get("difficulty_range") is not None:
+                rg = item["difficulty_range"]
+                if len(rg) != 2 or any(not isinstance(x, int) for x in rg) or not 1 <= rg[0] <= rg[1] <= 5:
+                    raise ValueError("Invalid difficulty interval")
+            verify_evidence(item, artifacts)
+            item = plan(item, check)
+            if item.get("finding_kind") == "informational_observation" or item.get("actual_band") == "S0":
+                observations.append(item)
+                continue
+            ids = sorted(set(item.get("related_check_ids", []) + [item["check_id"]]))
+            if any(i not in catalogue for i in ids):
+                raise ValueError("Unknown related check ID")
+            evidence_key = tuple(sorted((e.get("artifact", ""), e.get("locator", "")) for e in item.get("evidence_refs", [])))
+            cause = item.get("root_cause_key")
+            if cause and not item.get("root_cause_reason"):
+                raise ValueError("Explicit root cause requires reasoning")
+            dedup = (item.get("scope"), item.get("finding_kind"), cause or evidence_key)
+            item["related_check_ids"] = ids
+            item["id"] = item.get("id") or "F-" + hashlib.sha256(repr(dedup).encode()).hexdigest()[:12]
+            if dedup in merged:
+                prev = merged[dedup]
+                prev["related_check_ids"] = sorted(set(prev.get("related_check_ids", []) + ids))
+                prev["evidence_refs"] += [e for e in item.get("evidence_refs", []) if e not in prev.get("evidence_refs", [])]
+                b_curr = str(item.get("actual_band", ""))
+                curr_band_num = int(b_curr[1]) if b_curr.startswith("S") and len(b_curr) > 1 and b_curr[1].isdigit() else -1
+                b_prev = str(prev.get("actual_band", ""))
+                prev_band_num = int(b_prev[1]) if b_prev.startswith("S") and len(b_prev) > 1 and b_prev[1].isdigit() else -1
+                if curr_band_num > prev_band_num:
+                    prev["actual_band"] = item["actual_band"]
+                prev["depends_on"] = sorted(set(prev.get("depends_on", []) + item.get("depends_on", [])))
+                if item.get("downstream_symptoms"):
+                    prev_syms = prev.setdefault("downstream_symptoms", [])
+                    for s in item["downstream_symptoms"]:
+                        if s not in prev_syms:
+                            prev_syms.append(s)
+                prev["priority_index"] = None
+                prev["difficulty"] = None
+            else:
+                merged[dedup] = item
+        except (ValueError, KeyError, TypeError) as exc:
+            dropped.append(dict(candidate_index=index, check_id=item.get("check_id"), reason=str(exc)))
+
+    findings = sort_tasks(list(merged.values()))
+    for idx, item in enumerate(findings, 1):
+        item["severity"] = LABELS.get(item.get("actual_band", "S2"), "medium")
+        item["priority_rank"] = idx
+        evidence_snippets = []
+        for e in item.get("evidence_refs", []):
+            art = e.get("artifact", "primary_source")
+            loc = e.get("locator", "text")
+            q = e.get("quote")
+            obs = e.get("structural_observation")
+            if q:
+                evidence_snippets.append(f"{art} at {loc}: {q[:500]}")
+            elif obs:
+                evidence_snippets.append(f"{art} at {loc} [structural]: {obs[:500]}")
+            else:
+                evidence_snippets.append(f"{art} at {loc} (verified absence)")
+        item["evidence"] = "; ".join(evidence_snippets) if evidence_snippets else str(item.get("observation") or "Empirical measurement")
+        cid = str(item.get("cause_id") or item.get("check_id", ""))
+        cat = "discoverability"
+        if cid.startswith("E") or "ENTITY" in cid or "PRODUCT" in cid or "OFFER" in cid:
+            cat = "entity_content"
+        elif cid.startswith("N") or "FACT" in cid or "PRICE" in cid:
+            cat = "fact_consistency"
+        elif cid.startswith("P") or "AUTHORITY" in cid or "SAMEAS" in cid:
+            cat = "corroboration"
+        elif cid.startswith("G") or "CITABILITY" in cid or "GEO" in cid:
+            cat = "geo_content"
+        elif cid.startswith(("I", "J")) or "ENGAGEMENT" in cid or "CTA" in cid or "SCENT" in cid:
+            cat = "engagement"
+        item.setdefault("category", cat)
+        if not item.get("root_cause") or item.get("root_cause") == item.get("severity_reason"):
+            item["root_cause"] = item.get("root_cause") or (f"Defect mechanism for {cid}" if cid else "Unspecified defect mechanism")
+        if not item.get("confidence") or item.get("confidence") not in ("high", "medium", "low"):
+            item["confidence"] = "low"
+        if not item.get("affected_urls"):
+            item["affected_urls"] = [item["scope"]] if item.get("scope") and str(item["scope"]).startswith("http") else [site]
+
+        dag_node = resolve_dag_node(cid, cat)
+        item["dag_node"] = dag_node
+        just = generate_priority_justification(item, idx)
+        item["priority_justification"] = just
+
+        action = dict(item.get("suggested_action") or {})
+        if item.get("queue") != "investigation" and (item.get("remedy_readiness") == "ready" or item.get("difficulty") is not None):
+            diff = item.get("difficulty") if item.get("difficulty") is not None else infer_finding_difficulty(item)
+            band = str(item.get("actual_band", "S2"))
+            sev_num = int(band[1]) if band.startswith("S") and len(band) > 1 and band[1].isdigit() else 2
+            p_idx = calculate_priority_index(sev_num, diff)
+            item["difficulty"] = diff
+            item["priority_index"] = p_idx
+            action["difficulty"] = diff
+            action["priority_index"] = p_idx
+        else:
+            diff = item.get("difficulty")
+            item["difficulty"] = diff
+            action["difficulty"] = diff
+            action["priority_index"] = item.get("priority_index")
+
+        if not item.get("scope"):
+            item["scope"] = site
+
+        if not item.get("impact"):
+            if cat == "fact_consistency" or cid.startswith("BN") or "FACT" in cid or "PRICE" in cid:
+                raw_impact = "Conflicting first-party facts reduce model consensus confidence, leading to hallucinations or citation exclusion."
+            elif cat == "corroboration" or cid.startswith(("BC", "PP", "SA", "SC", "P")) or "AUTHORITY" in cid or "SAMEAS" in cid:
+                raw_impact = "Lack of third-party authority links weakens brand identity verification across external knowledge graphs."
+            elif cat == "entity_content" or cid.startswith(("EC", "ED", "ME", "E")) or "ENTITY" in cid or "PRODUCT" in cid or "OFFER" in cid:
+                raw_impact = "Ambiguous entity and product attributes prevent generative engines from answering user purchase queries directly."
+            elif cat == "geo_content" or cid.startswith(("N", "G")) or "CITABILITY" in cid or "GEO" in cid:
+                raw_impact = "Low statistical density and absent direct-answer formatting depress citation frequency in generative response engines."
+            elif cat in ("engagement", "engagement_context") or cid.startswith(("I", "J")) or "SCENT" in cid or "CTA" in cid or "ENGAGEMENT" in cid:
+                raw_impact = "Degrades post-citation visitor orientation and decreases intent-handoff retention."
+            elif cat in ("discoverability", "crawlability") or cid.startswith(("A", "B", "D", "F", "H")):
+                raw_impact = "Impairs AI crawler indexation, causing the domain or catalog to be omitted from AI search retrieval."
+            else:
+                raw_impact = "Degrades post-citation visitor orientation and decreases intent-handoff retention."
+            item["impact"] = raw_impact
+
+        action.setdefault("technical_fix", f"Technical remediation for {item.get('check_id', '')}.")
+        action.setdefault("creative_fix", None)
+        action.setdefault("verification", "Verify remediation in production.")
+        action.setdefault("is_proactive", False)
+        item["suggested_action"] = action
+
+    summary = dict(
+        total_findings=len(findings),
+        critical=sum(i.get("severity") == "critical" for i in findings),
+        high=sum(i.get("severity") == "high" for i in findings),
+        medium=sum(i.get("severity") == "medium" for i in findings),
+        low=sum(i.get("severity") == "low" for i in findings),
+        confirmed_problems=sum(i.get("finding_kind") == "confirmed_problem" for i in findings),
+    )
+
+    pages_list = [
+        r for r in records_list
+        if isinstance(r, dict) and not str(r.get("artifact", "")).startswith("sensor-") and r.get("url")
+    ]
+    total_pages = max(len(pages_list), 1)
+
+    sensors: Dict[str, Any] = {}
+    for r in records_list:
+        if isinstance(r, dict):
+            art = str(r.get("artifact", ""))
+            s_name = r.get("sensor") or (art[7:] if art.startswith("sensor-") else None)
+            if s_name:
+                txt = r.get("text", "")
+                if txt:
+                    try:
+                        sensors[s_name] = json.loads(txt)
+                    except Exception:
+                        pass
+
+    if pages_list:
+        def _to_code(p_item):
+            c = p_item.get("status_code") or p_item.get("status")
+            try:
+                val = int(c)
+                return val if 100 <= val <= 599 else None
+            except (ValueError, TypeError):
+                return None
+        crawlable_count = sum(1 for p in pages_list if _to_code(p) is not None and _to_code(p) < 400)
+        crawlability = round((crawlable_count / total_pages) * 100.0, 2) if total_pages > 0 else 0.0
+        substantive_pages = [
+            p for p in pages_list
+            if (len((p.get("text") or "").split()) if p.get("text") else p.get("word_count", 0)) >= 50
+        ]
+        retrieval_readiness = round((len(substantive_pages) / total_pages) * 100.0, 2) if total_pages > 0 else 0.0
+    else:
+        crawlability = 0.0
+        retrieval_readiness = 0.0
+
+    geo_res = sensors.get("geo-content-audit", {})
+    avg_cit = geo_res.get("coverage", {}).get("average_citability_score", 0.0)
+    citation_readiness = round(float(avg_cit or 0.0), 2)
+
+    entity_res = sensors.get("entity-content-audit", {})
+    corrob_res = sensors.get("corroboration-authority-audit", {})
+    has_jsonld = bool(entity_res.get("coverage", {}).get("jsonld_present", False))
+    has_org = bool(entity_res.get("entity_snapshot", {}).get("organization"))
+    sameas_count = int(corrob_res.get("coverage", {}).get("sameas_declared", 0) or 0)
+    if has_jsonld and has_org and sameas_count >= 2:
+        entity_authority = 100.0
+    elif has_jsonld or has_org:
+        entity_authority = 50.0
+    elif sameas_count > 0:
+        entity_authority = 25.0
+    else:
+        entity_authority = 0.0
+
+    disc_res = sensors.get("discoverability-audit", {})
+    disc_cov = disc_res.get("coverage", {})
+    raw_bots_allowed = disc_cov.get("retrieval_bots_allowed")
+    raw_bots_total = disc_cov.get("retrieval_bots_total")
+    bots_allowed = int(raw_bots_allowed) if raw_bots_allowed is not None else 4
+    bots_total = max(int(raw_bots_total) if raw_bots_total is not None else 4, 1)
+    bot_ratio = bots_allowed / bots_total if bots_total else 1.0
+    cross_engine_visibility = round(bot_ratio * retrieval_readiness, 2)
+
+    commerce_pages = sum(
+        1 for p in pages_list
+        if p.get("page_type") in ("product_detail", "product", "pricing")
+        or bool(p.get("has_product_schema"))
+        or any(k in str(p.get("url", "")).lower() for k in ("/product/", "/pricing", "/cart", "/checkout"))
+    )
+    agentic_commerce = round((commerce_pages / total_pages) * 100.0, 2) if pages_list else 0.0
+
+    dimensions = {
+        "crawlability": crawlability,
+        "retrieval_readiness": retrieval_readiness,
+        "citation_readiness": citation_readiness,
+        "entity_authority": entity_authority,
+        "cross_engine_visibility": cross_engine_visibility,
+        "agentic_commerce": agentic_commerce,
+    }
+    weights = {
+        "crawlability": 0.2,
+        "retrieval_readiness": 0.15,
+        "citation_readiness": 0.25,
+        "entity_authority": 0.2,
+        "cross_engine_visibility": 0.1,
+        "agentic_commerce": 0.1,
+    }
+    composite_score = round(sum(dimensions[k] * weights[k] for k in weights), 2)
+    if composite_score >= 85.0:
+        grade = "A"
+    elif composite_score >= 70.0:
+        grade = "B"
+    elif composite_score >= 50.0:
+        grade = "C"
+    elif composite_score >= 30.0:
+        grade = "D"
+    else:
+        grade = "F"
+
+    finding_cids = {str(f.get("cause_id") or f.get("id", "")) for f in findings}
+    has_render_gap = "RENDERED_CONTENT_GAP" in finding_cids or any("RENDER" in c for c in finding_cids)
+    dimension_status = {
+        "crawlability": "observed" if pages_list else "unmeasured",
+        "retrieval_readiness": "observed" if pages_list else "unmeasured",
+        "citation_readiness": "provisional" if has_render_gap else "observed",
+        "entity_authority": "provisional" if has_render_gap else "observed",
+        "cross_engine_visibility": "observed" if pages_list else "unmeasured",
+        "agentic_commerce": "provisional" if has_render_gap else "observed",
+    }
+    readiness = {
+        "composite_score": composite_score,
+        "grade": grade,
+        "dimensions": dimensions,
+        "weights": weights,
+        "dimension_status": dimension_status,
+        "score_scope": "Observed static inventory and specialist telemetry; heuristic citation-readiness proxy, not live provider ranking or citation measurement.",
+    }
+
+    if detect_business_archetype is not None:
+        archetype = detect_business_archetype({"pages": pages_list})
+    elif commerce_pages > 0 or any("PRODUCT" in c or "OFFER" in c for c in finding_cids):
+        archetype = "ecommerce"
+    elif any("/pricing" in str(p.get("url", "")).lower() for p in pages_list):
+        archetype = "saas"
+    elif any("/article" in str(p.get("url", "")).lower() or "/post" in str(p.get("url", "")).lower() for p in pages_list):
+        archetype = "publisher"
+    else:
+        archetype = "corporate"
+
+    summary["detected_archetype"] = archetype
+
+    if cov_dict.get("sensor_errors"):
+        audit_status = "partial"
+    elif not pages_list:
+        audit_status = "failed"
+    else:
+        audit_status = "complete"
+
+    iso_now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    report = dict(
+        schema_version="1.0.0",
+        site=site,
+        audited_at=iso_now,
+        audit_status=audit_status,
+        archetype=archetype,
+        summary=summary,
+        findings=findings,
+        proactive_actions=proactive_actions,
+        readiness=readiness,
+        observations=observations,
+        dropped_findings=dropped,
+        coverage=cov_dict,
+        limitations=[
+            "No JavaScript browser rendering was performed.",
+            "Findings are based only on resources successfully acquired during this audit.",
+            "Robots.txt observations represent declared crawler permissions and do not prove search inclusion, indexing, ranking, or citation.",
+            "No claim is made about actual citation or placement by a specific AI assistant.",
+            "Engagement observations are content/navigation proxies unless external behavioral analytics are explicitly supplied.",
+        ],
+        evidence_classes={
+            "first_party_dom": True,
+            "third_party_authority": True,
+            "deterministic_telemetry": True,
+        },
+    )
+
+    if geo_res.get("geo_citability_summary"):
+        report["geo_citability_summary"] = geo_res["geo_citability_summary"]
+    if geo_res.get("page_improvement_plans"):
+        report["page_improvement_plans"] = geo_res["page_improvement_plans"]
+    eng_res = sensors.get("engagement-context-audit", {})
+    if eng_res.get("engagement_continuity_summary"):
+        report["engagement_continuity_summary"] = eng_res["engagement_continuity_summary"]
+    if disc_res.get("ai_agent_scrapeability_summary"):
+        report["ai_agent_scrapeability_summary"] = disc_res["ai_agent_scrapeability_summary"]
+
+    run_manifest = cov_dict.get("run_manifest") if cov_dict.get("run_manifest") else build_run_manifest(site)
+    report["run_manifest"] = run_manifest
+
+    validate_report(report)
+    return report
+
+
 def collect_telemetry(
     site: str,
     inventory: Optional[str] = None,
@@ -2062,24 +2883,29 @@ def get_telemetry_payload(
                 if f.get("cause_id") == "PROOF_ARCHITECTURE_DEFICIT"
             ],
             "orientation_vacuums": [
-                f.get("url") for f in eng_res.get("findings", [])
+                (f.get("url") or f.get("scope")) for f in eng_res.get("findings", [])
                 if f.get("cause_id") in ("VALUE_PROPOSITION_ORIENTATION_VACUUM", "LOW_INFORMATION_SCENT", "GENERIC_H1")
+                and (f.get("url") or f.get("scope"))
             ],
             "friction_barriers": [
-                f.get("url") for f in eng_res.get("findings", [])
-                if f.get("cause_id") in ("FRICTION_TO_VALUE_BARRIER", "CTA_REACHABILITY_FRICTION")
+                (f.get("url") or f.get("scope")) for f in eng_res.get("findings", [])
+                if f.get("cause_id") in ("FRICTION_TO_VALUE_BARRIER", "CTA_REACHABILITY_FRICTION", "DELAYED_COMMERCIAL_CALL_TO_ACTION")
+                and (f.get("url") or f.get("scope"))
             ],
             "objection_coverage_voids": [
-                f.get("url") for f in eng_res.get("findings", [])
+                (f.get("url") or f.get("scope")) for f in eng_res.get("findings", [])
                 if f.get("cause_id") == "OBJECTION_COVERAGE_VOID"
+                and (f.get("url") or f.get("scope"))
             ],
             "dead_end_routes": [
-                f.get("url") for f in eng_res.get("findings", [])
+                (f.get("url") or f.get("scope")) for f in eng_res.get("findings", [])
                 if f.get("cause_id") == "DECISION_PATHWAY_DEAD_END"
+                and (f.get("url") or f.get("scope"))
             ],
             "generic_h1_pages": [
-                f.get("url") for f in eng_res.get("findings", [])
+                (f.get("url") or f.get("scope")) for f in eng_res.get("findings", [])
                 if f.get("cause_id") in ("LOW_INFORMATION_SCENT", "GENERIC_H1")
+                and (f.get("url") or f.get("scope"))
             ],
         },
         "dag": {
@@ -2234,6 +3060,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Master Orchestrator for Brand AI-Readiness & Visibility Audit."
     )
+    parser.add_argument("target_pos", nargs="?", default=None, metavar="TARGET", help="Target URL, domain, or inventory JSON (optional)")
     parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (optional if --inventory is provided)")
     parser.add_argument("--inventory", "-i", help="Path to pre-crawled site inventory JSON (optional)")
     parser.add_argument("--candidate-backlinks", help="Path to candidate backlinks JSON (optional)")
@@ -2280,6 +3107,19 @@ def main():
         configure_skills_dir(args.skills_dir)
     skills_list = [s.strip() for s in args.skills.split(",") if s.strip()] if args.skills else None
 
+    # Handle optional positional argument
+    if args.target_pos:
+        if args.target_pos.endswith(".json") or os.path.exists(args.target_pos):
+            if not args.inventory:
+                args.inventory = args.target_pos
+        else:
+            if not args.site:
+                args.site = args.target_pos
+
+    # Auto-detect inv.json in cwd if --inventory is omitted
+    if not args.inventory and os.path.exists("inv.json"):
+        args.inventory = "inv.json"
+
     # Infer target site from inventory if omitted
     site = args.site
     if not site and args.inventory and os.path.exists(args.inventory):
@@ -2293,7 +3133,12 @@ def main():
     if not site:
         parser.error("Either --site / -s or a valid --inventory / -i JSON containing site information is required.")
 
+    # Auto-detect review.json in cwd if --review is omitted and not running telemetry
+    if not args.review and not args.telemetry and os.path.exists("review.json"):
+        args.review = "review.json"
+
     is_clean = args.clean
+
     include_scores = args.include_scores
 
     try:

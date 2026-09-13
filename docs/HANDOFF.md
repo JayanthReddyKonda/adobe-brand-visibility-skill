@@ -42,13 +42,12 @@ adobe-brand-visibility-skill/
 ├── src/skills/                      # Source skills directory (8 skills total)
 │   ├── audit-orchestrator/          # Entrypoint coordinator & report synthesis
 │   │   ├── SKILL.md                 # Orchestrator runbook & synthesis guidelines
-│   │   ├── scripts/                 # orchestrator.py, audit.py, assemble_report.py, causal_gate.py, validate_report.py
+│   │   ├── scripts/                 # orchestrator.py, causal_gate.py, validate_report.py, bundle_context.py, plan.py
 │   │   └── references/              # report-schema.json, knowledge-base.md, checks.md, checks.json
 │   ├── web-scraper/                 # Autonomous crawler, RFC 9309 matrices, markdown & JSON-LD
 │   │   ├── SKILL.md                 # Scraper runbook & CLI guidelines
 │   │   ├── scripts/safe_fetch.py    # Canonical zero-trust SSRF fetcher
 │   │   ├── scripts/acquire_inventory.py # Canonical inventory acquisition crawler
-│   │   ├── scripts/run_scraper.py   # CLI entrypoint with JSON & MD table outputs
 │   │   └── scripts/crawler/         # 16 pure-Python modules (policy, fetch, robots, sitemap, etc.)
 │   ├── discoverability-audit/       # RFC 9309, AI bots, SNR, nosnippet (HF-03, HF-04, HF-05)
 │   ├── entity-content-audit/        # Schema.org @graph, sameAs, ISO 4217, product consistency (HF-06)
@@ -74,11 +73,11 @@ adobe-brand-visibility-skill/
 ### 1. `audit-orchestrator` (The Master Coordinator)
 - **Role:** Coordinates the audit runbook and synthesizes diagnostic reports.
 - **Key Tools:**
-  - `orchestrator.py`: Master CLI pipeline executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions. Supports `--telemetry` mode for AI agent cognitive reasoning.
-  - `audit.py`: Multi-pass execution engine coordinating collection, agent review finalization, and validation.
-  - `assemble_report.py`: Assembles candidate finding objects into Draft-07 schema compliance with dual-track remediation.
+  - `orchestrator.py`: Master CLI pipeline executing single-pass crawl, offline sensor fan-out, causal DAG synthesis, and proactive actions. Supports `--telemetry` mode for AI agent cognitive reasoning, smart auto-detection of inputs, and `--deliverable` generation.
   - `causal_gate.py`: 6-Layer Causal DAG enforcing deterministic suppression of downstream symptoms when upstream blockers exist. Supports bidirectional taxonomy aliases.
+  - `bundle_context.py`: Compiles condensed context briefings tailored to business archetype and observed anomalies.
   - `validate_report.py`: Strict Draft-07 JSON schema validator enforcing required fields and locked enums.
+  - `plan.py`: Mathematical action prioritization indexing.
 - **Cognitive Responsibility:** The agent synthesizes specialist telemetry, deduplicates overlapping findings, calculates the 6 Orthogonal Scores, maps root causes to the 16-Defect Matrix, and outputs the final report.
 - **Sensor-Brain Architecture:** The Python scripts are deterministic telemetry sensors providing empirical measurements. The AI agent is the Cognitive Reasoning Brain that reasons over telemetry, applies the 6-Layer Causal DAG, classifies business archetypes, and synthesizes bespoke dual-track remediation. The agent must NEVER simply run orchestrator.py --format json and forward the output.
 
@@ -87,7 +86,7 @@ adobe-brand-visibility-skill/
 - **Key Tools:**
   - `safe_fetch.py`: Canonical zero-trust SSRF protection blocking private RFC-1918, link-local, and loopback IP addresses.
   - `acquire_inventory.py`: Canonical crawler generating `inv.json` with page classifications, HTML, clean text, and robots directives.
-  - `run_scraper.py`: Production CLI with JSON output (`inv.json`) and clean terminal Markdown tables.
+  - `crawler/engine.py`: Consolidated high-performance crawl engine.
   - `crawler/`: 16 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval and training bots, recursive sitemap parsing, clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, and zero-trust SSRF defense.
 - **Enriched Acquisition Signals:** Streaming parser extracts interactive CTAs (`ctas`), internationalization (`hreflangs`), publication and modification dates (`dates`), edge HTTP directives (`x_robots_tag`, HTTP `Link` canonicals), structured contact channels (`contact_info`), social authority profiles (`social_links`), author attribution (`authors`), and AI discovery manifests (`/llms.txt`, `/pricing.md`, `/.well-known/ai-plugin.json`, `/.well-known/security.txt`).
 
@@ -134,17 +133,14 @@ The AI agent reasons over the telemetry, applies the 6-Layer Causal DAG, classif
 python3 src/skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json --baseline-only
 ```
 
-### Interface 2: Contract-Driven Multi-Pass Audit Engine (`audit.py`)
-Multi-pass orchestration isolating bounded evidence collection, semantic agent review, and Draft-07 schema validation:
+### Interface 2: Concise Production Deliverable & Auto-Detection (`orchestrator.py`)
+Streamlined deliverable generation with smart input auto-detection:
 ```bash
-# 1. Bounded single-pass collection & baseline report emission (bounded to 160s)
-python3 src/skills/audit-orchestrator/scripts/audit.py collect https://example.com --out output/audit
+# 1. Zero-friction deliverable generation (auto-detects inv.json and review.json)
+python3 src/skills/audit-orchestrator/scripts/orchestrator.py --deliverable -o report.json
 
-# 2. Agent semantic finalization composing collected evidence with review.json
-python3 src/skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review output/audit/review.json --out output/audit/final-report.json
-
-# 3. Validate final report against Draft-07 schema and consistency invariants
-python3 src/skills/audit-orchestrator/scripts/audit.py validate output/audit/final-report.json
+# 2. Validate final report against Draft-07 schema and consistency invariants
+python3 src/skills/audit-orchestrator/scripts/validate_report.py report.json
 ```
 
 ### Interface 3: Modular Specialist Sensor Invocations

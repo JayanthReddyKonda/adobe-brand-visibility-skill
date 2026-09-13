@@ -30,28 +30,9 @@ class TestCLIInterfaces(unittest.TestCase):
         if os.path.exists(cls.inv_path):
             os.remove(cls.inv_path)
 
-    # 1. web-scraper CLI
-    def test_web_scraper_cli_arguments(self):
-        """Verify web-scraper arguments: --site, --output, --max-pages, --timeout, --max-depth, --format, --strict-robots, --verbose."""
-        res = run_skill_script("web-scraper", "run_scraper.py", ["--help"])
-        self.assertEqual(res.returncode, 0)
-        self.assertIn("--site", res.stdout)
-        self.assertIn("--output", res.stdout)
-        self.assertIn("--max-pages", res.stdout)
-        self.assertIn("--timeout", res.stdout)
-        self.assertIn("--max-depth", res.stdout)
-        self.assertIn("--format", res.stdout)
-        self.assertIn("--strict-robots", res.stdout)
-        self.assertIn("--verbose", res.stdout)
-
-    def test_web_scraper_missing_site_fails(self):
-        """Verify web-scraper fails when required --site argument is omitted."""
-        res = run_skill_script("web-scraper", "run_scraper.py", [])
-        self.assertNotEqual(res.returncode, 0)
-        self.assertIn("required", res.stderr.lower())
-
     # 2. acquire_inventory CLI
     def test_acquire_inventory_cli_arguments(self):
+
         """Verify acquire_inventory arguments: --site, --output, --format."""
         res = run_skill_script("web-scraper", "acquire_inventory.py", ["--help"])
         self.assertEqual(res.returncode, 0)
@@ -202,15 +183,6 @@ class TestCLIInterfaces(unittest.TestCase):
         self.assertIn("--telemetry", res.stdout)
         self.assertIn("--findings", res.stdout)
 
-    # 14. assemble_report CLI
-    def test_assemble_report_cli_help(self):
-        """Verify assemble_report.py CLI options."""
-        res = run_skill_script("audit-orchestrator", "assemble_report.py", ["--help"])
-        self.assertEqual(res.returncode, 0)
-        self.assertIn("--site", res.stdout)
-        self.assertIn("--candidates", res.stdout)
-        self.assertIn("--artifacts", res.stdout)
-
     # 15. validate_report CLI with --schema
     def test_validate_report_cli_schema(self):
         """Verify validate_report.py CLI supports --schema argument."""
@@ -230,15 +202,6 @@ class TestCLIInterfaces(unittest.TestCase):
         data = json.loads(res.stdout)
         self.assertIn("signals", data)
         self.assertIn("briefing", data)
-
-    # 17. audit CLI
-    def test_audit_cli_help(self):
-        """Verify audit.py CLI options and help output."""
-        res = run_skill_script("audit-orchestrator", "audit.py", ["--help"])
-        self.assertEqual(res.returncode, 0)
-        self.assertIn("collect", res.stdout)
-        self.assertIn("finalize", res.stdout)
-        self.assertIn("validate", res.stdout)
 
 
 if __name__ == "__main__":

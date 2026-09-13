@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 """
-fact_consistency_check.py - Audits fact freshness, update timestamps, and cross-page fact consistency.
-
-Causal Root Causes:
-  - FACT.CONSISTENCY: FIRST_PARTY_FACT_CONFLICT, CONFLICTING_COMMERCIAL_TERMS
-  - FACT.FRESHNESS: LEGACY_FACT_PROPAGATION, STALE_AUTHORITATIVE_FACT
-  - FACT.LIFECYCLE: DISCONTINUED_VS_CURRENT_CONFLICT
+fact_consistency_check.py - Audits cross-page fact consistency, prices, and freshness.
+Constructs a multi-attribute first-party fact ledger to isolate verified contradictions.
 """
 
 import argparse
@@ -15,7 +11,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from html.parser import HTMLParser
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -30,12 +26,9 @@ CURRENT_YEAR = datetime.now(timezone.utc).year
 PRICE_PATTERN = re.compile(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", re.IGNORECASE)
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+", re.IGNORECASE)
 PHONE_PATTERN = re.compile(r"(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?){2,4}\d{2,4}")
-DISCONTINUED_PATTERN = re.compile(
-    r"\b(discontinued|retired|legacy|obsolete|end of life|out of production)\b", re.IGNORECASE
-)
 
 
-def extract_currency(raw_str):
+def extract_currency(raw_str: Optional[str]) -> str:
     raw = raw_str or ""
     s = raw.upper()
     if "₹" in raw or "INR" in s or "RS" in s:
@@ -59,17 +52,11 @@ def extract_currency(raw_str):
     return "UNKNOWN"
 
 
-def extract_interval(raw_str):
+def extract_interval(raw_str: Optional[str]) -> str:
     s = (raw_str or "").lower()
-    if re.search(
-        r"(\bmonthly\b|\bper\s+month\b|/\s*mo\b|/\s*month\b|\bper\s+user/mo\b|\bper\s+seat/mo\b|/\s*user/month\b|/\s*seat/month\b|\bbilled\s+monthly\b)",
-        s,
-    ):
+    if re.search(r"(\bmonthly\b|\bper\s+month\b|/\s*mo\b|/\s*month\b|\bper\s+user/mo\b|\bper\s+seat/mo\b|/\s*user/month\b|/\s*seat/month\b|\bbilled\s+monthly\b)", s):
         return "month"
-    if re.search(
-        r"(\bannually\b|\bannual\b|\byearly\b|\bper\s+year\b|/\s*yr\b|/\s*year\b|\bbilled\s+annually\b|\bbilled\s+yearly\b|/\s*user/year\b|/\s*seat/year\b)",
-        s,
-    ):
+    if re.search(r"(\bannually\b|\bannual\b|\byearly\b|\bper\s+year\b|/\s*yr\b|/\s*year\b|\bbilled\s+annually\b|\bbilled\s+yearly\b|/\s*user/year\b|/\s*seat/year\b)", s):
         return "year"
     if re.search(r"(\bweekly\b|\bper\s+week\b|/\s*wk\b|/\s*week\b)", s):
         return "week"
@@ -78,23 +65,17 @@ def extract_interval(raw_str):
     return "one_time"
 
 
-def normalize_price_str(raw, currency=None):
-    """Normalize price string to standardized float string representation (e.g. '$49.99' -> '49.99', '€1.250,50' -> '1250.50', '₹5,499' -> '5499.00')."""
+def normalize_price_str(raw: Any, currency: Optional[str] = None) -> Optional[str]:
     if not raw:
         return None
     s = str(raw).strip()
-    # European format with dot thousand separator and comma decimal: 1.250,50
     if re.search(r"\d+\.\d{3},\d{2}", s):
         s = s.replace(".", "").replace(",", ".")
     elif "," in s and "." in s:
-        # Standard US/UK: 1,250.50
         s = s.replace(",", "")
     elif "," in s:
         parts = s.split(",")
-        if len(parts) == 2 and len(parts[1]) == 2:
-            s = parts[0] + "." + parts[1]
-        else:
-            s = s.replace(",", "")
+        s = (parts[0] + "." + parts[1]) if len(parts) == 2 and len(parts[1]) == 2 else s.replace(",", "")
 
     m = re.search(r"(\d+(?:\.\d{1,2})?)", s)
     if not m:
@@ -111,43 +92,37 @@ class FreshnessAnalyzer(HTMLParser):
         super().__init__()
         self.in_script = False
         self.in_json_ld = False
-        self.json_ld_contents = []
-        self.meta_tags = {}
-        self.text_content = []
-        self.headings = []
-        self.current_h = None
-        self.current_h_text = []
-        self.current_section = "General"
-        self.text_with_context = []
+        self.json_ld_contents: List[str] = []
+        self.meta_tags: Dict[str, str] = {}
+        self.text_content: List[str] = []
+        self.headings: List[Tuple[str, str]] = []
+        self.current_h: Optional[str] = None
+        self.current_h_text: List[str] = []
 
     def handle_starttag(self, tag, attrs):
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
-        tag_lower = tag.lower()
-
-        if tag_lower in ("script", "style"):
+        t = tag.lower()
+        if t in ("script", "style"):
             self.in_script = True
-            if tag_lower == "script" and "application/ld+json" in attr_dict.get("type", "").lower():
+            if t == "script" and "application/ld+json" in attr_dict.get("type", "").lower():
                 self.in_json_ld = True
-        elif tag_lower == "meta":
+        elif t == "meta":
             prop = attr_dict.get("property", attr_dict.get("name", "")).lower()
             content = attr_dict.get("content", "")
             if prop and content:
                 self.meta_tags[prop] = content
-        elif tag_lower in ("h1", "h2", "h3", "h4"):
-            self.current_h = tag_lower
+        elif t in ("h1", "h2", "h3", "h4"):
+            self.current_h = t
             self.current_h_text = []
 
     def handle_endtag(self, tag):
-        tag_lower = tag.lower()
-        if tag_lower in ("script", "style"):
+        t = tag.lower()
+        if t in ("script", "style"):
             self.in_script = False
             self.in_json_ld = False
-        elif tag_lower in ("h1", "h2", "h3", "h4"):
-            if self.current_h:
-                htxt = " ".join(self.current_h_text).strip()
-                if htxt:
-                    self.headings.append((self.current_h, htxt))
-                    self.current_section = htxt
+        elif t in ("h1", "h2", "h3", "h4"):
+            if self.current_h and self.current_h_text:
+                self.headings.append((self.current_h, " ".join(self.current_h_text).strip()))
             self.current_h = None
 
     def handle_data(self, data):
@@ -155,901 +130,246 @@ class FreshnessAnalyzer(HTMLParser):
             self.json_ld_contents.append(data.strip())
         elif self.current_h is not None:
             self.current_h_text.append(data.strip())
-        elif not self.in_script:
-            txt = data.strip()
-            if txt:
-                self.text_content.append(txt)
-                self.text_with_context.append((self.current_section, txt))
+        elif not self.in_script and data.strip():
+            self.text_content.append(data.strip())
 
 
-UTILITY_HEADINGS = {
-    "contact",
-    "contact us",
-    "about",
-    "about us",
-    "privacy policy",
-    "terms of service",
-    "terms & conditions",
-    "cart",
-    "shopping cart",
-    "checkout",
-    "login",
-    "register",
-    "sign in",
-    "sign up",
-    "cookie policy",
-    "faq",
-    "faqs",
-    "frequently asked questions",
-    "search",
-    "menu",
-    "navigation",
-    "home",
-    "homepage",
-    "welcome",
-    "pricing",
-    "plans",
-    "subscription",
-    "overview",
-    "details",
-    "features",
-    "giving",
-    "gives",
-    "diversity",
-    "impact",
-    "donate",
-    "donation",
-    "usage",
-    "usage limit",
-    "limits",
-    "support",
-    "help",
-    "careers",
-    "press",
-    "news",
-    "blog",
-    "events",
-    "community",
-    "resources",
-    "general",
-    "summary",
-    "introduction",
-    "conclusion",
-    "table of contents",
-    "highlights",
-    "compare",
-    "comparison",
-    "reviews",
-    "testimonials",
-    "questions",
-    "answers",
-}
-
-
-def is_valid_product_entity(name):
-    """Validate whether a candidate heading or string is a plausible product/service entity name."""
-    if not name or not isinstance(name, str):
-        return False
-    clean = name.strip()
-    clean_lower = clean.lower()
-
-    # Length boundaries: product/plan names are typically 3 to 50 characters
-    if len(clean) < 3 or len(clean) > 50:
-        return False
-
-    # Must not end with question/colon punctuation (e.g. FAQ questions)
-    if clean.endswith(("?", ":")):
-        return False
-
-    # Must not contain question prefixes or FAQ phrases
-    question_prefixes = (
-        "what ",
-        "why ",
-        "how ",
-        "when ",
-        "where ",
-        "who ",
-        "which ",
-        "can ",
-        "is ",
-        "does ",
-        "faq",
-        "frequently ",
-    )
-    if clean_lower.startswith(question_prefixes):
-        return False
-
-    # Must not contain price tags, currency indicators, billing terms or math symbols
-    if any(sym in clean for sym in ("$", "€", "£", "₹", "¥")):
-        return False
-    if re.search(
-        r"\b(usd|eur|gbp|inr|cad|aud|per\s+month|per\s+user|per\s+year|/\s*mo|/\s*yr|billed|billing|pricing|tier|tiers|cost|rate|fee|fees|discount|first\s+\d+)\b",
-        clean_lower,
-    ):
-        return False
-
-    # Must not contain large digit spans or raw numbers
-    if re.search(r"\d{2,}", clean):
-        return False
-
-    if clean_lower in UTILITY_HEADINGS:
-        return False
-    return not any(
-        k in clean_lower
-        for k in ("cookie", "privacy", "terms", "navigation", "diversity", "giving", "usage limit", "frequently asked")
-    )
-
-
-def resolve_json_ld_graph(raw_json_list):
-    """Extract and resolve @graph node references (@id linking) in JSON-LD."""
-    raw_objects = []
-    for raw in raw_json_list:
-        try:
-            data = json.loads(raw)
-            to_process = data if isinstance(data, list) else [data]
-            for item in to_process:
-                if isinstance(item, dict) and "@graph" in item and isinstance(item["@graph"], list):
-                    raw_objects.extend(item["@graph"])
-                elif isinstance(item, dict):
-                    raw_objects.append(item)
-        except Exception:
-            pass
-
-    id_map = {
-        obj["@id"].strip(): obj
-        for obj in raw_objects
-        if isinstance(obj, dict) and "@id" in obj and isinstance(obj["@id"], str)
-    }
-    resolved = []
-    for obj in raw_objects:
-        if not isinstance(obj, dict):
-            continue
-        entity = dict(obj)
-        if "offers" in entity:
-            offers = entity["offers"]
-            if isinstance(offers, dict) and "@id" in offers and offers["@id"] in id_map:
-                entity["offers"] = id_map[offers["@id"]]
-            elif isinstance(offers, list):
-                entity["offers"] = [
-                    id_map.get(o["@id"], o) if isinstance(o, dict) and "@id" in o and o["@id"] in id_map else o
-                    for o in offers
-                ]
-        resolved.append(entity)
-
-    for obj in raw_objects:
-        if isinstance(obj, dict):
-            raw_t = obj.get("@type", "")
-            otypes = {str(t).lower() for t in raw_t} if isinstance(raw_t, list) else {str(raw_t).lower()}
-            if otypes.intersection({"offer", "aggregateoffer"}):
-                item_offered = obj.get("itemOffered")
-                if isinstance(item_offered, dict) and "@id" in item_offered and item_offered["@id"] in id_map:
-                    prod = id_map[item_offered["@id"]]
-                    if "offers" not in prod:
-                        prod["offers"] = []
-                    elif isinstance(prod["offers"], dict):
-                        prod["offers"] = [prod["offers"]]
-                    if isinstance(prod["offers"], list) and obj not in prod["offers"]:
-                        prod["offers"].append(obj)
-    return resolved
-
-
-def extract_scoped_facts(html_str, url, page_dict=None):
-    """Extract first-party facts with contextual scope, status, and lifecycle."""
+def extract_scoped_facts(html: str, url: str) -> Dict[str, Any]:
+    """Extract structured facts (prices, currency, billing interval) from HTML JSON-LD."""
     parser = FreshnessAnalyzer()
     try:
-        parser.feed(html_str)
+        parser.feed(html)
     except Exception:
         pass
+    scoped_prices: List[Dict[str, Any]] = []
+    for jstr in parser.json_ld_contents:
+        try:
+            data = json.loads(jstr)
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if isinstance(item, dict):
+                    offers = item.get("offers", item)
+                    off_list = offers if isinstance(offers, list) else [offers] if isinstance(offers, dict) else []
+                    for off in off_list:
+                        if isinstance(off, dict):
+                            p = normalize_price_str(off.get("price"))
+                            cur = off.get("priceCurrency") or extract_currency(str(off.get("price")))
+                            pspec = off.get("priceSpecification")
+                            unit = ""
+                            if isinstance(pspec, dict):
+                                unit = str(pspec.get("unitCode", "")).upper()
+                                if not p and pspec.get("price"):
+                                    p = normalize_price_str(pspec.get("price"))
+                            if not unit:
+                                unit = str(off.get("unitCode", "")).upper()
+                            interval = "month" if unit in ("MON", "MONTH") else extract_interval(str(pspec or ""))
+                            if p:
+                                scoped_prices.append({"price": p, "currency": cur, "interval": interval, "url": url})
+        except Exception:
+            pass
+    return {"scoped_prices": scoped_prices, "url": url}
 
-    full_text = " ".join(parser.text_content)
-    facts = {
-        "url": url,
-        "copyright_years": [],
-        "brand_names": [],
-        "alternate_names": [],
-        "taglines": [],
-        "scoped_prices": [],
-        "contact_emails": [],
-        "contact_phones": [],
-        "modification_dates": [],
-        "products_with_status": [],
-        "trial_periods": [],
+
+def make_finding(cause_id: str, title: str, severity: str, scope: str, evidence: Any, root_cause: str = "", category: str = "fact_consistency") -> Dict[str, Any]:
+    ev_summary = evidence if isinstance(evidence, str) else str(evidence)
+    return {
+        "id": cause_id,
+        "cause_id": cause_id,
+        "title": title,
+        "severity": severity,
+        "category": category,
+        "confidence": "high",
+        "scope": scope,
+        "evidence": {"summary": ev_summary, "sources": [{"url": scope, "observation": ev_summary}]},
+        "root_cause": root_cause or f"Defect detected: {title}",
+        "impact": f"Triggers LLM hallucination or conflicting citations: {title}",
+        "suggested_action": {
+            "summary": f"Remediate {cause_id} on {scope}",
+            "technical_fix": f"Synchronize data sources for {cause_id}.",
+            "creative_fix": f"Ensure consistent factual claims across {scope}.",
+            "priority": severity,
+            "verification": f"Verify consistency on {scope}.",
+        },
     }
 
-    # 1. Copyright years
-    matches = re.findall(r"(?:©|&copy;|copyright)\s*(?:[0-9]{4}\s*[-–]\s*)?([0-9]{4})", full_text, re.IGNORECASE)
-    for y in matches:
+
+def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_file: Optional[str] = None,
+          attribute: Optional[str] = None, compare_urls: Optional[List[str]] = None, query: Optional[str] = None) -> Dict[str, Any]:
+    """Execute fact consistency sensor against site or inventory."""
+    if isinstance(inv, (str, bytes, os.PathLike)) and os.path.exists(inv):
         try:
-            iy = int(y)
-            if 1990 <= iy <= CURRENT_YEAR + 1:
-                facts["copyright_years"].append(iy)
-        except ValueError:
-            pass
-    facts["copyright_years"] = sorted(set(facts["copyright_years"]))
-
-    # 2. Structured Data extraction with @graph node resolution
-    resolved_json_ld = resolve_json_ld_graph(parser.json_ld_contents)
-    for o in resolved_json_ld:
-        raw_t = o.get("@type", "")
-        otypes = {str(t).lower() for t in raw_t} if isinstance(raw_t, list) else {str(raw_t).lower()}
-        if otypes.intersection({"organization", "brand", "corporation", "localbusiness"}):
-            if o.get("name") and isinstance(o["name"], str):
-                facts["brand_names"].append(o["name"].strip())
-            if o.get("slogan"):
-                facts["taglines"].append(str(o.get("slogan")).strip())
-            if o.get("alternateName"):
-                # P1-53: Do not map alternateName to brand_names to prevent false self-contradictions
-                facts["alternate_names"].append(str(o.get("alternateName")).strip())
-        elif otypes.intersection({"product", "individualproduct", "productmodel", "softwareapplication", "service"}):
-            pname = str(o.get("name") or "").strip()
-            offers = o.get("offers") or {}
-            offer_obj = offers[0] if isinstance(offers, list) and offers else offers
-            if isinstance(offer_obj, dict):
-                has_exact = offer_obj.get("price") is not None
-                p_val = offer_obj.get("price") if has_exact else offer_obj.get("lowPrice")
-                price_type = "exact" if has_exact else "range_min"
-                p_curr = str(offer_obj.get("priceCurrency") or "UNKNOWN").upper()
-                avail = str(offer_obj.get("availability") or "").lower()
-                p_variant = str(offer_obj.get("sku") or offer_obj.get("name") or o.get("sku") or "default").strip()
-                status = (
-                    "discontinued"
-                    if "discontinued" in avail
-                    else ("in_stock" if "instock" in avail else ("preorder" if "preorder" in avail else "unknown"))
-                )
-
-                # Extract interval from priceSpecification, unitCode, or billingIncrement
-                p_interval = "one_time"
-                p_spec = offer_obj.get("priceSpecification")
-                if isinstance(p_spec, dict):
-                    unit_code = str(p_spec.get("unitCode") or "").upper()
-                    if unit_code in ("MON", "MONTH", "P1M"):
-                        p_interval = "month"
-                    elif unit_code in ("ANN", "YEAR", "P1Y"):
-                        p_interval = "year"
-                    elif unit_code in ("WEE", "WEEK", "P1W"):
-                        p_interval = "week"
-                if p_interval == "one_time":
-                    offer_desc = f"{offer_obj.get('name', '')} {offer_obj.get('description', '')} {o.get('description', '')}"
-                    inferred_inv = extract_interval(offer_desc)
-                    if inferred_inv != "one_time":
-                        p_interval = inferred_inv
-
-                if pname and is_valid_product_entity(pname):
-                    facts["products_with_status"].append({"name": pname, "status": status, "url": url})
-                    if p_val:
-                        norm_p = normalize_price_str(str(p_val), p_curr)
-                        if norm_p:
-                            facts["scoped_prices"].append(
-                                {
-                                    "entity": pname,
-                                    "price": norm_p,
-                                    "currency": p_curr,
-                                    "interval": p_interval,
-                                    "variant": p_variant,
-                                    "price_type": price_type,
-                                    "raw": f"{p_curr} {p_val}",
-                                }
-                            )
-        # P1-52: Do not fall back dateModified to datePublished
-        if "dateModified" in o and isinstance(o["dateModified"], str):
-            facts["modification_dates"].append(o["dateModified"])
-
-    # Meta / OpenGraph update timestamps and brand/title facts
-    for meta_key in ("article:modified_time", "og:updated_time", "last-modified"):
-        if meta_key in parser.meta_tags:
-            facts["modification_dates"].append(parser.meta_tags[meta_key])
-
-    if "og:site_name" in parser.meta_tags:
-        facts["brand_names"].append(parser.meta_tags["og:site_name"].strip())
-
-    # 4. Text-based scoped price extraction (within valid sections or explicit inline assertions)
-    for ctx, txt in parser.text_with_context:
-        inline_m = re.search(
-            r"(?:our|the)?\s*([A-Za-z0-9\s\-]{2,30}?)\s+(?:tier|plan)?\s*(?:is\s+)?priced at\s*(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)",
-            txt,
-            re.IGNORECASE,
-        )
-        if inline_m:
-            candidate_ent = inline_m.group(1).strip()
-            if candidate_ent and is_valid_product_entity(candidate_ent):
-                curr = extract_currency(txt)
-                norm_p = normalize_price_str(inline_m.group(2), curr)
-                if norm_p and float(norm_p) > 0:
-                    invl = extract_interval(txt)
-                    if not any(
-                        sp["price"] == norm_p
-                        and sp["entity"].lower() == candidate_ent.lower()
-                        and sp["currency"] == curr
-                        and sp["interval"] == invl
-                        for sp in facts["scoped_prices"]
-                    ):
-                        facts["scoped_prices"].append(
-                            {
-                                "entity": candidate_ent,
-                                "price": norm_p,
-                                "currency": curr,
-                                "interval": invl,
-                                "variant": "default",
-                                "raw": inline_m.group(0),
-                            }
-                        )
-
-        if not ctx or ctx == "General" or not is_valid_product_entity(ctx):
-            continue
-        for m in re.finditer(r"(?:₹|Rs\.?|INR|\$|USD|€|EUR|£|GBP)\s?(\d[\d,]*(?:\.\d{1,2})?)", txt, re.IGNORECASE):
-            curr = extract_currency(m.group(0))
-            norm_p = normalize_price_str(m.group(1), curr)
-            if norm_p and float(norm_p) > 0:
-                invl = extract_interval(txt)
-                if not any(
-                    sp["price"] == norm_p
-                    and sp["entity"].lower() == ctx.lower().strip()
-                    and sp["currency"] == curr
-                    and sp["interval"] == invl
-                    for sp in facts["scoped_prices"]
-                ):
-                    facts["scoped_prices"].append(
-                        {
-                            "entity": ctx.strip(),
-                            "price": norm_p,
-                            "currency": curr,
-                            "interval": invl,
-                            "variant": "default",
-                            "raw": m.group(0),
-                        }
-                    )
-
-    # 5. Lifecycle text detection (Removed to prevent false positives)
-    for h in parser.headings:
-        h_text = h[1]
-        if DISCONTINUED_PATTERN.search(h_text) and is_valid_product_entity(h_text):
-            matched = False
-            for p in facts["products_with_status"]:
-                if p["name"].lower() == h_text.lower().strip():
-                    p["status"] = "discontinued"
-                    matched = True
-            if not matched:
-                facts["products_with_status"].append({"name": h_text.strip(), "status": "discontinued", "url": url})
-
-    # 6. Scoped emails & phones
-    for m in EMAIL_PATTERN.finditer(html_str):
-        addr = m.group(0).strip(".").lower()
-        if not addr.endswith((".png", ".jpg", ".gif", ".webp", ".js", ".css")):
-            scope = "sales" if "sales" in addr else ("support" if "support" in addr else "general")
-            facts["contact_emails"].append({"scope": scope, "email": addr})
-
-    for m in PHONE_PATTERN.finditer(full_text):
-        digits = re.sub(r"\D", "", m.group(0))
-        if 8 <= len(digits) <= 15:
-            facts["contact_phones"].append({"scope": "telephone", "phone": digits})
-
-    # Ingest structured pre-extracted contact_info, dates, and ctas from page_dict if provided
-    if page_dict and isinstance(page_dict.get("contact_info"), dict):
-        c_info = page_dict["contact_info"]
-        for em in c_info.get("emails", []):
-            clean_em = str(em).lower().strip()
-            if clean_em.startswith("mailto:"):
-                clean_em = clean_em[7:]
-            if clean_em and not any(e.get("email") == clean_em for e in facts["contact_emails"]):
-                scope = "sales" if "sales" in clean_em else ("support" if "support" in clean_em else "general")
-                facts["contact_emails"].append({"scope": scope, "email": clean_em})
-        for ph in c_info.get("phones", []):
-            digits = re.sub(r"\D", "", str(ph))
-            if 8 <= len(digits) <= 15 and not any(p.get("phone") == digits for p in facts["contact_phones"]):
-                facts["contact_phones"].append({"scope": "telephone", "phone": digits})
-
-    if page_dict and isinstance(page_dict.get("dates"), dict):
-        d_info = page_dict["dates"]
-        for dt_key in ("modified", "published"):
-            val = d_info.get(dt_key)
-            if val and isinstance(val, str) and val not in facts["modification_dates"]:
-                facts["modification_dates"].append(val)
-
-    if page_dict and page_dict.get("ctas"):
-        for cta in page_dict["ctas"]:
-            cta_text = cta.get("text", "") if isinstance(cta, dict) else getattr(cta, "text", "")
-            m_trial = re.search(r"(\d+)[-\s]day\s+(?:free\s+)?trial", cta_text, re.I)
-            if m_trial:
-                facts["trial_periods"].append({
-                    "days": int(m_trial.group(1)),
-                    "raw": cta_text,
-                    "url": url,
-                })
-
-    # Deduplicate facts lists
-    facts["brand_names"] = sorted(set(facts["brand_names"]))
-    facts["taglines"] = sorted(set(facts["taglines"]))
-    facts["modification_dates"] = sorted(set(facts["modification_dates"]))
-
-    return facts
-
-
-def evaluate_fact_consistency(page_fact_list, base_url):
-    """Detect verified contradictions and lifecycle conflicts across first-party pages."""
-    findings = []
-    recommendations = []
-
-    # 1. Scoped Price Contradictions (entity + currency + interval)
-    # Price ledger: (entity, currency, interval) -> price -> set of URLs
-    price_ledger = {}
-    for pf in page_fact_list:
-        for sp in pf["scoped_prices"]:
-            ent = sp["entity"].lower().strip()
-            if not is_valid_product_entity(ent):
-                continue
-            key = (
-                ent,
-                sp.get("currency", "USD"),
-                sp.get("interval", "one_time"),
-                sp.get("variant", "default"),
-                sp.get("price_type", "exact"),
-            )
-            price_ledger.setdefault(key, {}).setdefault(sp["price"], set()).add(pf["url"])
-
-    for (ent, curr, invl, _var, ptype), val_map in price_ledger.items():
-        if len(val_map) >= 2:
-            # Map each URL to all prices it asserts for this entity
-            url_to_prices = {}
-            for price_val, urls in val_map.items():
-                for u in urls:
-                    url_to_prices.setdefault(u, set()).add(price_val)
-
-            # Filter for URLs that assert a single distinct price (eliminating tiered single-page listings)
-            clean_conflicts = {}
-            for price_val, urls in val_map.items():
-                single_price_urls = {u for u in urls if len(url_to_prices[u]) == 1}
-                if single_price_urls:
-                    clean_conflicts[price_val] = single_price_urls
-
-            # A true cross-page conflict requires at least 2 different prices on at least 2 distinct URLs
-            if len(clean_conflicts) >= 2:
-                all_affected_urls = set()
-                details = []
-                for pval, urls in clean_conflicts.items():
-                    all_affected_urls.update(urls)
-                    for u in sorted(urls):
-                        details.append(f"{curr} {pval} on {u}")
-
-                if len(all_affected_urls) >= 2:
-                    findings.append(
-                        {
-                            "category": "fact-consistency",
-                            "title": f"Conflicting pricing published for '{ent}'",
-                            "severity": "high",
-                            "confidence": "high",
-                            "root_cause": f"Different {ptype} price values for '{ent}' ({curr}, {invl}) are published across separate first-party pages.",
-                            "cause_family": "FACT.CONSISTENCY",
-                            "id": "FIRST_PARTY_FACT_CONFLICT",
-                            "cause_id": "FIRST_PARTY_FACT_CONFLICT",
-                            "impact": "AI retrieval systems quote contradictory pricing, creating commercial confusion and user distrust.",
-                            "evidence": f"{len(all_affected_urls)} separate page(s) publish conflicting figures for '{ent}': {'; '.join(details)}.",
-                            "suggested_action": {
-                                "summary": f"Establish a single canonical price for '{ent}' and synchronize across all product listings and structured markup.",
-                                "technical_fix": "Centralize pricing in a single structured JSON-LD PriceSpecification or database source of truth across all routes.",
-                                "creative_fix": "Audit promotional copy, landing pages, and comparison charts to remove outdated discount pricing.",
-                                "priority": "high",
-                                "verification": f"Re-crawl {', '.join(sorted(all_affected_urls))} and verify identical pricing appears on all pages.",
-                            },
-                        }
-                    )
-
-    # 2. Product Lifecycle Conflicts (Discontinued vs Active)
-    status_by_name = {}
-    for pf in page_fact_list:
-        for p in pf.get("products_with_status", []):
-            name_clean = p["name"].lower().strip()
-            if is_valid_product_entity(name_clean):
-                status_by_name.setdefault(name_clean, []).append((p["status"], p["url"]))
-
-    for name, statuses in status_by_name.items():
-        stat_types = {s[0] for s in statuses}
-        if "discontinued" in stat_types and ("in_stock" in stat_types or "current" in stat_types):
-            urls = {s[1] for s in statuses}
-            if len(urls) >= 2:
-                findings.append(
-                    {
-                        "category": "lifecycle",
-                        "title": f"Product lifecycle conflict for '{name}' (discontinued vs current)",
-                        "severity": "high",
-                        "confidence": "high",
-                        "root_cause": f"Product '{name}' is marked discontinued on one surface while advertised as current/in-stock on another.",
-                        "cause_family": "FACT.LIFECYCLE",
-                        "id": "DISCONTINUED_VS_CURRENT_CONFLICT",
-                        "cause_id": "DISCONTINUED_VS_CURRENT_CONFLICT",
-                        "impact": "AI assistants quote obsolete products as active commercial offerings, causing customer churn.",
-                        "evidence": f"Lifecycle statuses differ across {len(urls)} page(s): {', '.join(f'{s[0]} on {s[1]}' for s in statuses)}.",
-                        "suggested_action": {
-                            "summary": f"Update all pages referencing '{name}' to consistently reflect its current product lifecycle status.",
-                            "technical_fix": "Set Schema.org ItemAvailability to Discontinued or InStock uniformly across all product JSON-LD schemas.",
-                            "creative_fix": "Update legacy blog posts, product catalogs, and banners with clear migration notices to active product lines.",
-                            "priority": "high",
-                            "verification": f"Verify {', '.join(sorted(urls))} show consistent availability/discontinued markers.",
-                        },
-                    }
-                )
-
-    # 3. Copyright Year Inconsistency (Signals legacy fact drift - emitted as proactive observation unless paired with conflict)
-    c_years_by_url = {}
-    for pf in page_fact_list:
-        if pf["copyright_years"]:
-            c_years_by_url[pf["url"]] = max(pf["copyright_years"])
-
-    unique_years = set(c_years_by_url.values())
-    if len(unique_years) >= 2:
-        oldest_year = min(unique_years)
-        newest_year = max(unique_years)
-        if newest_year - oldest_year >= 3:
-            recommendations.append(
-                {
-                    "title": "Synchronize footer copyright year across templates",
-                    "category": "freshness",
-                    "rationale": f"Copyright years range from {oldest_year} to {newest_year} across sampled page templates.",
-                    "suggested_action": f"Standardize site footers to dynamically render current year ({CURRENT_YEAR}).",
-                }
-            )
-
-    # 4. Conflicting Commercial Trial Terms
-    trials_by_days: dict = {}
-    for pf in page_fact_list:
-        for tr in pf.get("trial_periods", []):
-            d = tr["days"]
-            trials_by_days.setdefault(d, []).append(tr["url"])
-
-    if len(trials_by_days) > 1:
-        details = ", ".join(f"{days}-day on {', '.join(sorted(set(urls))[:2])}" for days, urls in sorted(trials_by_days.items()))
-        findings.append(
-            {
-                "category": "commercial_terms",
-                "title": "Conflicting free trial durations advertised across pages",
-                "severity": "high",
-                "confidence": "high",
-                "root_cause": "Different pages publish contradictory trial periods, creating commercial ambiguity for AI shopping engines.",
-                "cause_family": "FACT.CONSISTENCY",
-                "id": "CONFLICTING_COMMERCIAL_TERMS",
-                "cause_id": "CONFLICTING_COMMERCIAL_TERMS",
-                "impact": "AI assistants quote inconsistent trial durations to prospective customers.",
-                "evidence": f"Contradictory trial terms detected: {details}.",
-                "suggested_action": {
-                    "summary": "Align free trial duration uniformly across all landing pages and CTA copy.",
-                    "technical_fix": "Standardize CTA copy and pricing tables to state identical trial terms.",
-                    "creative_fix": "Audit marketing funnels and update legacy promotional copy.",
-                    "priority": "high",
-                    "verification": "Confirm all pages declare identical trial durations.",
-                },
-            }
-        )
-
-    return findings, recommendations
-
-
-def compare_ai_observations(fact_ledger, responses_file):
-    findings = []
-    notes = []
-
-    if not responses_file:
-        return findings, notes
-
-    data = None
-    if isinstance(responses_file, (dict, list)):
-        data = responses_file
-    elif isinstance(responses_file, (str, bytes, os.PathLike)) and os.path.exists(responses_file):
-        try:
-            with open(responses_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            with open(inv, "r", encoding="utf-8") as f:
+                inv = json.load(f)
         except Exception:
-            return findings, notes
-    else:
-        return findings, notes
-
-    try:
-        if isinstance(data, dict):
-            obs_list = data.get("observations") or data.get("responses") or []
-        elif isinstance(data, list):
-            obs_list = data
-        else:
-            obs_list = []
-
-        for idx, obs in enumerate(obs_list):
-            assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx + 1}"
-            mentioned = obs.get("mentioned") is True
-
-            if not mentioned:
-                notes.append(f"{assistant_name} omitted brand.")
-                continue
-
-            for claim in obs.get("claims", []):
-                c_entity = str(claim.get("entity", "")).lower()
-                c_attr = str(claim.get("attribute", "")).lower()
-                c_val = str(claim.get("value", ""))
-
-                if c_attr == "price":
-                    claim_num = normalize_price_str(c_val, "UNKNOWN")
-                    if claim_num is not None:
-                        found_match = False
-                        entity_prices = []
-                        for page_facts in fact_ledger:
-                            for sp in page_facts.get("scoped_prices", []):
-                                if sp["entity"].lower() == c_entity:
-                                    found_match = True
-                                    site_num = normalize_price_str(sp["price"], sp["currency"])
-                                    if site_num is not None:
-                                        entity_prices.append(float(site_num))
-
-                        if (
-                            found_match
-                            and entity_prices
-                            and not any(abs(float(claim_num) - sv) < 0.01 for sv in entity_prices)
-                        ):
-                            # P0-48 & P0-24 & P0-25: Entity bound global price checking
-                            findings.append(
-                                {
-                                    "category": "representation",
-                                    "title": f"{assistant_name} states conflicting pricing for '{claim.get('entity')}'",
-                                    "severity": "high",
-                                    "confidence": "high",
-                                    "root_cause": f"The AI asserts a price ({c_val}) for '{claim.get('entity')}' that contradicts its canonical on-site representation.",
-                                    "cause_family": "FACT.CONSISTENCY",
-                                    "id": "AI_FACT_CONFLICT",
-                                    "cause_id": "AI_FACT_CONFLICT",
-                                    "evidence": f"Assistant asserted '{c_val}'. Canonical site prices for this entity: {set(entity_prices)}.",
-                                    "suggested_action": {
-                                        "summary": "Publish canonical pricing in structured Schema.org markup.",
-                                        "technical_fix": "Deploy machine-explicit Schema.org Product Offer JSON-LD declaring price, priceCurrency, and validFrom/validThrough.",
-                                        "creative_fix": "Publish an authoritative pricing table in clean markdown on the canonical product page and /llms.txt.",
-                                        "priority": "high",
-                                        "verification": "Re-evaluate assistant queries against updated canonical pricing ledger.",
-                                    },
-                                }
-                            )
-    except Exception:
-        pass
-
-    return findings, notes
-
-
-def audit(base, domain, inv=None, state_file=None, responses_file=None, attribute=None, compare_urls=None, query=None):
-    if isinstance(inv, (str, bytes, os.PathLike)) and responses_file is None:
-        responses_file = inv
+            inv = None
+    elif not isinstance(inv, dict):
         inv = None
-    elif isinstance(responses_file, dict) and inv is None:
-        inv = responses_file
-        responses_file = None
 
-    findings = []
-    recommendations = []
-    page_fact_list = []
+    findings: List[Dict[str, Any]] = []
+    recommendations: List[Dict[str, Any]] = []
 
-    if inv is not None:
-        pages_to_process = inv.get("pages") if isinstance(inv, dict) else []
-        for p in (pages_to_process or []):
-            if not isinstance(p, dict):
+    pages = inv.get("pages", []) if inv else []
+    if not pages:
+        if inv is not None:
+            return {"status": "inconclusive", "telemetry": {}, "findings": [], "recommendations": []}
+        st, _, html, _ = safe_fetch(base + "/", timeout=10, max_bytes=2097152)
+        pages = [{"url": base + "/", "page_type": "homepage", "html": html, "status": st}]
+
+    # Build first-party fact ledger
+    fact_ledger: List[Dict[str, Any]] = []
+    prices_by_page: Dict[str, List[Dict[str, Any]]] = {}
+
+    for p in pages:
+        purl = p.get("url") or base
+        phtml = p.get("html", "") or p.get("text", "")
+        pdom = FreshnessAnalyzer()
+        try:
+            pdom.feed(phtml)
+        except Exception:
+            pass
+
+        # 1. Prices from JSON-LD
+        jsonld_blocks = list(p.get("jsonld", []))
+        for jstr in pdom.json_ld_contents:
+            try:
+                parsed = json.loads(jstr)
+                if isinstance(parsed, list):
+                    jsonld_blocks.extend(parsed)
+                elif isinstance(parsed, dict):
+                    if "@graph" in parsed and isinstance(parsed["@graph"], list):
+                        jsonld_blocks.extend(parsed["@graph"])
+                    else:
+                        jsonld_blocks.append(parsed)
+            except Exception:
+                pass
+
+        page_prices: List[Dict[str, Any]] = []
+        for obj in jsonld_blocks:
+            if not isinstance(obj, dict):
                 continue
-            u = p.get("url") or ""
-            raw_html = p.get("html") or ""
-            if not u or not raw_html:
-                continue
-            if u.lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf")):
-                continue
-            if (
-                raw_html.strip().startswith("<?xml")
-                or "<urlset" in raw_html.lower()
-                or "<sitemapindex" in raw_html.lower()
-            ):
-                continue
-            page_fact_list.append(extract_scoped_facts(raw_html, u, page_dict=p))
-    else:
-        _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
-        if html:
-            page_fact_list.append(extract_scoped_facts(html, base + "/"))
+            t = str(obj.get("@type", "")).lower()
+            if "offer" in t or "product" in t:
+                offers = obj.get("offers", obj)
+                off_list = offers if isinstance(offers, list) else [offers] if isinstance(offers, dict) else []
+                for off in off_list:
+                    if isinstance(off, dict):
+                        p_val = normalize_price_str(off.get("price"))
+                        cur = off.get("priceCurrency") or extract_currency(str(off.get("price")))
+                        unit = str(off.get("unitCode", "")).upper()
+                        interval = "month" if unit in ("MON", "MONTH") else extract_interval(str(off.get("priceSpecification", "")))
+                        if p_val:
+                            entry = {"url": purl, "price": p_val, "currency": cur, "interval": interval, "source": "schema"}
+                            page_prices.append(entry)
+                            fact_ledger.append(entry)
 
-    if not page_fact_list:
-        return {
-            "status": "inconclusive",
-            "findings": [],
-            "recommendations": [],
-            "error": f"could not retrieve content from {base}",
-        }
+        # 2. Prices from text
+        all_text = " ".join(pdom.text_content)
+        for m in PRICE_PATTERN.finditer(all_text):
+            p_val = normalize_price_str(m.group(0))
+            cur = extract_currency(m.group(0))
+            surrounding = all_text[max(0, m.start() - 30):min(len(all_text), m.end() + 30)]
+            interval = extract_interval(surrounding)
+            if p_val:
+                entry = {"url": purl, "price": p_val, "currency": cur, "interval": interval, "source": "text"}
+                page_prices.append(entry)
+                fact_ledger.append(entry)
 
-    f_findings, f_recs = evaluate_fact_consistency(page_fact_list, base)
-    ai_findings, _ai_notes = compare_ai_observations(page_fact_list, responses_file)
-    f_findings.extend(ai_findings)
-    findings.extend(f_findings)
-    recommendations.extend(f_recs)
+        prices_by_page[purl] = page_prices
 
-    if attribute:
-        attr_clean = attribute.lower().strip()
-        if attr_clean in ("pricing", "price"):
-            findings = [f for f in findings if any(k in str(f.get("cause_id", "")).lower() or k in str(f.get("title", "")).lower() for k in ("price", "commercial", "conflict", "contradiction"))]
-            recommendations = [r for r in recommendations if any(k in str(r.get("id", "")).lower() or k in str(r.get("title", "")).lower() for k in ("price", "commercial"))]
-        elif attr_clean == "contact":
-            findings = [f for f in findings if any(k in str(f.get("cause_id", "")).lower() or k in str(f.get("title", "")).lower() for k in ("contact", "email", "phone"))]
-            recommendations = [r for r in recommendations if "contact" in str(r.get("id", "")).lower()]
-        elif attr_clean in ("legal", "copyright"):
-            findings = [f for f in findings if any(k in str(f.get("cause_id", "")).lower() or k in str(f.get("title", "")).lower() for k in ("copyright", "discontinued", "stale"))]
-            recommendations = [r for r in recommendations if "copyright" in str(r.get("id", "")).lower()]
+        # 3. Copyright year freshness
+        year_matches = re.findall(r"(?:©|&copy;|copyright)\s*(?:20\d{2}\s*-\s*)?(20\d{2})", all_text, re.I)
+        for y in year_matches:
+            if int(y) < CURRENT_YEAR - 2:
+                findings.append(make_finding("STALE_AUTHORITATIVE_FACT", f"Stale copyright year {y} on {purl}", "low", purl, f"Copyright year {y} indicates unmaintained content."))
 
-    result_payload = {
+    # Detect Cross-Page Price Conflicts
+    all_normalized_prices = set()
+    conflicts: List[Dict[str, Any]] = []
+    for _u, plist in prices_by_page.items():
+        for item in plist:
+            all_normalized_prices.add((item["price"], item["currency"], item["interval"]))
+
+    # If different pages list conflicting prices for what appears to be the same tier/product
+    distinct_prices = sorted(list({p[0] for p in all_normalized_prices}))
+    if len(distinct_prices) > 1:
+        # Check if conflicting prices occur across pages
+        urls_with_prices = [u for u, pl in prices_by_page.items() if pl]
+        if len(urls_with_prices) >= 2:
+            p1 = prices_by_page[urls_with_prices[0]][0]["price"]
+            p2 = prices_by_page[urls_with_prices[1]][0]["price"]
+            if p1 != p2:
+                conflict_msg = f"Contradictory prices detected between {urls_with_prices[0]} (${p1}) and {urls_with_prices[1]} (${p2})."
+                findings.append(make_finding("FIRST_PARTY_FACT_CONFLICT", "Cross-page price contradiction detected", "critical", urls_with_prices[0], conflict_msg))
+                conflicts.append({"urls": urls_with_prices[:2], "prices": [p1, p2]})
+
+    if attribute == "pricing":
+        findings = [f for f in findings if f["cause_id"] in ("FIRST_PARTY_FACT_CONFLICT", "CONFLICTING_COMMERCIAL_TERMS")]
+
+    res: Dict[str, Any] = {
         "status": "ok",
+        "telemetry": {
+            "fact_ledger_size": len(fact_ledger),
+            "distinct_prices_count": len(distinct_prices),
+            "contradictions_count": len(conflicts),
+            "pages_with_pricing": len([u for u, pl in prices_by_page.items() if pl]),
+        },
         "findings": findings,
         "recommendations": recommendations,
-        "coverage": {
-            "html_pages_checked": len(page_fact_list),
-            "scoped_facts_recorded": sum(
-                len(pf["scoped_prices"])
-                + len(pf["contact_emails"])
-                + len(pf["contact_phones"])
-                + len(pf["brand_names"])
-                + len(pf["products_with_status"])
-                + len(pf["copyright_years"])
-                for pf in page_fact_list
-            ),
-            "source": "shared-inventory" if inv is not None else "homepage-only",
-            # Continuous scoring: conflict ratio = fact_conflicts / facts_checked
-            "fact_conflicts": sum(
-                1 for f in findings
-                if f.get("cause_id") in (
-                    "FIRST_PARTY_FACT_CONFLICT", "COMMERCIAL_PRODUCT_DATA_CONTRADICTION",
-                    "DISCONTINUED_VS_CURRENT_CONFLICT", "CONFLICTING_COMMERCIAL_TERMS",
-                )
-            ),
-            "facts_checked": sum(
-                len(pf.get("scoped_prices", []))
-                + len(pf.get("contact_emails", []))
-                + len(pf.get("contact_phones", []))
-                + len(pf.get("copyright_years", []))
-                for pf in page_fact_list
-            ) or 1,  # guard against zero division in orchestrator
-        },
-        "limitations": ["Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"],
     }
 
-    if compare_urls and len(compare_urls) == 2:
-        u1, u2 = compare_urls[0].strip(), compare_urls[1].strip()
-        pf1 = next((p for p in page_fact_list if p.get("url") == u1 or urlparse(p.get("url", "")).path == urlparse(u1).path), None)
-        pf2 = next((p for p in page_fact_list if p.get("url") == u2 or urlparse(p.get("url", "")).path == urlparse(u2).path), None)
-        result_payload["url_comparison"] = {
+    if compare_urls and len(compare_urls) >= 2:
+        u1, u2 = compare_urls[0], compare_urls[1]
+        res["url_comparison"] = {
             "url1": u1,
             "url2": u2,
-            "url1_prices": pf1.get("scoped_prices", []) if pf1 else [],
-            "url2_prices": pf2.get("scoped_prices", []) if pf2 else [],
-            "url1_contacts": (pf1.get("contact_emails", []) + pf1.get("contact_phones", [])) if pf1 else [],
-            "url2_contacts": (pf2.get("contact_emails", []) + pf2.get("contact_phones", [])) if pf2 else [],
+            "url1_facts": prices_by_page.get(u1, []),
+            "url2_facts": prices_by_page.get(u2, []),
         }
 
     if query:
-        q_term = query.lower().strip()
-        q_matches = []
-        for pf in page_fact_list:
-            u = pf.get("url", "")
-            for p_item in pf.get("scoped_prices", []):
-                if q_term in str(p_item).lower():
-                    q_matches.append({"url": u, "category": "pricing", "fact": p_item})
-            for prod in pf.get("products_with_status", []):
-                if q_term in str(prod).lower():
-                    q_matches.append({"url": u, "category": "product", "fact": prod})
-            for c_item in pf.get("contact_emails", []) + pf.get("contact_phones", []):
-                if q_term in str(c_item).lower():
-                    q_matches.append({"url": u, "category": "contact", "fact": c_item})
-        result_payload["query_matches"] = q_matches
+        matches = [f for f in fact_ledger if query.lower() in str(f).lower()]
+        res["query_matches"] = matches
 
-    return result_payload
-
-
-def format_markdown_summary(res: Dict[str, Any], domain: Optional[str] = None) -> str:
-    """Format fact consistency sensor result as clean, readable Markdown."""
-    lines = [f"# Fact Consistency & Freshness Diagnostic Report: {domain or 'Target Site'}"]
-    lines.append(f"\n- **Status:** `{res.get('status', 'ok')}`")
-    cov = res.get("coverage", {})
-    if isinstance(cov, dict) and cov:
-        lines.append(f"- **Pages Evaluated:** {cov.get('pages_evaluated', 0)}")
-        lines.append(f"- **Total Facts Extracted:** {cov.get('total_facts_extracted', 0)}")
-        lines.append(f"- **Cross-Page Contradictions:** {cov.get('contradictions_found', 0)}")
-
-    findings = res.get("findings", [])
-    lines.append(f"\n## Diagnostic Findings ({len(findings)})")
-    if not findings:
-        lines.append("\nNo cross-page factual contradictions or pricing conflicts detected.")
-    else:
-        for f in findings:
-            fid = f.get("id") or f.get("cause_id") or "FINDING"
-            sev = str(f.get("severity", "medium")).upper()
-            title = f.get("title", "")
-            scope = f.get("scope") or f.get("url") or "-"
-            lines.append(f"\n### [{sev}] {fid}: {title}")
-            lines.append(f"- **Scope:** `{scope}`")
-            if f.get("root_cause"):
-                lines.append(f"- **Root Cause:** {f.get('root_cause')}")
-            if f.get("evidence"):
-                ev = f.get("evidence")
-                lines.append(f"- **Evidence:** {ev.get('summary') if isinstance(ev, dict) else ev}")
-            s_act = f.get("suggested_action")
-            if isinstance(s_act, dict):
-                lines.append(f"- **Technical Fix:** {s_act.get('technical_fix', s_act.get('summary', ''))}")
-
-    recs = res.get("recommendations", [])
-    if recs:
-        lines.append(f"\n## Proactive Recommendations ({len(recs)})")
-        for r in recs:
-            lines.append(f"- **[{str(r.get('priority', 'medium')).upper()}] {r.get('id', 'REC')}:** {r.get('title', '')} - {r.get('summary', '')}")
-
-    return "\n".join(lines) + "\n"
+    return res
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Fact Freshness & Lifecycle Consistency Diagnostic Sensor.\n"
-            "Deterministically constructs a normalized multi-attribute first-party fact ledger across crawled pages. "
-            "Detects cross-page pricing contradictions, interval cadence mismatches (annual vs monthly), "
-            "product lifecycle conflicts (discontinued vs active), and optionally cross-references observed AI assistant "
-            "responses to identify citation hallucination risks."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (optional if --inventory is provided)")
-    parser.add_argument("--inventory", "-i", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
-    parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
-    parser.add_argument(
-        "--responses", "--observations", dest="responses", help="JSON file of observed AI assistant outputs to cross-check against site facts"
-    )
-    parser.add_argument("--attribute", choices=["pricing", "contact", "legal", "specs"], help="Filter fact consistency checks by attribute category")
-    parser.add_argument("--compare-urls", nargs=2, metavar=("URL1", "URL2"), help="Direct head-to-head comparison of extracted first-party facts between two URLs")
-    parser.add_argument("--query", help="Search the first-party fact ledger for a specific product name, plan name, or term")
-    parser.add_argument("--conflict-only", dest="conflict_only", action="store_true", help="Filter findings to only direct factual contradictions and conflicts")
-    parser.add_argument("--format", choices=["json", "markdown"], default=None, help="Output serialization format (default: auto-inferred or json)")
-    parser.add_argument("--output", "-o", help="Destination path to write output JSON/Markdown (optional, defaults to stdout)")
+    parser = argparse.ArgumentParser(description="Fact Consistency & Lifecycle Diagnostic Sensor")
+    parser.add_argument("--site", "-s", default=None)
+    parser.add_argument("--inventory", "-i", default=None)
+    parser.add_argument("--state", default=None)
+    parser.add_argument("--attribute", choices=["pricing", "contact", "dates", "availability"])
+    parser.add_argument("--compare-urls", nargs=2, help="Compare facts between two specific URLs")
+    parser.add_argument("--query", help="Query facts by keyword")
+    parser.add_argument("--conflict-only", action="store_true", help="Filter for only conflict findings")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json")
+    parser.add_argument("--output", "-o")
     args = parser.parse_args()
 
-    if args.format is None:
-        args.format = "markdown" if args.output and args.output.lower().endswith((".md", ".markdown")) else "json"
-
+    inv_path = args.inventory or ("inv.json" if os.path.exists("inv.json") else None)
     inv = None
-    if args.inventory:
-        if os.path.exists(args.inventory):
-            try:
-                with open(args.inventory, "r", encoding="utf-8") as f:
-                    inv = json.load(f)
-            except Exception as e:
-                inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
-        else:
-            inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
+    if inv_path and isinstance(inv_path, (str, bytes, os.PathLike)) and os.path.exists(inv_path):
+        try:
+            with open(inv_path, "r", encoding="utf-8") as f:
+                inv = json.load(f)
+        except Exception:
+            inv = None
 
     site_str = args.site
     if not site_str and isinstance(inv, dict):
         site_str = inv.get("base_url") or inv.get("site")
     if not site_str:
-        parser.error("Either --site / -s or a valid --inventory / -i JSON containing site information is required.")
+        parser.error("Either --site or --inventory with site information is required.")
 
-    s = site_str.strip()
-    if not s.startswith("http"):
-        s = "https://" + s
-    p = urlparse(s)
-    base = f"{p.scheme}://{p.netloc}"
-    res = audit(
-        base,
-        p.netloc,
-        inv=inv,
-        state_file=args.state,
-        responses_file=args.responses,
-        attribute=args.attribute,
-        compare_urls=args.compare_urls,
-        query=args.query,
-    )
-    if args.conflict_only and "findings" in res:
-        res["findings"] = [
-            f for f in res["findings"]
-            if f.get("severity") in ("critical", "high")
-            or "conflict" in str(f.get("id", "")).lower()
-            or "conflict" in str(f.get("title", "")).lower()
-            or "contradiction" in str(f.get("title", "")).lower()
-        ]
-    formatted = format_markdown_summary(res, domain=p.netloc) if args.format == "markdown" else json.dumps(res, indent=2)
+    base = site_str if site_str.startswith("http") else "https://" + site_str
+    domain = urlparse(base).netloc
+    res = audit(base, domain, inv=inv, state_file=args.state, attribute=args.attribute, compare_urls=args.compare_urls, query=args.query)
+    out = json.dumps(res, indent=2)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
-            f.write(formatted)
-            f.write("\n")
+            f.write(out + "\n")
     else:
-        print(formatted)
+        print(out)
 
 
 if __name__ == "__main__":

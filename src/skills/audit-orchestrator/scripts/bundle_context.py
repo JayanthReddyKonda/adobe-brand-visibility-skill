@@ -450,6 +450,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Bundle and compile relevant knowledge base context for a given target site."
     )
+    parser.add_argument("target_pos", nargs="?", default=None, metavar="TARGET", help="Target site, inventory JSON, or telemetry JSON (optional)")
     parser.add_argument("--site", "-s", default=None, help="Target site URL or domain (optional if inventory or telemetry is provided)")
     parser.add_argument("--inventory", "-i", help="Path to pre-crawled inv.json site inventory (optional)")
     parser.add_argument("--telemetry", "-t", help="Path to telemetry.json payload (optional)")
@@ -472,8 +473,24 @@ def main():
     if args.skills_dir:
         configure_skills_dir(args.skills_dir)
 
-    data_payload: Optional[Dict[str, Any]] = None
+    # Handle optional positional argument
+    if args.target_pos:
+        if "telemetry" in args.target_pos.lower() and not args.telemetry:
+            args.telemetry = args.target_pos
+        elif (args.target_pos.endswith(".json") or os.path.exists(args.target_pos)) and not args.inventory:
+            args.inventory = args.target_pos
+        elif not args.site:
+            args.site = args.target_pos
+
+    # Auto-detect telemetry.json or inv.json in cwd if source is omitted
     source_file = args.telemetry or args.inventory
+    if not source_file:
+        if os.path.exists("telemetry.json"):
+            source_file = "telemetry.json"
+        elif os.path.exists("inv.json"):
+            source_file = "inv.json"
+
+    data_payload: Optional[Dict[str, Any]] = None
     if source_file and os.path.exists(source_file):
         try:
             with open(source_file, "r", encoding="utf-8") as f:
@@ -483,6 +500,7 @@ def main():
 
     # Auto-extract site from data payload if omitted
     site = args.site
+
     if not site and isinstance(data_payload, dict):
         site = data_payload.get("base_url") or data_payload.get("site")
     if not site:

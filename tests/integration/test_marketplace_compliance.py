@@ -22,11 +22,11 @@ for p in (ORCH_DIR, SCRAPER_DIR, DISC_DIR, ENTITY_DIR):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from assemble_report import assemble, sort_tasks, validate_report
 from crawler.links import normalize, safe_path
 from crawler.robots import Robots
 from discoverability_check import audit as discoverability_audit
 from entity_content_check import audit as entity_audit
+from orchestrator import assemble, sort_tasks, validate_report
 from plan import plan
 
 from tests.fixtures.fixture_audit import run_synthetic_audit

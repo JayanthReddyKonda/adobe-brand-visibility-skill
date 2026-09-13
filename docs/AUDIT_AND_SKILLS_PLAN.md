@@ -70,13 +70,11 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 ### 3.1 `audit-orchestrator` (Master Coordinator & Synthesis Engine)
 - **Role:** Entrypoint skill. Coordinates the 7 specialist skills, runs the single-pass acquisition pipeline, aggregates telemetry, gates findings through the 6-Layer Causal DAG, and enforces Draft-07 JSON schema compliance.
 - **Scripts:**
-  - `orchestrator.py`: Main orchestration CLI supporting `--telemetry` (for AI agents), `--baseline-only` (for headless CI testing), and full causal synthesis.
-  - `audit.py`: Multi-stage execution pipeline supporting bounded `collect`, agent `finalize`, and `validate` commands with watchdog timeouts.
+  - `orchestrator.py`: Main orchestration CLI supporting `--telemetry` (for AI agents), `--baseline-only` (for headless CI testing), `--deliverable`, and full causal report synthesis.
   - `plan.py`: Remediation readiness calculator and mathematical priority ranking index:
     `priority_index = 5 * severity + (6 - difficulty)`
   - `bundle_context.py`: Site-specific context compiler extracting relevant knowledge base sections based on detected archetype and signals.
   - `causal_gate.py`: 6-Layer Causal DAG enforcing deterministic suppression of downstream symptoms when upstream blockers exist.
-  - `assemble_report.py`: Assembles final report data structures, computes Wilson 95% confidence intervals, and calculates summary metrics.
   - `validate_report.py`: Strict Draft-07 schema validator verifying output integrity.
 - **References:**
   - `checks.json`: Master 134-check domain catalogue with activation criteria, severity bands, and V/C/E/X remedy levels.
@@ -93,8 +91,7 @@ A common failure mode in AI agent tooling is creating monolithic scripts that ge
 - **Role:** Safely fetches, parses, and structures site inventories under zero-trust pre-socket SSRF protection.
 - **Scripts:**
   - `safe_fetch.py`: Socket-level pre-connect DNS TOCTOU resolution, subnet blocklists, bounded redirects (max 5), and hard size caps.
-  - `acquire_inventory.py`: Single-pass crawler orchestrating RFC 9309 robots.txt evaluation, sitemap discovery, page fetching, Trafilatura-grade HTML extraction, and JSON-LD parsing.
-  - `run_scraper.py`: Production CLI with JSON output (`inv.json`) and clean terminal Markdown tables.
+  - `acquire_inventory.py`: Single-pass crawler orchestrating RFC 9309 robots.txt evaluation, sitemap discovery, page fetching, Trafilatura-grade HTML extraction, JSON-LD parsing, and CLI interface.
   - `crawler/`: 16 pure-Python modules implementing RFC 9309 robots matrices across 16 AI retrieval and training bots, recursive sitemap parsing, clean Markdown extraction with SNR scoring, Schema.org JSON-LD graph flattening, streaming HTML parsing, and zero-trust SSRF defense.
 - **Enriched Acquisition Contract:**
   - Extracts interactive CTAs (`ctas`) with commercial intent classification (`is_commercial_cta`).

@@ -4,7 +4,7 @@ Covers:
 1. Validator URI format checking and composition keywords (const, allOf, anyOf, oneOf).
 2. Monotonic causal suppression scope awareness (preventing missing scope from causing site-wide suppression).
 3. Deterministic readiness scoring, dimension weighting, and grade calculation.
-4. Specialist sensor error tracking during collection in audit.py.
+4. Specialist sensor error tracking during collection in orchestrator.py.
 """
 
 import json
@@ -393,7 +393,7 @@ class TestSensorErrorTracking(unittest.TestCase):
 
     def test_execute_audit_sensors_records_exception(self):
         """If a sensor raises an exception, execute_audit_sensors must record it in sensor_errors."""
-        from audit import execute_audit_sensors
+        from orchestrator import execute_audit_sensors
 
         sensor_errors = []
         # Pass a deliberately malformed inv that will cause a downstream sensor to fail if invoked
@@ -418,9 +418,9 @@ class TestSensorErrorTracking(unittest.TestCase):
         self.assertEqual(report["audit_status"], "partial")
         self.assertIn("geo-content-audit", report["coverage"]["sensor_errors"])
 
-    def test_assemble_report_sets_partial_status_when_sensor_errors_present(self):
+    def test_orchestrator_assemble_sets_partial_status_when_sensor_errors_present(self):
         """assemble() must set audit_status to 'partial' when coverage contains sensor_errors."""
-        from assemble_report import assemble
+        from orchestrator import assemble
 
         candidates = []
         records = []
@@ -903,8 +903,8 @@ class TestFrescopaHardeningAndArchetype(unittest.TestCase):
         self.assertIn("Agent identified AI bot blockage", finding_titles)
 
     def test_assemble_produces_readiness_and_manifest(self):
-        """assemble_report.py assemble() must compute readiness and attach run_manifest."""
-        from assemble_report import assemble
+        """orchestrator.py assemble() must compute readiness and attach run_manifest."""
+        from orchestrator import assemble
 
         records = [
             {
@@ -956,9 +956,10 @@ class TestFrescopaHardeningAndArchetype(unittest.TestCase):
 
     def test_priority_ranking_order_and_justification(self):
         """Findings must be strictly ordered by priority_index with contiguous 1..N priority_rank."""
-        from assemble_report import assemble
+        from orchestrator import assemble
 
         records = [
+
             {
                 "artifact": "response-0001",
                 "url": "https://example.com/",

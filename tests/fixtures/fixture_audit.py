@@ -17,7 +17,7 @@ for p in (ORCH_DIR, SCRAPER_DIR):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from assemble_report import assemble
+from orchestrator import assemble
 
 PAGES: Dict[str, tuple[int, str, str]] = {
     "https://fixture.invalid/robots.txt": (200, "text/plain", "User-agent: *\nAllow: /"),

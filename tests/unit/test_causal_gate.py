@@ -477,7 +477,7 @@ class TestCausalGate(unittest.TestCase):
 
     def test_assemble_preserves_downstream_symptoms_and_proactive_actions(self):
         """assemble() must preserve downstream symptoms and emit Pre-Hydration Product Schema action."""
-        from assemble_report import assemble
+        from orchestrator import assemble
 
         candidates = [
             {

@@ -282,9 +282,14 @@ def main():
             data = f.read()
     else:
         if sys.stdin.isatty():
-            parser.print_help(sys.stderr)
-            sys.exit(2)
-        data = sys.stdin.read()
+            if os.path.exists("report.json"):
+                with open("report.json", "r", encoding="utf-8") as f:
+                    data = f.read()
+            else:
+                parser.print_help(sys.stderr)
+                sys.exit(2)
+        else:
+            data = sys.stdin.read()
 
     if not data.strip():
         print("Error: Empty JSON input received.", file=sys.stderr)

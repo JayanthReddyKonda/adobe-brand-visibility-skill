@@ -17,17 +17,17 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Canonical Single-Pass Acquisition** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Canonical `inv.json` site inventory | Orchestrator Pipeline Entrypoint |
-| **Autonomous Crawler (Standard Crawl)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json` | Canonical `inv.json` site inventory | Standalone Acquisition |
-| **Fast Snapshot Inspection (5 pages)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 5 --timeout 10.0 --output inv.json` | Bounded `inv.json` snapshot | Quick Health Check |
-| **Deep Link Traversal (depth 3)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --max-pages 25 --max-depth 3 --output inv.json` | Deep `inv.json` inventory | Catalog & Documentation Traversal |
-| **Strict Compliance Acquisition** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --strict-robots --output inv.json` | Bounded `inv.json` (aborts if entrypoint disallowed) | Policy Compliance Audit |
-| **Dual Serialization (JSON + Markdown)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --format both --output inv.json` | JSON inventory + extracted `.md` pages | Full Text Extraction |
+| **Autonomous Crawler (Standard Crawl)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json` | Canonical `inv.json` site inventory | Standalone Acquisition |
+| **Fast Snapshot Inspection (5 pages)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --max-pages 5 --timeout 10.0 --output inv.json` | Bounded `inv.json` snapshot | Quick Health Check |
+| **Deep Link Traversal (depth 3)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --max-pages 25 --max-depth 3 --output inv.json` | Deep `inv.json` inventory | Catalog & Documentation Traversal |
+| **Strict Compliance Acquisition** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --strict-robots --output inv.json` | Bounded `inv.json` (aborts if entrypoint disallowed) | Policy Compliance Audit |
+| **Dual Serialization (JSON + Markdown)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --format both --output inv.json` | JSON inventory + extracted `.md` pages | Full Text Extraction |
 | **Zero-Trust URL & SSRF Probe** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com --check-only` | Status code, latency, and SSRF safety verdict | Direct URL & Network Probe |
 | **Targeted Route Header Probe** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com/route --headers-only` | Headers, server, content-type, SSRF safety | Route Metadata Probe |
 | **Zero-Trust Clean Text Extraction** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com/route --extract-text` | Extracted readable text, SNR, word count, headings | Live Route Content Extraction |
 
 > **Sensor-Brain Protocol Mandate:**
-> - **Clean Skill Isolation:** This skill is strictly isolated to single-pass inventory acquisition and zero-trust SSRF fetching. Only this skill invokes `scripts/acquire_inventory.py`, `scripts/run_scraper.py`, and `scripts/safe_fetch.py`.
+> - **Clean Skill Isolation:** This skill is strictly isolated to single-pass inventory acquisition and zero-trust SSRF fetching. Only this skill invokes `scripts/acquire_inventory.py` and `scripts/safe_fetch.py`.
 > - **Helper Sensor (Acquisition Telemetry Only):** `web-scraper` executes bounded, single-pass website acquisition emitting canonical `inv.json`. It enforces socket-level SSRF validation, parses robots.txt across 16 AI bots, traverses sitemaps, and extracts clean markdown. It reports only acquisition telemetry and does NOT recommend fixes, assign severities, or perform cognitive reasoning.
 > - **LLM Cognitive Generation:** All downstream specialist skills and the Master Orchestrator run offline against `inv.json`, requesting relevant telemetry from sensors while the LLM generates the complete audit report.
 
@@ -38,7 +38,7 @@ allowed-tools:
 > [!CAUTION]
 > **ZERO DIRECT AGENT URL READING MANDATE:**
 > You MUST NEVER use built-in web reading tools (`read_url_content`, `open_browser_url`, `browser_subagent`) or manual `curl`/`wget` to inspect websites or robots.txt.
-> All acquisition must flow through `python3 skills/web-scraper/scripts/acquire_inventory.py` or `run_scraper.py` to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
+> All acquisition must flow through `python3 skills/web-scraper/scripts/acquire_inventory.py` to guarantee socket-level zero-trust SSRF protection, complete Schema.org JSON-LD parsing, and single-pass canonical inventory generation.
 
 ---
 
@@ -84,8 +84,7 @@ Every script and reference in this skill serves a distinct, critical role:
 
 | Path | Type | Purpose & Agent Calling Role |
 |---|---|---|
-| `scripts/acquire_inventory.py` | Standalone Script | Canonical entrypoint used by `audit-orchestrator` to acquire `inv.json` with infrastructure stats. |
-| `scripts/run_scraper.py` | CLI Tool | Autonomous crawler with custom arguments (`--max-pages`, `--max-depth`, `--strict-robots`, `--format`). |
+| `scripts/acquire_inventory.py` | Standalone Script | Canonical crawler and entrypoint to acquire `inv.json` with full frontier control (`--max-pages`, `--max-depth`, `--timeout`, `--strict-robots`, `--format`). |
 | `scripts/safe_fetch.py` | Network Core | Shared zero-trust SSRF network engine enforcing DNS pre-resolution, private IP blocking, streaming chunk caps, and redirect re-validation. |
 | `scripts/crawler/engine.py` | Engine Core | Consolidated high-performance crawl engine uniting RFC 9309 robots auditing, XML sitemap traversal, streaming HTML parsing, Trafilatura-grade Markdown extraction, Schema.org JSON-LD normalization, frontier management, and evidence modeling. |
 | `scripts/crawler/__init__.py` | Package API | Re-exports public crawler API and provides dynamic module virtualization for full backwards compatibility. |
@@ -126,14 +125,14 @@ Read the specialist reference files using your native file reading capabilities 
 
 ### Step 2: Execute Single-Pass Acquisition
 
-Execute the canonical single-pass acquisition script used by `audit-orchestrator`:
+Execute single-pass acquisition:
 ```bash
 python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com -o inv.json --max-pages 15 --timeout 30 --concurrency 2
 ```
 
-Or execute the autonomous scraper CLI with custom frontier settings:
+Or execute with custom crawl and frontier settings:
 ```bash
-python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
+python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --max-pages 25 --max-depth 3 --strict-robots --output inv.json
 ```
 
 The scraper performs the following deterministic steps internally:

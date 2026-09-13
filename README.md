@@ -172,24 +172,21 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 The AI agent reasons over telemetry, applies the Causal DAG, and synthesizes the final report with cryptographic provenance (`run_manifest`).
 
 
-### Interface 2: Contract-Driven Multi-Pass Audit (`audit.py`)
+### Interface 2: Concise Production Deliverable & Auto-Detection (`orchestrator.py`)
 
 ```bash
-# 1. Bounded single-pass collection & baseline report emission (bounded to 160s)
-python3 skills/audit-orchestrator/scripts/audit.py collect https://example.com --out output/audit
+# 1. Zero-friction deliverable generation (auto-detects inv.json and review.json)
+python3 skills/audit-orchestrator/scripts/orchestrator.py --deliverable -o report.json
 
-# 2. Agent semantic finalization composing collected evidence with review.json
-python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review output/audit/review.json --out output/audit/final-report.json
-
-# 3. Validate final report against Draft-07 schema
-python3 skills/audit-orchestrator/scripts/audit.py validate output/audit/final-report.json
+# 2. Validate final report against Draft-07 schema
+python3 skills/audit-orchestrator/scripts/validate_report.py report.json
 ```
 
 ### Interface 3: Modular Specialist Sensor Invocations
 
 ```bash
 # 1. Acquire site inventory via single-pass web scraper under zero-trust SSRF
-python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
+python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 
 # 2. Execute specialist sensors against inv.json offline
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
@@ -276,7 +273,7 @@ adobe-brand-visibility-skill/
 │   └── skills/                      # 8 skills
 │       ├── audit-orchestrator/      # Entrypoint coordinator & Sensor-Brain synthesis
 │       │   ├── SKILL.md             # Agent reasoning runbook with Anti-Shortcut Directive
-│       │   ├── scripts/             # orchestrator.py, audit.py, assemble_report.py, causal_gate.py, validate_report.py
+│       │   ├── scripts/             # orchestrator.py, causal_gate.py, validate_report.py, bundle_context.py, plan.py
 │       │   └── references/          # report-schema.json, knowledge-base.md, checks.md, checks.json, core-synthesis-digest.md
 │       ├── web-scraper/             # Autonomous SSRF-safe crawler
 │       │   ├── scripts/safe_fetch.py    # Canonical zero-trust SSRF fetcher

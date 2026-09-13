@@ -25,7 +25,6 @@ allowed-tools:
 | **Remediation Priority Roadmap (JSON)** | `python3 skills/audit-orchestrator/scripts/plan.py -i report.json --top 5 -o plan.json` | Ranked JSON Roadmap with Priority Index | Remediation Planning (JSON) |
 | **Remediation Priority Roadmap (Markdown)**| `python3 skills/audit-orchestrator/scripts/plan.py -i report.json --top 5 -o plan.md` | Ranked Markdown Implementation Roadmap | Remediation Planning (Markdown) |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py -i inv.json -o sensor.json` | Specialist Domain Measurements | Targeted Deep Inspection |
-| **Headless CI Runner (Automated Testing ONLY)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --baseline-only` | Baseline Draft-07 Validated Report JSON | **CI/CD Only (No Agent Shortcut)** |
 | **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py report.json` | Exit Code 0 (pass) or non-zero (fail) | Verification Gate |
 
 > [!IMPORTANT]
@@ -78,7 +77,6 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 - **`--output`** (string, optional): Path to write final JSON report or telemetry payload (defaults to stdout).
 - **`--skills`** (string, optional, `orchestrator.py`): Comma-separated list of specialist skills to execute (e.g. `discoverability,entity,geo,engagement`).
 - **`--telemetry`** (flag, optional): Emits raw aggregated empirical sensor measurements for cognitive synthesis.
-- **`--baseline-only`** (flag, optional): Emits automated baseline report directly (strictly reserved for automated CI/CD suites).
 - **`--clean`** (flag, optional, `orchestrator.py`): Emits a concise, high-signal Draft-07 deliverable report focused strictly on prioritized findings, readiness scores, and actionable engineering/copywriting remediations (omits internal runtime pipeline traces).
 - **`--format`** (enum, optional, default: `json`): Output serialization format.
 - **`--archetype`** (enum, optional, `bundle_context.py`): Explicit business archetype context (`ecommerce`, `saas`, `publisher`, `local_business`, `corporate`).
@@ -86,7 +84,7 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 - **`--findings`** (string, optional, `causal_gate.py`): Path to findings JSON file to apply causal suppression rules.
 - **`--finding` / `--rule`** (string, optional, `plan.py`): Path or inline JSON for single finding / rule difficulty calculation.
 - **`--rank-findings`** (string, optional, `plan.py`): JSON string or file path of findings to sort and rank by DAG hierarchy and priority index.
-- **`--candidates` / `--artifacts` / `--rules`** (string, optional, `assemble_report.py`): Inputs for low-level standalone report assembly.
+- **`--deliverable`** (flag, optional, `orchestrator.py`): Convenience flag combining `--clean` and `--include-scores` to emit executive-ready deliverables in one step.
 
 ---
 
@@ -96,13 +94,11 @@ Every script and reference in this skill serves a distinct, critical orchestrati
 
 | Path | Type | Purpose & Agent Calling Role |
 |---|---|---|
-| `scripts/orchestrator.py` | Master Script | Entrypoint coordinating crawler and all 6 specialist sensors, aggregating empirical telemetry (`--telemetry`), ingesting agent review findings (`--review`), and synthesizing Draft-07 reports (with optional `--clean`). |
+| `scripts/orchestrator.py` | Master Script | Canonical entrypoint coordinating crawler and all 6 specialist sensors, aggregating empirical telemetry (`--telemetry`), ingesting agent review findings (`--review`), and synthesizing Draft-07 reports (with optional `--deliverable` or `--clean`). |
 | `scripts/bundle_context.py` | CLI Tool | Dynamic context compiler extracting archetype-tailored rules, Schema.org templates, and research cheatsheets based on site signals. Verified with SHA-256 reference checksums. |
 | `scripts/plan.py` | CLI Tool | Task priority calculator computing `priority_index = 5 * severity + (6 - difficulty)` and ranking findings roadmap. |
 | `scripts/causal_gate.py` | Standalone CLI | 6-Layer Causal DAG engine evaluating epistemic states, causal node graph, and applying deterministic defect suppression. |
-| `scripts/assemble_report.py` | Standalone CLI | Unified evidence gate, cause-scoped deduplication, queue ordering, readiness scoring, and report assembler. |
 | `scripts/validate_report.py` | CLI Tool | Strict Draft-07 JSON Schema validator supporting `--schema` for both `report-schema.json` and `telemetry-schema.json`. |
-| `scripts/audit.py` | Multi-Sensor Runner | Sensor executor mapping raw sensor findings directly to research check IDs in `checks.json`, providing `collect`, `finalize`, and `validate` subcommands with `run_manifest` tracking. |
 | `references/checks.json` | Master Catalogue | Authoritative 134-check catalogue with detection conditions, activation criteria, reference bands, and V/C/E/X remedy levels. |
 | `references/checks.md` | Reference Catalogue | Human-readable master diagnostic check procedures across all 8 AI visibility domains. |
 | `references/core-synthesis-digest.md` | Reference Digest | Concise executive reference (< 2,500 tokens) on the 6-Layer Causal DAG, scoring math, and 9 Princeton GEO vectors. |
@@ -288,7 +284,7 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
    - Never duplicate defect findings in proactive actions.
    - Ensure all JSON string fields are clean prose or semicolon-delimited (` ; `). Never embed literal newlines (`\n\n`), raw Markdown tables (`| Col | Col |`), or raw HTML tags inside JSON strings.
 
-6. **Unified Report Synthesis via CLI (`--review` or `audit.py finalize`):**
+6. **Unified Report Synthesis via CLI (`--review` or `--deliverable`):**
    - Save agent candidate findings and proactive actions into `review.json`:
 
    > [!IMPORTANT]
@@ -352,11 +348,11 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
     # Emits schema-validated deliverable stripped of internal runtime pipeline debug data
     python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --clean --output report.json
 
-    # Option C: Finalize via unified multi-sensor runner
-    python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review review.json --out report.json
+    # Option C: Production Deliverable with Scores
+    python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --deliverable -o report.json
     ```
 
-    All options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, and causal gating. Adding `--clean` emits only the high-signal findings, summary, and proactive actions required for engineering and executive execution, omitting ambiguous heuristic scores and pipeline debug traces (pass `--include-scores` if heuristic scoring is explicitly required).
+    All options execute the unified report synthesis engine (`orchestrator.py::synthesize_audit_report()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, and causal gating. Adding `--clean` emits only the high-signal findings, summary, and proactive actions required for engineering and executive execution, omitting ambiguous heuristic scores and pipeline debug traces (pass `--include-scores` if heuristic scoring is explicitly required).
 
 
 
