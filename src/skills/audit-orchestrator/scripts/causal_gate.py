@@ -38,6 +38,8 @@ TAXONOMY_ALIASES: Dict[str, str] = {
     "INTENT_TO_LANDING_MISMATCH": "COMMERCIAL_HANDOFF_DISCONTINUITY",
     "ABOVE_FOLD_ACTION_DELAY": "CTA_REACHABILITY_FRICTION",
     "CTA_REACHABILITY_FRICTION": "ABOVE_FOLD_ACTION_DELAY",
+    "DELAYED_COMMERCIAL_CALL_TO_ACTION": "CTA_REACHABILITY_FRICTION",
+    "INERT_CTA_TARGET": "CTA_REACHABILITY_FRICTION",
     "TEMPORAL_DRIFT_DETECTED": "CONTENT_RECENCY_DEFICIT",
     "CONTENT_RECENCY_DEFICIT": "TEMPORAL_DRIFT_DETECTED",
     "ROBOTS_SITEWIDE_DISALLOW": "AI_RETRIEVAL_BLOCKED",
@@ -170,6 +172,8 @@ SUPPRESSED_BY_LAYER1: Set[str] = {
     # Layer 5 & 6 — Engagement, Orientation & Referral Continuity (cannot measure CTAs or headings on unrendered DOM)
     "CTA_REACHABILITY_FRICTION",
     "ABOVE_FOLD_ACTION_DELAY",
+    "DELAYED_COMMERCIAL_CALL_TO_ACTION",
+    "INERT_CTA_TARGET",
     "VIEWPORT_ANSWER_ABSENCE",
     "AGENT_INTERACTION_BARRIER",
     "INTENT_TO_LANDING_MISMATCH",
@@ -472,11 +476,15 @@ def apply_causal_suppression(
         if isinstance(p, dict):
             p_url = str(p.get("url", "")).strip().lower()
             wc = int(p.get("word_count") or 0)
-            snr = float(p.get("snr") or 1.0)
+            snr = float(p["snr"]) if p.get("snr") is not None else 1.0
             html = str(p.get("html", "")).lower()
-            # High-confidence SPA shell detection requiring BOTH structural markers AND ultra-thin content
-            has_spa_marker = any(m in html for m in ('id="root"', 'id="app"')) and ('type="module"' in html or '<noscript>' in html)
-            if p_url and ((wc < 25 and wc > 0 and has_spa_marker) or (snr < 0.03 and wc < 30 and has_spa_marker)):
+            # High-confidence SPA shell detection requiring structural markers OR ultra-thin content (<25 words)
+            has_spa_marker = (
+                any(m in html for m in ('id="root"', 'id="app"', '@dropins', 'storefront-', 'scripts/aem.js', '__next', 'nuxt'))
+                or ('type="module"' in html and wc < 30)
+                or '<noscript>' in html
+            )
+            if p_url and ((wc < 25 and has_spa_marker) or (snr < 0.03 and wc > 0 and wc < 30)):
                 rendering_gap_pages.add(p_url)
 
     has_any_finding_scope = any(bool(extract_finding_route(f)) for f in all_raw_findings)
@@ -575,12 +583,29 @@ def apply_causal_suppression(
             downstream_symptoms_by_cause.setdefault(primary_l0, []).append(symptom_label)
             continue
 
-        # Evaluate Layer 1 rendering gap suppression
+        # Evaluate Layer 1 rendering gap suppression with route-level pruning
         suppress_l1 = False
-        if bool(cids.intersection(SUPPRESSED_BY_LAYER1)) and (
-            is_site_wide_rendering_gap or (f_route and any(routes_match(f_route, gap_p) for gap_p in rendering_gap_pages))
-        ):
-            suppress_l1 = True
+        if bool(cids.intersection(SUPPRESSED_BY_LAYER1)):
+            aff_urls = f.get("affected_urls")
+            if isinstance(aff_urls, list) and aff_urls and rendering_gap_pages:
+                unrendered_on_f = [u for u in aff_urls if any(routes_match(str(u), gap_p) for gap_p in rendering_gap_pages)]
+                if unrendered_on_f:
+                    remaining_urls = [u for u in aff_urls if not any(routes_match(str(u), gap_p) for gap_p in rendering_gap_pages)]
+                    if not remaining_urls or is_site_wide_rendering_gap:
+                        suppress_l1 = True
+                    else:
+                        # Prune unrendered routes from finding and record as downstream symptom
+                        f_copy = dict(f)
+                        f_copy["affected_urls"] = remaining_urls
+                        if f_route and any(routes_match(f_route, gap_p) for gap_p in rendering_gap_pages):
+                            f_copy["scope"] = remaining_urls[0]
+                        f = f_copy
+                        primary_l1 = layer1_findings[0].get("cause_id") or "RENDERED_CONTENT_GAP" if layer1_findings else "RENDERED_CONTENT_GAP"
+                        sym_cid1 = f.get("cause_id") or next((c for c in cids if not c.startswith("F-")), "DEFECT")
+                        symptom_label = f"{sym_cid1}: {f.get('title', '')} (pruned unrendered routes: {', '.join(unrendered_on_f)})"
+                        downstream_symptoms_by_cause.setdefault(primary_l1, []).append(symptom_label)
+            elif is_site_wide_rendering_gap or (f_route and any(routes_match(f_route, gap_p) for gap_p in rendering_gap_pages)):
+                suppress_l1 = True
 
         if suppress_l1:
             suppressed.append(f)

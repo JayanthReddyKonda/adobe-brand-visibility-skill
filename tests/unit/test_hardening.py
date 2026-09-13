@@ -1326,6 +1326,136 @@ class TestStreamlinedInvocation(unittest.TestCase):
         llms_actions = [p for p in report.get("proactive_actions", []) if "llms.txt" in p.get("title", "").lower() or "llms.txt" in p.get("summary", "").lower()]
         self.assertEqual(len(llms_actions), 1)
 
+    def test_report_defects_hardening_and_review_dedup(self):
+        """Verify report defect fixes: keyword deduplication, Layer 2 subsumption, unpadded proactive actions, and zero Princeton strings."""
+        import orchestrator
+        site = "https://example.com"
+        inv = {
+            "site": site,
+            "pages": [
+                {"url": "https://example.com/", "word_count": 100, "snr": 0.5, "status": 200, "html": "<html><body>Home</body></html>"},
+                {"url": "https://example.com/unrendered", "word_count": 0, "snr": 0.01, "status": 200, "html": '<div id="root"></div><script type="module" src="/aem.js"></script>'},
+            ],
+        }
+        specialist_results = {
+            "geo-content-audit": {
+                "status": "ok",
+                "findings": [
+                    {
+                        "id": "GEO-001",
+                        "cause_id": "EXCESSIVE_KEYWORD_DENSITY",
+                        "title": "Keyword 'coffee' density 4.8% exceeds threshold",
+                        "severity": "medium",
+                        "category": "geo_content",
+                        "scope": "https://example.com/",
+                        "evidence": "Term 'coffee' appears 48 times.",
+                    }
+                ],
+            },
+            "corroboration-authority-audit": {
+                "status": "ok",
+                "findings": [
+                    {
+                        "id": "CORROB-001",
+                        "cause_id": "CLAIM_CORROBORATION_GAP",
+                        "title": "Zero sameAs links found in structured data",
+                        "severity": "high",
+                        "category": "corroboration",
+                        "scope": "https://example.com/",
+                        "evidence": "No sameAs links found.",
+                    }
+                ],
+            },
+            "engagement-context-audit": {
+                "status": "ok",
+                "findings": [
+                    {
+                        "id": "ENG-001",
+                        "cause_id": "CTA_REACHABILITY_FRICTION",
+                        "title": "Call to action absent above fold",
+                        "severity": "medium",
+                        "category": "engagement",
+                        "scope": "https://example.com/unrendered",
+                        "affected_urls": ["https://example.com/unrendered"],
+                        "evidence": "No CTA found on unrendered route.",
+                    }
+                ],
+            },
+        }
+        review = {
+            "archetype": "ecommerce",
+            "findings": [
+                {
+                    "cause_id": "EXCESSIVE_KEYWORD_DENSITY",
+                    "title": "Excessive density of coffee keyword undermines citation credibility",
+                    "severity": "medium",
+                    "category": "geo_content",
+                    "scope": "https://example.com/",
+                    "evidence": "Keyword density for coffee is 4.8%.",
+                    "root_cause": "Editorial keyword stuffing.",
+                    "suggested_action": {
+                        "summary": "Diversify lexical choices.",
+                        "technical_fix": "Replace redundant occurrences.",
+                        "creative_fix": "Use varied descriptive terms.",
+                        "priority": "medium",
+                        "verification": "Check keyword density < 2.5%.",
+                    },
+                },
+                {
+                    "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+                    "title": "Absence of Schema.org Organization structured data",
+                    "severity": "critical",
+                    "category": "entity_content",
+                    "scope": "https://example.com/",
+                    "evidence": "No Organization schema present.",
+                    "root_cause": "Missing machine identity.",
+                    "suggested_action": {
+                        "summary": "Deploy Organization JSON-LD.",
+                        "technical_fix": "Add Schema.org Organization.",
+                        "creative_fix": "Standardize brand name.",
+                        "priority": "critical",
+                        "verification": "Validate with Rich Results Test.",
+                    },
+                },
+            ],
+            "proactive_actions": [
+                {
+                    "id": "P-001",
+                    "title": "Deploy Machine-Readable Discovery Manifest (/llms.txt)",
+                    "category": "discoverability",
+                    "summary": "Structure /llms.txt with BLUF passages and clear navigation links.",
+                    "priority": "medium",
+                }
+            ],
+        }
+
+        report = orchestrator.synthesize_audit_report(site, inv, specialist_results, review=review)
+        findings = report.get("findings", [])
+
+        # 1. Keyword density finding is deduplicated (exactly 1 finding, agent title preserved)
+        kw_findings = [f for f in findings if f.get("cause_id") == "EXCESSIVE_KEYWORD_DENSITY"]
+        self.assertEqual(len(kw_findings), 1)
+        self.assertIn("undermines citation credibility", kw_findings[0]["title"])
+
+        # 2. Corroboration finding is causally subsumed into MATERIAL_ENTITY_AMBIGUITY downstream symptoms
+        corrob_findings = [f for f in findings if f.get("cause_id") == "CLAIM_CORROBORATION_GAP"]
+        self.assertEqual(len(corrob_findings), 0)
+        entity_findings = [f for f in findings if f.get("cause_id") == "MATERIAL_ENTITY_AMBIGUITY"]
+        self.assertEqual(len(entity_findings), 1)
+        self.assertTrue(any("CLAIM_CORROBORATION_GAP" in s for s in entity_findings[0].get("downstream_symptoms", [])))
+
+        # 3. Unrendered route engagement finding is suppressed by Layer 1 rendering gap
+        eng_findings = [f for f in findings if f.get("cause_id") == "CTA_REACHABILITY_FRICTION"]
+        self.assertEqual(len(eng_findings), 0)
+
+        # 4. Agent proactive actions are NOT padded to 5 when agent provides curated list
+        self.assertEqual(len(report.get("proactive_actions", [])), 1)
+
+        # 5. Prohibited Princeton strings are absent across the entire report
+        report_json_str = json.dumps(report)
+        self.assertNotIn("Princeton KDD 2024", report_json_str)
+        self.assertNotIn("AutoGEO", report_json_str)
+
 
 if __name__ == "__main__":
     unittest.main()

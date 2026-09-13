@@ -212,12 +212,7 @@ Every final report conforms to Draft-07 JSON Schema with priority-ranked finding
       },
       "affected_urls": [
         "https://example.com/subscription"
-      ],
-      "priority_rank": 1,
-      "priority_justification": "Rank #1: Critical commercial answerability blocker that prevents AI shopping assistants from quoting accurate terms.",
-      "dag_node": "ENTITY",
-      "priority_index": 24,
-      "difficulty": 2
+      ]
     }
   ],
   "proactive_actions": [

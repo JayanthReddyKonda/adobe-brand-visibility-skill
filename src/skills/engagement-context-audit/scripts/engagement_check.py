@@ -381,7 +381,7 @@ def make_finding(cause_id: str, title: str, severity: str, scope: str, evidence:
         "confidence": "high",
         "scope": scope,
         "evidence": {"summary": ev_summary, "sources": [{"url": scope, "observation": ev_summary}]},
-        "root_cause": root_cause or f"Defect detected: {title}",
+        "root_cause": root_cause or f"Empirical telemetry identified {title.lower()} on target scope.",
         "impact": f"Degrades post-citation visitor orientation and conversion: {title}",
         "suggested_action": {
             "summary": f"Remediate {cause_id} on {scope}",
