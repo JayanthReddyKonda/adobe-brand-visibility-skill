@@ -821,9 +821,9 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
     if not llms_content and not inv:
         try:
             llms_u = f"{base.rstrip('/')}/llms.txt"
-            st_l, _, b_l = safe_fetch(llms_u, max_bytes=65536, timeout=4)
+            st_l, b_l, _, _ = safe_fetch(llms_u, max_bytes=65536, timeout=4)
             if st_l == 200 and b_l:
-                llms_content = b_l.decode("utf-8", errors="ignore")
+                llms_content = b_l
         except Exception:
             pass
 

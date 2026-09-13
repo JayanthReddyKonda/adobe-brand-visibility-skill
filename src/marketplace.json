@@ -1,7 +1,7 @@
 {
   "name": "brand-ai-readiness-audit",
   "version": "2.1.0",
-  "description": "Comprehensive Brand AI-Readiness, Generative Engine Optimization (GEO), and AI Search Visibility multi-skill audit suite for ChatGPT Search, Claude Search, Perplexity Pro, and Google AI Overviews.",
+  "description": "Audit a website for AI-discoverability and on-site engagement problems — crawlability, JS-render gaps, missing/invalid structured data, facts locked in non-text, stale or uncorroborated facts, entity ambiguity, weak on-site orientation / no context retention — and produce a report of findings with evidence and severity, plus prioritized actionable fixes and proactive improvements. Entrypoint skill composes specialist sensors across the marketplace into a unified Draft-07 audit report.",
   "skills": [
     {
       "id": "audit-orchestrator",

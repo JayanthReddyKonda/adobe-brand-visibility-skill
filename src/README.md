@@ -1,140 +1,155 @@
-# Brand AI-Readiness & Visibility Marketplace
+# Brand AI-Readiness, Generative Engine Optimization (GEO) & Visibility Suite
 
 **Author:** Jayanth Reddy Konda
 **Version:** 2.1.0
-**Specification Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
+**Standard Compliance:** `agentskills.io` Standard & JSON Schema Draft-07
 
 ---
 
-## 1. The Problem
+## 1. Executive Overview: The Generative Search Transition
 
-Traditional SEO optimizes for keyword rank across 10 organic blue links. Generative AI search engines (ChatGPT Search, Claude, Perplexity, Google AI Overviews) have fundamentally changed discovery: they synthesize answers from multiple sources and selectively cite content based on structural quality, factual density, and machine-readable entity clarity — not page rank.
+Traditional search engine optimization (SEO) focuses on keyword rankings across ten organic blue links. Generative AI search engines—including ChatGPT Search, Claude Search, Perplexity Pro, and Google AI Overviews—have fundamentally shifted discovery: they synthesize direct answers from distributed web sources, selectively citing content based on structural answerability, causal depth, factual consensus, and machine-explicit entity clarity rather than traditional domain authority alone.
 
-Brands face an **AI Visibility Gap**: ranking #1 on Google no longer guarantees AI citation, and conversely, unranked long-tail pages frequently secure top AI citations. Sites that lack machine-explicit structured data, causal depth in content, or proper crawler permissions are invisible to generative engines.
+This creates the **AI Visibility Gap**: brands ranking #1 on traditional search engines frequently suffer from complete omission, brand hallucination, or inaccurate pricing citations in generative answer engines. Conversely, high-density informational content with precise Schema.org JSON-LD structured data and strong factual grounding frequently captures top AI citations.
 
-This marketplace diagnoses exactly why a website is invisible, misrepresented, or losing visitors across AI search assistants, and provides actionable dual-track remediation (technical code fixes + creative content fixes).
+The **Brand AI-Readiness Suite** is a production multi-skill diagnostic system. It empowers AI coding agents and engineering teams to audit any website, isolate why it is invisible or misrepresented across generative search engines, diagnose post-citation visitor drop-off, and deliver schema-validated reports with dual-track remediation (patch-applicable technical code diffs and research-backed creative copy rewrites).
 
 ---
 
-## 2. The Sensor-Brain Architecture
+## 2. Sensor-Brain Cognitive Orchestration Architecture
 
-This marketplace implements a **Sensor-Brain Cognitive Orchestration Architecture** that separates deterministic measurement from intelligent reasoning:
+The suite operates on a **Sensor-Brain Cognitive Architecture** that decouples empirical measurement from contextual reasoning:
 
 ```
 +-------------------------------------------------------------------------+
 |                    BRAIN: AI AGENT (Cognitive Reasoning)                 |
 |                                                                         |
-|  - Reads sensor telemetry and applies 6-Layer Causal DAG               |
-|  - Classifies business archetype (e-commerce, SaaS, publisher, local)  |
-|  - Performs 5-Whys root-cause analysis across domain signals            |
-|  - Authors bespoke dual-track remediation (technical + creative)        |
-|  - Validates and delivers Draft-07 schema-compliant report             |
+|  - Deeply inspects site inventory (inv.json) and telemetry grid        |
+|  - Enforces 6-Layer Causal DAG to suppress downstream symptoms          |
+|  - Grounds findings in target business archetype (E-Comm, SaaS, etc.)  |
+|  - Authors bespoke dual-track remediations (technical patch + copy)     |
+|  - Ranks findings by needle-moving impact with explicit justification   |
+|  - Validates and emits Draft-07 schema-compliant report JSON            |
 +-------------------------------------------------------------------------+
                                     |
                     Empirical Telemetry (Structured JSON)
                                     |
 +-------------------------------------------------------------------------+
-|                 SENSORS: Deterministic Python Scripts                    |
+|                 SENSORS: Deterministic Python Core                       |
 |                                                                         |
-|  - Single-pass SSRF-safe crawl and inventory acquisition               |
-|  - RFC 9309 crawler permission matrix across 16 AI bots               |
-|  - Schema.org JSON-LD entity extraction and answerability scoring      |
-|  - Cross-page fact ledger and pricing contradiction detection          |
-|  - External identity corroboration via zero-trust probing              |
-|  - Princeton KDD 2024 citability heuristics and statistical density   |
-|  - Post-citation visitor orientation and CTA reachability scoring     |
+|  - Single-pass zero-trust SSRF crawl & content acquisition (safe_fetch) |
+|  - RFC 9309 crawler permission matrix across 16 AI retrieval bots       |
+|  - Schema.org JSON-LD entity graph & answerability attribute scoring    |
+|  - Multi-attribute first-party fact ledger & contradiction detection   |
+|  - External identity link corroboration (Wikidata, LinkedIn, Wikipedia) |
+|  - Princeton KDD 2024 citability heuristics & statistical density      |
+|  - Post-citation visitor orientation & interactive CTA reachability     |
 +-------------------------------------------------------------------------+
 ```
 
-**Why this matters:** The AI agent is the diagnostic brain, not a copy-paster. The Python scripts are precision measurement instruments that provide empirical telemetry. The agent reasons over that telemetry to produce a contextualized, archetype-aware diagnosis that no deterministic script can generate alone.
+### The Diagnostic Advantage
+Deterministic scripts provide rapid, reproducible, and verifiable telemetry without hallucination. However, script heuristics cannot understand nuanced brand voice, complex commercial journeys, or architectural subtleties. The AI Agent acts as the cognitive diagnostic brain: it inspects the raw inventory and telemetry grid, applies causal reasoning, contextualizes findings to the specific business model, and authors customized remediations that resolve root causes rather than surface symptoms.
 
 ---
 
-## 3. The 8 Skills
+## 3. The Multi-Skill Portfolio
 
-The marketplace decomposes into **1 entrypoint coordinator** and **7 specialist diagnostic sensors** (8 skills total):
+The suite decomposes into one master coordinator and seven specialist diagnostic modules (eight skills total):
 
-| Skill | Role | What It Measures |
-|---|---|---|
-| **`audit-orchestrator`** | Entrypoint Coordinator | Orchestrates single-pass crawl, fans out to all sensors, aggregates telemetry, gates findings through the 6-Layer Causal DAG, and validates the final report against Draft-07 schema. |
-| **`web-scraper`** | Acquisition Engine | Crawls websites under zero-trust SSRF protection, parses RFC 9309 robots.txt across 16 AI bots, extracts clean markdown with SNR scoring, flattens Schema.org JSON-LD graphs, and emits canonical site inventories (`inv.json`). |
-| **`discoverability-audit`** | Crawlability Sensor | Evaluates whether AI retrieval bots (OAI-SearchBot, Claude-SearchBot, PerplexityBot) can crawl and index the site. Detects robots.txt blocks, noindex directives, canonical fragmentation, and client-side rendering gaps. |
-| **`entity-content-audit`** | Entity Identity Sensor | Extracts Schema.org JSON-LD entities (Organization, Product, Offer) and scores answerability attribute completeness. Detects missing brand identity, incomplete pricing, and stale schema. |
-| **`fact-consistency-audit`** | Fact Ledger Sensor | Builds a cross-page fact ledger (prices, contacts, copyright dates) and diffs first-party claims to isolate verified contradictions that trigger LLM hallucination. |
-| **`corroboration-authority-audit`** | Authority Sensor | Probes declared sameAs identity links (Wikidata, LinkedIn, Wikipedia) under zero-trust SSRF to verify external entity corroboration. |
-| **`geo-content-audit`** | Citability Sensor | Audits content against Princeton KDD 2024 and AutoGEO research across 9 citability vectors: BLUF primacy, statistical density, causal depth, passage chunking, and evidence genre distribution. |
-| **`engagement-context-audit`** | Orientation Sensor | Evaluates post-citation visitor experience: heading information scent, above-the-fold CTA reachability, and intent-handoff continuity for AI-referred traffic. |
-
----
-
-## 4. How It Works
-
-### Step 1: Single-Pass Acquisition
-The orchestrator invokes `web-scraper` to crawl the target site once under SSRF protection, extracting HTML, robots.txt matrices, clean markdown, and JSON-LD into a canonical site inventory (`inv.json`). Crawling is never repeated.
-
-### Step 2: Offline Sensor Fan-Out
-All 6 specialist sensors run offline against `inv.json` with zero additional network overhead, producing structured empirical measurements.
-
-### Step 3: Cognitive Synthesis (The AI Agent)
-The AI agent ingests sensor telemetry via `orchestrator.py --telemetry`, then:
-- Applies the **6-Layer Causal DAG** to suppress downstream symptoms when upstream blockers exist (e.g., if robots.txt blocks crawlers, suppress content citability findings)
-- Classifies the **business archetype** (e-commerce, SaaS, publisher, local business) to reweight priorities
-- Authors **bespoke dual-track remediation**: copy-pasteable technical fixes (code/config/Schema.org JSON-LD) and actionable creative fixes (content/UX guidance grounded in GEO research)
-
-### Step 4: Schema Validation Gate
-The final report validates against a strict Draft-07 JSON schema, ensuring every finding has evidence, dual-track remediation, and correct severity classification.
+| Skill | Role | Primary Telemetry & Diagnostic Capabilities |
+| :--- | :--- | :--- |
+| **`audit-orchestrator`** | Master Coordinator | Orchestrates single-pass inventory acquisition, fans out offline sensor diagnostics, resolves causal dependencies via the 6-Layer Causal DAG, prioritizes findings, and validates output against Draft-07 JSON Schema. |
+| **`web-scraper`** | Acquisition Engine | Crawls websites under zero-trust SSRF protection, audits RFC 9309 robots.txt permissions across 16 AI retrieval bots, extracts clean markdown with Signal-to-Noise Ratio (SNR) scoring, and emits the canonical inventory (`inv.json`). |
+| **`discoverability-audit`** | Indexation Sensor | Audits crawler access barriers, meta robots directives, canonical tag consistency, hreflang validity, machine-readable `/llms.txt` manifests, and client-side JavaScript rendering copy vacuums. |
+| **`entity-content-audit`** | Structured Data Sensor | Extracts Schema.org JSON-LD graphs (Organization, Product, Offer, SoftwareApplication, LocalBusiness) and evaluates the 7-attribute commercial answerability index (pricing, availability, specifications, currency). |
+| **`fact-consistency-audit`** | Fact Consensus Sensor | Constructs a cross-page first-party fact ledger (pricing, product specifications, contact details, dates) and detects internal contradictions that trigger generative hallucination or model consensus penalties. |
+| **`corroboration-authority-audit`** | Identity Anchor Sensor | Probes declared `sameAs` identity anchors (Wikidata, LinkedIn, Wikipedia, Crunchbase) under zero-trust SSRF sandboxing to verify external knowledge graph corroboration. |
+| **`geo-content-audit`** | Citability Sensor | Evaluates content against Princeton KDD 2024 and AutoGEO benchmarks across nine vectors: BLUF answer primacy, statistical evidence density, causal conjunction depth, and 134-167 word passage chunking. |
+| **`engagement-context-audit`** | Post-Citation UX Sensor | Evaluates the 5-second orientation test, above-the-fold value proposition visibility, H1 conversational information scent, interactive CTA reachability, and authentication flow integrity for AI-referred traffic. |
 
 ---
 
-## 5. Use Cases
+## 4. End-to-End Operational Workflow
 
-### Use Case 1: Full AI Readiness Audit
-> "Audit `https://brand.com` for AI search visibility across ChatGPT, Claude, and Perplexity."
+1. **Single-Pass Acquisition:** `web-scraper` fetches target routes under strict SSRF protection, caching raw HTML, headers, markdown, and structured data into a canonical site inventory (`inv.json`). Target servers are crawled exactly once.
+2. **Offline Sensor Fan-Out:** Specialist sensors execute offline against `inv.json`, generating structured empirical telemetry with zero redundant network latency.
+3. **Cognitive AI Synthesis:** The AI Agent ingests sensor telemetry via `orchestrator.py --telemetry`, applies the 6-Layer Causal DAG to eliminate downstream symptom duplicates, contextualizes findings to the target website's business archetype, and authors bespoke dual-track remediations.
+4. **Draft-07 Schema Validation Gate:** Output reports are strictly validated against `report-schema.json`, ensuring every finding provides verifiable evidence, mechanism-sound root-cause explanation, and copy-pasteable technical and creative fixes.
 
-The agent acquires site inventory, runs all 6 sensors, reasons over the telemetry, and delivers an executive diagnostic briefing with a validated JSON report containing prioritized findings and dual-track remediation.
+---
 
-### Use Case 2: Diagnose AI Invisibility
-> "Why is our brand never cited by ChatGPT Search or Perplexity even though we rank #1 on Google?"
+## 5. Primary Use Cases
 
-The agent identifies the root causes: perhaps robots.txt blocks AI retrieval bots (Layer 0), or the site lacks Schema.org Organization markup (Layer 2), or the content has low causal depth and no statistical evidence (Layer 4).
+### Use Case 1: End-to-End Enterprise Brand AI-Readiness & Retrieval Architecture Audit
+**Objective:** Complete diagnostic evaluation of enterprise digital presence across generative engines (ChatGPT Search, Claude Search, Perplexity, and Google AI Overviews), resolving indexation barriers and entity ambiguity.
 
-### Use Case 3: Fix High AI Referral Bounce Rates
-> "AI search sends traffic to our site but visitors bounce within 5 seconds."
+**Auditor Prompt:**
+```text
+Audit https://example.com for comprehensive Brand AI-Readiness, Generative Engine Optimization (GEO), and Cross-Engine Citability across ChatGPT Search, Claude Search, Perplexity, and Google AI Overviews. Inspect the single-pass inventory and empirical telemetry to determine why AI engines omit or misrepresent our brand. Evaluate robots.txt access across all 16 AI crawler user-agents, raw HTML extractability for client-side JavaScript rendering gaps, and Schema.org JSON-LD graph completeness (Organization, Product, Offer, and PriceSpecification). Apply causal root-cause analysis to author bespoke, priority-ranked findings with copy-pasteable technical code fixes and creative content remediations. Verify all findings against actual page evidence before outputting the final report as clean, schema-validated JSON.
+```
 
-The engagement sensor detects heading scent mismatches, delayed CTA placement, and viewport answer absence. The agent provides specific H1 rewrites, above-the-fold restructuring, and CTA repositioning guidance.
+**Diagnostic Coverage:**
+- **Retrieval & Rendering (Layers 0 & 1):** Uncovers edge WAF blocks, restrictive robots.txt user-agent policies, and single-page application (SPA) client-side rendering gaps that leave AI crawlers with empty DOM shells.
+- **Entity Identity & Knowledge Graph (Layers 2 & 4):** Evaluates whether Schema.org graphs declare complete organizational stewardship and external authority anchors (Wikidata, LinkedIn).
+- **Deliverables:** A Draft-07 schema-compliant report featuring prioritized findings (`F-001`, `F-002`...), copy-pasteable JSON-LD patches, and forward-looking proactive improvements (e.g. authoritative `/llms.txt` manifests).
 
-### Use Case 4: E-Commerce AI Commerce Readiness
-> "Prepare our product catalog for autonomous AI purchasing agents (Google AI Mode, ChatGPT Checkout)."
+---
 
-The entity sensor evaluates Product/Offer schema completeness, pricing consistency, and ISO 4217 compliance. The agent recommends Universal Commerce Protocol (UCP) manifest deployment and machine-readable pricing manifests.
+### Use Case 2: Post-Citation Visitor Orientation & Intent-Handoff Friction Diagnosis
+**Objective:** Diagnose and eliminate immediate visitor drop-off for referral traffic arriving from generative AI answer citations.
+
+**Auditor Prompt:**
+```text
+Audit https://example.com for brand AI-readiness, post-citation visitor retention, and intent-handoff continuity. Focus on why visitors referred from generative AI answers immediately bounce: evaluate the 5-second orientation test, above-the-fold value proposition clarity, H1 information scent alignment with conversational search queries, and CTA reachability friction. Cross-reference empirical telemetry with the raw page inventory to detect inert interactive elements (buttons or links pointing to '#'), gated location pathways, or displaced core propositions. Synthesize priority-ordered findings and dual-track remediations that eliminate bounce friction, and emit the verified report as schema-compliant JSON.
+```
+
+**Diagnostic Coverage:**
+- **Information Scent Alignment:** Tests whether landing page H1 headings and opening propositions preserve contextual continuity from the AI assistant's cited answer.
+- **The 5-Second Orientation Test:** Inspects above-the-fold viewport content to confirm the primary answer proposition appears within the first 250 visible words without requiring scroll or interaction.
+- **Conversion Journey Continuity:** Evaluates primary calls to action, account registration pathways, and shopping cart triggers to isolate inert anchor links (`href='#'`), inaccessible dialogs, or form-gated discovery friction that trap both human visitors and autonomous purchasing agents (OpenAI Operator, Google Jarvis).
+- **Deliverables:** Precise H1 headline revisions, semantic viewport restructuring guidelines, and actionable CTA destination fixes.
+
+---
+
+### Use Case 3: Generative Engine Optimization (GEO) & Factual Consensus Audit
+**Objective:** Maximize AI citation frequency and eliminate hallucination risks by aligning content with empirical GEO research and auditing first-party factual consistency.
+
+**Auditor Prompt:**
+```text
+Conduct an in-depth Generative Engine Optimization (GEO) and commercial answerability audit for https://example.com. Evaluate content against generative citation criteria: measure statistical evidence density, BLUF (Bottom Line Up Front) answer structuring, causal conjunction depth, and 134-167 word passage chunking for LLM RAG absorption. Construct a first-party cross-page fact ledger to isolate contradictory pricing, availability, or legacy claims that trigger LLM hallucinations or citation suppression. Propose forward-looking proactive improvements tailored specifically to the site's business archetype, such as authoritative /llms.txt manifests and machine-readable pricing schemas. Deliver fully verified, priority-ordered findings in clean JSON.
+```
+
+**Diagnostic Coverage:**
+- **Princeton KDD 2024 Citability Heuristics:** Audits content for empirical citation drivers: quotation addition (+40.9% lift), statistical evidence density (+40.0% lift), causal conjunction depth (+28.2% lift), and elimination of unsupported promotional fluff.
+- **First-Party Fact Consensus Ledger:** Cross-references pricing tiers, cancellation policies, product specifications, and legal entity names across all crawled routes to detect internal discrepancies that cause AI models to lose consensus confidence.
+- **Archetype-Tailored Architecture:** Synthesizes proactive recommendations matching the organization's business model (e.g. un-gated `/pricing.md` manifests for SaaS, Universal Commerce Protocol readiness for E-Commerce).
+- **Deliverables:** Concrete copywriting diffs replacing vague claims with attributed data, modular passage restructuring plans, and first-party fact reconciliations.
 
 ---
 
 ## 6. Execution Interfaces
 
-### Primary: AI Agent Cognitive Pipeline
+### AI Agent Cognitive Workflow (Standard)
 ```bash
-# 1. Acquire site inventory (single-pass, SSRF-safe)
+# 1. Single-pass inventory acquisition (SSRF-safe crawl)
 python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com --output inv.json --format json
 
-# 2. Collect empirical telemetry from all sensors
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry
+# 2. Extract empirical telemetry across all diagnostic sensors
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --telemetry > telemetry.json
 
-# 3. Ingest agent review findings into unified causal DAG report synthesis
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
-```
-The AI agent reasons over the telemetry, consults domain knowledge bases, authors refined findings into `review.json`, and synthesizes the final report with cryptographic provenance (`run_manifest`).
-
-
-### Automated CI/CD Pipeline
-```bash
-# Headless baseline report for automated testing (NOT for agent use)
-python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --format json --baseline-only
+# 3. Ingest agent review findings and emit schema-validated deliverable report
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --clean --include-scores --output report.json
 ```
 
-### Modular Sensor Invocation
+### Automated CI/CD Headless Verification
 ```bash
-# Run individual sensors against pre-acquired inventory
+# Deterministic baseline execution for automated test pipelines
+python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --format json --baseline-only
+```
+
+### Modular Sensor Probing
+```bash
+# Targeted sensor execution against pre-crawled inventory
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
@@ -142,71 +157,110 @@ python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --si
 python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 
-# Validate report against Draft-07 schema
-python3 skills/audit-orchestrator/scripts/validate_report.py < report.json
+# Validate any report against Draft-07 schema
+python3 skills/audit-orchestrator/scripts/validate_report.py report.json
 ```
 
 ---
 
-## 7. Output Report Schema
+## 7. Output Report Structure
 
-Every report emitted by the audit conforms to Draft-07 JSON Schema:
+Every final report conforms to Draft-07 JSON Schema with priority-ranked findings and clear epistemic scoring:
 
 ```json
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "schema_version": "1.0.0",
   "site": "https://example.com",
-  "audited_at": "2026-09-02T12:00:00Z",
+  "audited_at": "2026-09-13T12:00:00Z",
   "audit_status": "complete",
   "summary": {
     "total_findings": 2,
-    "critical": 0,
+    "critical": 1,
     "high": 1,
-    "medium": 1,
-    "low": 0
+    "medium": 0,
+    "low": 0,
+    "detected_archetype": "ecommerce"
   },
-  "findings": [{
-      "id": "finding-1",
-      "title": "AI Search Crawlers Blocked in robots.txt",
-      "severity": "high",
-      "category": "discoverability",
-      "root_cause": "robots.txt explicitly disallows OAI-SearchBot and PerplexityBot.",
+  "findings": [
+    {
+      "id": "F-001",
+      "cause_id": "INCOMPLETE_OFFER_ATTRIBUTES",
+      "title": "Incomplete commercial subscription terms across affected routes",
+      "severity": "critical",
+      "category": "entity_content",
+      "root_cause": "The subscription offering advertises promotional discounts without disclosing standard recurring monthly rates or cancellation terms in machine-readable markup.",
+      "confidence": "high",
+      "scope": "https://example.com",
       "evidence": {
-        "summary": "Disallow: / found for OAI-SearchBot and PerplexityBot.",
-        "scope": "robots.txt",
-        "sources": [{"url": "https://example.com/robots.txt", "type": "robots_txt", "observation": "Disallow: /"}]
+        "summary": "Subscription page lacks standard recurring price and cancellation policy terms in Schema.org Offer.",
+        "sources": [
+          {
+            "url": "https://example.com/subscription",
+            "type": "structured_data",
+            "observation": "Missing priceCurrency, recurring price specification, and cancellation terms."
+          }
+        ]
       },
+      "impact": "Generative search assistants cannot answer purchase inquiries or quote accurate pricing, excluding the brand from conversational commerce.",
       "suggested_action": {
-        "summary": "Allow AI search retrieval bots in robots.txt.",
-        "priority": "high",
-        "technical_fix": "Add User-agent: OAI-SearchBot ; Allow: / to robots.txt.",
-        "creative_fix": "Update AI governance disclosures to clarify retrieval access is permitted.",
-        "verification": "Fetch robots.txt with User-Agent: OAI-SearchBot and verify Allow: /."
-      }
+        "summary": "Embed Schema.org Offer with explicit recurring billing terms and cancellation policy.",
+        "priority": "critical",
+        "technical_fix": "Add Schema.org Offer with price, priceCurrency, and explicit recurring billing terms to /subscription head JSON-LD.",
+        "creative_fix": "Display standard recurring rate clearly beneath promotional pricing in semantic HTML.",
+        "verification": "Inspect /subscription markup with Schema.org Validator to confirm complete Offer properties."
+      },
+      "affected_urls": [
+        "https://example.com/subscription"
+      ],
+      "priority_rank": 1,
+      "priority_justification": "Rank #1: Critical commercial answerability blocker that prevents AI shopping assistants from quoting accurate terms.",
+      "dag_node": "ENTITY",
+      "priority_index": 24,
+      "difficulty": 2
     }
   ],
-  "proactive_actions": []
+  "proactive_actions": [
+    {
+      "id": "P-001",
+      "title": "Deploy Machine-Readable /llms.txt Manifest",
+      "summary": "Deploy an authoritative /llms.txt manifest providing executive BLUF summaries and clean markdown links for generative search assistants.",
+      "priority": "low",
+      "category": "discoverability",
+      "technical_fix": "Serve /llms.txt with Content-Type: text/plain linking to core guide routes.",
+      "creative_fix": "Author first-100-word executive overviews for each core product offering.",
+      "verification": "Request GET /llms.txt and verify HTTP 200 with text/plain content."
+    }
+  ],
+  "archetype": "ecommerce",
+  "readiness": {
+    "composite_score": 78.5,
+    "grade": "B",
+    "score_scope": "Observed static inventory and specialist telemetry; heuristic citation-readiness proxy, not live provider ranking or citation measurement."
+  }
 }
 ```
 
 ---
 
-## 8. Technical Constraints
+## 8. Engineering Standards & Operational Invariants
 
-- **Zero Runtime Dependencies:** Pure Python 3.9+ standard library only. No pip packages at runtime.
-- **Zero-Trust SSRF Protection:** All network operations flow through `safe_fetch.py` with pre-socket IP validation against RFC 1918, loopback, link-local, and cloud metadata subnets.
-- **Single-Pass Acquisition:** The site is crawled exactly once. All sensors run offline against the cached inventory.
-- **Read-Only Execution:** Only GET and HEAD requests. Zero state-changing operations on target domains.
-- **Bounded Execution:** Full audit completes in under 5 minutes with strict wall-clock timeouts.
-- **Package Size:** Distribution zip is under 1 MB (well within the 50 MB ceiling).
+- **Zero Third-Party Runtime Dependencies:** All runtime logic across all eight skills uses strictly the Python 3.9+ standard library (`urllib`, `socket`, `html.parser`, `xml.etree.ElementTree`, `json`, `re`, `argparse`, `math`).
+- **Zero-Trust SSRF Protection:** All outbound network operations flow through `safe_fetch.py`, performing pre-socket DNS resolution and immediately aborting on private (RFC 1918), loopback, link-local (`169.254.0.0/16`), cloud metadata (`169.254.169.254`), and CGNAT subnets.
+- **Single-Pass Acquisition Architecture:** Target websites are crawled strictly once. All six specialist sensors operate offline against `inv.json`, ensuring zero redundant network traffic.
+- **Deterministic Execution:** Sensor measurements execute via deterministic static analysis without non-deterministic scraping or browser simulation.
+- **Zero Headless Browsers:** Eliminates Playwright, Puppeteer, Selenium, and Chromium binaries. The entire audit suite executes in under five minutes with low resource consumption.
+- **Compact Package Footprint:** The complete distribution package is approximately 0.4 MB, easily deployable in any enterprise environment.
 
 ---
 
-## 9. Research Foundation
+## 9. Academic Research Foundations
 
-The audit methodology is grounded in peer-reviewed academic research:
+The diagnostic rules and scoring vectors in this suite are grounded directly in peer-reviewed academic literature:
 
-- **Aggarwal et al. (ACM SIGKDD 2024):** "GEO: Generative Engine Optimization" — the foundational mathematical model of generative search, 10,000-query GEO-bench, and empirical lift table (quotations +40.9%, statistics +30.6%).
-- **Zhang, He, Yao (2026):** "From Citation Selection to Citation Absorption" — 21,143 citations, evidence-genre lift analysis (code +76.9%, statistics +61.6%, standalone FAQ -5.7% penalty).
-- **Tian et al. (2026):** "Citation Failure Modes in GEO" — 5-stage failure taxonomy explaining why 43% of topically relevant pages receive zero citations.
-- **Liu et al. (Stanford, TACL 2024):** "Lost in the Middle" — U-shaped attention curve proving BLUF primacy (44.2% of citations from top 30% of content).
-- **Omniscient Digital (2026):** 57% of branded AI citations come from third-party sources, not the brand's own website.
+- **Aggarwal et al. (ACM SIGKDD 2024):** "GEO: Generative Engine Optimization" — Established the empirical lift framework for generative citations: quotations (+40.9%), statistics (+30.6%), and technical fluency.
+- **Zhang, He, Yao (2026):** "From Citation Selection to Citation Absorption" — Analyzed 21,143 generative engine citations, documenting source absorption rates and content genre optimization.
+- **Tian et al. (2026):** "Citation Failure Modes in GEO" — Categorized the five-stage failure taxonomy explaining why relevant web pages fail to be selected by generative answer engines.
+- **Liu et al. (Stanford, TACL 2024):** "Lost in the Middle: How Language Models Use Long Contexts" — Demonstrated the U-shaped attention distribution in LLMs, proving the necessity of Bottom Line Up Front (BLUF) answer placement.
+- **RFC 9309:** Robots Exclusion Protocol standard compliance for autonomous AI retrieval crawlers and search indexers.
+

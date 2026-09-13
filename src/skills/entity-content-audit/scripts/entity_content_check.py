@@ -535,7 +535,7 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
     if not pages:
         if inv is not None:
             return {"status": "inconclusive", "telemetry": {}, "findings": [], "recommendations": []}
-        status, headers, html, _ = safe_fetch(base + "/", timeout=10, max_bytes=2097152)
+        status, html, headers, _ = safe_fetch(base + "/", timeout=10, max_bytes=2097152)
         dom = EntityDOMParser()
         try:
             dom.feed(html)

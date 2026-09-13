@@ -157,7 +157,11 @@ python3 skills/engagement-context-audit/scripts/engagement_check.py --site https
 5. **CTA Reachability Index & Commercial Continuity (`EXPERIENCE.CONTINUITY.CTA_REACHABILITY_FRICTION`):**
    - Evaluates the order of interactive DOM elements and structured action items (`ctas` and `nav_link_texts` from inventory).
    - If the first commercial conversion action ('Buy', 'Start Free Trial', 'Contact Sales', 'Book Demo') is preceded by more than 3 auxiliary interactive elements, flag `CTA_REACHABILITY_FRICTION` (Reachability Index = 1 / (1 + preceding)). Ensures visitors arriving from AI search citations can convert without cognitive navigation friction.
-6. **First-Party Analytics Cross-Correlation (Dual-Track Evaluation):**
+6. **Inert Conversion Actions & Authentication Barriers (`INERT_CTA_TARGET` / `INERT_ACCOUNT_FLOW`):**
+   - Probes interactive triggers (`<button>`, `<a>`, modals, dialogs) for inert destinations (`href="#"`, `href="javascript:void(0)"`, missing form actions, or empty containers).
+   - Distinguishes between Commercial conversion actions (`INERT_CTA_TARGET`: 'Subscribe', 'Checkout', 'Buy Now', 'Order') and Account/Auth pathways (`INERT_ACCOUNT_FLOW`: 'Sign In', 'Log In', 'Sign Up', 'Register', 'My Account', 'Customer Portal').
+   - Flag as Severity `high`. Both human visitors and autonomous purchasing agents (OpenAI Operator, Project Mariner, Google Jarvis) get trapped and abandon transactions when authentication, account creation, or checkout actions lead to dead ends.
+7. **First-Party Analytics Cross-Correlation (Dual-Track Evaluation):**
    - **Empirical Corroboration:** When analytics are ingested and a static UX defect aligns with high bounce rate (>= 60%) or low dwell time (<= 20s), elevate confidence and severity to `high`.
    - **Static Flag Mitigation:** When observed user retention is healthy (bounce rate <= 35%, dwell time >= 60s), downgrade static heuristic severity to `low` or informational.
    - **AI Referral Discontinuity:** When AI referral cohort bounce rate exceeds organic search baseline by >= 25%, flag `AI_REFERRAL_DISCONTINUITY` as a high-severity intent mismatch.

@@ -129,7 +129,7 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
     if not pages:
         if inv is not None:
             return {"status": "inconclusive", "telemetry": {}, "findings": [], "recommendations": []}
-        st, _, html, _ = safe_fetch(base + "/", timeout=10, max_bytes=2097152)
+        st, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2097152)
         pages = [{"url": base + "/", "page_type": "homepage", "html": html, "status": st}]
 
     for p in pages:

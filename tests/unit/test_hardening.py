@@ -1247,6 +1247,85 @@ class TestStreamlinedInvocation(unittest.TestCase):
                 if os.path.exists(p):
                     os.remove(p)
 
+    def test_orchestrator_cross_route_aggregation_and_flattening(self):
+        """Verify orchestrator merges same-cause findings across routes, flattens dict fixes, and dedups proactive actions."""
+        import orchestrator
+        site = "https://example.com"
+        inv = {
+            "site": site,
+            "pages": [
+                {"url": "https://example.com/", "page_type": "homepage", "html": "<html><h1>Home</h1></html>"},
+                {"url": "https://example.com/pricing", "page_type": "pricing", "html": "<html><h1>Pricing</h1></html>"},
+            ],
+        }
+        specialist_results = {
+            "entity-content-audit": {
+                "status": "ok",
+                "findings": [
+                    {
+                        "id": "RAW-001",
+                        "cause_id": "INCOMPLETE_OFFER_ATTRIBUTES",
+                        "title": "Incomplete commercial terms on https://example.com/",
+                        "severity": "high",
+                        "category": "entity_content",
+                        "scope": "https://example.com/",
+                        "evidence": {"summary": "Missing price on home", "sources": [{"url": "https://example.com/", "observation": "No price"}]},
+                        "suggested_action": {
+                            "summary": "Add Offer schema",
+                            "priority": "high",
+                            "technical_fix": {
+                                "file_or_route": "https://example.com/",
+                                "anchor": "<div class='tier'>",
+                                "snippet": "<div class='tier' data-price='$10'>",
+                            },
+                        },
+                    },
+                    {
+                        "id": "RAW-002",
+                        "cause_id": "INCOMPLETE_OFFER_ATTRIBUTES",
+                        "title": "Incomplete commercial terms on https://example.com/pricing",
+                        "severity": "critical",
+                        "category": "entity_content",
+                        "scope": "https://example.com/pricing",
+                        "evidence": {"summary": "Missing price on pricing", "sources": [{"url": "https://example.com/pricing", "observation": "No price"}]},
+                        "suggested_action": {
+                            "summary": "Add Offer schema on pricing",
+                            "priority": "critical",
+                            "technical_fix": "Add Schema.org Offer JSON-LD",
+                        },
+                    },
+                ],
+            }
+        }
+        review = {
+            "proactive_actions": [
+                {"id": "P-001", "title": "Deploy Authoritative /llms.txt", "summary": "Create /llms.txt file", "priority": "low"},
+                {"id": "P-002", "title": "Audit & Expand /llms.txt Manifest", "summary": "Improve /llms.txt with BLUF", "priority": "low"},
+            ]
+        }
+        report = orchestrator.synthesize_audit_report(site, inv, specialist_results, review=review)
+        findings = report.get("findings", [])
+
+        # 1. Merged into single canonical finding
+        offer_findings = [f for f in findings if f.get("cause_id") == "INCOMPLETE_OFFER_ATTRIBUTES"]
+        self.assertEqual(len(offer_findings), 1)
+        merged_f = offer_findings[0]
+
+        # 2. Promoted severity to critical
+        self.assertEqual(merged_f["severity"], "critical")
+
+        # 3. Affected URLs contains both routes
+        self.assertIn("https://example.com/", merged_f.get("affected_urls", []))
+        self.assertIn("https://example.com/pricing", merged_f.get("affected_urls", []))
+
+        # 4. Clean technical_fix from critical finding
+        tf = merged_f.get("suggested_action", {}).get("technical_fix")
+        self.assertEqual(tf, "Add Schema.org Offer JSON-LD")
+
+        # 5. Proactive actions deduplicated by topic (only 1 llms.txt action)
+        llms_actions = [p for p in report.get("proactive_actions", []) if "llms.txt" in p.get("title", "").lower() or "llms.txt" in p.get("summary", "").lower()]
+        self.assertEqual(len(llms_actions), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

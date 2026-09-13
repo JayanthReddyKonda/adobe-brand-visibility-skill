@@ -96,6 +96,22 @@ class TestEngagementUnit(unittest.TestCase):
         '''
         self.assertIsNone(engagement_check.check_unnamed_interactive_controls(html_labeled, "https://example.com/products"))
 
+    def test_inert_actions_detects_both_account_and_commercial(self):
+        """Verify both Account (sign in) and Commercial (subscribe) inert actions are detected on same page."""
+        html = '''
+        <html>
+            <body>
+                <h1>Premium Coffee Service</h1>
+                <a class="nav-link" href="#">Sign In</a>
+                <a class="btn" href="#">Subscribe Now</a>
+            </body>
+        </html>
+        '''
+        findings, _, _ = engagement_check.audit_page_engagement(html, "https://example.com/subscribe")
+        cause_ids = [f["cause_id"] for f in findings]
+        self.assertIn("INERT_ACCOUNT_FLOW", cause_ids)
+        self.assertIn("INERT_CTA_TARGET", cause_ids)
+
 
 if __name__ == "__main__":
     unittest.main()

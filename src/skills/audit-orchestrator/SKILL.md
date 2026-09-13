@@ -264,7 +264,7 @@ Then invoke the specialist sensor directly with custom parameters for granular d
 
 1. **Direct Inspection of `inv.json` (Content, DOM, and Structure)**:
    - **Page Content & Heading Hierarchies**: Read through core routes (homepage, pricing, catalog, about, locations). Verify whether H1/H2 tags communicate unambiguous value propositions or suffer from generic scent vacuums.
-   - **Interactive Elements & CTAs**: Inspect `<button>`, `<a>`, `<form>`, and `<input>` tags. Check for icon-only buttons lacking accessible names (`aria-label`, `title`), CTAs targeting inert `#` anchors, or search inputs that gate physical location discovery behind client-side forms.
+   - **Interactive Elements, Account Portals & CTAs**: Inspect `<button>`, `<a>`, `<form>`, modals, and dialogs. Check for icon-only buttons lacking accessible names (`aria-label`, `title`), CTAs targeting inert `#` or `javascript:void(0)` anchors, or broken search inputs. Crucially, verify authentication and account pathways: check whether "Sign In", "Log In", "Sign Up", "Register", "My Account", or checkout triggers point to inert `#` anchors or missing backend endpoints. Flag these as `INERT_ACCOUNT_FLOW` or `INERT_CTA_TARGET` (Severity: `high` or `critical` depending on commercial journey). Both human users and autonomous purchasing agents (OpenAI Operator, Project Mariner, Google Jarvis) get trapped and abandon conversion when authentication, account creation, or checkout actions are non-functional.
    - **Structured Data & JSON-LD**: Inspect `jsonld` blocks in `inv.json`. Check for staging/preview domains (`.aem.live`, `.webflow.io`, `staging.*`) declared in `@id` or `offers.url`, missing Organization graphs, or incomplete commercial terms.
    - **Media & Non-Text Facts**: Identify commercial charts, pricing tables, or feature comparisons published as raster images without machine-readable HTML table equivalents.
 
@@ -278,7 +278,7 @@ Then invoke the specialist sensor directly with custom parameters for granular d
 3. **Authoring Bespoke Findings & Dual-Track Remediations**:
    - For each gap discovered during direct inspection of `inv.json` and `telemetry.json`, author a structured finding object in `review.json`.
    - Every finding must include:
-     - `cause_id` / `check_id` (e.g. `FORM_GATED_DISCOVERY_TRAP`, `COMPONENT_LOADING_FAILURE`, `CONTROL_REPRESENTATION_GAP`, `SCHEMA_INTERNAL_CONTRADICTION`, `INERT_CTA_TARGET`, etc.)
+     - `cause_id` / `check_id` (e.g. `FORM_GATED_DISCOVERY_TRAP`, `COMPONENT_LOADING_FAILURE`, `CONTROL_REPRESENTATION_GAP`, `SCHEMA_INTERNAL_CONTRADICTION`, `INERT_CTA_TARGET`, `INERT_ACCOUNT_FLOW`, etc.)
      - `title`: Clear, descriptive defect headline.
      - `severity`: `critical` | `high` | `medium` | `low`.
      - `category`: `discoverability` | `entity_content` | `fact_consistency` | `corroboration` | `geo_content` | `engagement_context`.
@@ -288,7 +288,7 @@ Then invoke the specialist sensor directly with custom parameters for granular d
      - `impact`: Exact effect on AI search engines (ChatGPT, Claude, Perplexity, Google) or human visitors.
      - `suggested_action`:
        - `summary`: One-sentence fix summary.
-       - `technical_fix`: Copy-pasteable code diff, config snippet, or Schema.org JSON-LD `@graph` customized to the real domain name.
+       - `technical_fix`: Copy-pasteable code diff, config snippet, or Schema.org JSON-LD `@graph` customized to the real domain name. Emitted as a clean, high-density 1-2 sentence string.
        - `creative_fix`: Concrete copywriting or information architecture guidance grounded in Princeton KDD 2024 / AutoGEO research.
        - `priority`: Matching severity tier.
        - `verification`: Deterministic test command or validation step.
@@ -297,29 +297,39 @@ Then invoke the specialist sensor directly with custom parameters for granular d
    - Propose strategic architectural enhancements even where no explicit defect was flagged.
    - Examples: Authoritative `/llms.txt` manifest, machine-readable purchasing manifest (`/pricing.md`), E-E-A-T author credentials with external Wikidata/LinkedIn anchors, and Princeton citability passage structuring.
    - Every item must include all 4 required fields: `id` (`P-001`, `P-002`), `title`, `summary`, and `priority`.
+   - **Topic Deduplication Standard**: Every proactive action must cover a distinct strategic capability. Never emit duplicate initiatives (e.g., maximum one `/llms.txt` action, one `/pricing.md` action, one edge markdown negotiation action).
 
 1. **Apply 6-Layer Causal DAG & Keystone Deduplication:**
    - **Anti-Shortcut Rule for Agent Brain**: NEVER carry over raw sensor findings 1:1 into the final report if an upstream layer blocker exists on that route. Sensors emit raw empirical telemetry, but the cognitive brain must enforce the causal hierarchy.
    - **Layer 0 (`AI_RETRIEVAL_BLOCKED`, `NOINDEX_EXCLUSION`)**: If robots.txt, edge `X-Robots-Tag: noindex`, or HTTP 403 blocks live AI retrieval crawlers (`OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`), suppress downstream text citability, entity ambiguity, and authority findings on blocked routes (`MATERIAL_ENTITY_AMBIGUITY`, `MISSING_SAMEAS_VERIFICATION`, `UNLINKED_KNOWLEDGE_GRAPH_ANCHOR`, `MISSING_IN_DEPTH_MECHANISMS`, `LACK_OF_SPECIFIC_EVIDENCE`, `COMMERCIAL_INTRUSION_IN_INFORMATIONAL_CONTENT`).
    - **Layer 1 (`RENDERED_CONTENT_GAP`)**: If initial raw HTML contains only an unrendered client-side JS shell (< 25 words or SNR < 0.08), suppress downstream Layer 2 answerability (`ATTRIBUTE_INCOMPLETENESS`, `INCOMPLETE_OFFER_ATTRIBUTES`), Layer 3 fact consistency (`FIRST_PARTY_FACT_CONFLICT`, `CONFLICTING_COMMERCIAL_TERMS`, `MISSING_MATERIAL_FACT`), Layer 4 GEO citability (`LOW_CITABILITY_SCORE`, `SUB_THRESHOLD_CITABILITY`), and Layer 6 engagement (`CTA_REACHABILITY_FRICTION`, `ABOVE_FOLD_ACTION_DELAY`) findings on that route. Downstream findings are strictly consequential symptoms and MUST be subsumed into the keystone finding's `downstream_symptoms` list rather than emitted as standalone primary defects.
    - **Bundle Conditional Schema into Proactive Actions**: When unrendered product routes have suppressed schema omissions, bundle conditional pre-hydration product structured data requirements into `proactive_actions` (e.g. `P-003: Pre-Hydration Product Schema Architecture`) to prepare engineering for post-SSR deployment without generating false-positive primary findings.
-   - **Consolidate Multi-Route Findings**: When the same defect occurs across multiple language or catalog routes (e.g. `/en/products`, `/fr/products`, `/es/products` all missing Product schema), consolidate them into a single finding with comprehensive scope and evidence. Never emit duplicate finding objects.
+   - **Mandatory Cross-Route Finding Aggregation**: When identical or sibling defect mechanisms occur across multiple routes (e.g. `INCOMPLETE_OFFER_ATTRIBUTES` on `/` and `/subscription`, `RENDERED_CONTENT_GAP` on multiple SPA pages, `VALUE_PROPOSITION_ORIENTATION_VACUUM` on multiple routes, or `EXCESSIVE_KEYWORD_DENSITY`), NEVER emit separate finding objects per route. Merge them into a single canonical finding:
+     - Populate `affected_urls` with all impacted URLs.
+     - Combine evidence sources to provide concrete proof across all affected routes without duplicate observations.
+     - Generalize the title to avoid pinning to a single route (e.g. `"Incomplete commercial subscription terms across affected routes"`).
+     - Author concise, high-density 1-2 sentence strings for `technical_fix` and `creative_fix`. Never bloat reports with repetitive per-page clones.
 
 
-2. **Contextualize by Business Archetype:**
-   - **E-Commerce:** Prioritize Product schema, PriceSpecification, Offer availability, and specification tables. Suggest Universal Commerce Protocol (UCP) / machine-purchasing readiness.
-   - **SaaS:** Prioritize SoftwareApplication schema, pricing tier transparency, and API docs. Deploy un-gated machine-readable `/pricing.md` manifests.
-   - **Publisher / Media:** Prioritize NewsArticle, Person authorship, and verified source citations. Deploy E-E-A-T credentials and 40-60w BLUF answer blocks (+40.9% quotation lift).
-   - **Local Business:** Prioritize LocalBusiness schema, GeoCoordinates, openingHours, and NAP consistency across branch locations.
+2. **Contextualize by Business Archetype & Technical Architecture:**
+   - **Archetype-Grounded Cognitive Diagnosis**: Ingest empirical telemetry from `telemetry.json` and raw page content from `inv.json`, synthesizing bespoke findings that reflect the target site's exact commercial archetype and technical architecture:
+     - **E-Commerce:** Prioritize Product schema, PriceSpecification, Offer availability, catalog routes, specification comparison tables, and Universal Commerce Protocol (UCP) machine-purchasing readiness. Crucially verify conversion pathways: flag inert 'Add to Cart', 'Subscribe', or checkout triggers (`href='#'`) and broken authentication flows (`INERT_ACCOUNT_FLOW`, `INERT_CTA_TARGET`) that trap autonomous purchasing agents (OpenAI Operator, Google Jarvis, Project Mariner).
+     - **SaaS:** Prioritize SoftwareApplication schema, pricing tier transparency, feature comparison grids, API documentation, and un-gated machine-readable `/pricing.md` manifests for AI procurement bots.
+     - **Publisher / Media:** Prioritize NewsArticle, Person authorship, and verified source citations. Deploy E-E-A-T credentials, structured fact attributions, and 40-60w BLUF answer blocks (+40.9% quotation lift).
+     - **Local Business:** Prioritize LocalBusiness schema, GeoCoordinates, openingHoursSpecification, and strict NAP consistency across branch landing pages.
+     - **Technical Architecture (SSR vs CSR / Headless CMS):** Diagnose whether the frontend relies on client-side JS rendering shells that starve AI retrieval engines of raw text, or whether edge WAF rules mistakenly block AI search bots.
 
 3. **Author Bespoke Dual-Track Remediations (Machine-Actionable for Downstream Agents):**
    - **`technical_fix`**: Craft precise, patch-applicable code, config, or Schema.org JSON-LD `@graph` snippets customized to the brand's actual domain name, real product names, currency, and entity anchors. May be emitted as a clean code string or a structured `{file_or_route, change_type, snippet, anchor}` object designed for direct consumption by a downstream execution agent.
    - **`creative_fix`**: Provide concrete, actionable copywriting and architecture guidance grounded in Princeton KDD 2024 / AutoGEO research (+40.9% quotation lift, +40.0% statistics lift, +28.2% causal conjunction lift, 40-60 word BLUF answers).
    - **`verification`**: Provide a deterministic test command or validation step to verify remediation.
 
-4. **Rank Tasks with Global Ordering (`priority_rank` & `priority_justification`):**
-   - Sort all findings across the entire report by DAG position (Retrieval -> Rendering -> Entity -> Facts -> Corroboration -> Citability -> Engagement) -> severity -> number of simulated AI assistants affected.
-   - Assign a contiguous global **`priority_rank`** from `1` to `N`.
+4. **Enforce Strict Descending Priority-Ranked Ordering (`priority_rank` & `priority_justification`):**
+   - **LLM Brain Decides True Priority**: The AI Agent / LLM Brain decides which findings and actions are genuinely critical and needle-moving for the target website's business archetype, rather than mechanically obeying script counters or alphabetical checks.
+   - **Top Priority on Top**: Findings MUST be reported in strict descending priority order: the most urgent, high-impact barrier at the very top (Rank 1 / `F-001`), followed by the second most important (`F-002`), down to lower-priority tactical fixes.
+   - **Authoritative Agent Ranking via `review.json`**: In `review.json`, set `"priority_rank": 1`, `"priority_rank": 2`... or author your findings in the exact priority order you want them delivered. The orchestrator guarantees that the findings array will be sorted and indexed (`F-001`, `F-002`, `F-003`...) matching your priority decisions.
+   - **Proactive Actions Prioritization**: Proactive actions are similarly ranked from highest impact (`critical`, `high`) down to `low` (`P-001`, `P-002`...).
+   - **Clean Deliverable Schema Standard**: In the deliverable report (`report.json`), heuristic internal pipeline fields such as `"dimensions": { ... }` are omitted; readiness retains only clean `composite_score` and `grade` when scores are included.
    - For every pair of findings sharing a severity tier, provide a **`priority_justification`** explaining which moves the needle more and why (this ordering judgment is explicitly evaluated).
    - Assign the causal **`dag_node`** (`RETRIEVAL`, `RENDERING`, `ENTITY`, `FACTS`, `CORROBORATION`, `GEO_CITABILITY`, `ENGAGEMENT`).
    - Use `plan.py` for mathematical priority indexing: `priority_index = 5 * severity + (6 - difficulty)`.

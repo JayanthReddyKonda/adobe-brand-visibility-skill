@@ -26,7 +26,7 @@ except ImportError:
     safe_fetch = None  # type: ignore
 
 COMMERCIAL_ACTION_PATTERNS = re.compile(
-    r"\b(buy|order|cart|checkout|subscribe|sign up|sign up today|start free trial|book demo|contact sales|request demo|get started|purchase|try free|pricing|free trial)\b",
+    r"\b(buy|order|cart|checkout|subscribe|sign up|sign up today|sign in|login|log in|log on|register|create account|my account|account|portal|dashboard|start free trial|book demo|contact sales|request demo|get started|purchase|try free|pricing|free trial)\b",
     re.IGNORECASE,
 )
 MARKETING_FLUFF_PATTERNS = re.compile(
@@ -449,14 +449,22 @@ def audit_page_engagement(
         ))
 
     if cta_reach.get("inert_ctas"):
-        icta = cta_reach["inert_ctas"][0]
-        findings.append(make_finding(
-            "INERT_CTA_TARGET",
-            f"Commercial CTA targets inert destination (\"{icta['text']}\" -> {icta['href'] or 'empty'})",
-            "high",
-            url,
-            f"Commercial call-to-action '{icta['text']}' has inert target '{icta['href']}', causing visitor conversion abandonment.",
-        ))
+        seen_inert_types = set()
+        for icta in cta_reach["inert_ctas"]:
+            txt_lower = icta["text"].lower()
+            action_type = "Account" if any(w in txt_lower for w in ("sign in", "login", "log in", "account", "register", "sign up", "portal", "dashboard")) else "Commercial"
+            if action_type in seen_inert_types:
+                continue
+            seen_inert_types.add(action_type)
+            cause = "INERT_ACCOUNT_FLOW" if action_type == "Account" else "INERT_CTA_TARGET"
+            findings.append(make_finding(
+                cause,
+                f"{action_type} action targets inert destination (\"{icta['text']}\" -> {icta['href'] or 'empty'})",
+                "high",
+                url,
+                f"{action_type} action '{icta['text']}' has inert target '{icta['href']}', causing visitor conversion and authentication abandonment.",
+                root_cause=f"The page renders a critical {action_type.lower()} conversion action with an inert href ('#') without server-rendered destination or functional navigation fallback.",
+            ))
 
     fake_form_f = check_fake_or_inaccessible_forms(html_content, url)
     if fake_form_f:
@@ -566,15 +574,24 @@ def audit(
                 f"Commercial CTA delayed: index={cta_reach['first_commercial_cta_index']}, preceding={cta_reach['preceding_interactive_elements']}",
             ))
 
-        if cta_reach.get("inert_ctas") and not any(f.get("cause_id") == "INERT_CTA_TARGET" and f.get("scope") == url for f in findings):
-            icta = cta_reach["inert_ctas"][0]
-            findings.append(make_finding(
-                "INERT_CTA_TARGET",
-                f"Commercial CTA targets inert destination (\"{icta['text']}\" -> {icta['href'] or 'empty'})",
-                "high",
-                url,
-                f"Commercial call-to-action '{icta['text']}' has inert target '{icta['href']}', causing visitor conversion abandonment.",
-            ))
+        if cta_reach.get("inert_ctas"):
+            seen_inert_types = set()
+            for icta in cta_reach["inert_ctas"]:
+                txt_lower = icta["text"].lower()
+                action_type = "Account" if any(w in txt_lower for w in ("sign in", "login", "log in", "account", "register", "sign up", "portal", "dashboard")) else "Commercial"
+                if action_type in seen_inert_types:
+                    continue
+                seen_inert_types.add(action_type)
+                cause = "INERT_ACCOUNT_FLOW" if action_type == "Account" else "INERT_CTA_TARGET"
+                if not any(f.get("cause_id") == cause and f.get("scope") == url for f in findings):
+                    findings.append(make_finding(
+                        cause,
+                        f"{action_type} action targets inert destination (\"{icta['text']}\" -> {icta['href'] or 'empty'})",
+                        "high",
+                        url,
+                        f"{action_type} action '{icta['text']}' has inert target '{icta['href']}', causing visitor conversion and authentication abandonment.",
+                        root_cause=f"The page renders a critical {action_type.lower()} conversion action with an inert href ('#') without server-rendered destination or functional navigation fallback.",
+                    ))
 
         fake_form_f = check_fake_or_inaccessible_forms(html, url)
         if fake_form_f and not any(f.get("cause_id") == "INACCESSIBLE_INTERACTIVE_DIALOG" and f.get("scope") == url for f in findings):

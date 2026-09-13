@@ -207,12 +207,14 @@ def verify_summary_counts(report):
 
     # Invariant: actual_band to severity mapping and priority_index formula
     band_to_sev = {"S4": "critical", "S3": "high", "S2": "medium", "S1": "low", "S0": "info", "U": "unassessable"}
+    sev_to_band = {v: k for k, v in band_to_sev.items() if k in ("S1", "S2", "S3", "S4")}
     for f in findings:
         if not isinstance(f, dict):
             continue
-        band = f.get("actual_band")
-        if band in band_to_sev and f.get("severity") and f["severity"] != band_to_sev[band]:
-            errors.append(f"Finding {f.get('id')}: severity '{f.get('severity')}' does not match actual_band '{band}'")
+        raw_band = f.get("actual_band")
+        band = raw_band or sev_to_band.get(f.get("severity"))
+        if raw_band and raw_band in band_to_sev and f.get("severity") and f["severity"] != band_to_sev[raw_band]:
+            errors.append(f"Finding {f.get('id')}: severity '{f.get('severity')}' does not match actual_band '{raw_band}'")
         score = f.get("priority_index")
         d = f.get("difficulty")
         if score is not None and (
