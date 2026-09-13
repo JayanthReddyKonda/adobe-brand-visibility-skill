@@ -3392,7 +3392,7 @@ def sanitize_clean_report(report: Dict[str, Any], include_scores: bool = False) 
             "severity": f.get("severity"),
             "category": f.get("category"),
             "root_cause": f.get("root_cause"),
-            "confidence": f.get("confidence", "high"),
+            "confidence": f.get("confidence") or "medium",
             "scope": f.get("scope"),
             "evidence": f.get("evidence"),
             "impact": f.get("impact"),

@@ -65,6 +65,7 @@ class Resource:
     latency_ms: float = 0.0
     redirects: List[str] = field(default_factory=list)
     ip_address: Optional[str] = None
+    truncated: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert resource to dictionary, omitting binary body."""
@@ -78,6 +79,7 @@ class Resource:
             "redirects": self.redirects,
             "ip_address": self.ip_address,
             "bytes_length": len(self.body_bytes),
+            "truncated": self.truncated,
         }
 
 
@@ -256,6 +258,7 @@ class PageModel:
     fetch_telemetry: Dict[str, Any] = field(default_factory=dict)
     headers: Dict[str, str] = field(default_factory=dict)
     raw_html: str = ""
+    truncated: bool = False
 
     def to_dict(self, include_raw_html: bool = False) -> Dict[str, Any]:
         """Convert page model to dictionary for JSON serialization."""
@@ -264,6 +267,7 @@ class PageModel:
             "final_url": self.final_url,
             "redirect_chain": self.redirect_chain,
             "status": self.status,
+            "truncated": self.truncated,
             "content_type": self.content_type,
             "title": self.title,
             "description": self.description,
@@ -1211,6 +1215,7 @@ class SafeFetcher:
 
                     body_chunks: List[bytes] = []
                     total_bytes = 0
+                    is_truncated = False
 
                     while True:
                         if self.budget.remaining_time() <= 0.0:
@@ -1225,6 +1230,7 @@ class SafeFetcher:
                         self.budget.record_bytes(len(chunk))
 
                         if total_bytes > self.budget.max_page_bytes:
+                            is_truncated = True
                             break
 
                     raw_body = b"".join(body_chunks)
@@ -1241,6 +1247,7 @@ class SafeFetcher:
                         latency_ms=latency_ms,
                         redirects=redirect_handler.redirect_chain,
                         ip_address=pool.last_connected_ip or resolved_ip,
+                        truncated=is_truncated,
                     )
 
             except urllib.error.HTTPError as e:
@@ -1293,7 +1300,8 @@ class SafeFetcher:
                 total_len = 0
                 chunk_len = 16384
                 for i in range(0, len(raw_data), chunk_len):
-                    chunk = dobj.decompress(raw_data[i:i + chunk_len])
+                    remaining_bound = max(0, limit - total_len)
+                    chunk = dobj.decompress(raw_data[i:i + chunk_len], remaining_bound)
                     decompressed_chunks.append(chunk)
                     total_len += len(chunk)
                     if total_len >= limit:
@@ -3136,6 +3144,7 @@ class WebAuditEngine:
                 },
                 headers=resource.headers,
                 raw_html=html_text,
+                truncated=resource.truncated,
             )
 
         except Exception:

@@ -96,17 +96,26 @@ def build_inventory(
 
     effective_timeout = max(5.0, (deadline - time.monotonic()) if deadline else timeout_seconds)
     engine = WebAuditEngine(time_limit_sec=effective_timeout, max_pages=max_pages)
+    crawl_error = None
     try:
         engine.crawl(base_url)
-    except Exception:
-        pass
+    except Exception as e:
+        crawl_error = {"type": type(e).__name__, "message": str(e)}
 
     inv_dict = engine.to_inventory_dict()
     inv_dict["site"] = domain
     inv_dict["base_url"] = base_url
     inv_dict.setdefault("limitations", [])
+    if crawl_error:
+        inv_dict["crawl_error"] = crawl_error
+        inv_dict["limitations"].append(f"Crawl aborted with {crawl_error['type']}: {crawl_error['message']}")
     if not engine.pages:
         inv_dict["limitations"].append("Homepage unreachable or non-HTML; inventory could not be built.")
+        inv_dict["status"] = "failed"
+    elif crawl_error:
+        inv_dict["status"] = "partial"
+    else:
+        inv_dict["status"] = "complete"
 
     elapsed = round(time.monotonic() - start_mono, 1)
     inv_dict["elapsed_seconds"] = elapsed
@@ -158,7 +167,7 @@ def main() -> None:
         base_url = f"{parts[0]}://{parts[1].split('/')[0]}"
 
     inv, stats = build_inventory(base_url, max_pages=args.max_pages, timeout_seconds=args.timeout)
-    out_data = inv if inv else {"homepage_reachable": False, "error": stats.get("error")}
+    out_data = inv if inv else {"status": "failed", "homepage_reachable": False, "error": stats.get("error")}
     out_json = json.dumps(out_data, indent=2)
 
     if args.output:
