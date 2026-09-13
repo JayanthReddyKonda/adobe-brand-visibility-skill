@@ -64,6 +64,38 @@ class TestEngagementUnit(unittest.TestCase):
         commercial_elements = [el for el in parser.interactive_elements if el.get("is_commercial_cta")]
         self.assertGreaterEqual(len(commercial_elements), 3)
 
+    def test_broken_component_integrations_detects_google_maps_error(self):
+        """EN2: Detect Google Maps runtime error banner in DOM."""
+        html_with_err = '<div><h1>Store Location</h1><div class="gm-err-container">This page can\'t load Google Maps correctly.</div></div>'
+        finding = engagement_check.check_broken_component_integrations(html_with_err, "https://example.com/stores")
+        self.assertIsNotNone(finding)
+        self.assertEqual(finding["id"], "EN2_COMPONENT_LOADING_FAILURE")
+        self.assertEqual(finding["cause_id"], "COMPONENT_LOADING_FAILURE")
+
+        html_clean = '<div><h1>Store Location</h1><p>123 Main Street</p></div>'
+        self.assertIsNone(engagement_check.check_broken_component_integrations(html_clean, "https://example.com/stores"))
+
+    def test_unnamed_interactive_controls_detects_empty_buttons(self):
+        """EN6: Detect multiple action buttons lacking text, alt, or aria-labels."""
+        html_unnamed = '''
+        <div class="catalog">
+            <button class="cart-btn"><svg></svg></button>
+            <button class="fav-btn"><i class="icon"></i></button>
+        </div>
+        '''
+        finding = engagement_check.check_unnamed_interactive_controls(html_unnamed, "https://example.com/products")
+        self.assertIsNotNone(finding)
+        self.assertEqual(finding["id"], "EN6_UNNAMED_INTERACTIVE_CONTROL")
+        self.assertEqual(finding["cause_id"], "CONTROL_REPRESENTATION_GAP")
+
+        html_labeled = '''
+        <div class="catalog">
+            <button class="cart-btn" aria-label="Add to cart"><svg></svg></button>
+            <button class="fav-btn" aria-label="Add to wishlist"><i class="icon"></i></button>
+        </div>
+        '''
+        self.assertIsNone(engagement_check.check_unnamed_interactive_controls(html_labeled, "https://example.com/products"))
+
 
 if __name__ == "__main__":
     unittest.main()

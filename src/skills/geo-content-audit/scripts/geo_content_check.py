@@ -38,6 +38,16 @@ _STAT_RE = re.compile(r"(\b\d+(\.\d+)?%|\$\d+(?:,\d{3})*(?:\.\d+)?|\b\d+\s+(?:mi
 _SPEAKER_ATTRIBUTION_RE = re.compile(r'\b(?:said|says|according to|stated|explains|notes)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b')
 _CREDENTIAL_TITLE_RE = re.compile(r"\b(Ph\.?D|M\.?D|CTO|CEO|Chief|Director|Professor|Engineer|Architect)\b", re.I)
 QUESTION_RE = re.compile(r"^(what|why|how|when|where|who|can|is|are|does|do|which)\b", re.IGNORECASE)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_COMMON_STOPWORDS = {
+    "the", "and", "for", "that", "this", "with", "from", "are", "have", "has", "had",
+    "you", "your", "our", "all", "not", "but", "can", "was", "were", "been", "will",
+    "more", "about", "into", "their", "they", "what", "which", "when", "where", "how",
+    "who", "out", "other", "some", "such", "than", "then", "them", "these", "those",
+    "also", "may", "might", "could", "would", "div", "span", "class", "href", "html",
+    "body", "script", "style", "table", "button", "input", "form", "section", "header",
+    "footer", "nav", "main", "article", "aside", "path", "svg", "width", "height",
+}
 
 
 def split_sentences_abbr(text: str) -> List[str]:
@@ -198,7 +208,11 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
                 f"Hedge frequency {round(hedge_rate * 100, 1)}% exceeds empirical threshold (1.2%).",
             ))
 
-        p_kw_words = re.findall(r"\b[a-zA-Z]{3,}\b", ptext.lower())
+        clean_ptext = _HTML_TAG_RE.sub(" ", ptext)
+        p_kw_words = [
+            w for w in re.findall(r"\b[a-zA-Z]{3,}\b", clean_ptext.lower())
+            if w not in _COMMON_STOPWORDS
+        ]
         if len(p_kw_words) >= 50:
             counts = Counter(p_kw_words)
             most_common_word, kw_cnt = counts.most_common(1)[0]

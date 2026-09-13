@@ -902,6 +902,69 @@ class TestFrescopaHardeningAndArchetype(unittest.TestCase):
         finding_titles = [f["title"] for f in report["findings"]]
         self.assertIn("Agent identified AI bot blockage", finding_titles)
 
+    def test_orchestrator_merges_review_findings_with_sensor_findings(self):
+        """orchestrator.py must combine agent-authored findings with sensor findings rather than discarding sensors."""
+        from orchestrator import synthesize_audit_report
+
+        inv = {
+            "pages": [
+                {"url": "https://example.com/", "status": 200, "word_count": 120, "page_type": "homepage"},
+            ]
+        }
+        sensor_results = {
+            "discoverability-audit": {
+                "status": "ok",
+                "findings": [
+                    {
+                        "check_id": "B1",
+                        "cause_id": "NOINDEX_DIRECTIVE",
+                        "title": "Robots Meta Noindex Tag Detected",
+                        "severity": "high",
+                        "category": "discoverability",
+                        "scope": "https://example.com/",
+                        "evidence": "Found <meta name='robots' content='noindex'>",
+                        "suggested_action": {
+                            "summary": "Remove noindex tag",
+                            "priority": "high",
+                        },
+                    }
+                ],
+            }
+        }
+        agent_review = {
+            "findings": [
+                {
+                    "check_id": "E1",
+                    "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+                    "title": "Agent Discovered Missing Organization Schema",
+                    "severity": "medium",
+                    "category": "entity_content",
+                    "scope": "https://example.com/",
+                    "evidence": "No Schema.org Organization found in HTML DOM",
+                    "suggested_action": {
+                        "summary": "Deploy Organization JSON-LD",
+                        "priority": "medium",
+                    },
+                }
+            ],
+            "proactive_actions": [
+                {
+                    "id": "P-001",
+                    "title": "Custom Agent Proactive Strategy",
+                    "summary": "Deploy llms.txt at root",
+                    "priority": "medium",
+                }
+            ],
+        }
+        report = synthesize_audit_report("https://example.com", inv, sensor_results, review=agent_review)
+        finding_cids = [f.get("cause_id") for f in report["findings"]]
+        # Both the sensor-detected finding and the agent-discovered finding must be present
+        self.assertIn("NOINDEX_DIRECTIVE", finding_cids)
+        self.assertIn("MATERIAL_ENTITY_AMBIGUITY", finding_cids)
+        # Agent proactive action must be present
+        proactive_titles = [p["title"] for p in report["proactive_actions"]]
+        self.assertIn("Custom Agent Proactive Strategy", proactive_titles)
+
     def test_assemble_produces_readiness_and_manifest(self):
         """orchestrator.py assemble() must compute readiness and attach run_manifest."""
         from orchestrator import assemble

@@ -742,12 +742,13 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
         jld_str = json.dumps(p.get("jsonld", []) or p.get("json_ld_contents", []) or []).lower()
         visible_text = f"{text} {title} {h1}".lower()
 
-        # 1. Ecommerce (Retail, consumer products, shopping carts)
-        if ptype in ("product_detail", "product", "product_listing", "category", "cart", "checkout") or any(
+        # 1. Ecommerce (Retail, consumer products, shopping carts, subscriptions)
+        if ptype in ("product_detail", "product", "product_listing", "category", "cart", "checkout", "subscription_flow") or any(
             k in url for k in (
                 "/product", "/products", "/shop", "/item", "/items", "/store",
                 "/collection", "/collections", "/catalog", "/catalogue", "/cart",
-                "/checkout", "/goods", "/merchandise"
+                "/checkout", "/goods", "/merchandise", "/coffee", "/subscription",
+                "/beans", "/roast"
             )
         ):
             ecomm_score += 3
@@ -756,7 +757,9 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
             "in stock", "out of stock", "shipping & returns", "item in stock",
             "add to basket", "buy now", "order summary", "item total",
             "pickup & delivery", "same day delivery", "order pickup",
-            "weekly ad", "registry & wish list"
+            "weekly ad", "registry & wish list", "delivered to your door",
+            "first month half-price", "monthly delivery", "subscribe to",
+            "whole bean", "ground coffee", "artisan roast", "shop coffee"
         )):
             ecomm_score += 3
         elif any(k in jld_str for k in ("schema.org/product", "schema.org/offer", '"@type": "product"')):

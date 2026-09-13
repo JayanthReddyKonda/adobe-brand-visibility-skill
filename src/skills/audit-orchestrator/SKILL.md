@@ -18,10 +18,8 @@ allowed-tools:
 | **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py <url> -o inv.json` | Canonical Site Inventory JSON (`inv.json`) | Bounded Acquisition |
 | **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py -i inv.json -t -o telemetry.json` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Telemetry Mode** |
 | **Selective Specialist Telemetry** | `python3 skills/audit-orchestrator/scripts/orchestrator.py -i inv.json -t --skills discoverability,entity,geo -o telemetry.json` | Filtered Sensor Telemetry Payload | Scoped Multi-Skill Telemetry |
+| **Direct Specialist Skill Reading** | Native file reading tool on `skills/<skill>/SKILL.md` and `references/` | Direct Domain Rules & Archetype Cheatsheets | **Primary Agent Knowledge Mode** |
 | **Agent Cognitive Review Synthesizer** | `python3 skills/audit-orchestrator/scripts/orchestrator.py -i inv.json -r review.json --deliverable -o report.json` | Clean Scored Draft-07 JSON Client Deliverable | **Primary Deliverable Synthesis Mode** |
-| **Dynamic Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py -i inv.json -o briefing.md` | Tailored Knowledge Base & Remediation Briefing | Markdown Context Compilation |
-| **Structured Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py -i inv.json -o briefing.json` | Structured Signals & Rules Reference (JSON) | Structured Context Compilation |
-| **Scoped Archetype & Topic Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py -i inv.json --archetype saas --topic retrieval -o briefing.md` | Scoped Reference Briefing & Cheatsheets | Targeted Archetype/Topic Context |
 | **Remediation Priority Roadmap (JSON)** | `python3 skills/audit-orchestrator/scripts/plan.py -i report.json --top 5 -o plan.json` | Ranked JSON Roadmap with Priority Index | Remediation Planning (JSON) |
 | **Remediation Priority Roadmap (Markdown)**| `python3 skills/audit-orchestrator/scripts/plan.py -i report.json --top 5 -o plan.md` | Ranked Markdown Implementation Roadmap | Remediation Planning (Markdown) |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py -i inv.json -o sensor.json` | Specialist Domain Measurements | Targeted Deep Inspection |
@@ -35,7 +33,7 @@ allowed-tools:
 > - **Seven-Step Cognitive Reasoning Protocol**:
 >   1. **Acquire Inventory**: Run `acquire_inventory.py` under zero-trust SSRF protection to build canonical `inv.json`.
 >   2. **Collect Empirical Telemetry**: Run `orchestrator.py --telemetry` to extract un-truncated measurements across all sensors and causal DAG nodes.
->   3. **Compile Tailored Context**: Run `bundle_context.py --site <url> --inventory inv.json` to extract archetype-specific code templates and research heuristics.
+>   3. **Direct Specialist Knowledge Consultation**: Read the relevant specialist skills (`SKILL.md` and `references/knowledge-base.md`) directly using native file reading tools to acquire domain rules, schema patterns, and Princeton KDD 2024 copy structures.
 >   4. **Targeted Specialist Invocations**: When telemetry indicates specific anomalies (e.g. blocked bots, missing schema, price conflicts, broken sameAs, low citability, bounce friction), invoke the relevant specialist skill's sensor directly with custom parameters.
 >   5. **Apply 6-Layer Causal DAG**: Suppress downstream symptoms when upstream blockers exist (Layer 0 access blocks preempt downstream; Layer 1 unhydrated shells preempt citability/facts).
 >   6. **Author Bespoke Dual-Track Remediations**: Write exact, copy-pasteable technical code diffs (`technical_fix`) and concrete editorial copywriting guidance (`creative_fix`), ranking tasks with `plan.py`.
@@ -157,17 +155,21 @@ python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example
 
 ---
 
-### Stage 2 — Tailored Context & Specialist Deep Dives
+### Stage 2 — Specialist Knowledge Consultation & Targeted Deep Dives
 
-**Step 3: Compile Tailored Site Context Briefing**
-Execute `bundle_context.py` to extract high-signal rules, templates, and research citations tailored to the detected business archetype and observed signals:
-```bash
-python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com --inventory inv.json
-```
-Or pass the telemetry payload directly:
-```bash
-python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com --telemetry telemetry.json
-```
+**Step 3: Direct Specialist Skill & Knowledge Consultation**
+As an autonomous AI agent, do not rely on an intermediate bundler script. Use your native file reading tools to directly inspect the relevant specialist skill manifests (`SKILL.md`) and knowledge bases (`references/knowledge-base.md`):
+
+| Specialist Domain | Canonical SKILL.md Path | Reference Knowledge Base | Primary Diagnostic Sensor |
+| :--- | :--- | :--- | :--- |
+| **Crawl & Single-Pass Acquisition** | `skills/web-scraper/SKILL.md` | `skills/web-scraper/references/bot-registry.json` | `skills/web-scraper/scripts/acquire_inventory.py` |
+| **Bot Access & Discoverability** | `skills/discoverability-audit/SKILL.md` | `skills/discoverability-audit/references/knowledge-base.md` | `skills/discoverability-audit/scripts/discoverability_check.py` |
+| **Schema & Commercial Entities** | `skills/entity-content-audit/SKILL.md` | `skills/entity-content-audit/references/knowledge-base.md` | `skills/entity-content-audit/scripts/entity_content_check.py` |
+| **Fact Consistency & Price Drift** | `skills/fact-consistency-audit/SKILL.md` | `skills/fact-consistency-audit/references/knowledge-base.md` | `skills/fact-consistency-audit/scripts/fact_consistency_check.py` |
+| **Authority & sameAs Verification** | `skills/corroboration-authority-audit/SKILL.md` | `skills/corroboration-authority-audit/references/knowledge-base.md` | `skills/corroboration-authority-audit/scripts/corroboration_check.py` |
+| **GEO & Citability Optimization** | `skills/geo-content-audit/SKILL.md` | `skills/geo-content-audit/references/knowledge-base.md` | `skills/geo-content-audit/scripts/geo_content_check.py` |
+| **Engagement & Intent Continuity** | `skills/engagement-context-audit/SKILL.md` | `skills/engagement-context-audit/references/knowledge-base.md` | `skills/engagement-context-audit/scripts/engagement_check.py` |
+| **Master Orchestrator & Causal DAG** | `skills/audit-orchestrator/SKILL.md` | `skills/audit-orchestrator/references/knowledge-base.md` | `skills/audit-orchestrator/scripts/orchestrator.py` |
 
 **Step 4: Consult Specialist Skills & Execute Targeted Sensor Inspections (Custom Calling)**
 
@@ -251,7 +253,50 @@ Then invoke the specialist sensor directly with custom parameters for granular d
 
 ### Stage 3 — Cognitive AI Reasoning & Bespoke Synthesis
 
-Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated diagnosis:
+> [!IMPORTANT]
+> **COGNITIVE BRAIN MANDATE: DIRECT INSPECTION OF `inv.json` AND `telemetry.json`**
+> - **The Sensor-Brain Imperative**: Diagnostic scripts (`discoverability_check.py`, `entity_content_check.py`, `geo_content_check.py`, etc.) and pre-programmed checks provide fast, deterministic, empirical telemetry. However, sensors are bounded code; they cannot grasp brand voice, nuanced commercial terms, conversational journey friction, or subtle layout inconsistencies.
+> - **YOU, the AI Agent, are the Cognitive Reasoning Brain.** You MUST read and directly inspect `inv.json` and `telemetry.json` using your native file reading tools.
+> - **Discover Agent-Authored Findings Beyond Scripts**: You must NOT merely forward script findings or limit the audit to what automated scripts caught. By reading `inv.json` (raw page HTML, text, headings, buttons, links, images, JSON-LD) and `telemetry.json` (empirical metrics, answerability scores, citability ratings, bot permissions), you must discover and author your OWN bespoke findings, proactive actions, and tailored dual-track remediations.
+> - **Seamless Ingestion via `review.json`**: When you author findings and proactive actions in `review.json` and invoke `orchestrator.py -i inv.json -r review.json -o report.json`, the orchestrator automatically MERGES your cognitive findings with all the sensor-detected findings and checks. Your agent-authored findings supersede matching sensor findings while all other unique sensor findings are preserved.
+
+#### Agent Direct Inspection Protocol:
+
+1. **Direct Inspection of `inv.json` (Content, DOM, and Structure)**:
+   - **Page Content & Heading Hierarchies**: Read through core routes (homepage, pricing, catalog, about, locations). Verify whether H1/H2 tags communicate unambiguous value propositions or suffer from generic scent vacuums.
+   - **Interactive Elements & CTAs**: Inspect `<button>`, `<a>`, `<form>`, and `<input>` tags. Check for icon-only buttons lacking accessible names (`aria-label`, `title`), CTAs targeting inert `#` anchors, or search inputs that gate physical location discovery behind client-side forms.
+   - **Structured Data & JSON-LD**: Inspect `jsonld` blocks in `inv.json`. Check for staging/preview domains (`.aem.live`, `.webflow.io`, `staging.*`) declared in `@id` or `offers.url`, missing Organization graphs, or incomplete commercial terms.
+   - **Media & Non-Text Facts**: Identify commercial charts, pricing tables, or feature comparisons published as raster images without machine-readable HTML table equivalents.
+
+2. **Direct Inspection of `telemetry.json` (Empirical Metrics & Heuristics)**:
+   - **Retrieval & Crawlability Grid**: Verify `retrieval.has_nav_fragment`, `retrieval.broken_primary_nav_routes`, `retrieval.form_gated_location_pages`, and bot permission ratios across 16 retrieval and training crawlers.
+   - **Rendering & Shell Gaps**: Inspect `rendering.empty_navigation_pages` and text-to-HTML ratios to identify client-side rendering bottlenecks where primary copy is omitted from initial HTML.
+   - **Entity Answerability Breakdown**: Review `entity.average_answerability_score` and examine evaluations for missing priceCurrency, availability, specifications, and commercial attributes.
+   - **Citability & Information Gain**: Review `geo.average_citability_score`, `geo.average_hedge_density`, and identify passages needing statistical evidence or BLUF restructuring.
+   - **Engagement & Intent Continuity**: Check `engagement.inert_cta_pages`, H1-to-lead scent purity, and viewport answer anchoring metrics.
+
+3. **Authoring Bespoke Findings & Dual-Track Remediations**:
+   - For each gap discovered during direct inspection of `inv.json` and `telemetry.json`, author a structured finding object in `review.json`.
+   - Every finding must include:
+     - `cause_id` / `check_id` (e.g. `FORM_GATED_DISCOVERY_TRAP`, `COMPONENT_LOADING_FAILURE`, `CONTROL_REPRESENTATION_GAP`, `SCHEMA_INTERNAL_CONTRADICTION`, `INERT_CTA_TARGET`, etc.)
+     - `title`: Clear, descriptive defect headline.
+     - `severity`: `critical` | `high` | `medium` | `low`.
+     - `category`: `discoverability` | `entity_content` | `fact_consistency` | `corroboration` | `geo_content` | `engagement_context`.
+     - `scope`: Exact target URL or route.
+     - `evidence`: Concrete quotation and observation directly from `inv.json`.
+     - `root_cause`: Underlying architectural or CMS mechanism.
+     - `impact`: Exact effect on AI search engines (ChatGPT, Claude, Perplexity, Google) or human visitors.
+     - `suggested_action`:
+       - `summary`: One-sentence fix summary.
+       - `technical_fix`: Copy-pasteable code diff, config snippet, or Schema.org JSON-LD `@graph` customized to the real domain name.
+       - `creative_fix`: Concrete copywriting or information architecture guidance grounded in Princeton KDD 2024 / AutoGEO research.
+       - `priority`: Matching severity tier.
+       - `verification`: Deterministic test command or validation step.
+
+4. **Authoring Forward-Looking Proactive Actions (`proactive_actions`)**:
+   - Propose strategic architectural enhancements even where no explicit defect was flagged.
+   - Examples: Authoritative `/llms.txt` manifest, machine-readable purchasing manifest (`/pricing.md`), E-E-A-T author credentials with external Wikidata/LinkedIn anchors, and Princeton citability passage structuring.
+   - Every item must include all 4 required fields: `id` (`P-001`, `P-002`), `title`, `summary`, and `priority`.
 
 1. **Apply 6-Layer Causal DAG & Keystone Deduplication:**
    - **Anti-Shortcut Rule for Agent Brain**: NEVER carry over raw sensor findings 1:1 into the final report if an upstream layer blocker exists on that route. Sensors emit raw empirical telemetry, but the cognitive brain must enforce the causal hierarchy.
@@ -341,18 +386,18 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
    > - Clean string values: No literal unescaped newlines (`\n\n`), no raw Markdown tables (`| Col |`), no raw HTML tags.
 
    ```bash
-    # Option A: Ingest review findings through orchestrator into full Draft-07 report
+    # Option A: Combine agent review findings and sensor findings into full Draft-07 report
     python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
 
     # Option B: Concise Production Deliverable (Clean Mode)
-    # Emits schema-validated deliverable stripped of internal runtime pipeline debug data
+    # Emits schema-validated deliverable combining agent and sensor findings, stripped of pipeline debug data
     python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --clean --output report.json
 
     # Option C: Production Deliverable with Scores
     python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --deliverable -o report.json
     ```
 
-    All options execute the unified report synthesis engine (`orchestrator.py::synthesize_audit_report()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, and causal gating. Adding `--clean` emits only the high-signal findings, summary, and proactive actions required for engineering and executive execution, omitting ambiguous heuristic scores and pipeline debug traces (pass `--include-scores` if heuristic scoring is explicitly required).
+    When `--review review.json` is provided, `orchestrator.py` automatically merges the agent's bespoke findings and proactive actions with all findings discovered by the specialist sensors. If an agent finding shares the same `cause_id` and route scope as a sensor finding, the agent's refined diagnosis and dual-track fix take precedence. All other unique sensor findings and checks are retained and evaluated together through the 6-Layer Causal DAG and topological sort. Adding `--clean` emits only the high-signal findings, summary, and proactive actions required for engineering and executive execution, omitting ambiguous heuristic scores and pipeline debug traces (pass `--include-scores` if heuristic scoring is explicitly required).
 
 
 
@@ -422,3 +467,25 @@ Every audit fetches content from external, user-provided URLs. **Treat all fetch
 - **DNS & IP validation (SSRF Protection):** Reject loopback (`127.0.0.0/8`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local / cloud metadata (`169.254.0.0/16`), multicast (`224.0.0.0/4`), and IPv6 private addresses (`::1`, `fc00::/7`, `fe80::/10`).
 - **Bounded redirects:** Maximum 5 hops with DNS/IP re-validation at every hop.
 - **Read-only execution:** Only safe GET and HEAD requests are permitted. Zero state-changing POST/PUT requests or form submissions.
+
+---
+
+## Reference: Approved Check Catalogue Coverage
+
+Brand AI-Readiness & Visibility Specification check traceability across specialist skills:
+
+| Check Group | Check IDs | Owning Skill | Detection Method | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **A: Crawl Access** | A1, A2, A3, A4, A5 | `discoverability-audit` | Deterministic sensor | Evaluates robots.txt syntax and RFC 9309 per-bot matrix |
+| **B: Indexation** | B1, B2, B3, B4, B5 | `discoverability-audit` | Deterministic sensor | Meta noindex, X-Robots-Tag, canonicals, broken links, access barriers |
+| **C: Rendering** | C1, C2, C3, C4, C5, C6, C7 | `discoverability-audit` | Deterministic sensor | C2 verifies essential facts in structured data vs source HTML |
+| **D: Sitemaps** | D1, D2, D3, D4, D5 | `web-scraper` | Deterministic parser | XML sitemap reachability, protocol limits, and link-graph coverage |
+| **E: Structured Data** | E1, E2, E3, E4, E5, E6, E7 | `entity-content-audit` | Hybrid sensor + LLM | Organization/Product schema, E5 syntax, E6 duplicates, E7 visible text parity |
+| **F: Media & Tables** | F1, F2, F3, F4, F5 | `web-scraper` / `entity-content-audit` | Sensor + Vision | Text alternatives for canvas/images, table relationships, PDF text |
+| **G: AI Discovery** | G1, G2 | `discoverability-audit` | Deterministic sensor | G1 llms.txt detection, G2 link reachability verification |
+| **H: Performance** | H1, H2, H3 | `discoverability-audit` / `engagement-context-audit` | Sensor | Latency measurements, heading hierarchies, desktop/mobile parity |
+| **Offsite Consistency** | PROFILE_DATA_MISMATCH | `corroboration-authority-audit` | Sensor + Live probe | Declared sameAs identity corroboration under SSRF protection |
+| **I: Entry Routing** | I1, I2 | `discoverability-audit` | Sensor | Direct entry stability and safe query parameter handling |
+| **EN: Engagement** | EN1 to EN8 | `engagement-context-audit` | Sensor + LLM synthesis | Above-the-fold clarity, heading information scent, CTA reachability |
+| **N: Common Content** | N1, N3, N12, N13, N14 | `fact-consistency-audit` / `geo-content-audit` | Sensor + LLM synthesis | Cross-page fact ledger (N12), temporal drift (N14), evidence density |
+| **Q: Query Rubrics** | Q6, Q7 | `geo-content-audit` | LLM synthesis | Intent question coverage from `references/query-rubrics.json` |

@@ -206,12 +206,16 @@ def compute_cta_reachability_index(dom: EngagementDOMParser) -> dict:
     elements = dom.interactive_elements
     first_comm_idx = None
     first_comm_text = ""
+    inert_ctas: List[Dict[str, str]] = []
 
     for idx, el in enumerate(elements):
         if el.get("is_commercial_cta"):
-            first_comm_idx = idx
-            first_comm_text = el.get("text", "")
-            break
+            if first_comm_idx is None:
+                first_comm_idx = idx
+                first_comm_text = el.get("text", "")
+            href = (el.get("href") or "").strip()
+            if href in ("#", "", "javascript:void(0)", "javascript:;", "javascript:void(0);") or href.startswith("javascript:"):
+                inert_ctas.append({"text": el.get("text", ""), "href": href})
 
     if first_comm_idx is None:
         return {
@@ -220,6 +224,7 @@ def compute_cta_reachability_index(dom: EngagementDOMParser) -> dict:
             "reachability_score": 0.0,
             "is_delayed": True,
             "first_cta_text": "",
+            "inert_ctas": inert_ctas,
         }
 
     reachability_score = round(1.0 / (1.0 + first_comm_idx), 3)
@@ -229,7 +234,107 @@ def compute_cta_reachability_index(dom: EngagementDOMParser) -> dict:
         "reachability_score": reachability_score,
         "is_delayed": first_comm_idx > 3,
         "first_cta_text": first_comm_text,
+        "inert_ctas": inert_ctas,
     }
+
+
+def check_fake_or_inaccessible_forms(html: str, url: str) -> Optional[Dict[str, Any]]:
+    """Detect modal sign-in or form triggers pointing to empty/inaccessible containers."""
+    if not html:
+        return None
+    dialog_matches = re.finditer(
+        r'<(?:div|dialog|form)\b[^>]*id=["\']([^"\']*(?:login|signin|signup|modal|dialog)[^"\']*)["\'][^>]*>(.*?)</(?:div|dialog|form)>',
+        html,
+        re.DOTALL | re.I,
+    )
+    for m in dialog_matches:
+        container_id = m.group(1)
+        body = m.group(2)
+        inputs = re.findall(r"<input\b", body, re.I)
+        if len(inputs) == 0 and len(body.strip()) < 100:
+            return make_finding(
+                "INACCESSIBLE_INTERACTIVE_DIALOG",
+                f"Interactive dialog container #{container_id} is non-functional (0 input fields)",
+                "high",
+                url,
+                f"Interactive element targets #{container_id} which contains 0 input elements in raw HTML.",
+            )
+    return None
+
+
+def check_broken_component_integrations(html_content: str, url: str) -> Optional[Dict[str, Any]]:
+    """EN2: Detect broken third-party components (e.g. Google Maps API errors) failing in initial/rendered DOM."""
+    map_error = bool(re.search(r"This page can['’]t load Google Maps correctly", html_content, re.I))
+    gm_err = bool(re.search(r'\b(?:gm-err-container|gm-err-message)\b', html_content, re.I))
+    if map_error or gm_err:
+        return {
+            "id": "EN2_COMPONENT_LOADING_FAILURE",
+            "cause_id": "COMPONENT_LOADING_FAILURE",
+            "check_id": "EN2",
+            "title": f"Interactive map component displays runtime loading error on {url}",
+            "severity": "medium",
+            "category": "engagement",
+            "confidence": "high",
+            "scope": url,
+            "evidence": {
+                "summary": f"Interactive Google Maps component on {url} displays: 'This page can\\'t load Google Maps correctly.'",
+                "sources": [{"url": url, "observation": "Google Maps runtime configuration failure (missing API key or referrer mismatch)"}],
+            },
+            "root_cause": "Embedded map widget is missing a valid API key, billing setup, or authorized HTTP referrer.",
+            "impact": "Visitors seeking physical store locations encounter broken visual errors rather than store directions.",
+            "suggested_action": {
+                "summary": "Configure valid map API key or provide static accessible location fallback.",
+                "technical_fix": "Supply a valid Google Maps JavaScript API key and embed static address text alongside the map.",
+                "creative_fix": "Ensure physical store addresses and operating hours remain readable if external scripts fail.",
+                "priority": "medium",
+                "verification": f"Verify map container on {url} renders without error banners.",
+            },
+        }
+    return None
+
+
+def check_unnamed_interactive_controls(html_content: str, url: str) -> Optional[Dict[str, Any]]:
+    """EN6: Control representation - detect interactive buttons with empty text and no accessible name."""
+    unnamed_buttons = 0
+    for btn_match in re.finditer(r"<button\b([^>]*)>(.*?)</button>", html_content, re.DOTALL | re.I):
+        attrs_str = btn_match.group(1)
+        inner_content = btn_match.group(2)
+        has_label = bool(re.search(r'\b(?:aria-label|aria-labelledby|title)=["\'][^"\']+["\']', attrs_str, re.I))
+        if has_label:
+            continue
+        text_only = re.sub(r"<[^>]+>", " ", inner_content).strip()
+        if text_only:
+            continue
+        img_has_alt = bool(re.search(r'<img\b[^>]*\balt=["\'][^"\']+["\']', inner_content, re.I))
+        if img_has_alt:
+            continue
+        unnamed_buttons += 1
+
+    if unnamed_buttons >= 2:
+        return {
+            "id": "EN6_UNNAMED_INTERACTIVE_CONTROL",
+            "cause_id": "CONTROL_REPRESENTATION_GAP",
+            "check_id": "EN6",
+            "title": f"Product action controls lack accessible names ({unnamed_buttons} unnamed buttons on {url})",
+            "severity": "medium",
+            "category": "engagement",
+            "confidence": "high",
+            "scope": url,
+            "evidence": {
+                "summary": f"Found {unnamed_buttons} interactive <button> elements with empty text and no aria-label or title attributes on {url}.",
+                "sources": [{"url": url, "observation": f"{unnamed_buttons} action buttons expose no name to assistive tech or machine agents"}],
+            },
+            "root_cause": "Icon-only buttons (such as cart or wishlist) omit accessible text or aria-label attributes.",
+            "impact": "Assistive screen readers, conversational agents, and automated buying bots cannot determine control purpose.",
+            "suggested_action": {
+                "summary": "Add explicit aria-label attributes to all icon-only action buttons.",
+                "technical_fix": "Add aria-label=\"Add to cart\" or aria-label=\"Add to wishlist\" to <button> elements.",
+                "creative_fix": "Ensure all interactive shopping controls communicate their clear intent.",
+                "priority": "medium",
+                "verification": f"Verify all buttons on {url} possess accessible names in the DOM accessibility tree.",
+            },
+        }
+    return None
 
 
 def compute_information_scent(h1_text: str, lead_text: str) -> dict:
@@ -343,6 +448,28 @@ def audit_page_engagement(
             f"Commercial CTA delayed: index={cta_reach['first_commercial_cta_index']}",
         ))
 
+    if cta_reach.get("inert_ctas"):
+        icta = cta_reach["inert_ctas"][0]
+        findings.append(make_finding(
+            "INERT_CTA_TARGET",
+            f"Commercial CTA targets inert destination (\"{icta['text']}\" -> {icta['href'] or 'empty'})",
+            "high",
+            url,
+            f"Commercial call-to-action '{icta['text']}' has inert target '{icta['href']}', causing visitor conversion abandonment.",
+        ))
+
+    fake_form_f = check_fake_or_inaccessible_forms(html_content, url)
+    if fake_form_f:
+        findings.append(fake_form_f)
+
+    comp_err_f = check_broken_component_integrations(html_content, url)
+    if comp_err_f:
+        findings.append(comp_err_f)
+
+    unnamed_f = check_unnamed_interactive_controls(html_content, url)
+    if unnamed_f:
+        findings.append(unnamed_f)
+
     # 3. Viewport answer anchoring
     anchoring = compute_viewport_answer_anchoring(dom, full_text, page_type)
     if not anchoring["anchored_in_viewport"] and anchoring["missing_propositions"]:
@@ -438,6 +565,20 @@ def audit(
                 url,
                 f"Commercial CTA delayed: index={cta_reach['first_commercial_cta_index']}, preceding={cta_reach['preceding_interactive_elements']}",
             ))
+
+        if cta_reach.get("inert_ctas") and not any(f.get("cause_id") == "INERT_CTA_TARGET" and f.get("scope") == url for f in findings):
+            icta = cta_reach["inert_ctas"][0]
+            findings.append(make_finding(
+                "INERT_CTA_TARGET",
+                f"Commercial CTA targets inert destination (\"{icta['text']}\" -> {icta['href'] or 'empty'})",
+                "high",
+                url,
+                f"Commercial call-to-action '{icta['text']}' has inert target '{icta['href']}', causing visitor conversion abandonment.",
+            ))
+
+        fake_form_f = check_fake_or_inaccessible_forms(html, url)
+        if fake_form_f and not any(f.get("cause_id") == "INACCESSIBLE_INTERACTIVE_DIALOG" and f.get("scope") == url for f in findings):
+            findings.append(fake_form_f)
 
         # 3. Viewport answer anchoring
         anchoring = compute_viewport_answer_anchoring(dom, full_text, ptype)

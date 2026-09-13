@@ -138,17 +138,32 @@ def detect_signals(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             saas_indicators = ["pricing", "api docs", "sign up free", "per user", "monthly plan", "workspace", "softwareapplication"]
             pub_indicators = ["published by", "news", "editorial team", "min read", "opinion", "article", "newsarticle"]
             local_indicators = ["localbusiness", "postaladdress", "openinghours", "store-locator", "location", "branches"]
+            port_indicators = ["portfolio", "my work", "case study", "freelance", "projects", "photographer", "designer"]
+            doc_indicators = ["documentation", "api reference", "sdk reference", "tutorial", "endpoints", "quickstart"]
+            edu_indicators = ["curriculum", "courses", "syllabus", "admissions", "enrollment", "coursework"]
+            comm_indicators = ["forum", "community", "discussions", "thread", "moderator"]
+            media_indicators = ["episodes", "stream now", "season", "tv series", "movie", "watch now"]
 
             ecom_count = sum(1 for ind in ecom_indicators if ind in text_corpus)
             saas_count = sum(1 for ind in saas_indicators if ind in text_corpus)
             pub_count = sum(1 for ind in pub_indicators if ind in text_corpus)
             local_count = sum(1 for ind in local_indicators if ind in text_corpus)
+            port_count = sum(1 for ind in port_indicators if ind in text_corpus)
+            doc_count = sum(1 for ind in doc_indicators if ind in text_corpus)
+            edu_count = sum(1 for ind in edu_indicators if ind in text_corpus)
+            comm_count = sum(1 for ind in comm_indicators if ind in text_corpus)
+            media_count = sum(1 for ind in media_indicators if ind in text_corpus)
 
             scores = [
                 (ecom_count, "ecommerce"),
                 (saas_count, "saas"),
                 (pub_count, "publisher"),
                 (local_count, "local_business"),
+                (port_count, "portfolio"),
+                (doc_count, "documentation"),
+                (edu_count, "education"),
+                (comm_count, "community"),
+                (media_count, "media"),
             ]
             scores.sort(key=lambda x: x[0], reverse=True)
             if scores[0][0] >= 2:

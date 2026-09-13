@@ -256,6 +256,44 @@ class TestEntityContentUnit(unittest.TestCase):
         self.assertFalse(facts["engagement_model"])
         self.assertEqual(ans["results"][0]["score"], 0.0)
 
+    def test_check_staging_hostname_in_schema_detects_aem_live(self):
+        """E7: Detect non-production staging/preview hostname in Schema.org entity."""
+        page = {"url": "https://frescopa.coffee/products/roast"}
+        entities = [
+            {
+                "@context": "https://schema.org",
+                "@type": "Product",
+                "@id": "https://main--frescopa--hlxsites.aem.live/products/roast#product",
+                "name": "House Roast",
+                "offers": {
+                    "@type": "Offer",
+                    "url": "https://main--frescopa--hlxsites.aem.live/products/roast",
+                    "price": "18.00",
+                },
+            }
+        ]
+        findings = entity_content_check.check_staging_hostname_in_schema(page, entities, "frescopa.coffee")
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["id"], "E7_STAGING_HOSTNAME_IN_SCHEMA")
+        self.assertEqual(findings[0]["cause_id"], "SCHEMA_INTERNAL_CONTRADICTION")
+
+        # Test clean production schema does not trigger finding
+        clean_entities = [
+            {
+                "@context": "https://schema.org",
+                "@type": "Product",
+                "@id": "https://frescopa.coffee/products/roast#product",
+                "name": "House Roast",
+                "offers": {
+                    "@type": "Offer",
+                    "url": "https://frescopa.coffee/products/roast",
+                    "price": "18.00",
+                },
+            }
+        ]
+        clean_findings = entity_content_check.check_staging_hostname_in_schema(page, clean_entities, "frescopa.coffee")
+        self.assertEqual(len(clean_findings), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -52,7 +52,6 @@ Composite Score = 0.20 * C_crawl + 0.15 * R_retr + 0.25 * C_cite + 0.20 * E_auth
 - **Grade A**: >= 85.0 | **Grade B**: 70.0 - 84.9 | **Grade C**: 50.0 - 69.9 | **Grade D**: 30.0 - 49.9 | **Grade F**: < 30.0
 - **Dimension Status**: Each dimension evaluates to `"pass"` (>= threshold), `"warning"` (healthy - 20 <= score < healthy), or `"fail"` (< healthy - 20).
 
-
 ---
 
 ## 3. The 9 Princeton KDD 2024 / AutoGEO Citability Vectors
@@ -165,5 +164,4 @@ Securing an AI citation (via ChatGPT, Perplexity, or Claude) is only half the ba
 5. **`AGENT_INTERACTION_BARRIER`**: Critical conversion triggers and navigation links are implemented as non-semantic `<div onclick>` or `<span onclick>` elements rather than standard `<a href>` or `<button type="button">`, blocking both autonomous buying agents (OpenAI Operator, Project Mariner) and assistive keyboard technologies.
 6. **`LOCALE_MISCONFIGURATION`**: Cross-language or cross-regional links land users on mismatched languages, non-local currency, or missing `hreflang` routes, causing immediate regional bounce.
 7. **`COGNITIVE_READABILITY_FRICTION`**: High Automated Readability Index (ARI > 14) and dense marketing jargon obscure direct answers, causing cognitive fatigue for users seeking immediate factual clarity.
-
 

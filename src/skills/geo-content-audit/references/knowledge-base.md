@@ -392,4 +392,3 @@ Generative search engines evaluate the commercial intent and domain authority of
 - **Significance**: When informational guides, technical documentation, or educational articles contain dense commercial sales pitches (>= 4 high-friction CTAs like "Buy Now", "Request Demo", "Start Free Trial"), LLM query routers classify the page as promotional advertising rather than objective reference material.
 - **Guidance**: Keep informational content cleanly separated from aggressive sales funnels. Restrict conversion points on research and educational pages to subtle, contextually relevant resource links.
 
-

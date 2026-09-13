@@ -32,8 +32,8 @@ allowed-tools:
 > - **LLM Cognitive Generation:** All downstream specialist skills and the Master Orchestrator run offline against `inv.json`, requesting relevant telemetry from sensors while the LLM generates the complete audit report.
 
 > [!NOTE]
-> **Scale Architecture and Context Boundary (`inv.json`):**
-> Full raw HTML is persisted in `inv.json` to enable deterministic offline diagnostic sensors to inspect DOM structures, JSON-LD graphs, and visible word counts without duplicate network roundtrips. To protect LLM context limits, `inv.json` is strictly an intermediate machine artifact on disk and must NEVER be read into the AI agent's context window. The AI agent ingests only distilled empirical telemetry via `orchestrator.py --telemetry` and context bundles via `bundle_context.py`.
+> **Scale Architecture and Single-Pass Inventory Contract (`inv.json`):**
+> Full raw HTML and metadata are persisted in `inv.json` to enable deterministic offline diagnostic sensors and the AI agent to inspect DOM structures, JSON-LD graphs, headings, buttons, links, and forms without duplicate network roundtrips. The AI agent inspects `inv.json` alongside empirical metrics from `orchestrator.py --telemetry` to discover bespoke brand findings, proactive strategic opportunities, and dual-track suggestions in addition to automated script findings.
 
 > [!CAUTION]
 > **ZERO DIRECT AGENT URL READING MANDATE:**

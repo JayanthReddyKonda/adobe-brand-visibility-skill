@@ -56,6 +56,52 @@ class TestDiscoverabilityUnit(unittest.TestCase):
         self.assertIn("status", res)
         self.assertIsInstance(res.get("findings"), list)
 
+    def test_broken_primary_nav_route(self):
+        """Failure test: Navigation fragment referencing a 404 endpoint emits B4_BROKEN_PRIMARY_NAV_ROUTE."""
+        inv = {
+            "site": "https://example.com",
+            "infrastructure": {
+                "nav_fragment": {
+                    "status": 200,
+                    "url": "https://example.com/nav.plain.html",
+                    "links": ["https://example.com/products", "https://example.com/dead-route"],
+                }
+            },
+            "pages": [
+                {"url": "https://example.com/", "status": 200, "html": "<html><body>Home</body></html>"},
+                {"url": "https://example.com/products", "status": 200, "html": "<html><body>Products</body></html>"},
+                {"url": "https://example.com/dead-route", "status": 404, "html": "<html><body>Not Found</body></html>"},
+            ],
+        }
+        res = discoverability_check.audit("https://example.com", "example.com", inv)
+        findings = res.get("findings", [])
+        nav_broken = [f for f in findings if f.get("id") == "B4_BROKEN_PRIMARY_NAV_ROUTE"]
+        self.assertTrue(len(nav_broken) > 0)
+        self.assertEqual(nav_broken[0]["cause_id"], "BROKEN_LINK")
+        self.assertEqual(nav_broken[0]["severity"], "high")
+
+    def test_form_gated_entity_discovery(self):
+        """Failure test: Store locator gating store locations behind postal code input emits B5_FORM_GATED_ENTITY_DISCOVERY."""
+        inv = {
+            "site": "https://example.com",
+            "pages": [
+                {
+                    "url": "https://example.com/locations",
+                    "status": 200,
+                    "html": '<div class="store-locator"><h2>Find A Location</h2><form><label>Post Code</label><input type="text"><button>Search</button></form></div>',
+                    "clean_text": "Find A Location Post Code Search",
+                    "links": [],
+                    "schemas": [],
+                }
+            ],
+        }
+        res = discoverability_check.audit("https://example.com", "example.com", inv)
+        findings = res.get("findings", [])
+        form_gated = [f for f in findings if f.get("id") == "B5_FORM_GATED_ENTITY_DISCOVERY"]
+        self.assertTrue(len(form_gated) > 0)
+        self.assertEqual(form_gated[0]["cause_id"], "FORM_GATED_DISCOVERY_TRAP")
+        self.assertEqual(form_gated[0]["severity"], "medium")
+
 
 if __name__ == "__main__":
     unittest.main()

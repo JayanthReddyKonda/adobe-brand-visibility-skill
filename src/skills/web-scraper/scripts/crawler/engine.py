@@ -699,13 +699,17 @@ class Frontier:
         "legal": 30.0,
         "cookie": 25.0,
         "cookies": 25.0,
-        "cart": 10.0,
-        "checkout": 10.0,
-        "login": 10.0,
-        "signin": 10.0,
-        "signup": 10.0,
-        "register": 10.0,
-        "auth": 10.0,
+        "cart": 55.0,
+        "checkout": 55.0,
+        "subscription": 92.0,
+        "subscribe": 92.0,
+        "coffee": 88.0,
+        "login": 50.0,
+        "signin": 50.0,
+        "signup": 50.0,
+        "register": 50.0,
+        "auth": 45.0,
+        "quiz": 70.0,
         "admin": 5.0,
     }
 
@@ -716,7 +720,13 @@ class Frontier:
         self._visited: Set[str] = set()
         self._lock = threading.Lock()
 
-    def compute_priority(self, url: str, depth: int, is_sitemap_declared: bool = False) -> float:
+    def compute_priority(
+        self,
+        url: str,
+        depth: int,
+        is_sitemap_declared: bool = False,
+        source_url: Optional[str] = None,
+    ) -> float:
         """Computes a numeric priority score for a given URL."""
         parsed = urlparse(url)
         path = (parsed.path or "/").lower().strip("/")
@@ -734,10 +744,17 @@ class Frontier:
                     if route_key in path:
                         base_score = max(base_score, weight * 0.9)
 
+        # Asset / DAM / media paths are low-priority for content audit
+        asset_penalty = 0.0
+        if any(seg in path for seg in ("content/dam", "/dam/", "dam/", "/assets/", "/media/", "/static/", "/uploads/", "/images/")):
+            asset_penalty = 60.0
+
+        # Direct homepage/seed links receive higher priority than arbitrary sitemap URLs
+        seed_link_bonus = 30.0 if (depth <= 1 and not is_sitemap_declared) else 0.0
         sitemap_bonus = 15.0 if is_sitemap_declared else 0.0
-        depth_penalty = depth * 15.0
+        depth_penalty = depth * 12.0
         query_penalty = 10.0 if parsed.query else 0.0
-        return base_score + sitemap_bonus - depth_penalty - query_penalty
+        return base_score + seed_link_bonus + sitemap_bonus - depth_penalty - query_penalty - asset_penalty
 
     def push(
         self,
@@ -753,7 +770,7 @@ class Frontier:
             if len(self._enqueued) >= self.max_capacity:
                 return False
 
-            priority = self.compute_priority(url, depth, is_sitemap_declared)
+            priority = self.compute_priority(url, depth, is_sitemap_declared, source_url=source_url)
             item = FrontierItem(
                 neg_priority=-priority,
                 depth=depth,
@@ -2824,6 +2841,9 @@ class WebAuditEngine:
         self.ai_plugin_status: int = 404
         self.security_txt_content: Optional[str] = None
         self.security_txt_status: int = 404
+        self.nav_fragment_content: Optional[str] = None
+        self.nav_fragment_url: Optional[str] = None
+        self.nav_fragment_links: List[str] = []
 
     def crawl(self, seed_url: str) -> EvidenceModel:
         norm_seed = LinkProcessor.normalize_url(seed_url)
@@ -2930,7 +2950,29 @@ class WebAuditEngine:
         except Exception:
             pass
 
-        # 4. Discover XML sitemaps
+        # 4. Probe dynamic navigation fragments (Adobe EDS, JAMstack, Headless CMS)
+        for frag_path in ("/nav.plain.html", "/header.plain.html"):
+            try:
+                frag_url = urljoin(base_origin, frag_path)
+                frag_res = self.fetcher.fetch(frag_url, timeout=3.0)
+                if frag_res.status == 200 and frag_res.body_bytes:
+                    self.nav_fragment_url = frag_url
+                    self.nav_fragment_content = frag_res.body_bytes.decode("utf-8", errors="replace")
+                    nav_hrefs = re.findall(r'<a\s+[^>]*href=["\']([^"\']+)["\']', self.nav_fragment_content, re.I)
+                    for raw_h in nav_hrefs:
+                        if raw_h.startswith(("#", "javascript:", "mailto:", "tel:")):
+                            continue
+                        full_nav_u = urljoin(base_origin, raw_h)
+                        norm_nav_u = LinkProcessor.normalize_url(full_nav_u)
+                        if norm_nav_u and LinkProcessor.is_same_origin(base_origin, norm_nav_u):
+                            if norm_nav_u not in self.nav_fragment_links:
+                                self.nav_fragment_links.append(norm_nav_u)
+                            self.frontier.push(norm_nav_u, depth=1, is_sitemap_declared=False, source_url=frag_url)
+                    break
+            except Exception:
+                pass
+
+        # 5. Discover XML sitemaps
         sitemap_discovery = SitemapDiscovery(
             fetch_func=lambda u: self.fetcher.fetch(u, timeout=5.0).body_bytes.decode("utf-8", errors="replace"),
             max_sitemaps=6,
@@ -3029,6 +3071,26 @@ class WebAuditEngine:
             )
 
             all_page_obs = canon_obs + meta_obs + jsonld_obs + rendering_obs
+            if resource.status in (404, 410):
+                all_page_obs.append(
+                    Observation(
+                        type="broken_link",
+                        value=f"http_status_{resource.status}",
+                        confidence="high",
+                        evidence=f"Internal link returned HTTP {resource.status}: {resource.url}",
+                        severity_hint="high",
+                    )
+                )
+            elif resource.status >= 400:
+                all_page_obs.append(
+                    Observation(
+                        type="http_error",
+                        value=f"http_status_{resource.status}",
+                        confidence="high",
+                        evidence=f"HTTP {resource.status} returned for {resource.url}",
+                        severity_hint="medium",
+                    )
+                )
             all_page_facts = jsonld_facts + text_facts
 
             self.budget.commit_page_slot()
@@ -3200,6 +3262,13 @@ class WebAuditEngine:
                     "status": self.security_txt_status,
                     "present": bool(self.security_txt_content),
                     "snippet": self.security_txt_content[:400] if self.security_txt_content else None,
+                },
+                "nav_fragment": {
+                    "status": 200 if self.nav_fragment_content else 404,
+                    "url": self.nav_fragment_url,
+                    "present": bool(self.nav_fragment_content),
+                    "links": self.nav_fragment_links,
+                    "snippet": self.nav_fragment_content[:400] if self.nav_fragment_content else None,
                 },
             },
             "stats": self.budget.get_stats(),

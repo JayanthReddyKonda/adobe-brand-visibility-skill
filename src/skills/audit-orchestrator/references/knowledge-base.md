@@ -2,57 +2,11 @@
 
 ## Table of Contents
 
-- [Causal Taxonomy Hierarchy](#causal-taxonomy-hierarchy)
-- [Root Cause Reference Table](#root-cause-reference-table)
-- [1. `AI_RETRIEVAL_BLOCKED`](#1-ai-retrieval-blocked)
-- [2. `RENDERED_CONTENT_GAP`](#2-rendered-content-gap)
-- [3. `MATERIAL_ENTITY_AMBIGUITY`](#3-material-entity-ambiguity)
-- [4. `FIRST_PARTY_FACT_CONFLICT`](#4-first-party-fact-conflict)
-- [5. `BROKEN_AUTHORITY_ANCHOR`](#5-broken-authority-anchor)
-- [5b. `CANDIDATE_BACKLINK_UNREACHABLE`](#5b-candidate-backlink-unreachable)
-- [6. `INTENT_TO_LANDING_MISMATCH`](#6-intent-to-landing-mismatch)
-- [7. `LOW_INFORMATION_SCENT`](#7-low-information-scent)
-- [7b. `AI_REFERRAL_DISCONTINUITY`](#7b-ai-referral-discontinuity)
-- [8. `AI_FACT_CONFLICT`](#8-ai-fact-conflict)
-- [9. `MISSING_IN_DEPTH_MECHANISMS`](#9-missing-in-depth-mechanisms)
-- [Top-Level Fields](#top-level-fields)
-- [Summary Object](#summary-object)
-- [Finding Object](#finding-object)
-  - [Suggested Action Object](#suggested-action-object)
-- [Root Cause Object](#root-cause-object)
-- [Example Clean Production Report](#example-clean-production-report)
-- [Severity Rubric](#severity-rubric)
-- [Confidence Model](#confidence-model)
-- [1. Specialist Responsibilities](#1-specialist-responsibilities)
-- [2. Global Wall-Clock Deadline (< 5 Minutes)](#2-global-wall-clock-deadline-5-minutes)
-- [3. SSRF Protection & Bounded Streaming](#3-ssrf-protection-bounded-streaming)
-- [4. Crawler Matrix Semantics](#4-crawler-matrix-semantics)
-- [5. Eligibility Gate & Deduplication](#5-eligibility-gate-deduplication)
-- [6. Taxonomy-Driven Root-Cause Clustering](#6-taxonomy-driven-root-cause-clustering)
-- [7. Objective Audit Metrics](#7-objective-audit-metrics)
-- [1. Specialist Status Contract](#1-specialist-status-contract)
-- [2. Public Report Contract](#2-public-report-contract)
-  - [2.1 Finding Contract](#21-finding-contract)
-- [3. Internal Shared State Contract](#3-internal-shared-state-contract)
-- [4. No Heuristic Defects Rule](#4-no-heuristic-defects-rule)
-- [8. Scoring Model v2 & Composite GEO Score](#8-scoring-model-v2--composite-geo-score)
-- [9. Machine-Readable `GEO-AUDIT-META` Specification](#9-machine-readable-geo-audit-meta-specification)
-- [10. The Canonical 16-Defect Matrix (HF-01 to HF-08 and W-01 to W-08)](#10-the-canonical-16-defect-matrix-hf-01-to-hf-08-and-w-01-to-w-08)
-- [11. The 6 Orthogonal Scoring Dimensions & Statistical Formulation](#11-the-6-orthogonal-scoring-dimensions--statistical-formulation)
-- [12. Causal Dependency Graph (DAG) & The Keystone Defect Rule](#12-causal-dependency-graph-dag--the-keystone-defect-rule)
-- [13. Epistemic Falsification & Disambiguation Protocol](#13-epistemic-falsification--disambiguation-protocol-anti-hallucination-gates)
-- [14. The 5-Step Cognitive Synthesis Protocol](#14-the-5-step-cognitive-synthesis-protocol-from-sensors-to-diagnostic-judgment)
-- [15. Multi-Engine Retrieval Simulation Matrix](#15-multi-engine-retrieval-simulation-matrix)
-- [17. Effort-vs-Impact Executive Prioritization Matrix](#17-effort-vs-impact-executive-prioritization-matrix)
-- [18. State-of-the-Art Generative Engine Optimization (GEO) Benchmarks](#18-state-of-the-art-generative-engine-optimization-geo-benchmarks)
-- [19. Multiplicative Layered Probability Model & Advanced Citability Framework](#19-multiplicative-layered-probability-model--advanced-citability-framework)
-- [20. Citation Absorption & Structural Feature Engineering (GEO-SFE)](#20-citation-absorption--structural-feature-engineering-geo-sfe)
-- [21. Archetype Dynamic Adaptation & Query-Strategy Profiles](#21-archetype-dynamic-adaptation--query-strategy-profiles)
-- [22. Epistemic Reasoning & Evidence Policy (Evidence Plane vs. Cognitive Brain)](#22-epistemic-reasoning--evidence-policy-evidence-plane-vs-cognitive-brain)
-- [23. Shared Operational Standards & Zero-Trust SSRF Policy](#23-shared-operational-standards--zero-trust-ssrf-policy)
-- [24. Audit Contract, Normalized Vocabulary, & Locators Grammar](#24-audit-contract-normalized-vocabulary--locators-grammar)
-- [25. Detection Feasibility, Severity Scales (S0-S4/U), & Solution Levels (V/C/E/X)](#25-detection-feasibility-severity-scales-s0-s4u--solution-levels-vcex)
-- [26. Architectural Precedence, 6 Core Concerns, & Standards Reference](#26-architectural-precedence-6-core-concerns--standards-reference)
+- **Taxonomy & Root Causes**: [Hierarchy](#causal-taxonomy-hierarchy) | [Root Cause Table](#root-cause-reference-table) | [Check Contracts (1-9)](#audit-check-contracts-catalog)
+- **Report & Calibration**: [Report Schema](#brand-ai-readiness-audit-report-schema) | [Severity Rubric](#severity-rubric) | [Confidence Model](#confidence-model)
+- **Operating Guidelines**: [Specialist Responsibilities](#1-specialist-responsibilities) | [Wall-Clock Deadline](#2-global-wall-clock-deadline-5-minutes) | [Zero-Trust SSRF](#3-ssrf-protection-bounded-streaming) | [Crawler Matrix](#4-crawler-matrix-semantics) | [Deduplication](#5-eligibility-gate-deduplication) | [Root-Cause Clustering](#6-taxonomy-driven-root-cause-clustering) | [Audit Metrics](#7-objective-audit-metrics)
+- **Contracts & Models**: [Status Contract](#1-specialist-status-contract) | [Report Contract](#2-public-report-contract) | [Shared State](#3-internal-shared-state-contract) | [No Heuristic Defects](#4-no-heuristic-defects-rule) | [Scoring Model v2](#8-scoring-model-v2--composite-geo-score) | [GEO-AUDIT-META](#9-machine-readable-geo-audit-meta-specification) | [16-Defect Matrix](#10-the-canonical-16-defect-matrix-hf-01-to-hf-08-and-w-01-to-w-08) | [6 Scoring Dimensions](#11-the-6-orthogonal-scoring-dimensions--statistical-formulation) | [Causal DAG & Keystone](#12-causal-dependency-graph-dag--the-keystone-defect-rule) | [Epistemic Gates](#13-epistemic-falsification--disambiguation-protocol-anti-hallucination-gates) | [Cognitive Synthesis](#14-the-cognitive-synthesis-protocol-from-empirical-telemetry-to-diagnostic-judgment) | [Retrieval Simulation](#15-multi-engine-retrieval-simulation-matrix) | [Bayesian Evidence](#16-bayesian-evidence-triangulation--sample-size-discounting) | [Effort-vs-Impact](#17-effort-vs-impact-executive-prioritization-matrix)
+- **Research & Standards**: [GEO Benchmarks](#18-state-of-the-art-generative-engine-optimization-geo-benchmarks) | [Citability Framework](#19-multiplicative-layered-probability-model--advanced-citability-framework) | [Feature Engineering (GEO-SFE)](#20-citation-absorption--structural-feature-engineering-geo-sfe) | [Archetype Adaptation](#21-archetype-dynamic-adaptation--query-strategy-profiles) | [Evidence Policy](#22-epistemic-reasoning--evidence-policy-evidence-plane-vs-cognitive-brain) | [Zero-Trust Policy](#23-shared-operational-standards--zero-trust-ssrf-policy) | [Locators Grammar](#24-audit-contract-normalized-vocabulary--locators-grammar) | [Severity & Feasibility Scales](#25-detection-feasibility-severity-scales-s0-s4u--solution-levels-vcex) | [Precedence & Concerns](#26-architectural-precedence-6-core-concerns--standards-reference) | [Archetypes & Subsets](#27-extended-archetype-knowledge--domain-check-subsets)
 
 ---
 
@@ -351,175 +305,19 @@ Formal contracts defining inputs, evidence criteria, decision boundaries, and re
 
 ## Brand AI-Readiness Audit Report Schema
 
-This document specifies the structure, validation constraints, and field semantics for the audit report emitted by `audit-orchestrator`.
+Canonical structure, validation constraints, and field semantics for audit reports emitted by `audit-orchestrator`. Formal validation is governed strictly by `references/report-schema.json` (Draft-07 compliant).
 
----
-
-## Top-Level Fields
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `site` | String | Yes | Target domain or URL (e.g., `example.com` or `https://example.com`) |
-| `audited_at` | String (ISO 8601) | Yes | UTC timestamp in ISO 8601 format (e.g., `2026-09-20T14:32:00Z`) |
-| `audit_status` | String (Enum) | Yes | Audit completion status: `complete`, `partial`, `failed` |
-| `summary` | Object | Yes | Aggregate counts of findings categorized by severity (`critical`, `high`, `medium`, `low`) |
-| `findings` | Array | Yes | Ordered list of verified defects with supporting evidence and suggested actions |
-| `readiness` | Object | No | Multi-dimensional score breakdown, composite score, letter grade, and weights |
-| `dimension_status` | Object | No | Pass/warning/fail status per scoring dimension |
-| `run_manifest` | Object | No | Execution provenance tracking reference SHA-256 checksums and runtime environment |
-| `suppressed_findings` | Array | No | Trace of downstream symptoms suppressed by upstream keystone blockers |
-| `proactive_actions` | Array | No | Deduplicated proactive opportunities (e.g. sitemap creation, llms.txt, JSON-LD) |
-| `evidence_classes` | Object | No | Explicit segregation: `declared_identity_nodes` (Schema sameAs) vs `verified_candidate_backlinks` (verified via bounded probe) |
-| `analytics_summary` | Object | No | Quantitative metrics from first-party analytics (total referrals, bounce rates, dwell) and heuristic fallback caveats |
-| `page_improvement_plans` | Array | No | Deterministic page-level content improvement plans with gap analysis, structural and textual actions, and epistemic boundaries |
-| `geo_citability_summary` | Object | No | Aggregated Princeton KDD 2024 / AutoGEO citability metrics |
-| `engagement_continuity_summary` | Object | No | Post-citation intent scent and transactional handoff continuity summary |
-| `ai_agent_scrapeability_summary` | Object | No | Average text-to-HTML SNR, bot matrix permissions, and rendering status |
-
----
-
-## Summary Object
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `total_findings` | Integer | Yes | Total count of items in `findings` |
-| `critical` | Integer | Yes | Count of findings with severity `critical` |
-| `high` | Integer | Yes | Count of findings with severity `high` |
-| `medium` | Integer | Yes | Count of findings with severity `medium` |
-| `low` | Integer | No | Count of findings with severity `low` |
-
----
-
-## Finding Object
-
-Each entry in the `findings` array represents a verified, evidence-backed defect.
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | String | Yes | Unique finding identifier (e.g., `F-001`, `F-002`) |
-| `title` | String | Yes | Concise, human-readable summary of the defect |
-| `severity` | Enum | Yes | `critical` \| `high` \| `medium` \| `low` |
-| `evidence` | String | Yes | Concrete data, observed metrics, or reproduction steps verifying the finding |
-| `suggested_action` | Object | Yes | Actionable, mechanism-sound remediation plan |
-| `confidence` | Enum | No | `high` \| `medium` \| `low` |
-| `category` | String | No | Functional category (e.g. `access`, `entity-integrity`, `fact-consistency`, `orientation`) |
-| `cause_family` | String | No | Standardized taxonomy family (`DISCOVERY.ACCESS`, `ENTITY.IDENTITY`, etc.) |
-| `cause_id` | String | No | Specific root cause identifier |
-| `impact` | String | No | Explanation of downstream impact on AI citations and user retention |
-| `verification` | String | No | Procedure to verify resolution |
-| `priority_index` | Integer / Null | No | Task priority score: `5 * severity + (6 - difficulty)` |
-| `difficulty` | Integer / Null | No | Estimated implementation difficulty (1 = low, 5 = high) |
-
-
-### Suggested Action Object
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `summary` | String | Yes | Clear instruction on what to change and how to resolve the root cause |
-| `priority` | Enum | Yes | `critical` \| `high` \| `medium` \| `low` |
-| `verification` | String | No | Method to test that the fix worked |
-| `implementation_guidance` | String | No | Optional code snippet, schema template, or configuration directive |
-
----
-
-## Root Cause Object
-
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `cause_family` | String | Yes | Standard taxonomy family (e.g. `DISCOVERY.ACCESS`, `FACT.CONSISTENCY`) |
-| `cause_id` | String | Yes | Specific root cause identifier |
-| `root_cause` | String | Yes | Descriptive explanation of underlying failure |
-| `finding_ids` | Array of Strings | Yes | Associated finding IDs grouped under this cause |
-| `max_severity` | Enum | Yes | Highest severity among grouped findings |
-| `suggested_priority` | Enum | Yes | Recommended resolution priority |
-
----
-
-## Example Clean Production Report
-
-```json
-{
-  "site": "https://frescopa.coffee",
-  "audited_at": "2026-08-28T16:52:37Z",
-  "audit_status": "complete",
-  "summary": {
-    "total_findings": 2,
-    "critical": 0,
-    "high": 1,
-    "medium": 1,
-    "low": 0
-  },
-  "findings": [{
-      "id": "FACT.INTEGRITY.PRICE_CONFLICT.001",
-      "title": "Product price is inconsistent across first-party surfaces",
-      "severity": "high",
-      "category": "fact-integrity",
-      "root_cause": "The same product is represented with different current prices on the product and category pages.",
-      "confidence": "high",
-      "impact": "AI assistants quote conflicting prices across multi-page retrieval contexts.",
-      "evidence": {
-        "summary": "Product page states ₹5,499 while category page states ₹4,999 for the same product.",
-        "scope": "product-catalog",
-        "sources": [{
-            "url": "https://frescopa.coffee/products/ethiopia-guji",
-            "type": "html_dom",
-            "observation": "Price rendered as ₹5,499"
-          },
-          {
-            "url": "https://frescopa.coffee/products",
-            "type": "html_dom",
-            "observation": "Price rendered as ₹4,999"
-          }
-        ]
-      },
-      "suggested_action": {
-        "summary": "Establish one authoritative offer value and synchronize visible content and structured data across affected pages.",
-        "technical_fix": "Synchronize pricing database feeds to both product and catalog templates.",
-        "creative_fix": "Audit promotional banners to ensure legacy discounts are not displayed.",
-        "verification": "Crawl product and listing pages to verify matching ₹5,499 price tags.",
-        "priority": "high"
-      }
-    },
-    {
-      "id": "DISCOVERY.REPRESENTATION_AVAILABILITY.RENDERED_CONTENT_GAP.002",
-      "title": "Important product information is difficult to retrieve",
-      "severity": "medium",
-      "category": "discoverability",
-      "root_cause": "Material product facts are absent from the initial machine-readable representation of sampled product pages.",
-      "confidence": "medium",
-      "impact": "AI crawlers unable to render client-side JavaScript miss core product specifications.",
-      "evidence": {
-        "summary": "Across sampled product pages, raw HTML word count < 25 words with unrendered app container.",
-        "scope": "product-pages",
-        "sources": [{
-            "url": "https://frescopa.coffee/products/ethiopia-guji",
-            "type": "raw_html",
-            "observation": "Body contains <div id='root'></div> with only 12 words of static text."
-          }
-        ]
-      },
-      "suggested_action": {
-        "summary": "Expose core product facts directly in crawlable HTML and keep structured representation consistent.",
-        "technical_fix": "Implement Server-Side Rendering (SSR) for product detail pages.",
-        "creative_fix": "Ensure primary value proposition is present in server-rendered markup.",
-        "verification": "Fetch raw HTML via curl and confirm full specification text is present.",
-        "priority": "medium"
-      }
-    }
-  ],
-  "proactive_actions": [{
-      "id": "PROACTIVE.ENTITY.BRAND_IDENTITY.001",
-      "title": "Strengthen canonical brand identity",
-      "category": "entity",
-      "summary": "Maintain a consistent organization identity, canonical name, logo and authoritative external references across major brand surfaces.",
-      "technical_fix": "Embed Schema.org Organization JSON-LD with sameAs social links on homepage.",
-      "creative_fix": "Ensure official legal company name is displayed in footer.",
-      "verification": "Validate Organization schema with Google Rich Results Test.",
-      "priority": "low"
-    }
-  ]
-}
-```
+| Section / Object | Required Fields | Core Invariants & Rules |
+| :--- | :--- | :--- |
+| **Root Document** | `site`, `audited_at`, `audit_status`, `summary`, `findings` | `audit_status`: `complete` | `partial` | `failed`. `audited_at`: ISO 8601 UTC timestamp. Validates cleanly against `report-schema.json`. |
+| **`summary`** | `total_findings`, `critical`, `high`, `medium`, `low` | All non-negative integers. `total_findings` strictly equals sum of severity counts. |
+| **`findings[]`** | `id`, `title`, `severity`, `evidence`, `suggested_action` | `severity`: `critical` | `high` | `medium` | `low`. String properties must be clean: zero raw HTML, no unescaped newlines (`\n\n`), no raw markdown tables. |
+| **`suggested_action`** | `summary`, `priority` | `priority` matches finding severity or higher. Must offer actionable, mechanism-sound remediation; optional `technical_fix` and `creative_fix` for dual-track engineering and copywriting. |
+| **`proactive_actions[]`** | `id`, `title`, `summary`, `priority` | All 4 fields strictly required for every proactive item. Deduplicated opportunities (e.g. sitemap, llms.txt, Schema.org, /pricing.md). |
+| **`readiness`** | (Optional) `score`, `grade`, `dimensions` | 6 orthogonal dimensions (0-100) weighted to composite score. Letter grade: A (>=85), B (70-84.9), C (50-69.9), D (30-49.9), F (<30). |
+| **`evidence_classes`** | (Optional) `declared_identity_nodes`, `verified_candidate_backlinks` | Explicit segregation between declared Schema sameAs nodes and network-probed external candidate links. |
+| **`analytics_summary`** | (Optional) `total_referrals`, `bounce_rate_pct`, `avg_dwell_time_sec` | First-party referral telemetry or explicit heuristic fallback caveats when analytics are unavailable. |
+| **`page_improvement_plans`** | (Optional) `url`, `gap_analysis`, `structural_actions`, `textual_actions` | Page-specific content improvement plans with epistemic boundaries. |
 
 ---
 
@@ -885,14 +683,18 @@ Before committing an observation as an authoritative finding, the AI must execut
 
 ---
 
-## 14. The 5-Step Cognitive Synthesis Protocol (From Sensors to Diagnostic Judgment)
+## 14. The Cognitive Synthesis Protocol (From Empirical Telemetry to Diagnostic Judgment)
 
-The AI orchestrator executes this five-step cognitive loop to transform raw sensor outputs into an executive-grade diagnostic report:
+The AI Agent executes this cognitive loop to transform raw sensor telemetry and inventory content into an executive-grade diagnostic report:
 
 ```text
-[Step A: Triangulation] -> [Step B: Causal Root-Tracing] -> [Step C: Falsification] -> [Step D: Engine Simulation] -> [Step E: Dual-Track Prescription]
+[Step 0: Direct Inventory & Telemetry Inspection] -> [Step A: Triangulation] -> [Step B: Causal Root-Tracing] -> [Step C: Falsification] -> [Step D: Engine Simulation] -> [Step E: Dual-Track & Proactive Prescription]
 ```
 
+0. **Step 0 — Direct Inspection of `inv.json` & `telemetry.json` (Cognitive Gap Discovery):**
+   - The AI Agent directly inspects raw crawled pages (`inv.json`) and aggregated sensor telemetry (`telemetry.json`) using native tools.
+   - Identifies brand identity ambiguities, CTA friction, missing commercial terms, and layout issues beyond automated heuristics.
+   - Formulates agent-discovered findings and proactive actions, saved to `review.json`, which are seamlessly merged with sensor findings.
 1. **Step A — Multi-Sensor Triangulation & Route Indexing:**
    - Group raw sensor findings by URL path and entity identifier. Cross-correlate discoverability, entity schema, fact consistency, and engagement metrics into a unified route ledger.
 2. **Step B — Causal Root-Tracing (The 5-Whys Analysis):**
@@ -901,8 +703,8 @@ The AI orchestrator executes this five-step cognitive loop to transform raw sens
    - Evaluate: *"If engineering fixes this proposed defect, does the AI search barrier immediately dissolve, or does an unaddressed upstream gate remain?"* If an upstream gate remains, re-center priority on the upstream blocker.
 4. **Step D — Platform-Specific Retrieval Simulation:**
    - Model how the defect specifically penalizes Google AI Overviews, ChatGPT Search, and Perplexity Pro using the differential retrieval mechanics defined in Section 15.
-5. **Step E — Dual-Track Remediation Prescription:**
-   - Author domain-tailored technical specifications (for software engineers and DevOps) and creative copy/architecture guidance (for content strategists and brand marketers), complete with a deterministic verification procedure.
+5. **Step E — Dual-Track Remediation & Proactive Prescription:**
+   - Author domain-tailored technical specifications (for software engineers and DevOps) and creative copy/architecture guidance (for content strategists and brand marketers), complete with a deterministic verification procedure and strategic proactive enhancements.
 
 ---
 
@@ -1232,7 +1034,7 @@ ARCHETYPE_SEVERITY_OVERRIDES = {
 | **`geo-content-audit`** | Compute empirical text heuristics (quotability, statistic density, causal conjunctions, chunk length). | Claim guaranteed search engine rankings. |
 | **`engagement-context-audit`** | Measure visible orientation signals (CTA DOM depth, H1 alignment, above-fold word density, information scent). | Claim to have measured actual user bounce rate without first-party analytics. |
 | **Deterministic Causal Gate (`causal_gate.py`)** | Deterministically suppress invalid downstream categories when upstream preconditions fail. | Write natural-language explanations. |
-| **Frontier AI Model** | Interpret telemetry evidence, formulate hypotheses, contextualize archetype, simulate queries, write dual-track fixes. | Override deterministic suppression or invent claims absent from telemetry. |
+| **Frontier AI Agent (Cognitive Brain)** | Directly inspects `inv.json` and `telemetry.json`, discovers agent findings beyond automated sensors, synthesizes proactive actions, contextualizes archetype, and authors bespoke dual-track remediations in `review.json`. | Blindly forwarding raw sensor output, fabricating synthetic evidence absent from `inv.json`/`telemetry`, or omitting cognitive verification. |
 | **Schema Gate (`validate_report.py`)** | Mechanically validate JSON types, required fields, summary arithmetic, and enum values against Draft-07 schema. | Add new substantive findings. |
 
 ### 22.3 The Four-State Epistemic Model
@@ -1423,3 +1225,51 @@ Every candidate evaluated by the cognitive review loop requires:
 - **Robots Protocol:** RFC 9309 (https://www.rfc-editor.org/rfc/rfc9309.html)
 - **Schema.org Vocabulary:** https://schema.org/docs/datamodel.html
 
+---
+
+## 27. Extended Archetype Knowledge & Domain Check Subsets
+
+Brand AI-Readiness & Visibility Specification and approved checklist reference for extended website archetypes beyond core commercial and SaaS models.
+
+### 27.1 Extended Archetype Classification & Priority Checks
+
+| Archetype Code | Archetype Name | Dominant Schema Types | Key Discovery URL Tokens | Priority Check Subset | Keystone Optimization Focus |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **PP** | Portfolio & Personal | Person, CreativeWork | portfolio, projects, my-work | PP1, PP2, PP3, PP7 | Contribution attribution, verified case outcomes, credential links |
+| **BN** | Blog & Editorial News | Article, NewsArticle, BlogPosting | articles, news, blog, editorial | BN1, BN3, BN4, BN9 | Primary claim attribution, quantitative baseline context, byline transparency |
+| **DOC** | Documentation & Reference | TechArticle, APIReference | docs, documentation, reference, api | C2, H2, SA1, SA9 | Prerequisite clarity, version changelogs, error recovery steps |
+| **ED** | Education & Courseware | Course, EducationalOrganization | courses, curriculum, admissions | ED1, ED2, ED4 | Learner level prerequisites, syllabus format, refund/access terms |
+| **SC** | Social & Community | DiscussionForumPosting | community, discussion, forum | SC1, SC4 | Participation rules, membership terms, community help routes |
+| **ME** | Media & Entertainment | Movie, VideoObject, TVSeries | episodes, watch, listen, media | ME1, ME2, ME6, ME8 | Edition runtime metadata, territorial availability, licensing periods |
+
+### 27.2 Archetype Specific Citability & Deduplication Directives
+
+1. **Portfolio (PP):**
+   - Focus on PP1 (Project contribution and outcomes) and PP2 (Attribution for testimonials).
+   - Confidential or creative projects do not require numerical business metrics; qualitative impact descriptions are valid.
+   - Testimonial text requires clear speaker/role attribution. A named individual without institutional context provides weak authority.
+
+2. **Blog and News (BN):**
+   - Focus on BN1 (Traceable evidence for central claims) and BN3 (Context for quantitative claims).
+   - When citing metrics, baselines, periods, and sample populations must be preserved.
+   - In BN9 and N14, old publication dates on evergreen articles do not indicate staleness; do not prescribe artificial refresh dates.
+
+3. **Documentation (DOC):**
+   - Critical risk is C2 (code blocks, parameters, or endpoints rendered solely via client-side JavaScript).
+   - Ensure prerequisites, versions, and step-by-step code samples are available in server-delivered HTML.
+
+4. **Education (ED):**
+   - Focus on ED1 (Course suitability and prerequisites) and ED4 (Practical course delivery/refund questions).
+   - Do not require employment guarantee statistics; focus on explicit syllabus, required background, and duration.
+
+5. **Community (SC):**
+   - Focus on SC1 (Membership and participation rules) and SC4 (Accessible community onboarding help).
+   - Public membership terms and code of conduct should be directly linkable without requiring registration.
+
+6. **Media (ME):**
+   - Focus on ME1 (Work and edition metadata) and ME8 (Availability periods and territorial rights).
+   - Distinguish territorial release windows from global availability to avoid hallucinated streaming claims.
+
+7. **One-Cause-One-Finding Deduplication:**
+   - When an issue touches multiple categories (e.g. an overlay obscuring both pricing and CTA buttons), emit a single finding citing the primary cause.
+   - For content questions, merge overlapping queries from Q6, N13, and category-specific checks (e.g. EC5/BC8/ED4) into one unified remediation action.

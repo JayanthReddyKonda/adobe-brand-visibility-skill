@@ -338,6 +338,182 @@ def make_finding(cause_id: str, title: str, severity: str, scope: str, evidence:
     }
 
 
+def check_markup_vs_visible_facts(page: Dict[str, Any], entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """E7: Compare JSON-LD structured data claims against visible body text on the same page."""
+    findings: List[Dict[str, Any]] = []
+    purl = page.get("url") or ""
+    clean_text = (page.get("clean_text") or page.get("text") or "").lower()
+    if not clean_text or len(clean_text.split()) < 50:
+        return findings
+
+    for ent in entities:
+        if not isinstance(ent, dict):
+            continue
+        offers = ent.get("offers")
+        offer_list = [offers] if isinstance(offers, dict) else (offers if isinstance(offers, list) else [])
+        for off in offer_list:
+            if not isinstance(off, dict):
+                continue
+            price = off.get("price")
+            currency = str(off.get("priceCurrency") or "").lower()
+            if price is not None and str(price).strip():
+                price_str = str(price).strip()
+                num_part = re.sub(r"\.00$", "", price_str)
+                if len(num_part) >= 2 and num_part not in clean_text:
+                    findings.append({
+                        "id": "E7_MARKUP_VISIBLE_CONTRADICTION",
+                        "cause_id": "MARKUP_VISIBLE_CONTRADICTION",
+                        "check_id": "E7",
+                        "title": f"Structured data price ({currency.upper()} {price_str}) not found in visible text on {purl}",
+                        "severity": "medium",
+                        "category": "entity_content",
+                        "confidence": "high",
+                        "scope": purl,
+                        "evidence": {
+                            "summary": f"Schema.org Offer specifies price {price_str} {currency.upper()}, but this value does not appear in visible body text.",
+                            "sources": [{"url": purl, "observation": f"JSON-LD price {price_str} not verified in page text"}],
+                        },
+                        "root_cause": "Markup price and visible page pricing are out of sync or price is hidden behind unrendered script components.",
+                        "impact": "Search engines and AI Overviews may detect structured data discrepancies and suppress rich result eligibility.",
+                        "suggested_action": {
+                            "summary": f"Align displayed price with Schema.org Offer price on {purl}.",
+                            "technical_fix": f"Ensure visible price in HTML body matches Schema.org Offer price {price_str}.",
+                            "creative_fix": "Display clear price and currency matching the structured data feed.",
+                            "priority": "medium",
+                            "verification": f"Verify displayed body copy contains {price_str}.",
+                        },
+                    })
+                    break
+    return findings
+
+
+def check_incomplete_subscription_offers(page: Dict[str, Any], entities: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """EC9/EC6: Detect incomplete subscription pricing terms and promotional ambiguity."""
+    purl = page.get("url") or ""
+    clean_text = (page.get("clean_text") or page.get("text") or "").lower()
+
+    # Check if page is offering a subscription
+    is_sub_page = "/subscription" in purl.lower() or "subscribe" in purl.lower()
+    sub_mentions = any(k in clean_text for k in ("subscription", "monthly delivery", "first month half-price", "half-price", "recurring delivery", "delivered monthly"))
+    if not (is_sub_page or sub_mentions):
+        return None
+
+    # Check for recurring base price
+    has_recurring_price = bool(re.search(r"\$\s*\d+(?:\.\d{2})?\s*(?:/|\bper\b)\s*(?:month|mo|week|delivery|shipment)\b", clean_text)) or bool(re.search(r"\b(?:regular price|standard price|normally)\s*:\s*\$\s*\d+", clean_text))
+
+    # Check for structured Offer price
+    has_markup_price = False
+    for ent in entities:
+        if isinstance(ent, dict):
+            offers = ent.get("offers", {})
+            o_list = offers if isinstance(offers, list) else [offers] if isinstance(offers, dict) else []
+            for o in o_list:
+                if isinstance(o, dict) and o.get("price") and str(o.get("price")).strip():
+                    has_markup_price = True
+                    break
+
+    # Check for billing interval and cancellation policy
+    has_interval = any(k in clean_text for k in ("every month", "monthly", "per month", "/month", "/mo", "every 2 weeks", "weekly", "cadence", "billing cycle"))
+    has_cancel_policy = any(k in clean_text for k in ("cancel anytime", "cancellation", "pause or cancel", "skip or cancel", "no commitment", "refund policy"))
+
+    missing_terms: List[str] = []
+    if not (has_recurring_price or has_markup_price):
+        missing_terms.append("standard recurring base price (promotional discount stated without regular monthly rate)")
+    if not has_interval:
+        missing_terms.append("explicit recurring billing interval")
+    if not has_cancel_policy:
+        missing_terms.append("subscription cancellation or pause policy terms")
+
+    if missing_terms:
+        terms_str = "; ".join(missing_terms)
+        return {
+            "id": "EC9_INCOMPLETE_SUBSCRIPTION_OFFER",
+            "cause_id": "INCOMPLETE_OFFER_ATTRIBUTES",
+            "check_id": "EC9",
+            "title": f"Incomplete commercial subscription terms on {purl}",
+            "severity": "high",
+            "category": "entity_content",
+            "confidence": "high",
+            "scope": purl,
+            "evidence": {
+                "summary": f"Subscription offering lacks essential commercial attributes: {terms_str}",
+                "sources": [{"url": purl, "observation": f"Promoted subscription missing terms: {terms_str}"}],
+            },
+            "root_cause": "The subscription offering advertises promotional discounts without disclosing the base recurring monthly price, billing interval, or cancellation terms.",
+            "impact": "AI recommendation engines (ChatGPT, Claude, Perplexity) cannot quote accurate pricing models, degrading transactional citability.",
+            "suggested_action": {
+                "summary": f"Disclose complete subscription terms and base pricing on {purl}.",
+                "technical_fix": "Add Schema.org Offer with price, priceCurrency, and explicit recurring billing terms; display base monthly price and cancellation policy in HTML.",
+                "creative_fix": "State regular recurring price clearly beneath introductory discounts (e.g. '$10 first month, then $20/month. Cancel anytime').",
+                "priority": "high",
+                "verification": f"Verify page clearly states standard monthly pricing and cancellation policy: {purl}.",
+            },
+        }
+    return None
+
+
+def check_staging_hostname_in_schema(page: Dict[str, Any], ents: List[Dict[str, Any]], base_domain: str) -> List[Dict[str, Any]]:
+    """E7: Detect staging, preview, or dev hostnames declared in production Schema.org JSON-LD."""
+    findings = []
+    purl = page.get("url") or ""
+    effective_domain = (base_domain or (urlparse(purl).netloc if purl else "")).lower()
+    staging_patterns = (
+        r"\.aem\.live\b",
+        r"\.webflow\.io\b",
+        r"\.vercel\.app\b",
+        r"\.netlify\.app\b",
+        r"\bstaging\.",
+        r"\bdev\.",
+        r"\bpreview\.",
+        r"\.wpenginepowered\.com\b",
+    )
+    for e in ents:
+        urls_to_check = []
+        for key in ("@id", "url"):
+            val = e.get(key)
+            if isinstance(val, str):
+                urls_to_check.append(val)
+        offers = e.get("offers")
+        if isinstance(offers, dict):
+            u_offer = offers.get("url")
+            if isinstance(u_offer, str):
+                urls_to_check.append(u_offer)
+        elif isinstance(offers, list):
+            for off in offers:
+                if isinstance(off, dict) and isinstance(off.get("url"), str):
+                    urls_to_check.append(off["url"])
+
+        for u in urls_to_check:
+            parsed_u = urlparse(u)
+            if (parsed_u.netloc and parsed_u.netloc.lower() != effective_domain
+                    and any(re.search(pat, parsed_u.netloc, re.I) for pat in staging_patterns)):
+                findings.append({
+                    "id": "E7_STAGING_HOSTNAME_IN_SCHEMA",
+                    "cause_id": "SCHEMA_INTERNAL_CONTRADICTION",
+                    "check_id": "E7",
+                    "title": f"Production Schema.org entity references non-production hostname: {parsed_u.netloc}",
+                    "severity": "medium",
+                    "category": "entity_content",
+                    "confidence": "high",
+                    "scope": purl or u,
+                    "evidence": {
+                        "summary": f"Schema entity on {purl} declares identity/offer URL on staging host '{u}' rather than canonical production domain '{effective_domain}'.",
+                        "sources": [{"url": purl, "observation": f"Entity URI points to staging origin: {u}"}],
+                    },
+                    "root_cause": "Pre-production CMS or preview domain leaked into published JSON-LD structured data.",
+                    "impact": "AI search engines and knowledge graphs associate product availability and authority with transient development hostnames.",
+                    "suggested_action": {
+                        "summary": f"Replace staging host '{parsed_u.netloc}' with production domain '{effective_domain}' in structured data.",
+                        "technical_fix": f"Update canonical URL generation in JSON-LD templates to use '{effective_domain}'.",
+                        "creative_fix": "Ensure all machine-readable catalog references point to the public consumer store.",
+                        "priority": "medium",
+                        "verification": f"Verify all JSON-LD URLs on {purl} match the production domain.",
+                    },
+                })
+                break
+    return findings
+
+
 def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_file: Optional[str] = None,
           target_url: Optional[str] = None, schema_type: Optional[str] = None) -> Dict[str, Any]:
     """Execute entity content sensor against site or inventory."""
@@ -397,6 +573,17 @@ def audit(base: str, domain: str, inv: Optional[Dict[str, Any]] = None, state_fi
             src = str(img.get("src", "")).lower()
             if any(term in src for term in ("pricing", "chart", "table", "plan")) and not pdom.text_content:
                 findings.append(make_finding("MISSING_MATERIAL_FACT", f"Commercial chart published in image without machine-readable HTML on {purl}", "high", purl, f"Image {src} lacks structured text equivalent"))
+
+        # Check E7: Structured data vs visible facts
+        findings.extend(check_markup_vs_visible_facts(p, ents))
+
+        # Check E7: Staging hostname in production schema
+        findings.extend(check_staging_hostname_in_schema(p, ents, domain or urlparse(base).netloc))
+
+        # Check EC9: Incomplete subscription commercial terms
+        sub_f = check_incomplete_subscription_offers(p, ents)
+        if sub_f and not any(f.get("id") == sub_f.get("id") and f.get("scope") == sub_f.get("scope") for f in findings):
+            findings.append(sub_f)
 
         # Evaluate Answerability
         ans = evaluate_page_answerability(ptype, phtml, pdom, purl, ents, page_dict=p)
