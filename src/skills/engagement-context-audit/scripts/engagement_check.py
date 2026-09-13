@@ -20,6 +20,7 @@ import re
 import sys
 from collections import Counter
 from html.parser import HTMLParser
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -939,7 +940,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
             )
 
     # 4. Friction-to-Value & Conversion Obstacles (Forced Sales Gate)
-    # Technical evaluators and developers arriving from AI citations bounce immediately if forced into
+    # Technical buyers and developers arriving from AI citations bounce immediately if forced into
     # a 30-minute sales meeting rather than experiencing immediate product value.
     if page_type in ("pricing", "product_detail", "product") and total_body_words >= 60:
         has_sales_gate = bool(FORCED_SALES_GATE_PATTERNS.search(all_action_text))
@@ -953,7 +954,7 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                     "confidence": "high",
                     "root_cause": (
                         "FRICTION_TO_VALUE_BARRIER: The primary conversion trigger enforces a high-friction sales consultation gate "
-                        "with zero self-service onboarding, interactive sandbox, or transparent documentation for technical evaluators."
+                        "with zero self-service onboarding, interactive sandbox, or transparent documentation for technical buyers."
                     ),
                     "cause_family": "EXPERIENCE.CONTINUITY",
                     "id": "FRICTION_TO_VALUE_BARRIER",
@@ -1249,6 +1250,8 @@ def audit(
     referrer_query=None,
     viewport_only=False,
 ):
+    if inv is not None and not isinstance(inv, dict):
+        inv = None
     state = {}
     if state_file and isinstance(state_file, (str, bytes, os.PathLike)) and os.path.exists(state_file):
         try:
@@ -1689,6 +1692,48 @@ def audit(
     return result_payload
 
 
+def format_markdown_summary(res: Dict[str, Any], domain: Optional[str] = None) -> str:
+    """Format engagement context sensor result as clean, readable Markdown."""
+    lines = [f"# Visitor Engagement & Orientation Diagnostic Report: {domain or 'Target Site'}"]
+    lines.append(f"\n- **Status:** `{res.get('status', 'ok')}`")
+    cov = res.get("coverage", {})
+    if isinstance(cov, dict) and cov:
+        lines.append(f"- **Pages Evaluated:** {cov.get('pages_evaluated', 0)}")
+        lines.append(f"- **Above-Fold Answer Absence:** {cov.get('viewport_answer_absence_count', 0)}")
+        lines.append(f"- **CTA Friction Rate:** {cov.get('cta_friction_rate', 'N/A')}")
+
+    findings = res.get("findings", [])
+    lines.append(f"\n## Diagnostic Findings ({len(findings)})")
+    if not findings:
+        lines.append("\nNo visitor orientation or post-citation engagement friction detected.")
+    else:
+        for f in findings:
+            fid = f.get("id") or f.get("cause_id") or "FINDING"
+            sev = str(f.get("severity", "medium")).upper()
+            title = f.get("title", "")
+            scope = f.get("scope") or f.get("url") or "-"
+            lines.append(f"\n### [{sev}] {fid}: {title}")
+            lines.append(f"- **Scope:** `{scope}`")
+            if f.get("root_cause"):
+                lines.append(f"- **Root Cause:** {f.get('root_cause')}")
+            if f.get("evidence"):
+                ev = f.get("evidence")
+                lines.append(f"- **Evidence:** {ev.get('summary') if isinstance(ev, dict) else ev}")
+            s_act = f.get("suggested_action")
+            if isinstance(s_act, dict):
+                lines.append(f"- **Technical Fix:** {s_act.get('technical_fix', s_act.get('summary', ''))}")
+                if s_act.get("creative_fix"):
+                    lines.append(f"- **Creative Fix:** {s_act.get('creative_fix')}")
+
+    recs = res.get("recommendations", [])
+    if recs:
+        lines.append(f"\n## Proactive Recommendations ({len(recs)})")
+        for r in recs:
+            lines.append(f"- **[{str(r.get('priority', 'medium')).upper()}] {r.get('id', 'REC')}:** {r.get('title', '')} - {r.get('summary', '')}")
+
+    return "\n".join(lines) + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -1737,7 +1782,10 @@ def main():
         referrer_query=args.referrer_query,
         viewport_only=args.viewport_only,
     )
-    print(json.dumps(res, indent=2))
+    if args.format == "markdown":
+        print(format_markdown_summary(res, domain=p.netloc))
+    else:
+        print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

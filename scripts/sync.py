@@ -6,7 +6,6 @@ Mirrors src/skills/ to .agents/skills/ and build/brand-ai-readiness-audit/skills
 
 import os
 import shutil
-import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
@@ -15,6 +14,7 @@ AGENTS_SKILLS = os.path.join(PROJECT_ROOT, ".agents", "skills")
 SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 AGENTS_DIR = os.path.join(PROJECT_ROOT, ".agents")
 BUILD_DIR = os.path.join(PROJECT_ROOT, "build", "brand-ai-readiness-audit")
+BRAND_AUDIT_AGENTS = os.path.abspath(os.path.join(PROJECT_ROOT, "..", "brand_audit", ".agents"))
 
 
 def sync_tree(src: str, dst: str):
@@ -69,6 +69,17 @@ def main():
         for manifest in ("marketplace.json", "README.md", "LICENSE"):
             src_m = os.path.join(SRC_DIR, manifest)
             dst_m = os.path.join(BUILD_DIR, manifest)
+            if os.path.exists(src_m):
+                shutil.copy2(src_m, dst_m)
+
+    # 4. If ../brand_audit/.agents exists, sync to brand_audit/.agents
+    if os.path.isdir(BRAND_AUDIT_AGENTS) or os.path.isdir(os.path.dirname(BRAND_AUDIT_AGENTS)):
+        print(f"Syncing to {BRAND_AUDIT_AGENTS}...")
+        brand_audit_skills = os.path.join(BRAND_AUDIT_AGENTS, "skills")
+        sync_tree(SRC_SKILLS, brand_audit_skills)
+        for manifest in ("marketplace.json", "README.md", "LICENSE"):
+            src_m = os.path.join(SRC_DIR, manifest)
+            dst_m = os.path.join(BRAND_AUDIT_AGENTS, manifest)
             if os.path.exists(src_m):
                 shutil.copy2(src_m, dst_m)
 

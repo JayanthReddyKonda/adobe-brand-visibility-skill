@@ -71,7 +71,10 @@ Performs bounded, zero-trust SSRF-safe, single-pass website acquisition and cont
 - `--strict-robots` (flag, optional): Abort crawling immediately if `robots.txt` disallows the entrypoint.
 - `--headers-only` (flag, optional, `safe_fetch.py`): Probe URL headers and edge metadata without fetching full body under SSRF safety.
 - `--extract-text` (flag, optional, `safe_fetch.py`): Fetch target URL under SSRF protection and extract clean readable text, word count, SNR score, and headings (`h1`, `h2`).
+- `--max-bytes <int>` (integer, optional, `safe_fetch.py`, default: `2097152`): Hard byte cap for streaming reads.
+- `--method <GET|HEAD>` (enum, optional, `safe_fetch.py`, default: `GET`): HTTP request method under SSRF safety.
 - `--verbose` (flag, optional): Emit real-time crawl diagnostic traces to stderr.
+
 
 ---
 

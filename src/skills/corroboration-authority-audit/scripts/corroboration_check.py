@@ -14,6 +14,7 @@ import re
 import sys
 import time
 from html.parser import HTMLParser
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -851,11 +852,51 @@ def audit(
     }
 
 
+def format_markdown_summary(res: Dict[str, Any], domain: Optional[str] = None) -> str:
+    """Format corroboration authority sensor result as clean, readable Markdown."""
+    lines = [f"# Corroboration & Authority Diagnostic Report: {domain or 'Target Site'}"]
+    lines.append(f"\n- **Status:** `{res.get('status', 'ok')}`")
+    cov = res.get("coverage", {})
+    if isinstance(cov, dict) and cov:
+        lines.append(f"- **Pages Evaluated:** {cov.get('pages_evaluated', 0)}")
+        lines.append(f"- **Declared sameAs Links:** {cov.get('declared_sameas_count', len(res.get('sameas_links', [])))}")
+        lines.append(f"- **Broken Anchors Detected:** {cov.get('broken_anchors_count', 0)}")
+
+    findings = res.get("findings", [])
+    lines.append(f"\n## Diagnostic Findings ({len(findings)})")
+    if not findings:
+        lines.append("\nNo broken authority anchors or unlinked entity signals detected.")
+    else:
+        for f in findings:
+            fid = f.get("id") or f.get("cause_id") or "FINDING"
+            sev = str(f.get("severity", "medium")).upper()
+            title = f.get("title", "")
+            scope = f.get("scope") or f.get("url") or "-"
+            lines.append(f"\n### [{sev}] {fid}: {title}")
+            lines.append(f"- **Scope:** `{scope}`")
+            if f.get("root_cause"):
+                lines.append(f"- **Root Cause:** {f.get('root_cause')}")
+            if f.get("evidence"):
+                ev = f.get("evidence")
+                lines.append(f"- **Evidence:** {ev.get('summary') if isinstance(ev, dict) else ev}")
+            s_act = f.get("suggested_action")
+            if isinstance(s_act, dict):
+                lines.append(f"- **Technical Fix:** {s_act.get('technical_fix', s_act.get('summary', ''))}")
+
+    recs = res.get("recommendations", [])
+    if recs:
+        lines.append(f"\n## Proactive Recommendations ({len(recs)})")
+        for r in recs:
+            lines.append(f"- **[{str(r.get('priority', 'medium')).upper()}] {r.get('id', 'REC')}:** {r.get('title', '')} - {r.get('summary', '')}")
+
+    return "\n".join(lines) + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Cross-Web Authority & Identity Corroboration Diagnostic Sensor.\n"
-            "Deterministically extracts Schema.org sameAs links, probes external authority anchors "
+            "Cross-Web Authority & Corroboration Diagnostic Sensor.\n"
+            "Extracts Schema.org sameAs identity anchors, probes external knowledge graph nodes "
             "(Wikidata, Wikipedia, Crunchbase, LinkedIn) under zero-trust SSRF sandboxing, "
             "evaluates knowledge graph identity substantiation, and verifies candidate inbound backlinks."
         ),
@@ -912,7 +953,10 @@ def main():
         verify_backlink=args.verify_backlink,
         sameas_only=args.sameas_only,
     )
-    print(json.dumps(res, indent=2))
+    if args.format == "markdown":
+        print(format_markdown_summary(res, domain=p.netloc))
+    else:
+        print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

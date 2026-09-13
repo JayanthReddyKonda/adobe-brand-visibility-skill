@@ -276,7 +276,7 @@ def generate_priority_justification(f: Dict[str, Any], idx: int) -> str:
     elif "ORIENTATION" in cid or "VALUE_PROPOSITION" in cid:
         just = "Post-citation bounce vector. Visitors arriving from specific AI citations bounce within 5 seconds when the hero section fails the cognitive orientation test with vague marketing abstractions."
     elif "PROOF" in cid:
-        just = "Skepticism hurdle. AI search evaluators require quantitative benchmarks, enterprise logos, or compliance attestations immediately upon arrival to validate the factual claims made in the citation."
+        just = "Skepticism hurdle. High-intent AI citation visitors require quantitative benchmarks, enterprise logos, or compliance attestations immediately upon arrival to validate the factual claims made in the citation."
     elif "FRICTION" in cid or "GATE" in cid:
         just = "Conversion bottleneck. Forcing high-intent visitors arriving from citations into mandatory sales meetings without self-service sandbox exploration causes immediate referral abandonment."
     elif "PATHWAY" in cid:

@@ -1405,7 +1405,7 @@ Every candidate evaluated by the cognitive review loop requires:
 ## 26. Architectural Precedence, 6 Core Concerns, & Standards Reference
 
 ### 26.1 Precedence Hierarchy
-1. **Contest Rubric & Schema Standard:** Precedence for layout, schema floor, guardrails, runtime, and scoring rubric.
+1. **Output Schema & Runtime Constraints:** Precedence for Draft-07 output JSON schema, technical security boundaries, bounded runtime (< 5 min), and deterministic output.
 2. **Research Catalogue (134 Checks):** Joined research rows control conditional detector and remedy reasoning.
 3. **Single-Pass Acquisition Invariant:** All diagnostic sensors run offline against `inv.json` emitted by `web-scraper`.
 
@@ -1418,7 +1418,7 @@ Every candidate evaluated by the cognitive review loop requires:
 6. **Orchestration & Validation:** 6-Layer Causal DAG, Keystone suppression, Draft-07 JSON Schema validation.
 
 ### 26.3 Standards Consulted
-- **Contest Specification:** Round 3 updated handout, schema p2, manifest p3, evaluation/rubric p4, guardrails p5, appendix p6.
+- **Brand AI-Readiness Technical Specification:** Core engineering architecture for AI retrieval engine discoverability, structured entity knowledge graphs, and agentic engagement continuity.
 - **Agent Skills Standard:** https://agentskills.io/specification
 - **Robots Protocol:** RFC 9309 (https://www.rfc-editor.org/rfc/rfc9309.html)
 - **Schema.org Vocabulary:** https://schema.org/docs/datamodel.html

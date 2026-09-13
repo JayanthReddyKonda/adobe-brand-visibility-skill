@@ -255,7 +255,7 @@ def generate_priority_justification(f: Dict[str, Any], idx: int) -> str:
     elif "ORIENTATION" in cid or "VALUE_PROPOSITION" in cid:
         just = "Post-citation bounce vector. Visitors arriving from specific AI citations bounce within 5 seconds when the hero section fails the cognitive orientation test with vague marketing abstractions."
     elif "PROOF" in cid:
-        just = "Skepticism hurdle. AI search evaluators require quantitative benchmarks, enterprise logos, or compliance attestations immediately upon arrival to validate the factual claims made in the citation."
+        just = "Skepticism hurdle. High-intent AI citation visitors require quantitative benchmarks, enterprise logos, or compliance attestations immediately upon arrival to validate the factual claims made in the citation."
     elif "FRICTION" in cid or "GATE" in cid:
         just = "Conversion bottleneck. Forcing high-intent visitors arriving from citations into mandatory sales meetings without self-service sandbox exploration causes immediate referral abandonment."
     elif "PATHWAY" in cid:
@@ -2147,7 +2147,7 @@ def audit(
 
 
 def sanitize_clean_report(report: Dict[str, Any]) -> Dict[str, Any]:
-    """Strip auxiliary internal pipeline debug data, leaving only high-signal evaluator fields."""
+    """Strip internal runtime pipeline debug data, leaving only core findings, scores, and proactive actions."""
     clean = {
         "$schema": report.get("$schema", "http://json-schema.org/draft-07/schema#"),
         "schema_version": report.get("schema_version", "1.0.0"),
@@ -2226,7 +2226,7 @@ def main():
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="Emit clean, high-signal report containing only core evaluator fields (strips auxiliary manifests and internal DAG meta-tags)",
+        help="Emit clean, high-signal report containing core findings, scores, and remediations (omits internal pipeline debug traces)",
     )
 
     args = parser.parse_args()

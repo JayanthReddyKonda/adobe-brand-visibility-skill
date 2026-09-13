@@ -19,7 +19,7 @@ import os
 import re
 import sys
 from html.parser import HTMLParser
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -579,6 +579,8 @@ def inspect_target_entity(inv, base, domain, target_url):
 
 
 def audit(base, domain, inv=None, state_file=None, target_url=None, schema_type=None, answerability_only=False):
+    if inv is not None and not isinstance(inv, dict):
+        inv = None
     state: Dict[str, Any] = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
     if state_file and os.path.exists(state_file):
         try:
@@ -591,7 +593,9 @@ def audit(base, domain, inv=None, state_file=None, target_url=None, schema_type=
     # 1. Filter genuine HTML pages from inventory
     html_pages = []
     if inv is not None:
-        for p in inv.get("pages", []):
+        for p in (inv.get("pages", []) if isinstance(inv, dict) else []):
+            if not isinstance(p, dict):
+                continue
             u = p.get("url") or ""
             raw_html = p.get("html") or ""
             if not u or not raw_html:
@@ -1013,7 +1017,7 @@ def audit(base, domain, inv=None, state_file=None, target_url=None, schema_type=
                                 }
                             )
 
-            # 3.3 Non-Text Fact Locking Check (Round 3 PS Page 3 & Round 2 Appendix Concept C/F)
+            # 3.3 Non-Text Fact Locking Check:
             # Detects critical commercial/pricing/specification charts locked inside unparsed raster images
             locked_images = []
             img_candidates = list(p.get("images", []))
@@ -1162,12 +1166,52 @@ def audit(base, domain, inv=None, state_file=None, target_url=None, schema_type=
     return res_payload
 
 
+def format_markdown_summary(res: Dict[str, Any], domain: Optional[str] = None) -> str:
+    """Format entity content sensor result as clean, readable Markdown."""
+    lines = [f"# Entity & Structured Data Diagnostic Report: {domain or 'Target Site'}"]
+    lines.append(f"\n- **Status:** `{res.get('status', 'ok')}`")
+    cov = res.get("coverage", {})
+    if isinstance(cov, dict) and cov:
+        lines.append(f"- **HTML Pages Evaluated:** {cov.get('html_pages_evaluated', 0)}")
+        lines.append(f"- **Total JSON-LD Blocks:** {cov.get('total_json_ld_blocks', 0)}")
+        lines.append(f"- **Schema Types Present:** {', '.join(cov.get('schema_types_present', [])) or 'None'}")
+        lines.append(f"- **Answerability Index:** {cov.get('mean_answerability_score', 'N/A')}")
+
+    findings = res.get("findings", [])
+    lines.append(f"\n## Diagnostic Findings ({len(findings)})")
+    if not findings:
+        lines.append("\nNo entity resolution or schema defects detected.")
+    else:
+        for f in findings:
+            fid = f.get("id") or f.get("cause_id") or "FINDING"
+            sev = str(f.get("severity", "medium")).upper()
+            title = f.get("title", "")
+            scope = f.get("scope") or f.get("url") or "-"
+            lines.append(f"\n### [{sev}] {fid}: {title}")
+            lines.append(f"- **Scope:** `{scope}`")
+            if f.get("root_cause"):
+                lines.append(f"- **Root Cause:** {f.get('root_cause')}")
+            if f.get("evidence"):
+                ev = f.get("evidence")
+                lines.append(f"- **Evidence:** {ev.get('summary') if isinstance(ev, dict) else ev}")
+            s_act = f.get("suggested_action")
+            if isinstance(s_act, dict):
+                lines.append(f"- **Technical Fix:** {s_act.get('technical_fix', s_act.get('summary', ''))}")
+
+    recs = res.get("recommendations", [])
+    if recs:
+        lines.append(f"\n## Proactive Recommendations ({len(recs)})")
+        for r in recs:
+            lines.append(f"- **[{str(r.get('priority', 'medium')).upper()}] {r.get('id', 'REC')}:** {r.get('title', '')} - {r.get('summary', '')}")
+
+    return "\n".join(lines) + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
-            "Entity & Commercial Content Understanding Diagnostic Sensor.\n"
-            "Deterministically parses DOM trees, extracts Schema.org JSON-LD (@graph, Organization, "
-            "Product, Offer, Service), evaluates multi-archetype answerability (pricing, subscription, "
+            "Entity Identity & Content Answerability Diagnostic Sensor.\n"
+            "Evaluates Schema.org @graph architectures (Organization, WebSite, Product, Offer, "
             "services, contact), validates ISO 4217 priceCurrency codes, and computes the 7-attribute Answerability Index."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1204,7 +1248,10 @@ def main():
         schema_type=args.schema_type,
         answerability_only=args.answerability_only,
     )
-    print(json.dumps(res, indent=2))
+    if args.format == "markdown":
+        print(format_markdown_summary(res, domain=p.netloc))
+    else:
+        print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

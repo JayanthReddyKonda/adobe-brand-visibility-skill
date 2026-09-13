@@ -7,7 +7,6 @@ Creates brand-ai-readiness-audit.zip conforming to Marketplace distribution stan
 import hashlib
 import os
 import shutil
-import sys
 import zipfile
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -62,7 +61,7 @@ def main():
         os.remove(ZIP_PATH)
 
     with zipfile.ZipFile(ZIP_PATH, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, dirs, files in os.walk(PACKAGE_DIR):
+        for root, _dirs, files in os.walk(PACKAGE_DIR):
             for file in files:
                 abs_path = os.path.join(root, file)
                 rel_path = os.path.relpath(abs_path, BUILD_DIR)

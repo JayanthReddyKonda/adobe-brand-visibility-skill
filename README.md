@@ -272,7 +272,7 @@ python scripts/sync.py
 adobe-brand-visibility-skill/
 ├── src/                             # Canonical source of truth
 │   ├── marketplace.json             # Standard marketplace manifest (1 entrypoint + 7 specialists)
-│   ├── README.md                    # Evaluator-facing documentation (ships in zip)
+│   ├── README.md                    # Public marketplace documentation (ships in zip)
 │   └── skills/                      # 8 skills
 │       ├── audit-orchestrator/      # Entrypoint coordinator & Sensor-Brain synthesis
 │       │   ├── SKILL.md             # Agent reasoning runbook with Anti-Shortcut Directive

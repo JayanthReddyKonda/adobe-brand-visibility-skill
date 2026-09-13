@@ -225,7 +225,7 @@ A page can achieve a 95/100 technical SEO score and still fail completely in AI 
 - **Formula:** `[Action Verb] + [Specific Desired Outcome/Asset]`.
 
 ### The 6 Masterclass Post-Citation Retention Vectors (Why Arriving AI Referral Visitors Leave):
-When visitors click through from AI assistant citations (ChatGPT Search, Perplexity, Claude, Google AI Overviews), they are skeptical, high-intent evaluators verifying a specific claim. If the destination violates behavioral continuity, up to 75% bounce within 5 seconds:
+When visitors click through from AI assistant citations (ChatGPT Search, Perplexity, Claude, Google AI Overviews), they are skeptical, high-intent visitors verifying a specific claim. If the destination violates behavioral continuity, up to 75% bounce within 5 seconds:
 
 1. **`VALUE_PROPOSITION_ORIENTATION_VACUUM` (Orientation Shock / 5-Second Test Failure):**
    The hero viewport leads with abstract marketing platitudes ("Empowering enterprise agility", "Welcome to our portal") instead of immediately defining what the product does, for whom, and its concrete outcome within 50 words. The visitor cannot confirm they are in the right place and bounces.
@@ -234,7 +234,7 @@ When visitors click through from AI assistant citations (ChatGPT Search, Perplex
    AI search users know generative models hallucinate. When they visit to verify claims, the absence of empirical proof anchors (verifiable benchmark metrics, customer case studies with quantified results, or SOC2/HIPAA security credentials) causes immediate dismissal of the brand's claims.
 
 3. **`FRICTION_TO_VALUE_BARRIER` (Forced Sales Gates vs. Self-Service):**
-   Technical and product buyers arriving from AI search seek immediate product utility. Forcing an unskippable "Book a 30-Minute Sales Call" gate with zero self-service entry points (documentation, interactive sandbox, transparent pricing tiers) drives evaluators directly to self-service competitors.
+   Technical and product buyers arriving from AI search seek immediate product utility. Forcing an unskippable "Book a 30-Minute Sales Call" gate with zero self-service entry points (documentation, interactive sandbox, transparent pricing tiers) drives prospective buyers directly to self-service competitors.
 
 4. **`OBJECTION_COVERAGE_VOID` (Purchase Decision Stall):**
    High-intent commercial traffic stalls when essential buyer hesitations are unaddressed above conversion triggers: pricing transparency, implementation and migration timelines, integration compatibility (APIs/SDKs), and security compliance terms.

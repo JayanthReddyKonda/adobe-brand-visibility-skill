@@ -14,6 +14,7 @@ import os
 import re
 import sys
 from html.parser import HTMLParser
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -426,6 +427,8 @@ def inspect_target_url(inv, base, domain, target_url, robots_txt=None):
 
 
 def audit(base, domain, inv=None, state_file=None, target_url=None, target_bot=None, subsystem=None):
+    if inv is not None and not isinstance(inv, dict):
+        inv = None
     findings, recommendations, observations = [], [], []
 
     # 1. Fetch Homepage & robots.txt via shared inventory or live probe
@@ -1356,6 +1359,47 @@ def audit(base, domain, inv=None, state_file=None, target_url=None, target_bot=N
     return result_payload
 
 
+def format_markdown_summary(res: Dict[str, Any], domain: Optional[str] = None) -> str:
+    """Format discoverability sensor result as clean, readable Markdown."""
+    lines = [f"# Discoverability Diagnostic Report: {domain or 'Target Site'}"]
+    lines.append(f"\n- **Status:** `{res.get('status', 'ok')}`")
+    cov = res.get("coverage", {})
+    if isinstance(cov, dict) and cov:
+        lines.append(f"- **Pages Evaluated:** {cov.get('pages_crawled', len(res.get('pages_checked', [])))}")
+        lines.append(f"- **Robots RFC 9309 Rules Parsed:** {cov.get('robots_rules_parsed', 0)}")
+        lines.append(f"- **Sitemaps Evaluated:** {cov.get('sitemaps_evaluated', 0)}")
+        lines.append(f"- **Average Page SNR:** {cov.get('average_page_snr', 'N/A')}")
+
+    findings = res.get("findings", [])
+    lines.append(f"\n## Diagnostic Findings ({len(findings)})")
+    if not findings:
+        lines.append("\nNo discoverability barriers or crawler defects detected.")
+    else:
+        for f in findings:
+            fid = f.get("id") or f.get("cause_id") or "FINDING"
+            sev = str(f.get("severity", "medium")).upper()
+            title = f.get("title", "")
+            scope = f.get("scope") or f.get("url") or "-"
+            lines.append(f"\n### [{sev}] {fid}: {title}")
+            lines.append(f"- **Scope:** `{scope}`")
+            if f.get("root_cause"):
+                lines.append(f"- **Root Cause:** {f.get('root_cause')}")
+            if f.get("evidence"):
+                ev = f.get("evidence")
+                lines.append(f"- **Evidence:** {ev.get('summary') if isinstance(ev, dict) else ev}")
+            s_act = f.get("suggested_action")
+            if isinstance(s_act, dict):
+                lines.append(f"- **Technical Fix:** {s_act.get('technical_fix', s_act.get('summary', ''))}")
+
+    recs = res.get("recommendations", [])
+    if recs:
+        lines.append(f"\n## Proactive Recommendations ({len(recs)})")
+        for r in recs:
+            lines.append(f"- **[{str(r.get('priority', 'medium')).upper()}] {r.get('id', 'REC')}:** {r.get('title', '')} - {r.get('summary', '')}")
+
+    return "\n".join(lines) + "\n"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -1386,7 +1430,10 @@ def main():
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
     res = audit(base, domain, inv=inv, state_file=args.state, target_url=args.url, target_bot=args.bot, subsystem=args.subsystem)
-    print(json.dumps(res, indent=2))
+    if args.format == "markdown":
+        print(format_markdown_summary(res, domain=domain))
+    else:
+        print(json.dumps(res, indent=2))
 
 
 if __name__ == "__main__":

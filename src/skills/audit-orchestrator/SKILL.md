@@ -79,10 +79,14 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 - **`--skills`** (string, optional, `orchestrator.py`): Comma-separated list of specialist skills to execute (e.g. `discoverability,entity,geo,engagement`).
 - **`--telemetry`** (flag, optional): Emits raw aggregated empirical sensor measurements for cognitive synthesis.
 - **`--baseline-only`** (flag, optional): Emits automated baseline report directly (strictly reserved for automated CI/CD suites).
+- **`--clean`** (flag, optional, `orchestrator.py`): Emits a concise, high-signal Draft-07 deliverable report focused strictly on prioritized findings, readiness scores, and actionable engineering/copywriting remediations (omits internal runtime pipeline traces).
 - **`--format`** (enum, optional, default: `json`): Output serialization format.
 - **`--archetype`** (enum, optional, `bundle_context.py`): Explicit business archetype context (`ecommerce`, `saas`, `publisher`, `local_business`, `corporate`).
 - **`--topic`** (enum, optional, `bundle_context.py`): Technical topic filter (`retrieval`, `rendering`, `entity`, `facts`, `corroboration`, `geo`, `engagement`).
+- **`--findings`** (string, optional, `causal_gate.py`): Path to findings JSON file to apply causal suppression rules.
+- **`--finding` / `--rule`** (string, optional, `plan.py`): Path or inline JSON for single finding / rule difficulty calculation.
 - **`--rank-findings`** (string, optional, `plan.py`): JSON string or file path of findings to sort and rank by DAG hierarchy and priority index.
+- **`--candidates` / `--artifacts` / `--rules`** (string, optional, `assemble_report.py`): Inputs for low-level standalone report assembly.
 
 ---
 
@@ -92,7 +96,7 @@ Every script and reference in this skill serves a distinct, critical orchestrati
 
 | Path | Type | Purpose & Agent Calling Role |
 |---|---|---|
-| `scripts/orchestrator.py` | Master Script | Entrypoint coordinating crawler and all 6 specialist sensors, aggregating empirical telemetry (`--telemetry`), ingesting agent review findings (`--review`), and synthesizing Draft-07 reports. |
+| `scripts/orchestrator.py` | Master Script | Entrypoint coordinating crawler and all 6 specialist sensors, aggregating empirical telemetry (`--telemetry`), ingesting agent review findings (`--review`), and synthesizing Draft-07 reports (with optional `--clean`). |
 | `scripts/bundle_context.py` | CLI Tool | Dynamic context compiler extracting archetype-tailored rules, Schema.org templates, and research cheatsheets based on site signals. Verified with SHA-256 reference checksums. |
 | `scripts/plan.py` | CLI Tool | Task priority calculator computing `priority_index = 5 * severity + (6 - difficulty)` and ranking findings roadmap. |
 | `scripts/causal_gate.py` | Standalone CLI | 6-Layer Causal DAG engine evaluating epistemic states, causal node graph, and applying deterministic defect suppression. |
@@ -103,7 +107,7 @@ Every script and reference in this skill serves a distinct, critical orchestrati
 | `references/checks.md` | Reference Catalogue | Human-readable master diagnostic check procedures across all 8 AI visibility domains. |
 | `references/core-synthesis-digest.md` | Reference Digest | Concise executive reference (< 2,500 tokens) on the 6-Layer Causal DAG, scoring math, and 9 Princeton GEO vectors. |
 | `references/knowledge-base.md` | Master KB | Definitive master specification covering 17 root causes, Draft-07 schemas, severity scales (S0-S4/U), and GEO benchmarks. |
-| `references/report-schema.json` | Draft-07 Schema | Schema defining exact required fields, enums, non-negative integer summary counts, and optional properties ($schema, priority_index, difficulty, dimension_status, run_manifest). |
+| `references/report-schema.json` | Draft-07 Schema | Schema defining exact required fields, enums, non-negative integer summary counts, and optional properties (`$schema`, `priority_index`, `difficulty`, `dimension_status`, `run_manifest`). |
 | `references/telemetry-schema.json` | Draft-07 Schema | Schema defining empirical sensor telemetry emitted by `orchestrator.py --telemetry`, supporting disambiguated average_page_snr. |
 | `evals/evals.json` | Verification Fixtures | Multi-archetype test fixtures validating end-to-end orchestration, causal gating, and schema compliance. |
 
@@ -341,13 +345,18 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
    > - Clean string values: No literal unescaped newlines (`\n\n`), no raw Markdown tables (`| Col |`), no raw HTML tags.
 
    ```bash
-   # Option A: Ingest review findings through orchestrator into full Draft-07 report
-   python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
+    # Option A: Ingest review findings through orchestrator into full Draft-07 report
+    python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json
 
-   # Option B: Finalize via unified multi-sensor runner
-   python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review review.json --out report.json
-   ```
-   Both options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, causal gating, `priority_rank`, `priority_justification`, and SHA-256 reference hashes (`run_manifest`).
+    # Option B: Concise Production Deliverable (Clean Mode)
+    # Emits schema-validated deliverable stripped of internal runtime pipeline debug data
+    python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --clean --output report.json
+
+    # Option C: Finalize via unified multi-sensor runner
+    python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review review.json --out report.json
+    ```
+    All options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, and causal gating. Adding `--clean` emits only the high-signal findings, scores, and proactive actions required for engineering and executive execution.
+
 
 
 ---
@@ -367,17 +376,13 @@ Ensure exit code is 0 (pass).
 
 ---
 
-### Stage 5 — Executive Briefing & Final Delivery
+### Stage 5 — Final Delivery (JSON Only)
 
-**Step 6: Deliver Executive Diagnostic Briefing + Valid JSON Report**
-Deliver your final response structured as:
-1. **Executive Diagnostic Briefing (Markdown):**
-   - Brand AI Readiness Grade and Composite Citability Score.
-   - Breakdown across generative engines (ChatGPT Search, Claude Search, Perplexity Pro, Google AI Overviews).
-   - Keystone Root-Cause Analysis (5-Whys diagnosis explaining why engines currently fail to recommend or cite the brand).
-   - Prioritized Dual-Track Action Plan.
-2. **Draft-07 Validated Report (JSON):**
-   - The complete, unabridged Draft-07 JSON report enclosed inside a single ````json```` code block with zero string pollution.
+**Step 6: Deliver Strictly Valid Draft-07 JSON Report**
+Emit the complete, unabridged Draft-07 JSON report as the sole deliverable:
+- Output MUST be strictly valid JSON conforming to `references/report-schema.json`.
+- Output must be JSON ONLY: zero conversational preamble, zero introductory text, zero markdown summary outside the JSON, and zero conversational postscript.
+- The deliverable must parse directly as valid JSON.
 
 
 ---
@@ -393,13 +398,13 @@ Deliver your final response structured as:
 7. **A heuristic signal alone cannot create a `high`-severity causal finding.**
 8. **Every finding must cite concrete, verifiable evidence from the actual pages.**
 9. **Zero direct agent URL reading tools:** Crawling is strictly single-pass via `acquire_inventory.py`; downstream sensors run offline against `inv.json`.
-10. **Clean output standard:** Every report must validate against `references/report-schema.json`, containing zero conversational preamble, zero duplicate Markdown tables before the JSON, and zero literal `\n\n` or raw Markdown tables inside JSON string values.
+10. **JSON-Only Deliverable Standard:** The final report must be strictly JSON ONLY validating against `references/report-schema.json`, containing zero conversational preamble, zero preceding Markdown briefings or tables, and zero literal `\n\n` or raw HTML/Markdown inside JSON string values.
 
 ---
 
 ## Output Format
 
-The final report must strictly conform to the `references/report-schema.json` Draft-07 specification. Emit the JSON object inside a single ````json```` block.
+The final report must strictly conform to the `references/report-schema.json` Draft-07 specification. Emit the raw JSON report object ONLY (no conversational preamble, no markdown summaries, no trailing comments).
 
 ---
 

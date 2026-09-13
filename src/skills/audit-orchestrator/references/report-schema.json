@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "BrandAIReadinessAuditReport",
-  "description": "Production Draft-07 schema for Brand AI-Readiness, GEO, and Visibility Audit Reports, strictly conforming to Adobe Hackathon Round 3 requirements.",
+  "description": "Production Draft-07 schema for Brand AI-Readiness, Generative Engine Optimization (GEO), and AI Visibility Audit Reports.",
   "type": "object",
   "required": [
     "schema_version",
