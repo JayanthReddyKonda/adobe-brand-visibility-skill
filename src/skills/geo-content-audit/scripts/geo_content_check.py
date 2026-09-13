@@ -597,33 +597,120 @@ def score_passage_citability(text: str, headings: list, html: str = "") -> dict:
     }
 
 
-def audit(base, domain, inv=None, state_file=None):
+def audit(
+    base,
+    domain,
+    inv=None,
+    state_file=None,
+    *,
+    target_url=None,
+    page_plan_only=None,
+    analyze_text=None,
+):
     findings = []
     recommendations = []
     observations = []
 
-    if not inv or not inv.get("pages"):
+    # 0. Custom forensic parameter: direct text / document citability analysis
+    if analyze_text:
+        text = analyze_text
+        if os.path.exists(analyze_text):
+            try:
+                with open(analyze_text, "r", encoding="utf-8") as f:
+                    text = f.read()
+            except Exception as e:
+                return {"status": "error", "error": f"Failed to read file: {e}"}
+
+        words = _word_count(text)
+        extracted_headings = [line.lstrip("#").strip() for line in text.splitlines() if line.startswith("#")]
+        citability = score_passage_citability(text, headings=extracted_headings)
+        attr_quotes = extract_attributed_quotations("", text)
+        kw_stuffing = detect_keyword_stuffing(text)
+        bluf = analyze_bluf_placement(text, words)
+        atomic_facts = count_atomic_facts(text)
+        ftr = round(atomic_facts / max(words, 1), 3)
+        stat_matches = _STAT_RE.findall(text)
+        mechanism_words = [
+            "how", "why", "because", "therefore", "allows", "enables",
+            "mechanism", "results in", "due to", "consequently",
+        ]
+        depth_score = sum(1 for w in mechanism_words if re.search(rf"\b{w}\b", text.lower()))
+        hedging = _HEDGE_RE.findall(text)
+        fluff = _FLUFF_RE.findall(text)
+
+        return {
+            "status": "ok",
+            "mode": "analyze_text",
+            "word_count": words,
+            "citability_score": citability["total"],
+            "citability_breakdown": citability,
+            "causal_mechanisms_score": depth_score,
+            "statistical_metrics_count": len(stat_matches),
+            "sample_statistics": stat_matches[:8],
+            "attributed_quotes": attr_quotes,
+            "atomic_facts_count": atomic_facts,
+            "fact_to_token_ratio": ftr,
+            "bluf_placement": bluf,
+            "keyword_stuffing": kw_stuffing,
+            "hedging_phrases_count": len(hedging),
+            "fluff_words": list(set(w.lower() for w in fluff)),
+        }
+
+    if not inv or not isinstance(inv, dict) or not inv.get("pages"):
         return {"status": "inconclusive", "findings": [], "recommendations": []}
 
-    html_pages = [p for p in inv["pages"] if p.get("html")]
+    raw_pages = inv.get("pages") or []
+    html_pages = [
+        p
+        for p in raw_pages
+        if isinstance(p, dict)
+        and (p.get("html") or p.get("text") or p.get("clean_text"))
+        and not (p.get("url") or "").lower().endswith((".xml", ".xml.gz", ".txt", ".json", ".pdf"))
+        and not (str(p.get("html") or "").strip().startswith("<?xml") or "<urlset" in str(p.get("html") or "").lower())
+    ]
     if not html_pages:
         return {"status": "inconclusive", "findings": [], "recommendations": []}
 
-    target_pages = [
-        p
-        for p in html_pages
-        if p.get("page_type")
-        in ("product_detail", "product", "article", "pricing", "about", "documentation", "guide", "faq")
-    ]
-    if not target_pages:
-        target_pages = html_pages
+    # Custom forensic filter: scope to single target URL
+    filter_url = page_plan_only or target_url
+    if filter_url:
+        matched = [
+            p for p in html_pages
+            if p.get("url") == filter_url
+            or urlparse(p.get("url", "")).path.rstrip("/") == urlparse(filter_url).path.rstrip("/")
+        ]
+        if matched:
+            target_pages = matched
+        else:
+            return {
+                "status": "inconclusive",
+                "error": f"URL '{filter_url}' not found in inventory HTML pages",
+                "available_urls": [p.get("url") for p in html_pages[:10]],
+            }
+    else:
+        target_pages = [
+            p
+            for p in html_pages
+            if p.get("page_type")
+            in ("product_detail", "product", "article", "pricing", "about", "documentation", "guide", "faq")
+        ]
+        if not target_pages:
+            target_pages = html_pages
     page_citability_map = {}
     page_improvement_plans: list[dict] = []
 
     for p in target_pages:
         url = p.get("url")
-        html = p.get("html")
-        ptype = p.get("page_type")
+        html = p.get("html") or f"<html><body><h1>{p.get('title', '')}</h1><p>{p.get('text', '')}</p></body></html>"
+        raw_ptype = p.get("page_type")
+        if not raw_ptype:
+            u_clean = url.rstrip("/") if url else ""
+            if not u_clean or u_clean == base.rstrip("/") or u_clean in (f"https://{domain}", f"http://{domain}"):
+                ptype = "homepage"
+            else:
+                ptype = "general"
+        else:
+            ptype = str(raw_ptype)
 
         parser = GEODOMParser(base_domain=domain)
         try:
@@ -631,7 +718,7 @@ def audit(base, domain, inv=None, state_file=None):
         except Exception:
             pass
 
-        full_text = " ".join(parser.text_blocks)
+        full_text = " ".join(parser.text_blocks) if parser.text_blocks else p.get("text", "")
         total_words = _word_count(full_text)
         has_auth_citation = False
         has_credentials = False
@@ -1389,15 +1476,45 @@ def audit(base, domain, inv=None, state_file=None):
             for genre in ["code", "statistics", "definition_copula", "comparison_table", "procedural_steps"]
         },
         "pages_with_attributed_quotes": sum(
-            1 for p in page_improvement_plans if p.get("attributed_quotations", {}).get("attributed_quotes", 0) > 0
+            1 for p in page_improvement_plans if isinstance(p, dict) and (p.get("attributed_quotations") or {}).get("attributed_quotes", 0) > 0
         ),
         "pages_with_bluf_alignment": sum(
-            1 for p in page_improvement_plans if p.get("bluf_placement", {}).get("present_in_top_30_pct", False)
+            1 for p in page_improvement_plans if isinstance(p, dict) and (p.get("bluf_placement") or {}).get("present_in_top_30_pct", False)
         ),
         "pages_with_keyword_stuffing": sum(
-            1 for p in page_improvement_plans if p.get("keyword_stuffing", {}).get("is_stuffed", False)
+            1 for p in page_improvement_plans if isinstance(p, dict) and (p.get("keyword_stuffing") or {}).get("is_stuffed", False)
         ),
     }
+
+    if page_plan_only:
+        matched_plan = next(
+            (
+                plan
+                for plan in page_improvement_plans
+                if isinstance(plan, dict)
+                and (
+                    plan.get("url") == page_plan_only
+                    or urlparse(plan.get("url", "")).path.rstrip("/") == urlparse(page_plan_only).path.rstrip("/")
+                )
+            ),
+            None,
+        )
+        if matched_plan:
+            return {
+                "status": "ok",
+                "url": page_plan_only,
+                "page_improvement_plan": matched_plan,
+            }
+        elif page_improvement_plans:
+            return {
+                "status": "ok",
+                "url": page_improvement_plans[0].get("url"),
+                "page_improvement_plan": page_improvement_plans[0],
+            }
+        return {
+            "status": "not_found",
+            "error": f"No improvement plan generated for '{page_plan_only}'",
+        }
 
     return {
         "status": "ok",
@@ -1430,17 +1547,29 @@ def main():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("--site", required=False, default="", help="Target website URL or domain (e.g. https://example.com)")
     parser.add_argument("--inventory", required=False, help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--url", help="Target URL route to scope citability evaluation")
+    parser.add_argument("--page-plan-only", dest="page_plan_only", help="Extract and output only the passage improvement plan for the specified URL")
+    parser.add_argument("--analyze-text", dest="analyze_text", help="Analyze raw text string or markdown file directly against Princeton KDD 2024 / AutoGEO vectors")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
-    s = args.site.strip()
-    if not s.startswith("http"):
+
+    if args.analyze_text:
+        res = audit("", "", None, state_file=args.state, analyze_text=args.analyze_text)
+        print(json.dumps(res, indent=2))
+        return
+
+    if not args.site and not args.inventory:
+        parser.error("Either --site or --inventory (or --analyze-text) must be provided.")
+
+    s = (args.site or "").strip()
+    if s and not s.startswith("http"):
         s = "https://" + s
-    p = urlparse(s)
-    base = f"{p.scheme}://{p.netloc}"
-    domain = p.netloc
+    p = urlparse(s) if s else None
+    base = f"{p.scheme}://{p.netloc}" if p and p.netloc else ""
+    domain = p.netloc if p and p.netloc else ""
 
     if args.inventory:
         if os.path.exists(args.inventory):
@@ -1463,7 +1592,15 @@ def main():
         else:
             inv = {"site": domain, "pages": []}
 
-    res = audit(base, domain, inv, state_file=args.state)
+    res = audit(
+        base,
+        domain,
+        inv,
+        state_file=args.state,
+        target_url=args.url,
+        page_plan_only=args.page_plan_only,
+        analyze_text=args.analyze_text,
+    )
     print(json.dumps(res, indent=2))
 
 

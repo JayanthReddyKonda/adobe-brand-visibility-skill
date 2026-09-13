@@ -342,6 +342,7 @@ def plan(item: Dict[str, Any], rule: Dict[str, Any]) -> Dict[str, Any]:
     item["suggested_action"] = action
     return item
 
+
 try:
     from causal_gate import (
         DEFAULT_LIMITATIONS,
@@ -393,7 +394,9 @@ except ImportError:
         compute_severity_score = None  # type: ignore
         compute_archetype_confidence = None  # type: ignore
         severity_from_score = None  # type: ignore
-        detect_business_archetype = lambda inv: "corporate"  # type: ignore
+
+        def detect_business_archetype(inv):  # type: ignore
+            return "corporate"
 
         TAXONOMY_ALIASES = {
             "META_DIRECTIVE_CONFLICT": "NOINDEX_EXCLUSION",
@@ -468,9 +471,7 @@ except ImportError:
                 return True
             if p1 != "/" and len(p1) > 2 and (p1 in r2_norm or r2_norm in p1):
                 return True
-            if p2 != "/" and len(p2) > 2 and (p2 in r1_norm or r1_norm in p2):
-                return True
-            return False
+            return bool(p2 != "/" and len(p2) > 2 and (p2 in r1_norm or r1_norm in p2))
 
         DEFAULT_LIMITATIONS = [
             "No JavaScript browser rendering was performed.",
@@ -725,7 +726,7 @@ def _build_default_proactive_actions(
             "id": f"P-{proactive_counter:03d}",
             "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {brand_guess}",
             "category": "entity",
-            "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
+            "summary": "Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
             "priority": "low",
             "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
             "creative_fix": f"Harmonize exact brand name '{brand_guess}', street address, and phone number formatting across local directory listings.",
@@ -733,8 +734,8 @@ def _build_default_proactive_actions(
         })
         proactive_counter += 1
     elif "MATERIAL_ENTITY_AMBIGUITY" not in finding_cids and "WEAK_IDENTITY_SIGNALS" not in finding_cids and pages:
-        corrob_res_p = specialist_results.get("corroboration-authority-audit", {})
-        corrob_cov_p = corrob_res_p.get("coverage", {})
+        corrob_res_p = specialist_results.get("corroboration-authority-audit") or {}
+        corrob_cov_p = corrob_res_p.get("coverage") or {}
         p_sa_count = corrob_cov_p.get("sameas_declared", corrob_cov_p.get("sameas_count", 0)) or 0
         if p_sa_count > 0:
             actions.append({
@@ -793,7 +794,7 @@ def synthesize_audit_report(
     _brand_guess = _domain_clean.split(".")[0].capitalize()
 
     # 1. Prefer brand from entity sensor snapshot if valid
-    entity_brand = specialist_results.get("entity-content-audit", {}).get("entity_snapshot", {}).get("brand_name")
+    entity_brand = ((specialist_results.get("entity-content-audit") or {}).get("entity_snapshot") or {}).get("brand_name")
     if entity_brand and isinstance(entity_brand, str) and len(entity_brand.strip()) > 1:
         _brand_guess = entity_brand.strip()
     else:
@@ -845,22 +846,32 @@ def synthesize_audit_report(
     sample_pricing_route = None
     EXCLUDED_ROUTE_PATTERNS = ("/drafts/", "/content/dam/", "/quiz/", "/assets/", "/static/", "/cdn-cgi/", "/_")
     for p in pages:
+        if not isinstance(p, dict):
+            continue
         p_url = p.get("url") or ""
         parsed_p = urlparse(p_url)
         path = parsed_p.path or "/"
-        if path not in ("/", ""):
-            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
-                if not path.lower().endswith((".jpg", ".png", ".gif", ".svg", ".css", ".js")):
-                    if path not in sample_routes:
-                        sample_routes.append(path)
-        if not sample_product_route and any(k in path.lower() for k in ("/product", "/products", "/item", "/items", "/shop", "/store", "/collection", "/collections", "/catalog", "/catalogue", "/goods")):
-            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
-                sample_product_route = path
-        if not sample_pricing_route and any(k in path.lower() for k in ("/pricing", "/plans", "/billing")):
-            if not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS):
-                sample_pricing_route = path
+        if (
+            path not in ("/", "")
+            and not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS)
+            and not path.lower().endswith((".jpg", ".png", ".gif", ".svg", ".css", ".js"))
+            and path not in sample_routes
+        ):
+            sample_routes.append(path)
+        if (
+            not sample_product_route
+            and any(k in path.lower() for k in ("/product", "/products", "/item", "/items", "/shop", "/store", "/collection", "/collections", "/catalog", "/catalogue", "/goods"))
+            and not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS)
+        ):
+            sample_product_route = path
+        if (
+            not sample_pricing_route
+            and any(k in path.lower() for k in ("/pricing", "/plans", "/billing"))
+            and not any(ex in path.lower() for ex in EXCLUDED_ROUTE_PATTERNS)
+        ):
+            sample_pricing_route = path
 
-    has_llms_txt = any("llms.txt" in (p.get("url") or "").lower() for p in pages) or bool(inv.get("llms_txt") if inv else False)
+    has_llms_txt = any("llms.txt" in (p.get("url") or "").lower() for p in pages if isinstance(p, dict)) or bool(inv.get("llms_txt") if inv else False)
 
     all_raw_findings: List[Dict[str, Any]] = []
     all_raw_recommendations: List[Dict[str, Any]] = []
@@ -885,7 +896,7 @@ def synthesize_audit_report(
             # When the AI Agent provides cognitive review findings, they become the primary findings
             all_raw_findings = [rf for rf in rev_findings if isinstance(rf, dict)]
 
-    if inv.get("status") == "failed" or (not pages and not inv.get("infrastructure", {}).get("homepage_reachable", True)):
+    if inv.get("status") == "failed" or (not pages and not (inv.get("infrastructure") or {}).get("homepage_reachable", True)):
         audit_status = "failed"
     elif all(s == "ok" for s in statuses) and not has_sensor_error:
         audit_status = "complete"
@@ -920,7 +931,6 @@ def synthesize_audit_report(
 
     for f in allowed_findings:
         cid = f.get("cause_id") or f.get("id") or f.get("title", "")
-        f_scope = extract_finding_route(f) or str(f.get("scope") or f.get("entity") or f.get("attribute") or f.get("url") or "").lower()
 
         # Deduplicate identical findings across routes by root cause and title (clean, non-mutating)
         dedup_key = f"{cid}::{f.get('title', '')}"
@@ -1046,7 +1056,13 @@ def synthesize_audit_report(
             clean_tf = raw_tf
         else:
             clean_tf_str = clean_text_string(raw_tf) or None
-            if clean_tf_str and ("('http" in clean_tf_str or '("http' in clean_tf_str):
+            # Only format as sameAs if it is literally a raw stringified tuple of URLs on an authority finding
+            if (
+                clean_tf_str
+                and clean_tf_str.strip().startswith(("('http", '("http'))
+                and clean_tf_str.strip().endswith(("')", '")'))
+                and any(k in cid for k in ("SAMEAS", "AUTHORITY", "CORROBORATION"))
+            ):
                 urls = re.findall(r"https?://[^\s'\"\)]+", clean_tf_str)
                 if urls:
                     clean_tf_str = f"Update Organization JSON-LD on homepage to include 'sameAs': {json.dumps(urls[:5])}."
@@ -1286,8 +1302,18 @@ def synthesize_audit_report(
                 pa_clean = dict(pa)
                 if not pa_clean.get("id"):
                     pa_clean["id"] = f"P-{p_idx:03d}"
-                if not pa_clean.get("priority"):
-                    pa_clean["priority"] = "medium"
+                raw_prio = str(pa_clean.get("priority") or "medium").lower()
+                pa_clean["priority"] = raw_prio if raw_prio in ("critical", "high", "medium", "low") else "medium"
+                pa_clean["title"] = clean_text_string(pa_clean.get("title"))
+                pa_clean["summary"] = clean_text_string(pa_clean.get("summary"))
+                if pa_clean.get("category"):
+                    pa_clean["category"] = clean_text_string(pa_clean["category"])
+                if pa_clean.get("technical_fix"):
+                    pa_clean["technical_fix"] = clean_text_string(pa_clean["technical_fix"])
+                if pa_clean.get("creative_fix"):
+                    pa_clean["creative_fix"] = clean_text_string(pa_clean["creative_fix"])
+                if pa_clean.get("verification"):
+                    pa_clean["verification"] = clean_text_string(pa_clean["verification"])
                 proactive_actions.append(pa_clean)
 
     if not proactive_actions:
@@ -1388,7 +1414,6 @@ def synthesize_audit_report(
                 "technical_fix": f"Embed Schema.org NewsArticle with Person authorship and sameAs links to external credential profiles on {base}/.",
                 "creative_fix": "Replace passive voice with attributed expert quotes and verifiable benchmark statistics (+40.9% Princeton GEO lift).",
                 "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
-                "verification": f"Inspect article markup on https://{domain}/ with Google Rich Results Test to confirm valid Person credentials.",
             })
             proactive_counter += 1
         elif archetype == "local_business" and "MISSING_POSTAL_ADDRESS" not in finding_cids and pages:
@@ -1396,7 +1421,7 @@ def synthesize_audit_report(
                 "id": f"P-{proactive_counter:03d}",
                 "title": f"Deploy MapGPT & Local AI Multi-Location Anchors for {_brand_guess}",
                 "category": "entity",
-                "summary": f"Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
+                "summary": "Structure Schema.org LocalBusiness with GeoCoordinates, openingHoursSpecification, and verified NAP consistency across all branch landing pages.",
                 "priority": "low",
                 "technical_fix": f"Embed Schema.org LocalBusiness with geo, telephone, openingHours, and priceRange on {base}/.",
                 "creative_fix": f"Harmonize exact brand name '{_brand_guess}', street address, and phone number formatting across local directory listings.",
@@ -1603,13 +1628,16 @@ def synthesize_audit_report(
     if geo_res.get("geo_citability_summary"):
         report["geo_citability_summary"] = geo_res["geo_citability_summary"]
     if geo_res.get("page_improvement_plans"):
+        for pip in geo_res["page_improvement_plans"]:
+            if isinstance(pip, dict) and not pip.get("page_type"):
+                pip["page_type"] = "general"
         report["page_improvement_plans"] = geo_res["page_improvement_plans"]
 
     eng_res = specialist_results.get("engagement-context-audit", {})
     if eng_res.get("engagement_continuity_summary"):
         report["engagement_continuity_summary"] = eng_res["engagement_continuity_summary"]
 
-    scrape_summary = inv.get("infrastructure", {}).get("ai_agent_scrapeability_summary") or specialist_results.get("discoverability-audit", {}).get("ai_agent_scrapeability_summary")
+    scrape_summary = (inv.get("infrastructure") or {}).get("ai_agent_scrapeability_summary") or (specialist_results.get("discoverability-audit") or {}).get("ai_agent_scrapeability_summary")
     if scrape_summary:
         report["ai_agent_scrapeability_summary"] = scrape_summary
 
@@ -1629,8 +1657,9 @@ def collect_telemetry(
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
     responses: Optional[str] = None,
+    skills: Optional[List[str]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
-    """Acquire inventory and execute all 6 specialist sensors, returning (inv, specialist_results)."""
+    """Acquire inventory and execute specialist sensors, returning (inv, specialist_results)."""
     base, domain = parse_target_domain(site)
 
     # 1. Acquire or load inventory
@@ -1681,16 +1710,52 @@ def collect_telemetry(
 
     specialist_results: Dict[str, Dict[str, Any]] = {}
 
+    skill_filter = None
+    if skills:
+        skill_alias_map = {
+            "discoverability": "discoverability-audit",
+            "discoverability-audit": "discoverability-audit",
+            "entity": "entity-content-audit",
+            "entity-content": "entity-content-audit",
+            "entity-content-audit": "entity-content-audit",
+            "fact": "fact-consistency-audit",
+            "fact-consistency": "fact-consistency-audit",
+            "fact-consistency-audit": "fact-consistency-audit",
+            "corroboration": "corroboration-authority-audit",
+            "corroboration-authority": "corroboration-authority-audit",
+            "corroboration-authority-audit": "corroboration-authority-audit",
+            "authority": "corroboration-authority-audit",
+            "geo": "geo-content-audit",
+            "geo-content": "geo-content-audit",
+            "geo-content-audit": "geo-content-audit",
+            "engagement": "engagement-context-audit",
+            "engagement-context": "engagement-context-audit",
+            "engagement-context-audit": "engagement-context-audit",
+        }
+        skill_filter = set()
+        for s in skills:
+            s_clean = s.strip().lower()
+            canonical = skill_alias_map.get(s_clean)
+            if canonical:
+                skill_filter.add(canonical)
+            else:
+                if not s_clean.endswith("-audit"):
+                    s_clean += "-audit"
+                skill_filter.add(s_clean)
+
     # Guard: If inventory failed (network down / site blocked), emit inconclusive
     if inv.get("status") == "failed" or not inv.get("pages"):
-        for skill_id in [
+        active_skills = [
             "discoverability-audit",
             "entity-content-audit",
             "fact-consistency-audit",
             "corroboration-authority-audit",
             "geo-content-audit",
             "engagement-context-audit",
-        ]:
+        ]
+        if skill_filter is not None:
+            active_skills = [s for s in active_skills if s in skill_filter]
+        for skill_id in active_skills:
             specialist_results[skill_id] = {
                 "status": "inconclusive",
                 "findings": [],
@@ -1699,44 +1764,50 @@ def collect_telemetry(
             }
         return inv, specialist_results
 
-    try:
-        from discoverability_check import audit as audit_disc
-        specialist_results["discoverability-audit"] = run_specialist_sensor(audit_disc, base, domain, inv)
-    except Exception as e:
-        specialist_results["discoverability-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
+    if skill_filter is None or "discoverability-audit" in skill_filter:
+        try:
+            from discoverability_check import audit as audit_disc
+            specialist_results["discoverability-audit"] = run_specialist_sensor(audit_disc, base, domain, inv)
+        except Exception as e:
+            specialist_results["discoverability-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
-    try:
-        from entity_content_check import audit as audit_entity
-        specialist_results["entity-content-audit"] = run_specialist_sensor(audit_entity, base, domain, inv)
-    except Exception as e:
-        specialist_results["entity-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
+    if skill_filter is None or "entity-content-audit" in skill_filter:
+        try:
+            from entity_content_check import audit as audit_entity
+            specialist_results["entity-content-audit"] = run_specialist_sensor(audit_entity, base, domain, inv)
+        except Exception as e:
+            specialist_results["entity-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
-    try:
-        from fact_consistency_check import audit as audit_fact
-        extra = {"responses_file": responses} if responses else None
-        specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv, extra)
-    except Exception as e:
-        specialist_results["fact-consistency-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
+    if skill_filter is None or "fact-consistency-audit" in skill_filter:
+        try:
+            from fact_consistency_check import audit as audit_fact
+            extra = {"responses_file": responses} if responses else None
+            specialist_results["fact-consistency-audit"] = run_specialist_sensor(audit_fact, base, domain, inv, extra)
+        except Exception as e:
+            specialist_results["fact-consistency-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
-    try:
-        from corroboration_check import audit as audit_corrob
-        extra = {"candidate_backlinks": candidate_backlinks} if candidate_backlinks else None
-        specialist_results["corroboration-authority-audit"] = run_specialist_sensor(audit_corrob, base, domain, inv, extra)
-    except Exception as e:
-        specialist_results["corroboration-authority-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
+    if skill_filter is None or "corroboration-authority-audit" in skill_filter:
+        try:
+            from corroboration_check import audit as audit_corrob
+            extra = {"candidate_backlinks": candidate_backlinks} if candidate_backlinks else None
+            specialist_results["corroboration-authority-audit"] = run_specialist_sensor(audit_corrob, base, domain, inv, extra)
+        except Exception as e:
+            specialist_results["corroboration-authority-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
-    try:
-        from geo_content_check import audit as audit_geo
-        specialist_results["geo-content-audit"] = run_specialist_sensor(audit_geo, base, domain, inv)
-    except Exception as e:
-        specialist_results["geo-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
+    if skill_filter is None or "geo-content-audit" in skill_filter:
+        try:
+            from geo_content_check import audit as audit_geo
+            specialist_results["geo-content-audit"] = run_specialist_sensor(audit_geo, base, domain, inv)
+        except Exception as e:
+            specialist_results["geo-content-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
-    try:
-        from engagement_check import audit as audit_eng
-        extra = {"analytics": analytics} if analytics else None
-        specialist_results["engagement-context-audit"] = run_specialist_sensor(audit_eng, base, domain, inv, extra)
-    except Exception as e:
-        specialist_results["engagement-context-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
+    if skill_filter is None or "engagement-context-audit" in skill_filter:
+        try:
+            from engagement_check import audit as audit_eng
+            extra = {"analytics": analytics} if analytics else None
+            specialist_results["engagement-context-audit"] = run_specialist_sensor(audit_eng, base, domain, inv, extra)
+        except Exception as e:
+            specialist_results["engagement-context-audit"] = {"status": "failed", "error": f"Sensor load exception: {type(e).__name__}: {e}", "findings": [], "recommendations": []}
 
     return inv, specialist_results
 
@@ -1747,10 +1818,13 @@ def get_telemetry_payload(
     analytics: Optional[str] = None,
     candidate_backlinks: Optional[str] = None,
     responses: Optional[str] = None,
+    skills: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Return raw empirical telemetry across all 6 sensors for AI cognitive orchestration."""
+    """Return raw empirical telemetry across specialist sensors for AI cognitive orchestration."""
     base, domain = parse_target_domain(site)
-    inv, specialist_results = collect_telemetry(site, inventory, analytics, candidate_backlinks, responses=responses)
+    inv, specialist_results = collect_telemetry(
+        site, inventory, analytics, candidate_backlinks, responses=responses, skills=skills
+    )
 
     # Precompute Causal DAG state and suppression boundaries
     all_raw_findings: List[Dict[str, Any]] = []
@@ -1863,35 +1937,37 @@ def get_telemetry_payload(
         "inventory": {
             "page_count": len(pages_list),
             "pages": enriched_pages,
-            "robots_summary": inv.get("robots", {}).get("summary", {}),
+            "robots_summary": (inv.get("robots") or {}).get("summary") or {},
             "sitemaps_count": len(sitemaps_list),
-            "sitemaps": [s if isinstance(s, str) else s.get("loc", "") for s in sitemaps_list[:10]],
-            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
+            "sitemaps": [s if isinstance(s, str) else s.get("loc", "") for s in sitemaps_list[:10] if isinstance(s, (str, dict))],
+            "has_llms_txt": any("llms.txt" in (p.get("url") or "").lower() for p in pages_list if isinstance(p, dict)),
         },
         "crawl_telemetry": {
             "pages_crawled": len(pages_list),
-            "average_latency_ms": inv.get("performance", {}).get("average_latency_ms"),
-            "total_facts_extracted": inv.get("performance", {}).get("total_facts", 0),
-            "total_claims_extracted": inv.get("performance", {}).get("total_claims", 0),
+            "average_latency_ms": (inv.get("performance") or {}).get("average_latency_ms"),
+            "total_facts_extracted": (inv.get("performance") or {}).get("total_facts", 0),
+            "total_claims_extracted": (inv.get("performance") or {}).get("total_claims", 0),
             "pages_by_type": pages_by_type,
-            "total_ctas_extracted": sum(len(p.get("ctas", [])) for p in pages_list),
-            "pages_with_hreflang": sum(1 for p in pages_list if p.get("hreflangs")),
+            "total_ctas_extracted": sum(len(p.get("ctas", [])) for p in pages_list if isinstance(p, dict)),
+            "pages_with_hreflang": sum(1 for p in pages_list if isinstance(p, dict) and p.get("hreflangs")),
         },
         "retrieval": {
             "robots_txt_found": bool(inv.get("robots")),
-            "bot_matrix": disc_res.get("ai_agent_scrapeability_summary", {}).get("retrieval_bot_matrix", {}),
-            "retrieval_bots_allowed": disc_res.get("coverage", {}).get("retrieval_bots_allowed"),
-            "retrieval_bots_total": disc_res.get("coverage", {}).get("retrieval_bots_total"),
-            "noindex_pages": [p.get("url") for p in pages_list if p.get("noindex")],
-            "has_ai_plugin": bool(inv.get("infrastructure", {}).get("ai_plugin", {}).get("present")),
-            "has_security_txt": bool(inv.get("infrastructure", {}).get("security_txt", {}).get("present")),
-            "has_llms_txt": bool(inv.get("infrastructure", {}).get("llms_txt", {}).get("present")) or any("llms.txt" in (p.get("url") or "").lower() for p in pages_list),
-            "has_pricing_md": bool(inv.get("infrastructure", {}).get("pricing_md", {}).get("present")),
+            "bot_matrix": (disc_res.get("ai_agent_scrapeability_summary") or {}).get("retrieval_bot_matrix") or {},
+            "retrieval_bots_allowed": (disc_res.get("coverage") or {}).get("retrieval_bots_allowed"),
+            "retrieval_bots_total": (disc_res.get("coverage") or {}).get("retrieval_bots_total"),
+            "noindex_pages": [p.get("url") for p in pages_list if isinstance(p, dict) and p.get("noindex")],
+            "has_ai_plugin": bool(((inv.get("infrastructure") or {}).get("ai_plugin") or {}).get("present")),
+            "has_security_txt": bool(((inv.get("infrastructure") or {}).get("security_txt") or {}).get("present")),
+            "has_llms_txt": bool(((inv.get("infrastructure") or {}).get("llms_txt") or {}).get("present")) or any("llms.txt" in (p.get("url") or "").lower() for p in pages_list if isinstance(p, dict)),
+            "has_pricing_md": bool(
+                ((inv.get("infrastructure") or {}).get("pricing_manifest") or (inv.get("infrastructure") or {}).get("pricing_md") or {}).get("present")
+            ),
             "sitemaps_found": len(sitemaps_list),
             "status_distribution": status_counts,
         },
         "rendering": {
-            "visible_words_initial_html": disc_res.get("coverage", {}).get("visible_words_initial_html"),
+            "visible_words_initial_html": (disc_res.get("coverage") or {}).get("visible_words_initial_html"),
             "spa_root_markers_detected": any(float(p.get("snr") or 1.0) < 0.05 for p in pages_list if isinstance(p, dict)),
             "average_word_count": avg_wc,
             "average_snr": avg_snr,
@@ -2033,10 +2109,16 @@ def audit(
     state_file: Optional[str] = None,
     responses: Optional[str] = None,
     review: Optional[str] = None,
+    skills: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute end-to-end multi-skill brand AI-readiness audit."""
     inv, specialist_results = collect_telemetry(
-        site, inventory=inventory, analytics=analytics, candidate_backlinks=candidate_backlinks, responses=responses
+        site,
+        inventory=inventory,
+        analytics=analytics,
+        candidate_backlinks=candidate_backlinks,
+        responses=responses,
+        skills=skills,
     )
 
     review_data = None
@@ -2064,6 +2146,58 @@ def audit(
     return report
 
 
+def sanitize_clean_report(report: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip auxiliary internal pipeline debug data, leaving only high-signal evaluator fields."""
+    clean = {
+        "$schema": report.get("$schema", "http://json-schema.org/draft-07/schema#"),
+        "schema_version": report.get("schema_version", "1.0.0"),
+        "site": report.get("site"),
+        "audited_at": report.get("audited_at"),
+        "audit_status": report.get("audit_status", "complete"),
+        "archetype": report.get("archetype"),
+        "summary": report.get("summary"),
+        "readiness": report.get("readiness"),
+        "findings": [],
+        "proactive_actions": [],
+    }
+    for idx, f in enumerate(report.get("findings", []), start=1):
+        clean_f = {
+            "id": f.get("id") or f"F-{idx:03d}",
+            "cause_id": f.get("cause_id"),
+            "title": f.get("title"),
+            "severity": f.get("severity"),
+            "category": f.get("category"),
+            "root_cause": f.get("root_cause"),
+            "confidence": f.get("confidence", "high"),
+            "scope": f.get("scope"),
+            "evidence": f.get("evidence"),
+            "impact": f.get("impact"),
+            "suggested_action": {
+                "summary": f.get("suggested_action", {}).get("summary"),
+                "priority": f.get("suggested_action", {}).get("priority", f.get("severity")),
+                "technical_fix": f.get("suggested_action", {}).get("technical_fix"),
+                "creative_fix": f.get("suggested_action", {}).get("creative_fix"),
+                "verification": f.get("suggested_action", {}).get("verification"),
+            },
+        }
+        if f.get("affected_urls"):
+            clean_f["affected_urls"] = f.get("affected_urls")
+        clean["findings"].append(clean_f)
+
+    for idx, p in enumerate(report.get("proactive_actions", []), start=1):
+        clean_p = {
+            "id": p.get("id") or f"P-{idx:03d}",
+            "title": p.get("title"),
+            "summary": p.get("summary"),
+            "priority": p.get("priority", "medium"),
+        }
+        for k in ("category", "technical_fix", "creative_fix", "verification"):
+            if p.get(k) is not None:
+                clean_p[k] = p.get(k)
+        clean["proactive_actions"].append(clean_p)
+    return clean
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -2080,6 +2214,7 @@ def main():
         "--responses", "--observations", dest="responses", help="Path to observed AI assistant outputs JSON to cross-check with fact ledger (optional)"
     )
     parser.add_argument("--review", help="Path to agent review JSON containing refined candidate findings and proactive actions (optional)")
+    parser.add_argument("--skills", help="Comma-separated list of specialist skills to execute (e.g. discoverability,entity,geo)")
     parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
     parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
@@ -2088,8 +2223,14 @@ def main():
         action="store_true",
         help="Emit automated baseline report directly (reserved for CI/headless verification). AI agents should use --telemetry for cognitive synthesis.",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Emit clean, high-signal report containing only core evaluator fields (strips auxiliary manifests and internal DAG meta-tags)",
+    )
 
     args = parser.parse_args()
+    skills_list = [s.strip() for s in args.skills.split(",") if s.strip()] if args.skills else None
 
     try:
         if args.telemetry:
@@ -2099,6 +2240,7 @@ def main():
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
                 responses=args.responses,
+                skills=skills_list,
             )
             formatted_output = json.dumps(payload, indent=2)
         else:
@@ -2114,7 +2256,10 @@ def main():
                 candidate_backlinks=args.candidate_backlinks,
                 responses=args.responses,
                 review=args.review,
+                skills=skills_list,
             )
+            if args.clean:
+                report = sanitize_clean_report(report)
             formatted_output = json.dumps(report, indent=2)
     except Exception as e:
         sys.stderr.write(f"Orchestration Error: {e}\n")
@@ -2125,7 +2270,7 @@ def main():
             f.write(formatted_output)
             f.write("\n")
         out_dir = os.path.dirname(os.path.abspath(args.output))
-        if os.path.isdir(out_dir) and not args.telemetry:
+        if os.path.isdir(out_dir) and not args.telemetry and not args.clean:
             manifest_file = os.path.join(out_dir, "run-manifest.json")
             try:
                 with open(manifest_file, "w", encoding="utf-8") as mf:

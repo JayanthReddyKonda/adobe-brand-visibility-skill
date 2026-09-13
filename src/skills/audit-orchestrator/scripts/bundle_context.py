@@ -65,16 +65,16 @@ def detect_signals(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             signals["has_robots_blocking"] = True
         if ret.get("noindex_pages"):
             signals["has_robots_blocking"] = True
-    if "rendering" in data and isinstance(data["rendering"], dict):
-        if data["rendering"].get("spa_root_markers_detected") or (data["rendering"].get("visible_words_initial_html", 100) or 0) < 50:
-            signals["has_rendering_gap"] = True
+    if "rendering" in data and isinstance(data["rendering"], dict) and (
+        data["rendering"].get("spa_root_markers_detected") or (data["rendering"].get("visible_words_initial_html", 100) or 0) < 50
+    ):
+        signals["has_rendering_gap"] = True
     if "entity" in data and isinstance(data["entity"], dict):
         ent = data["entity"]
         if not ent.get("jsonld_present") or not ent.get("types_declared"):
             signals["has_schema_omission"] = True
-    if "facts" in data and isinstance(data["facts"], dict):
-        if data["facts"].get("fact_conflicts", 0) > 0:
-            signals["has_fact_conflicts"] = True
+    if "facts" in data and isinstance(data["facts"], dict) and (data["facts"].get("fact_conflicts", 0) or 0) > 0:
+        signals["has_fact_conflicts"] = True
     if "corroboration" in data and isinstance(data["corroboration"], dict):
         corr = data["corroboration"]
         if corr.get("sameas_declared", 0) == 0 or len(corr.get("broken_authority_anchors", [])) > 0:
@@ -181,9 +181,17 @@ def extract_section(file_path: str, heading_prefix: str, max_chars: int = 3000) 
         return None
 
 
-def build_bundle(site: str, data: Optional[Dict[str, Any]] = None) -> str:
+def build_bundle(
+    site: str,
+    data: Optional[Dict[str, Any]] = None,
+    *,
+    archetype: Optional[str] = None,
+    topic: Optional[str] = None,
+) -> str:
     """Builds unified markdown briefing for the AI agent with dynamic archetype and domain rules."""
     signals = detect_signals(data)
+    if archetype:
+        signals["archetype"] = archetype.lower().strip()
     output_lines: List[str] = []
 
     # 1. Baseline Core Synthesis Digest
@@ -365,6 +373,35 @@ def build_bundle(site: str, data: Optional[Dict[str, Any]] = None) -> str:
             output_lines.append(orient_sec)
             output_lines.append("\n*(extracted from engagement-context-audit knowledge-base.md)*\n")
 
+    # 4. Optional Focused Topic Extraction
+    if topic:
+        topic_lower = topic.lower().strip()
+        topic_map = {
+            "retrieval": ("discoverability-audit", "## 1. robots.txt & Access Directives (RFC 9309)"),
+            "discoverability": ("discoverability-audit", "## 1. robots.txt & Access Directives (RFC 9309)"),
+            "rendering": ("discoverability-audit", "## 4. Rendering & Content Extractability"),
+            "entity": ("entity-content-audit", "## 1. Master Linked Graph Template"),
+            "schema": ("entity-content-audit", "## 1. Master Linked Graph Template"),
+            "facts": ("fact-consistency-audit", "## 1. Contextual Scope Invariant & False-Positive Prevention"),
+            "corroboration": ("corroboration-authority-audit", "## 2. Declared Identity Nodes vs. Verified Candidate Backlinks"),
+            "authority": ("corroboration-authority-audit", "## 2. Declared Identity Nodes vs. Verified Candidate Backlinks"),
+            "geo": ("geo-content-audit", "## 3. Princeton KDD 2024 Causal Conjunction Cheatsheet"),
+            "citability": ("geo-content-audit", "## 1. Direct Q&A Answer-Block Pattern (AutoGEO)"),
+            "engagement": ("engagement-context-audit", "## 1. The 4-Question First-Visit Orientation Test"),
+            "orientation": ("engagement-context-audit", "## 1. The 4-Question First-Visit Orientation Test"),
+        }
+        if topic_lower in topic_map:
+            skill_folder, sec_heading = topic_map[topic_lower]
+            extracted = extract_section(
+                os.path.join(SKILLS_DIR, skill_folder, "references", "knowledge-base.md"),
+                sec_heading,
+                max_chars=3500,
+            )
+            if extracted:
+                output_lines.append(f"\n### Topic Deep-Dive: `{topic}`\n")
+                output_lines.append(extracted)
+                output_lines.append(f"\n*(extracted from {skill_folder} references/knowledge-base.md)*\n")
+
     return "\n".join(output_lines)
 
 
@@ -409,6 +446,8 @@ def main():
     parser.add_argument("--site", default="https://example.com", help="Target site URL or domain")
     parser.add_argument("--inventory", help="Path to pre-crawled inv.json site inventory (optional)")
     parser.add_argument("--telemetry", help="Path to telemetry.json payload (optional)")
+    parser.add_argument("--archetype", choices=["ecommerce", "saas", "publisher", "local_business", "corporate"], help="Explicitly force business archetype context")
+    parser.add_argument("--topic", help="Scope context bundle to specific technical topic (e.g. retrieval, rendering, entity, facts, corroboration, geo, engagement)")
     parser.add_argument("--output", help="Path to write compiled briefing (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["markdown", "json"], default="markdown", help="Output format")
 
@@ -423,7 +462,7 @@ def main():
         except Exception as e:
             sys.stderr.write(f"Warning: Failed to load context source from {source_file}: {e}\n")
 
-    bundle_text = build_bundle(args.site, data_payload)
+    bundle_text = build_bundle(args.site, data_payload, archetype=args.archetype, topic=args.topic)
 
     if args.format == "json":
         signals = detect_signals(data_payload)

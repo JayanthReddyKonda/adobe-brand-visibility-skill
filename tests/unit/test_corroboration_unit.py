@@ -56,7 +56,6 @@ class TestCorroborationUnit(unittest.TestCase):
         self.assertIn("status", res)
         self.assertIn(res["status"], ["ok", "inconclusive"])
 
-
     def test_audit_with_candidate_backlinks(self):
         """Regression test: Candidate backlinks audit runs with time deadline and does not crash with NameError."""
         inv = make_healthy_inventory("https://example.com")
@@ -72,4 +71,3 @@ class TestCorroborationUnit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

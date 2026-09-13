@@ -92,7 +92,7 @@ To eliminate false-positive contradictions caused by locale or formatting discre
 | Raw String | Locale / Format | Normalized Value | Notes |
 |---|---|---|---|
 | `₹5,499.00` | INR with decimal | `5499` | Strip currency symbol, comma, and trailing `.00`. |
-| `\$49.99` | USD standard | `49` | Normalized to base integer unit. |
+| `USD 49.99` | USD standard | `49` | Normalized to base integer unit. |
 | `€1.250,50` | European (dot thousands, comma decimal) | `1250` | Strip dot group separator, discard decimal comma. |
 | `£99 / month` | GBP subscription | `99` | Strip cadence suffix and whitespace. |
 

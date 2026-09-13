@@ -143,7 +143,6 @@ class TestOrchestratorScript(unittest.TestCase):
         import orchestrator  # type: ignore
 
         base = "https://example.com"
-        domain = "example.com"
         inv = {
             "site": base,
             "pages": [
@@ -191,5 +190,3 @@ class TestOrchestratorScript(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

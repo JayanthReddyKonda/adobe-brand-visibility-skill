@@ -17,6 +17,9 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Offline Fact Ledger Sensor (Standard)** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, coverage}` | Primary Offline Inspection |
+| **Attribute-Scoped Conflict Audit** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --attribute pricing` | `{status, attribute_filter, scoped_conflicts_count, ...}` | Filter by Scoped Attribute (pricing, contact, legal, specs) |
+| **Route Head-to-Head Comparison** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --compare-urls https://example.com/pricing https://example.com/features` | `{status, url1, url2, url_comparison}` | Direct 2-Route Fact Comparison |
+| **Fact Ledger Term Query** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --query "Enterprise"` | `{status, query, match_count, query_matches}` | Query Ledger by Term |
 | **Observed Assistant Hallucination Cross-Check** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --responses assistant_outputs.json --format json` | `{status, findings, recommendations, coverage}` | AI Search Hallucination Verification |
 | **State-Augmented Fact Audit** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, coverage}` | Multi-Turn Stateful Evaluation |
 | **Direct Standalone Fact Probe** | `python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json` | `{status, findings, recommendations, coverage}` | Standalone Direct Probe |
@@ -51,6 +54,9 @@ Constructs a multi-attribute first-party fact ledger across website pages to det
 
 - `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
 - `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--attribute <pricing|contact|legal|specs>` (string, optional): Scope contradiction detection to a single verified attribute category.
+- `--compare-urls <url1> <url2>` (list of 2 strings, optional): Head-to-head comparison of extracted first-party facts between two distinct routes.
+- `--query <term>` (string, optional): Search term query across the first-party fact ledger to inspect entity facts directly.
 - `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
 - `--responses <path>` / `--observations <path>` (string, optional): Path to JSON file of observed AI assistant outputs to cross-check against site facts.
 - `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.

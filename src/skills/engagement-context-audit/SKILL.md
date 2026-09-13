@@ -17,6 +17,9 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Offline Engagement Sensor (Standard)** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, engagement_mode, coverage}` | Primary Offline Inspection |
+| **Target Route Engagement Audit** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --url https://example.com/pricing` | `{status, page_metrics, findings, recommendations}` | Single-Route Engagement Audit |
+| **Simulated Referral Query Scent Test** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --referrer-query "cloud backup enterprise pricing"` | `{status, referrer_query, evaluations}` | Intent-to-Landing Scent Test |
+| **Above-the-Fold Viewport Only** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --viewport-only` | `{status, viewport_records, average_cta_reachability, ...}` | Fast Viewport & CTA Inspection |
 | **First-Party Analytics Corroboration** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --analytics analytics.json --format json` | `{status, findings, recommendations, engagement_mode, analytics_summary}` | Dual-Track Empirical Audit |
 | **State-Augmented Engagement Audit** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, engagement_mode, coverage}` | Multi-Turn Stateful Evaluation |
 | **Direct Standalone Engagement Probe** | `python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --format json` | `{status, findings, recommendations, engagement_mode, coverage}` | Standalone Direct Probe |
@@ -52,6 +55,9 @@ Evaluates visitor orientation, information scent, and intent-handoff continuity 
 
 - `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
 - `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--url <route>` (string, optional): Target URL route to scope engagement and continuity evaluation.
+- `--referrer-query <query>` (string, optional): Simulate AI search citation referral query and test intent-to-landing scent and missing query terms.
+- `--viewport-only` (flag, optional): Inspect strictly above-the-fold viewport elements and CTA reachability across routes.
 - `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
 - `--analytics <path_or_json>` (string, optional): Path to first-party web analytics JSON/CSV file or raw JSON string with route-level bounce/dwell data.
 - `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.

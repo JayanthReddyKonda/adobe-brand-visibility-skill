@@ -171,7 +171,7 @@ Specialized landing routes must immediately satisfy the intent implied by their 
 - **Visitor Context:** Visitor arriving from an AI assistant seeking pricing clarity, tier comparisons, and commercial terms.
 - **Required On-Page Facts:**
   - `tier_names`: Explicit plan names (e.g. Free, Starter, Pro, Enterprise).
-  - `price_points`: Numerical price figures and currencies (e.g. $29/month).
+  - `price_points`: Numerical price figures and currencies (e.g. 29 USD/month).
   - `billing_interval`: Billing frequencies (monthly, annually, per-seat).
   - `feature_matrix`: Structured breakdown of features included in each tier.
   - `commercial_cta`: Actionable conversion trigger per tier (e.g. "Start Free Trial", "Contact Sales").

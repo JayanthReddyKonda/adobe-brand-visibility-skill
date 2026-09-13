@@ -196,7 +196,6 @@ class TestEntityContentUnit(unittest.TestCase):
         self.assertTrue(facts["location_or_form"])
         self.assertEqual(ans["results"][0]["score"], 1.0)
 
-
     def test_evaluate_page_answerability_empty_product_zero_score(self):
         """Verify an empty Product entity on an empty page scores 0.0 with all facts False."""
         html = "<html><body></body></html>"
@@ -260,5 +259,3 @@ class TestEntityContentUnit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

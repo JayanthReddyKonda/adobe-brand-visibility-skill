@@ -318,7 +318,7 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
             offers_list = offers if isinstance(offers, list) else [offers] if isinstance(offers, dict) else []
 
             facts = {}
-            for attr_name, (weight, kws) in weights_cfg.items():
+            for attr_name, (_weight, kws) in weights_cfg.items():
                 kw_match = any(_kw_in_text(kw, visible_text) for kw in kws)
                 if attr_name in ("product_name", "product_identity"):
                     has_entity_name = bool(
@@ -387,7 +387,7 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
     # 2. Non-Product Pages (pricing, subscription_flow, service, contact, product_listing, category)
     weights_cfg = MATERIAL_ATTRIBUTE_WEIGHTS[page_type]
     facts = {}
-    for attr_name, (weight, kws) in weights_cfg.items():
+    for attr_name, (_weight, kws) in weights_cfg.items():
         kw_match = any(_kw_in_text(kw, visible_text) for kw in kws)
         if page_type == "pricing":
             if attr_name == "tier_names":
@@ -535,11 +535,54 @@ def evaluate_page_answerability(page_type, html_content, dom, url, structured_en
     return {"status": "present", "results": results}
 
 
-def audit(base, domain, inv=None, state_file=None):
+def inspect_target_entity(inv, base, domain, target_url):
+    """Forensically inspect Schema.org JSON-LD and answerability for a single target URL."""
+    norm_url = target_url.strip()
+    if not norm_url.startswith("http"):
+        norm_url = f"{base.rstrip('/')}/{norm_url.lstrip('/')}"
+    p_path = urlparse(norm_url).path or "/"
+
+    page_data = None
+    if inv and inv.get("pages"):
+        for p in inv["pages"]:
+            if p.get("url") == norm_url or urlparse(p.get("url", "")).path == p_path:
+                page_data = p
+                break
+
+    if not page_data:
+        status, html, headers, err = safe_fetch(norm_url, timeout=10, max_bytes=2 * 1024 * 1024)
+        page_data = {"url": norm_url, "status": status, "html": html, "headers": headers, "error": err}
+
+    p_html = page_data.get("html") or page_data.get("raw_html") or ""
+    dom = EntityDOMParser()
+    try:
+        dom.feed(p_html)
+    except Exception:
+        pass
+
+    json_ld_nodes = parse_json_ld(dom.json_ld_contents, p_html)
+    types_found = [str(n.get("@type", "")) for n in json_ld_nodes if isinstance(n, dict) and n.get("@type")]
+
+    p_type = page_data.get("page_type") or "content"
+    ans_result = evaluate_page_answerability(p_type, p_html, dom, norm_url, json_ld_nodes, page_dict=page_data)
+
+    return {
+        "url": norm_url,
+        "path": p_path,
+        "page_type": p_type,
+        "total_json_ld_blocks": len(dom.json_ld_contents),
+        "total_entities_extracted": len(json_ld_nodes),
+        "schema_types_present": types_found,
+        "answerability": ans_result,
+        "entities": json_ld_nodes[:20],
+    }
+
+
+def audit(base, domain, inv=None, state_file=None, target_url=None, schema_type=None, answerability_only=False):
     state: Dict[str, Any] = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
     if state_file and os.path.exists(state_file):
         try:
-            with open(state_file, "r") as f:
+            with open(state_file, "r", encoding="utf-8") as f:
                 state = json.load(f)
         except Exception:
             pass
@@ -1038,6 +1081,8 @@ def audit(base, domain, inv=None, state_file=None):
         if "entities" not in state:
             state["entities"] = {}
         for p in html_pages:
+            if not isinstance(p, dict):
+                continue
             u = p.get("url", "")
             if u not in state["entities"]:
                 state["entities"][u] = []
@@ -1056,11 +1101,21 @@ def audit(base, domain, inv=None, state_file=None):
         import tempfile
 
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(state, f)
         os.replace(tmp, state_file)
 
-    return {
+    if answerability_only:
+        return {
+            "status": "ok",
+            "answerability_evaluations": answerability_evaluations,
+            "coverage": {
+                "html_pages_evaluated": len(html_pages),
+                "answerability_evaluations_count": len(answerability_evaluations),
+            },
+        }
+
+    res_payload = {
         "status": "ok",
         "findings": findings,
         "recommendations": recommendations,
@@ -1091,6 +1146,21 @@ def audit(base, domain, inv=None, state_file=None):
         ],
     }
 
+    if target_url:
+        res_payload["target_inspection"] = inspect_target_entity(inv, base, domain, target_url)
+
+    if schema_type:
+        st_clean = schema_type.lower().strip()
+        matched = []
+        for p in html_pages:
+            p_ents = parse_json_ld(p.get("json_ld_contents", []), p.get("html", ""))
+            for e in p_ents:
+                if isinstance(e, dict) and st_clean in str(e.get("@type", "")).lower():
+                    matched.append({"url": p.get("url"), "entity": e})
+        res_payload["matching_entities"] = matched
+
+    return res_payload
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1105,6 +1175,9 @@ def main():
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
     parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--url", help="Target specific route or URL for forensic entity and structured data inspection")
+    parser.add_argument("--schema-type", dest="schema_type", help="Filter and inspect entities matching a specific Schema.org type (e.g. Product, Organization, Service)")
+    parser.add_argument("--answerability-only", action="store_true", help="Emit only the 7-attribute Answerability Index evaluations")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -1122,7 +1195,15 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
-    res = audit(base, p.netloc, inv=inv, state_file=args.state)
+    res = audit(
+        base,
+        p.netloc,
+        inv=inv,
+        state_file=args.state,
+        target_url=args.url,
+        schema_type=args.schema_type,
+        answerability_only=args.answerability_only,
+    )
     print(json.dumps(res, indent=2))
 
 

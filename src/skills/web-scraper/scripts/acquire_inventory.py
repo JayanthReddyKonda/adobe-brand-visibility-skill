@@ -21,7 +21,6 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 from crawler.engine import EvidenceExtractor, PageClassifier, WebAuditEngine  # type: ignore
-from safe_fetch import DEFAULT_USER_AGENT, safe_fetch  # type: ignore
 
 NON_HTML_EXTENSIONS = (
     ".xml",

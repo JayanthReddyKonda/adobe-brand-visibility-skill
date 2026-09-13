@@ -322,7 +322,51 @@ __all__ = [
     "SafeHTTPHandler",
     "SafeHTTPSHandler",
     "SafeRedirectHandler",
+    "HTMLTextExtractor",
+    "extract_readable_text",
 ]
+
+
+from html.parser import HTMLParser
+
+
+class HTMLTextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.text_blocks = []
+        self.headings = []
+        self._current_tag = None
+
+    def handle_starttag(self, tag, attrs):
+        self._current_tag = tag.lower()
+
+    def handle_endtag(self, tag):
+        self._current_tag = None
+
+    def handle_data(self, data):
+        cleaned = data.strip()
+        if cleaned:
+            if self._current_tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+                self.headings.append(f"{self._current_tag}: {cleaned}")
+            if self._current_tag not in ("script", "style", "noscript", "svg"):
+                self.text_blocks.append(cleaned)
+
+
+def extract_readable_text(html: str) -> dict:
+    """Extract clean readable text, word count, and headings from HTML."""
+    extractor = HTMLTextExtractor()
+    if html:
+        try:
+            extractor.feed(html)
+        except Exception:
+            pass
+    clean_text = "\n\n".join(extractor.text_blocks)
+    words = len(clean_text.split())
+    return {
+        "text": clean_text,
+        "word_count": words,
+        "headings": extractor.headings,
+    }
 
 
 def main():
@@ -338,7 +382,9 @@ def main():
     parser.add_argument("--timeout", type=float, default=10.0, help="Socket timeout in seconds (default: 10.0)")
     parser.add_argument("--max-bytes", type=int, default=MAX_HTML_BYTES, help="Maximum bytes to read (default: 2097152)")
     parser.add_argument("--check-only", action="store_true", help="Only check status code without outputting full HTML")
-    parser.add_argument("--output", help="Path to write output HTML or JSON (optional, defaults to stdout)")
+    parser.add_argument("--headers-only", dest="headers_only", action="store_true", help="Perform HEAD/metadata probe and return headers (including X-Robots-Tag)")
+    parser.add_argument("--extract-text", dest="extract_text", action="store_true", help="Extract clean readable text and headings from page HTML under SSRF protection")
+    parser.add_argument("--output", help="Path to write output HTML, text, or JSON (optional, defaults to stdout)")
     args = parser.parse_args()
 
     t0 = time.monotonic()
@@ -368,6 +414,35 @@ def main():
         print(json.dumps(out_obj, indent=2))
         return
 
+    if args.headers_only:
+        status, _, headers, err = safe_fetch(
+            args.url,
+            timeout=args.timeout,
+            max_bytes=1024,
+            method="HEAD",
+        )
+        if status in (403, 405, 501):
+            status, _, headers, err = safe_fetch(
+                args.url,
+                timeout=args.timeout,
+                max_bytes=1024,
+                method="GET",
+            )
+        duration_ms = round((time.monotonic() - t0) * 1000, 2)
+        is_ssrf = bool(err and "SSRF" in str(err))
+        out_obj = {
+            "url": args.url,
+            "status": status,
+            "latency_ms": duration_ms,
+            "ssrf_safe": not is_ssrf,
+            "headers": headers,
+            "x_robots_tag": (headers or {}).get("x-robots-tag") or (headers or {}).get("X-Robots-Tag"),
+            "content_type": (headers or {}).get("content-type") or (headers or {}).get("Content-Type"),
+            "error": err if err else None,
+        }
+        print(json.dumps(out_obj, indent=2))
+        return
+
     status, body, headers, err = safe_fetch(
         args.url,
         timeout=args.timeout,
@@ -376,6 +451,32 @@ def main():
     )
     duration_ms = round((time.monotonic() - t0) * 1000, 2)
 
+    if args.extract_text:
+        extractor = HTMLTextExtractor()
+        if body:
+            try:
+                extractor.feed(body)
+            except Exception:
+                pass
+        clean_text = "\n\n".join(extractor.text_blocks)
+        words = len(clean_text.split())
+        out_obj = {
+            "url": args.url,
+            "status": status,
+            "latency_ms": duration_ms,
+            "word_count": words,
+            "headings": extractor.headings,
+            "text": clean_text if not args.output else clean_text[:500] + "...",
+            "error": err if err else None,
+        }
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(clean_text)
+            print(f"Extracted text written to {args.output}")
+        else:
+            print(json.dumps(out_obj, indent=2))
+        return
+
     result = {
         "url": args.url,
         "status": status,
@@ -383,7 +484,7 @@ def main():
         "content_length": len(body),
         "headers": headers,
         "error": err if err else None,
-        "ssrf_safe": True if "SSRF" not in str(err) else False,
+        "ssrf_safe": "SSRF" not in str(err),
     }
 
     if args.output:

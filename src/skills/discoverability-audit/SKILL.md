@@ -17,6 +17,9 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Offline Discoverability Sensor (Standard)** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, coverage}` | Primary Offline Inspection |
+| **Target Route Forensic Inspection** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --url https://example.com/pricing` | `{status, target_url, word_count, spa_root, meta_robots, canonical}` | Single-Route Forensic Deep-Dive |
+| **RFC 9309 Bot Permission Test** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --bot PerplexityBot` | `{status, bot, decision, matching_rule, role, platform, impact}` | Bot Permission Validation |
+| **Subsystem Isolated Audit** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --subsystem rendering` | `{status, subsystem, ...}` | Subsystem Filter (access, rendering, canonical, sitemaps) |
 | **State-Augmented Discoverability Audit** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, coverage}` | Multi-Turn Stateful Evaluation |
 | **Direct Standalone Discoverability Probe** | `python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json` | `{status, findings, recommendations, coverage}` | Standalone Direct Probe |
 
@@ -50,6 +53,9 @@ Evaluates the technical discoverability and machine-readability pipeline of a br
 
 - `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
 - `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--url <route>` (string, optional): Target URL route to perform isolated single-page DOM, canonical, and SPA mounting container inspection.
+- `--bot <user_agent>` (string, optional): Specific crawler user agent (e.g. `OAI-SearchBot`, `Claude-SearchBot`, `PerplexityBot`) to evaluate RFC 9309 rules against.
+- `--subsystem <subsystem>` (enum: `access`, `rendering`, `canonical`, `sitemaps`, optional): Filter inspection to a specific discoverability diagnostic subsystem.
 - `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
 - `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
 

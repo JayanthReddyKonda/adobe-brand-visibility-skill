@@ -23,6 +23,8 @@ allowed-tools:
 | **Strict Compliance Acquisition** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --strict-robots --output inv.json` | Bounded `inv.json` (aborts if entrypoint disallowed) | Policy Compliance Audit |
 | **Dual Serialization (JSON + Markdown)** | `python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --format both --output inv.json` | JSON inventory + extracted `.md` pages | Full Text Extraction |
 | **Zero-Trust URL & SSRF Probe** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com --check-only` | Status code, latency, and SSRF safety verdict | Direct URL & Network Probe |
+| **Targeted Route Header Probe** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com/route --headers-only` | Headers, server, content-type, SSRF safety | Route Metadata Probe |
+| **Zero-Trust Clean Text Extraction** | `python3 skills/web-scraper/scripts/safe_fetch.py --url https://example.com/route --extract-text` | Extracted readable text, SNR, word count, headings | Live Route Content Extraction |
 
 > **Sensor-Brain Protocol Mandate:**
 > - **Clean Skill Isolation:** This skill is strictly isolated to single-pass inventory acquisition and zero-trust SSRF fetching. Only this skill invokes `scripts/acquire_inventory.py`, `scripts/run_scraper.py`, and `scripts/safe_fetch.py`.
@@ -67,6 +69,8 @@ Performs bounded, zero-trust SSRF-safe, single-pass website acquisition and cont
 - `--max-depth <int>` (integer, optional, default: `3`): Maximum link traversal hops from homepage.
 - `--format <json|markdown|both>` (enum, optional, default: `json`): Output serialization format.
 - `--strict-robots` (flag, optional): Abort crawling immediately if `robots.txt` disallows the entrypoint.
+- `--headers-only` (flag, optional, `safe_fetch.py`): Probe URL headers and edge metadata without fetching full body under SSRF safety.
+- `--extract-text` (flag, optional, `safe_fetch.py`): Fetch target URL under SSRF protection and extract clean readable text, word count, SNR score, and headings (`h1`, `h2`).
 - `--verbose` (flag, optional): Emit real-time crawl diagnostic traces to stderr.
 
 ---

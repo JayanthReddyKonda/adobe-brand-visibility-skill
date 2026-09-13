@@ -17,8 +17,10 @@ try:
     from orchestrator import (
         LABELS,
         calculate_priority_index,
+        generate_priority_justification,
         infer_finding_difficulty,
         plan,
+        resolve_dag_node,
     )
 except ImportError:
     LABELS: Dict[str, str] = {
@@ -43,6 +45,12 @@ except ImportError:
     def plan(item: Dict[str, Any], rule: Dict[str, Any]) -> Dict[str, Any]:
         return dict(item)
 
+    def resolve_dag_node(cid: str, cat: str) -> str:
+        return "RETRIEVAL"
+
+    def generate_priority_justification(f: Dict[str, Any], idx: int) -> str:
+        return f"Rank #{idx}: Prioritized based on severity and DAG hierarchy."
+
 
 def main():
     import argparse
@@ -54,6 +62,7 @@ def main():
     parser.add_argument("--finding", help="Path to finding JSON file or inline JSON string")
     parser.add_argument("--rule", help="Path to rule/check JSON file or inline JSON string (optional)")
     parser.add_argument("--report", help="Path to report JSON file to rank all findings")
+    parser.add_argument("--rank-findings", dest="rank_findings", help="Path to findings JSON file or inline JSON string to rank with causal DAG order and justifications")
     parser.add_argument("--severity", type=int, choices=[1, 2, 3, 4], help="Severity level (1=low, 2=medium, 3=high, 4=critical)")
     parser.add_argument("--difficulty", type=int, choices=[1, 2, 3, 4, 5], help="Difficulty level (1=easiest, 5=hardest)")
     parser.add_argument("--output", help="Path to write output JSON (optional, defaults to stdout)")
@@ -93,6 +102,63 @@ def main():
             })
         ranked.sort(key=lambda x: x["priority_index"], reverse=True)
         formatted_output = json.dumps({"total_ranked": len(ranked), "roadmap": ranked}, indent=2)
+
+    elif args.rank_findings:
+        try:
+            if os.path.exists(args.rank_findings):
+                with open(args.rank_findings, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                data = json.loads(args.rank_findings)
+        except Exception as e:
+            sys.stderr.write(f"Error: Failed to parse findings: {e}\n")
+            sys.exit(1)
+
+        raw_list = data.get("findings", data) if isinstance(data, dict) else data
+        if not isinstance(raw_list, list):
+            raw_list = [raw_list]
+
+        sev_map = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+        dag_order = {
+            "RETRIEVAL": 7,
+            "RENDERING": 6,
+            "ENTITY": 5,
+            "CORROBORATION": 4,
+            "FACTS": 3,
+            "GEO_CITABILITY": 2,
+            "ENGAGEMENT": 1,
+        }
+
+        enriched = []
+        for item in raw_list:
+            if not isinstance(item, dict):
+                continue
+            item_copy = dict(item)
+            cid = str(item_copy.get("cause_id") or item_copy.get("id") or "")
+            cat = str(item_copy.get("category") or "")
+            dag = item_copy.get("dag_node") or resolve_dag_node(cid, cat)
+            item_copy["dag_node"] = dag
+            if isinstance(item_copy.get("severity"), int):
+                sev_num = item_copy["severity"]
+            elif str(item_copy.get("severity", "")).isdigit():
+                sev_num = int(item_copy["severity"])
+            else:
+                sev_num = sev_map.get(str(item_copy.get("severity", "medium")).lower(), 2)
+            diff_num = infer_finding_difficulty(item_copy)
+            p_idx = calculate_priority_index(sev_num, diff_num)
+            item_copy["priority_index"] = p_idx
+            enriched.append((sev_num, dag_order.get(dag, 0), p_idx, item_copy))
+
+        # Sort by severity descending, DAG tier descending, priority_index descending
+        enriched.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+
+        ranked = []
+        for idx, (_, _, _, f) in enumerate(enriched, 1):
+            f["priority_rank"] = idx
+            f["priority_justification"] = generate_priority_justification(f, idx)
+            ranked.append(f)
+
+        formatted_output = json.dumps({"status": "ok", "total_ranked": len(ranked), "roadmap": ranked}, indent=2)
 
     elif args.finding:
         try:
@@ -134,4 +200,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

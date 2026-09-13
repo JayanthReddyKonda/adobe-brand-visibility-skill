@@ -1,6 +1,7 @@
 {
   "name": "brand-ai-readiness-audit",
   "version": "2.1.0",
+  "description": "Comprehensive Brand AI-Readiness, Generative Engine Optimization (GEO), and AI Search Visibility multi-skill audit suite for ChatGPT Search, Claude Search, Perplexity Pro, and Google AI Overviews.",
   "skills": [
     {
       "id": "audit-orchestrator",

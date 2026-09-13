@@ -725,16 +725,28 @@ def compare_ai_observations(fact_ledger, responses_file):
     findings = []
     notes = []
 
-    if not responses_file or not isinstance(responses_file, (str, bytes, os.PathLike)) or not os.path.exists(responses_file):
+    if not responses_file:
+        return findings, notes
+
+    data = None
+    if isinstance(responses_file, (dict, list)):
+        data = responses_file
+    elif isinstance(responses_file, (str, bytes, os.PathLike)) and os.path.exists(responses_file):
+        try:
+            with open(responses_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return findings, notes
+    else:
         return findings, notes
 
     try:
-        with open(responses_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        obs_list = data.get("observations") or data.get("responses") or []
-        if isinstance(data, list):
+        if isinstance(data, dict):
+            obs_list = data.get("observations") or data.get("responses") or []
+        elif isinstance(data, list):
             obs_list = data
+        else:
+            obs_list = []
 
         for idx, obs in enumerate(obs_list):
             assistant_name = obs.get("assistant") or obs.get("model") or f"Assistant-{idx + 1}"
@@ -794,8 +806,11 @@ def compare_ai_observations(fact_ledger, responses_file):
     return findings, notes
 
 
-def audit(base, domain, responses_file=None, inv=None, state_file=None):
-    if isinstance(responses_file, dict) and inv is None:
+def audit(base, domain, inv=None, state_file=None, responses_file=None, attribute=None, compare_urls=None, query=None):
+    if isinstance(inv, (str, bytes, os.PathLike)) and responses_file is None:
+        responses_file = inv
+        inv = None
+    elif isinstance(responses_file, dict) and inv is None:
         inv = responses_file
         responses_file = None
 
@@ -804,7 +819,10 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
     page_fact_list = []
 
     if inv is not None:
-        for p in inv.get("pages", []):
+        pages_to_process = inv.get("pages") if isinstance(inv, dict) else []
+        for p in (pages_to_process or []):
+            if not isinstance(p, dict):
+                continue
             u = p.get("url") or ""
             raw_html = p.get("html") or ""
             if not u or not raw_html:
@@ -837,7 +855,19 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
     findings.extend(f_findings)
     recommendations.extend(f_recs)
 
-    return {
+    if attribute:
+        attr_clean = attribute.lower().strip()
+        if attr_clean in ("pricing", "price"):
+            findings = [f for f in findings if any(k in str(f.get("cause_id", "")).lower() or k in str(f.get("title", "")).lower() for k in ("price", "commercial", "conflict", "contradiction"))]
+            recommendations = [r for r in recommendations if any(k in str(r.get("id", "")).lower() or k in str(r.get("title", "")).lower() for k in ("price", "commercial"))]
+        elif attr_clean == "contact":
+            findings = [f for f in findings if any(k in str(f.get("cause_id", "")).lower() or k in str(f.get("title", "")).lower() for k in ("contact", "email", "phone"))]
+            recommendations = [r for r in recommendations if "contact" in str(r.get("id", "")).lower()]
+        elif attr_clean in ("legal", "copyright"):
+            findings = [f for f in findings if any(k in str(f.get("cause_id", "")).lower() or k in str(f.get("title", "")).lower() for k in ("copyright", "discontinued", "stale"))]
+            recommendations = [r for r in recommendations if "copyright" in str(r.get("id", "")).lower()]
+
+    result_payload = {
         "status": "ok",
         "findings": findings,
         "recommendations": recommendations,
@@ -872,6 +902,37 @@ def audit(base, domain, responses_file=None, inv=None, state_file=None):
         "limitations": ["Fact ledger covers raw HTML and JSON-LD text only; external third-party catalogs not polled"],
     }
 
+    if compare_urls and len(compare_urls) == 2:
+        u1, u2 = compare_urls[0].strip(), compare_urls[1].strip()
+        pf1 = next((p for p in page_fact_list if p.get("url") == u1 or urlparse(p.get("url", "")).path == urlparse(u1).path), None)
+        pf2 = next((p for p in page_fact_list if p.get("url") == u2 or urlparse(p.get("url", "")).path == urlparse(u2).path), None)
+        result_payload["url_comparison"] = {
+            "url1": u1,
+            "url2": u2,
+            "url1_prices": pf1.get("scoped_prices", []) if pf1 else [],
+            "url2_prices": pf2.get("scoped_prices", []) if pf2 else [],
+            "url1_contacts": (pf1.get("contact_emails", []) + pf1.get("contact_phones", [])) if pf1 else [],
+            "url2_contacts": (pf2.get("contact_emails", []) + pf2.get("contact_phones", [])) if pf2 else [],
+        }
+
+    if query:
+        q_term = query.lower().strip()
+        q_matches = []
+        for pf in page_fact_list:
+            u = pf.get("url", "")
+            for p_item in pf.get("scoped_prices", []):
+                if q_term in str(p_item).lower():
+                    q_matches.append({"url": u, "category": "pricing", "fact": p_item})
+            for prod in pf.get("products_with_status", []):
+                if q_term in str(prod).lower():
+                    q_matches.append({"url": u, "category": "product", "fact": prod})
+            for c_item in pf.get("contact_emails", []) + pf.get("contact_phones", []):
+                if q_term in str(c_item).lower():
+                    q_matches.append({"url": u, "category": "contact", "fact": c_item})
+        result_payload["query_matches"] = q_matches
+
+    return result_payload
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -890,6 +951,9 @@ def main():
     parser.add_argument(
         "--responses", "--observations", dest="responses", help="JSON file of observed AI assistant outputs to cross-check against site facts"
     )
+    parser.add_argument("--attribute", choices=["pricing", "contact", "legal", "specs"], help="Filter fact consistency checks by attribute category")
+    parser.add_argument("--compare-urls", nargs=2, metavar=("URL1", "URL2"), help="Direct head-to-head comparison of extracted first-party facts between two URLs")
+    parser.add_argument("--query", help="Search the first-party fact ledger for a specific product name, plan name, or term")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -907,7 +971,16 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
-    res = audit(base, p.netloc, responses_file=args.responses, inv=inv, state_file=args.state)
+    res = audit(
+        base,
+        p.netloc,
+        inv=inv,
+        state_file=args.state,
+        responses_file=args.responses,
+        attribute=args.attribute,
+        compare_urls=args.compare_urls,
+        query=args.query,
+    )
     print(json.dumps(res, indent=2))
 
 

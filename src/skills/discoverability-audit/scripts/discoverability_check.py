@@ -344,7 +344,88 @@ def robots_access(groups, ua, path="/"):
     return best[0], best[1]
 
 
-def audit(base, domain, inv=None, state_file=None):
+def check_bot_permission(robots_txt, bot, path="/"):
+    """Test RFC 9309 crawler permissions for a specific bot against robots.txt."""
+    if not robots_txt:
+        return {
+            "bot": bot,
+            "path": path,
+            "allowed": True,
+            "decision": "allow",
+            "matching_rule": None,
+            "semantics": CRAWLER_SEMANTICS.get(bot, {"role": "general", "impact_desc": ""}),
+            "note": "No robots.txt provided; all crawlers allowed by default under RFC 9309.",
+        }
+    groups, _ = parse_robots(robots_txt)
+    decision, rule = robots_access(groups, bot, path)
+    sem = CRAWLER_SEMANTICS.get(bot, {"role": "general", "impact_desc": "Autonomous web crawler."})
+    return {
+        "bot": bot,
+        "path": path,
+        "allowed": decision == "allow",
+        "decision": decision,
+        "matching_rule": rule,
+        "role": sem.get("role", "general"),
+        "platform": sem.get("platform", "Unknown"),
+        "impact": sem.get("impact_desc", ""),
+    }
+
+
+def inspect_target_url(inv, base, domain, target_url, robots_txt=None):
+    """Forensically inspect a single target URL from inventory or live fetch."""
+    norm_url = target_url.strip()
+    if not norm_url.startswith("http"):
+        norm_url = f"{base.rstrip('/')}/{norm_url.lstrip('/')}"
+    p_path = urlparse(norm_url).path or "/"
+
+    page_data = None
+    if inv and inv.get("pages"):
+        for p in inv["pages"]:
+            if p.get("url") == norm_url or urlparse(p.get("url", "")).path == p_path:
+                page_data = p
+                break
+
+    if not page_data:
+        status, html, headers, err = safe_fetch(norm_url, timeout=10, max_bytes=2 * 1024 * 1024)
+        page_data = {"url": norm_url, "status": status, "html": html, "headers": headers, "error": err}
+
+    p_html = page_data.get("html") or page_data.get("raw_html") or ""
+    p_status = page_data.get("status") or page_data.get("status_code") or 200
+    p_dom = Dom()
+    try:
+        p_dom.feed(p_html)
+    except Exception:
+        pass
+
+    text_no_scripts = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", p_html, flags=re.DOTALL | re.IGNORECASE)
+    clean_text = re.sub(r"<[^>]+>", " ", text_no_scripts)
+    words = [w for w in clean_text.split() if w.strip()]
+    word_count = len(words)
+
+    bot_access = {}
+    if robots_txt:
+        groups, _ = parse_robots(robots_txt)
+        for bot in ("OAI-SearchBot", "Claude-SearchBot", "PerplexityBot", "GPTBot"):
+            dec, r = robots_access(groups, bot, p_path)
+            bot_access[bot] = {"allowed": dec == "allow", "rule": r}
+
+    return {
+        "url": norm_url,
+        "path": p_path,
+        "status_code": p_status,
+        "word_count": word_count,
+        "has_js_shell": word_count < 25 and p_dom.spa_root,
+        "mounting_container": p_dom.spa_root,
+        "spa_marker": p_dom.spa_marker_name,
+        "meta_robots": p_dom.meta_robots,
+        "is_noindex": "noindex" in (p_dom.meta_robots or "").lower(),
+        "canonical": p_dom.canonical,
+        "canonical_matches_domain": domain in (p_dom.canonical or "") if p_dom.canonical else True,
+        "crawler_access_samples": bot_access,
+    }
+
+
+def audit(base, domain, inv=None, state_file=None, target_url=None, target_bot=None, subsystem=None):
     findings, recommendations, observations = [], [], []
 
     # 1. Fetch Homepage & robots.txt via shared inventory or live probe
@@ -388,7 +469,7 @@ def audit(base, domain, inv=None, state_file=None):
     state = {"version": 1, "entities": {}, "facts": {}, "claims": {}, "observations": {}, "page_context": {}}
     if state_file and os.path.exists(state_file):
         try:
-            with open(state_file, "r") as f:
+            with open(state_file, "r", encoding="utf-8") as f:
                 state = json.load(f)
         except Exception:
             pass
@@ -398,7 +479,7 @@ def audit(base, domain, inv=None, state_file=None):
             import tempfile as _tf
 
             _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
-            with os.fdopen(_fd, "w") as f:
+            with os.fdopen(_fd, "w", encoding="utf-8") as f:
                 json.dump(state, f)
             os.replace(_tmp, state_file)
         return {
@@ -720,8 +801,8 @@ def audit(base, domain, inv=None, state_file=None):
 
     # Check D1: Declared sitemap XML validation
     sitemaps = []
-    if inv:
-        sitemaps = inv.get("sitemaps", []) or (inv.get("infrastructure", {}) or {}).get("sitemaps", [])
+    if inv and isinstance(inv, dict):
+        sitemaps = (inv.get("sitemaps") or []) or ((inv.get("infrastructure") or {}).get("sitemaps") or [])
     for sm in sitemaps:
         sm_text = sm.get("text", "") if isinstance(sm, dict) else ""
         sm_url = sm.get("url", "") if isinstance(sm, dict) else (sm if isinstance(sm, str) else "")
@@ -818,9 +899,11 @@ def audit(base, domain, inv=None, state_file=None):
         )
 
     # 3. Multi-Page Client-Side Rendering Shell Check on Commercial/Catalog Routes
-    if not any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in findings) and inv:
+    if not any(f.get("cause_id") == "RENDERED_CONTENT_GAP" for f in findings) and inv and isinstance(inv, dict):
         unrendered_pages = []
-        for p in inv.get("pages", []):
+        for p in (inv.get("pages") or []):
+            if not isinstance(p, dict):
+                continue
             p_url = p.get("url", "")
             p_html = p.get("html", "")
             p_type = p.get("page_type", "")
@@ -1218,11 +1301,24 @@ def audit(base, domain, inv=None, state_file=None):
         import tempfile as _tf
 
         _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
-        with os.fdopen(_fd, "w") as f:
+        with os.fdopen(_fd, "w", encoding="utf-8") as f:
             json.dump(state, f)
         os.replace(_tmp, state_file)
 
-    return {
+    if subsystem == "access":
+        findings = [f for f in findings if any(k in f.get("category", "").lower() or k in str(f.get("cause_id", "")).lower() for k in ("crawl", "access", "robot", "waf", "http"))]
+        recommendations = [r for r in recommendations if any(k in r.get("category", "").lower() or k in str(r.get("id", "")).lower() for k in ("crawl", "access", "robot", "waf"))]
+    elif subsystem == "rendering":
+        findings = [f for f in findings if "RENDER" in str(f.get("cause_id", "")) or "RENDER" in str(f.get("id", "")) or "NOSNIPPET" in str(f.get("cause_id", ""))]
+        recommendations = [r for r in recommendations if "RENDER" in str(r.get("id", ""))]
+    elif subsystem == "canonical":
+        findings = [f for f in findings if "CANONICAL" in str(f.get("cause_id", "")) or "CANONICAL" in str(f.get("id", ""))]
+        recommendations = [r for r in recommendations if "CANONICAL" in str(r.get("id", ""))]
+    elif subsystem == "sitemaps":
+        findings = [f for f in findings if "SITEMAP" in str(f.get("cause_id", "")) or "SITEMAP" in str(f.get("id", ""))]
+        recommendations = [r for r in recommendations if "SITEMAP" in str(r.get("id", ""))]
+
+    result_payload = {
         "status": "ok",
         "findings": findings,
         "recommendations": recommendations,
@@ -1252,6 +1348,13 @@ def audit(base, domain, inv=None, state_file=None):
         ],
     }
 
+    if target_url:
+        result_payload["target_inspection"] = inspect_target_url(inv, base, domain, target_url, robots_txt=robots_txt)
+    if target_bot:
+        result_payload["bot_permission"] = check_bot_permission(robots_txt, target_bot, path=urlparse(target_url or "/").path or "/")
+
+    return result_payload
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1266,6 +1369,9 @@ def main():
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
     parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
+    parser.add_argument("--url", help="Target specific route or URL for forensic discoverability inspection")
+    parser.add_argument("--bot", help="Test RFC 9309 crawler permissions for a specific AI bot (e.g. OAI-SearchBot, Claude-SearchBot)")
+    parser.add_argument("--subsystem", choices=["access", "rendering", "canonical", "sitemaps"], help="Isolate a specific diagnostic subsystem")
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     base, domain = parse_domain(args.site)
@@ -1279,7 +1385,7 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
-    res = audit(base, domain, inv=inv, state_file=args.state)
+    res = audit(base, domain, inv=inv, state_file=args.state, target_url=args.url, target_bot=args.bot, subsystem=args.subsystem)
     print(json.dumps(res, indent=2))
 
 

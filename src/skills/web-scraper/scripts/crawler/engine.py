@@ -23,7 +23,6 @@ Pure Python 3.9+ standard library ONLY. Zero runtime third-party pip dependencie
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import email.utils
 import heapq
 import http.client
@@ -48,10 +47,10 @@ from html.parser import HTMLParser
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import quote, unquote, urldefrag, urljoin, urlparse, urlsplit, urlunparse, urlunsplit
 
-
 # ==============================================================================
 # SECTION 1: DATA MODELS & ACQUISITION CONTRACTS
 # ==============================================================================
+
 
 @dataclass
 class Resource:
@@ -1501,11 +1500,12 @@ class RobotsAuditor:
 
         best_match: Optional[RobotsRule] = None
         for rule in matching_rules:
-            if rule.matches(path):
-                if best_match is None or rule.length > best_match.length:
-                    best_match = rule
-                elif rule.length == best_match.length and rule.is_allow and not best_match.is_allow:
-                    best_match = rule
+            if rule.matches(path) and (
+                best_match is None
+                or rule.length > best_match.length
+                or (rule.length == best_match.length and rule.is_allow and not best_match.is_allow)
+            ):
+                best_match = rule
 
         if best_match is None:
             return True
@@ -1875,9 +1875,8 @@ class StreamingHTMLParser(HTMLParser):
                 if hreflang and href:
                     self.hreflangs.append(HreflangLink(lang=hreflang, href=href))
                 type_val = attr_dict.get("type", "").lower()
-                if any(x in type_val for x in ("rss", "atom", "xml")):
-                    if href and href not in self.feed_links:
-                        self.feed_links.append(href)
+                if any(x in type_val for x in ("rss", "atom", "xml")) and href and href not in self.feed_links:
+                    self.feed_links.append(href)
 
         elif tag_lower == "title":
             self._in_title = True
@@ -2262,7 +2261,6 @@ class LinkProcessor:
         if ext in IGNORED_EXTENSIONS:
             return False
 
-        from urllib.parse import unquote
         full_query = parsed.path + ("?" + parsed.query if parsed.query else "")
         if UNSAFE_PATH_REGEX.search(unquote(full_query)):
             return False
@@ -2304,8 +2302,6 @@ class LinkProcessor:
 
 def safe_path(url: str) -> bool:
     """Check if URL contains unsafe or mutating query paths."""
-    from urllib.parse import unquote, urlsplit
-
     p = urlsplit(url)
     full = unquote(p.path + ("?" + p.query if p.query else ""))
     return not bool(UNSAFE_PATH_REGEX.search(full))
@@ -2313,8 +2309,6 @@ def safe_path(url: str) -> bool:
 
 def normalize(url: str) -> str:
     """Normalize public HTTP/HTTPS URL per strict safety contract."""
-    from urllib.parse import quote, urlsplit, urlunsplit
-
     if "://" not in url:
         url = "https://" + url
     p = urlsplit(url)
@@ -2777,10 +2771,9 @@ class EvidenceExtractor:
                 if m:
                     href = m.group(0)
                 href_lower = (href or "").lower()
-                if any(dom in href_lower for dom in cls.SOCIAL_DOMAINS):
-                    if href not in seen_social and href.startswith(("http://", "https://")):
-                        seen_social.add(href)
-                        social_links.append(href)
+                if any(dom in href_lower for dom in cls.SOCIAL_DOMAINS) and href not in seen_social and href.startswith(("http://", "https://")):
+                    seen_social.add(href)
+                    social_links.append(href)
 
         return contact_info, social_links
 

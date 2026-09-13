@@ -15,7 +15,7 @@ from crawler.fetch import PinnedConnectionPool, SafeFetcher
 from crawler.links import LinkProcessor
 from crawler.metadata import MetadataProcessor
 from crawler.parser import StreamingHTMLParser
-from crawler.policy import SecurityPolicy
+from crawler.policy import SecurityPolicy, SecurityValidationError
 
 from tests.fixtures.html_fixtures import (
     CLEAN_ENTERPRISE_HTML,
@@ -172,7 +172,7 @@ class TestCrawlerComponents(unittest.TestCase):
         self.assertEqual(pool.get_or_resolve_ip("example.com", 80), "93.184.216.34")
 
         # Private IP rejection on cross-host redirect
-        with self.assertRaises(Exception):
+        with self.assertRaises(SecurityValidationError):
             pool.get_or_resolve_ip("127.0.0.1", 80)
 
 

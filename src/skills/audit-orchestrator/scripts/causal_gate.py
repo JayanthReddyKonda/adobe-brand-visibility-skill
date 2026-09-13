@@ -362,9 +362,8 @@ def extract_finding_route(f: Dict[str, Any]) -> str:
     if isinstance(scope, dict):
         scope = scope.get("url") or scope.get("scope") or ""
     scope_str = str(scope or "").strip()
-    if not url and scope_str:
-        if scope_str.startswith(("/", "http://", "https://", "//")) or "." in scope_str.split("/")[0]:
-            url = scope_str
+    if not url and scope_str and (scope_str.startswith(("/", "http://", "https://", "//")) or "." in scope_str.split("/")[0]):
+        url = scope_str
 
     # 3. Check evidence sources
     ev = f.get("evidence")
@@ -477,11 +476,8 @@ def apply_causal_suppression(
             html = str(p.get("html", "")).lower()
             # High-confidence SPA shell detection requiring BOTH structural markers AND ultra-thin content
             has_spa_marker = any(m in html for m in ('id="root"', 'id="app"')) and ('type="module"' in html or '<noscript>' in html)
-            if (wc < 25 and wc > 0 and has_spa_marker) or (snr < 0.03 and wc < 30 and has_spa_marker):
-                if p_url:
-                    rendering_gap_pages.add(p_url)
-
-    home_page = next((p for p in inv_pages if p.get("page_type") == "homepage" or p.get("url") in ("/", "") or normalize_route_path(p.get("url", "")) == "/"), inv_pages[0] if inv_pages else {})
+            if p_url and ((wc < 25 and wc > 0 and has_spa_marker) or (snr < 0.03 and wc < 30 and has_spa_marker)):
+                rendering_gap_pages.add(p_url)
 
     has_any_finding_scope = any(bool(extract_finding_route(f)) for f in all_raw_findings)
 
@@ -497,10 +493,9 @@ def apply_causal_suppression(
                 break
             if "AI_RETRIEVAL_BLOCKED" in cid_set:
                 has_route_subpath = any(sub in f_ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content", "/quiz", "/product", "/item", "/news")) or (f_rt and normalize_route_path(f_rt) != "/")
-                if not has_route_subpath:
-                    if normalize_route_path(f_rt) == "/" or f_rt in ("site", "site-wide", "sitewide", "") or "root" in f_ev or "root url" in str(f.get("title", "")).lower() or "403" in f_ev or not inv_pages:
-                        is_site_wide_l0 = True
-                        break
+                if not has_route_subpath and (normalize_route_path(f_rt) == "/" or f_rt in ("site", "site-wide", "sitewide", "") or "root" in f_ev or "root url" in str(f.get("title", "")).lower() or "403" in f_ev or not inv_pages):
+                    is_site_wide_l0 = True
+                    break
             if f_rt in ("site", "site-wide", "sitewide") or "sitewide" in f_ev or "disallows all" in f_rc:
                 is_site_wide_l0 = True
                 break
@@ -512,10 +507,9 @@ def apply_causal_suppression(
             ):
                 is_site_wide_l0 = True
                 break
-            if not has_any_finding_scope and not f_rt:
-                if not any(sub in f_ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content", "/quiz", "/product")):
-                    is_site_wide_l0 = True
-                    break
+            if not has_any_finding_scope and not f_rt and not any(sub in f_ev for sub in ("/blog", "/admin", "/cart", "/checkout", "/api", "/content", "/quiz", "/product")):
+                is_site_wide_l0 = True
+                break
 
     is_site_wide_rendering_gap = False
     if has_layer1_rendering_gap:
@@ -568,11 +562,10 @@ def apply_causal_suppression(
 
         # Evaluate Layer 0 suppression
         suppress_l0 = False
-        if has_layer0_block and bool(cids.intersection(SUPPRESSED_BY_LAYER0)):
-            if is_site_wide_l0:
-                suppress_l0 = True
-            elif f_route and any(routes_match(f_route, extract_finding_route(l0_f)) for l0_f in layer0_findings if extract_finding_route(l0_f)):
-                suppress_l0 = True
+        if has_layer0_block and bool(cids.intersection(SUPPRESSED_BY_LAYER0)) and (
+            is_site_wide_l0 or (f_route and any(routes_match(f_route, extract_finding_route(l0_f)) for l0_f in layer0_findings if extract_finding_route(l0_f)))
+        ):
+            suppress_l0 = True
 
         if suppress_l0:
             suppressed.append(f)
@@ -584,13 +577,10 @@ def apply_causal_suppression(
 
         # Evaluate Layer 1 rendering gap suppression
         suppress_l1 = False
-        if bool(cids.intersection(SUPPRESSED_BY_LAYER1)):
-            if is_site_wide_rendering_gap:
-                suppress_l1 = True
-            elif f_route and any(routes_match(f_route, gap_p) for gap_p in rendering_gap_pages):
-                suppress_l1 = True
-            elif not f_route and is_site_wide_rendering_gap:
-                suppress_l1 = True
+        if bool(cids.intersection(SUPPRESSED_BY_LAYER1)) and (
+            is_site_wide_rendering_gap or (f_route and any(routes_match(f_route, gap_p) for gap_p in rendering_gap_pages))
+        ):
+            suppress_l1 = True
 
         if suppress_l1:
             suppressed.append(f)
@@ -736,7 +726,6 @@ def detect_business_archetype(inv: Dict[str, Any]) -> str:
             ptype = str(ptype).lower()
 
         url = (p.get("url") or "").lower()
-        html = (p.get("html") or "").lower()
         text = (p.get("clean_text") or p.get("clean_markdown") or "").lower()
         title_val = p.get("title")
         if isinstance(title_val, list):
@@ -875,7 +864,7 @@ def evaluate_causal_nodes(
         return nodes
 
     # Reachability & Retrieval
-    status_codes = [p.get("status") for p in pages if p.get("status") is not None]
+    status_codes = [p.get("status") for p in pages if isinstance(p, dict) and p.get("status") is not None]
     if any(s == 200 for s in status_codes):
         nodes["reachability"] = "confirmed_pass"
     elif status_codes:
@@ -883,7 +872,7 @@ def evaluate_causal_nodes(
         nodes["retrieval_access"] = "confirmed_fail"
         return nodes
 
-    disc_cov = (specialist_results or {}).get("discoverability-audit", {}).get("coverage", {})
+    disc_cov = ((specialist_results or {}).get("discoverability-audit") or {}).get("coverage") or {}
     bots_allowed = disc_cov.get("retrieval_bots_allowed")
     if bots_allowed is not None:
         nodes["retrieval_access"] = "confirmed_pass" if bots_allowed > 0 else "confirmed_fail"

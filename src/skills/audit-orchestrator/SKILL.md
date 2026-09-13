@@ -17,9 +17,12 @@ allowed-tools:
 |---|---|---|---|
 | **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) | Acquisition |
 | **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Mode** |
+| **Selective Specialist Telemetry** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry --skills discoverability,entity,geo` | Filtered Sensor Telemetry Payload | Scoped Multi-Skill Telemetry |
 | **Agent Cognitive Review Synthesizer** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --review review.json --output report.json` | Causal-Gated & Scored Draft-07 JSON Report | **Primary Synthesis Mode** |
 | **Dynamic Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py --site <url> --inventory inv.json` | Tailored Knowledge Base & Remediation Briefing | Context Compilation |
+| **Scoped Archetype & Topic Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py --inventory inv.json --archetype saas --topic retrieval` | Scoped Reference Briefing & Cheatsheets | Targeted Archetype/Topic Context |
 | **Remediation Priority Ranker** | `python3 skills/audit-orchestrator/scripts/plan.py --severity <1-4> --difficulty <1-5>` or `python3 skills/audit-orchestrator/scripts/plan.py --report report.json` | Task Priority Index & Queue Disposition | Remediation Planning |
+| **Global Findings Ordering & Plan** | `python3 skills/audit-orchestrator/scripts/plan.py --rank-findings findings.json` | Ranked findings with DAG sorting, priority_rank, priority_index | Causal Findings Ordering |
 | **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements | Targeted Deep Inspection |
 | **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` | Modular Pipeline |
 | **Headless CI Runner (Automated Testing ONLY)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json --baseline-only` | Baseline Draft-07 Validated Report JSON | **CI/CD Only (No Agent Shortcut)** |
@@ -48,6 +51,8 @@ allowed-tools:
 
 > [!TIP]
 > **Execution Context:** DO NOT assume your working directory contains a `skills/` folder directly. The marketplace may be installed in a nested directory like `.agents/skills/` or `src/skills/`. Resolve the root path before running commands. Always adapt shell commands (`python3`, `python`) to your host environment and use forward slashes (`/`) for cross-platform file paths.
+>
+> **Windows File Encoding Note:** When reading JSON files or markdown files in Python on Windows, always specify `encoding="utf-8"` (e.g. `open(path, encoding="utf-8")` or `Path(path).read_text(encoding="utf-8")`) to prevent `UnicodeDecodeError` caused by Windows default `cp1252` encoding.
 
 ## Summary
 
@@ -71,9 +76,13 @@ Coordinates the 7 specialist skills to perform a full-spectrum audit of brand di
 - **`--analytics`** (string, optional): Path to first-party route-level web analytics JSON/CSV file.
 - **`--responses` / `--observations`** (string, optional): Path to observed AI assistant outputs JSON to cross-check against site facts.
 - **`--output`** (string, optional): Path to write final JSON report or telemetry payload (defaults to stdout).
+- **`--skills`** (string, optional, `orchestrator.py`): Comma-separated list of specialist skills to execute (e.g. `discoverability,entity,geo,engagement`).
 - **`--telemetry`** (flag, optional): Emits raw aggregated empirical sensor measurements for cognitive synthesis.
 - **`--baseline-only`** (flag, optional): Emits automated baseline report directly (strictly reserved for automated CI/CD suites).
 - **`--format`** (enum, optional, default: `json`): Output serialization format.
+- **`--archetype`** (enum, optional, `bundle_context.py`): Explicit business archetype context (`ecommerce`, `saas`, `publisher`, `local_business`, `corporate`).
+- **`--topic`** (enum, optional, `bundle_context.py`): Technical topic filter (`retrieval`, `rendering`, `entity`, `facts`, `corroboration`, `geo`, `engagement`).
+- **`--rank-findings`** (string, optional, `plan.py`): JSON string or file path of findings to sort and rank by DAG hierarchy and priority index.
 
 ---
 
@@ -160,33 +169,81 @@ Or pass the telemetry payload directly:
 python3 skills/audit-orchestrator/scripts/bundle_context.py --site https://example.com --telemetry telemetry.json
 ```
 
-**Step 4: Execute Targeted Specialist Sensor Inspections (Custom Calling)**
-When `telemetry.json` flags domain-specific anomalies, invoke the specialist sensor directly for granular diagnostics:
+**Step 4: Consult Specialist Skills & Execute Targeted Sensor Inspections (Custom Calling)**
+
+> [!IMPORTANT]
+> **Mandatory Specialist Knowledge Base Consultation**:
+> When `telemetry.json` flags domain-specific anomalies or sub-optimal scores in any dimension, DO NOT attempt to write findings from generic memory.
+> You MUST read the corresponding specialist skill's `SKILL.md` (e.g. `skills/entity-content-audit/SKILL.md`, `skills/geo-content-audit/SKILL.md`, `skills/engagement-context-audit/SKILL.md`) and its `references/knowledge-base.md`.
+> Each specialist skill defines specific causal root-cause taxonomies, required Schema.org type hierarchies, Princeton KDD 2024 copy structures, and exact verification test commands.
+
+Then invoke the specialist sensor directly with custom parameters for granular diagnostics:
 - **Discoverability Anomalies (blocked bots, noindex, rendering shell):**
   ```bash
+  # Standard domain check
   python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
+  # Forensic target route inspection
+  python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --url https://example.com/pricing
+  # RFC 9309 specific bot test
+  python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --bot PerplexityBot
+  # Subsystem isolated inspection
+  python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --subsystem rendering
   ```
 - **Entity & Offer Gaps (missing Organization, unanchored products):**
   ```bash
+  # Standard domain check
   python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
+  # Forensic target route inspection
+  python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --url https://example.com/products/widget
+  # Target Schema.org type inspection
+  python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --schema-type Product
+  # 7-Attribute Answerability Index extraction
+  python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --answerability-only
   ```
 - **Factual Contradictions & Drift (pricing conflicts, stale copyright):**
   ```bash
+  # Standard domain check
   python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
+  # Scoped attribute conflict filtering
+  python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --attribute pricing
+  # Direct head-to-head fact comparison between two routes
+  python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --compare-urls https://example.com/ https://example.com/pricing
+  # Query term search across fact ledger
+  python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --query "subscription"
   ```
   *(Pass `--responses <file>` if observed AI assistant outputs are available for cross-checking)*
 - **Authority & sameAs Probing (broken anchors, candidate backlinks):**
   ```bash
+  # Standard domain check
   python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
+  # Offline sameAs extraction without network probes
+  python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --sameas-only
+  # Live safe_fetch probe of external anchor
+  python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --probe-url https://www.wikidata.org/wiki/Q12345 --site https://example.com
+  # Bounded inbound backlink verification
+  python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --verify-backlink https://techcrunch.com/article --site https://example.com
   ```
-  *(Pass `--candidate-backlinks <file>` to verify candidate external inbound links)*
 - **Citability & Passage Chunking (low stats, missing BLUF, hedge language):**
   ```bash
+  # Standard domain check
   python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
+  # Target route citability evaluation
+  python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --url https://example.com/about
+  # Deterministic 120-180 word passage improvement plan extraction
+  python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --page-plan-only https://example.com/features
+  # Live Princeton KDD 2024 citability scoring on raw text or draft markdown
+  python3 skills/geo-content-audit/scripts/geo_content_check.py --analyze-text "According to our 2025 benchmark, performance improved by 42%..."
   ```
 - **Visitor Continuity & Intent Scent (generic H1, above-fold CTA friction):**
   ```bash
+  # Standard domain check
   python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
+  # Target route UX inspection
+  python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --url https://example.com/landing
+  # AI referral query intent-to-landing simulation
+  python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --referrer-query "best enterprise security software"
+  # Viewport & above-the-fold CTA inspection
+  python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --viewport-only
   ```
   *(Pass `--analytics <file>` to correlate UX findings with first-party traffic data)*
 
@@ -229,6 +286,60 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
 
 6. **Unified Report Synthesis via CLI (`--review` or `audit.py finalize`):**
    - Save agent candidate findings and proactive actions into `review.json`:
+
+   > [!IMPORTANT]
+   > **Review JSON Contract & Template (`review.json`):**
+   > Structure `review.json` as a JSON object containing `archetype`, `findings`, and `proactive_actions`:
+   > ```json
+   > {
+   >   "archetype": "corporate",
+   >   "findings": [
+   >     {
+   >       "cause_id": "MATERIAL_ENTITY_AMBIGUITY",
+   >       "title": "Missing Machine-Explicit Schema.org JSON-LD Entity Graph",
+   >       "severity": "medium",
+   >       "category": "entity_content",
+   >       "root_cause": "The brand domain publishes no Schema.org Organization JSON-LD, preventing AI search engines from resolving identity.",
+   >       "confidence": "high",
+   >       "scope": "https://example.com/",
+   >       "evidence": {
+   >         "summary": "No Schema.org JSON-LD detected on https://example.com/ (0 script blocks found).",
+   >         "sources": [
+   >           {
+   >             "url": "https://example.com/",
+   >             "type": "structured_data",
+   >             "observation": "No application/ld+json blocks found in HTML head or body."
+   >           }
+   >         ]
+   >       },
+   >       "impact": "Generative search assistants cannot resolve canonical brand identity, leading to brand omission in knowledge graphs.",
+   >       "suggested_action": {
+   >         "summary": "Deploy unified Schema.org Organization JSON-LD on homepage.",
+   >         "technical_fix": "Add <script type=\"application/ld+json\">{\"@context\": \"https://schema.org\", \"@type\": \"Organization\", ...}</script> to homepage head.",
+   >         "creative_fix": "State canonical brand name and organizational steward clearly in body copy.",
+   >         "priority": "medium",
+   >         "verification": "Probe https://example.com/ and verify Organization JSON-LD is detected."
+   >       }
+   >     }
+   >   ],
+   >   "proactive_actions": [
+   >     {
+   >       "id": "P-001",
+   >       "title": "Deploy Machine-Readable /llms.txt Manifest",
+   >       "summary": "Deploy an authoritative /llms.txt manifest for generative search engines.",
+   >       "priority": "low",
+   >       "technical_fix": "Serve /llms.txt with Content-Type: text/plain linking to primary routes.",
+   >       "creative_fix": "Author first-100-word executive overviews for core services.",
+   >       "verification": "Request GET /llms.txt and verify HTTP 200."
+   >     }
+   >   ]
+   > }
+   > ```
+   > **Field Requirements & Invariants:**
+   > - `findings`: Required fields per item: `cause_id`, `title`, `severity` (`critical`|`high`|`medium`|`low`), `category` (`discoverability`|`entity_content`|`fact_consistency`|`corroboration`|`geo_content`|`engagement_context`), `root_cause`, `confidence` (`high`|`medium`|`low`), `scope`, `evidence` (dict with `summary` and `sources` list, or string), `impact`, `suggested_action` (dict with `summary`, `technical_fix`, `creative_fix`, `priority`).
+   > - `proactive_actions`: Every item MUST have all 4 Draft-07 required fields: `id`, `title`, `summary`, and `priority` (`critical`|`high`|`medium`|`low`). Optional fields: `category`, `technical_fix`, `creative_fix`, `verification`.
+   > - Clean string values: No literal unescaped newlines (`\n\n`), no raw Markdown tables (`| Col |`), no raw HTML tags.
+
    ```bash
    # Option A: Ingest review findings through orchestrator into full Draft-07 report
    python3 skills/audit-orchestrator/scripts/orchestrator.py --site https://example.com --inventory inv.json --review review.json --output report.json

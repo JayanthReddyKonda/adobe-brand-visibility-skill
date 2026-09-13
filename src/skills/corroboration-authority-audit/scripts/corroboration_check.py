@@ -200,17 +200,64 @@ def parse_candidate_backlinks(arg_val, inv=None):
     return clean_candidates
 
 
-def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
+def audit(
+    base,
+    domain,
+    inv=None,
+    state_file=None,
+    candidate_backlinks=None,
+    *,
+    probe_url=None,
+    verify_backlink=None,
+    sameas_only=False,
+):
     findings = []
     recommendations = []
     observations = []
 
+    # 0. Custom forensic parameter: single backlink verification
+    if verify_backlink:
+        domain_archetype = classify_referring_domain(verify_backlink)
+        t0 = time.monotonic()
+        s_status, s_html, _, s_err = safe_fetch(verify_backlink, timeout=5.0, max_bytes=1024 * 1024, method="GET")
+        latency_ms = round((time.monotonic() - t0) * 1000, 2)
+        if s_status != 200:
+            return {
+                "status": "source_unreachable",
+                "source_url": verify_backlink,
+                "domain_archetype": domain_archetype,
+                "http_status": s_status,
+                "latency_ms": latency_ms,
+                "error": s_err or f"HTTP {s_status}",
+                "inbound_links_found": 0,
+                "matching_links": [],
+            }
+        link_parser = InboundLinkExtractor(domain)
+        if s_html:
+            try:
+                link_parser.feed(s_html)
+            except Exception:
+                pass
+        matching_links = link_parser.found_links
+        return {
+            "status": "verified_intact" if matching_links else "no_inbound_link",
+            "source_url": verify_backlink,
+            "target_domain": domain,
+            "domain_archetype": domain_archetype,
+            "http_status": s_status,
+            "latency_ms": latency_ms,
+            "inbound_links_found": len(matching_links),
+            "matching_links": matching_links,
+        }
+
     # 1. Fetch Homepage
-    if inv is not None:
+    html = None
+    if inv is not None and isinstance(inv, dict):
+        pages_list = [p for p in (inv.get("pages") or []) if isinstance(p, dict)]
         home = next(
             (
                 p
-                for p in inv.get("pages", [])
+                for p in pages_list
                 if p.get("page_type") == "homepage"
                 and (
                     "html" in str(p.get("resource_type", "")).lower()
@@ -219,19 +266,60 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
             ),
             None,
         )
-        if not home and inv.get("pages"):
-            home = inv["pages"][0]
+        if not home and pages_list:
+            home = pages_list[0]
         html = home.get("html") if home else None
-    else:
+    elif base:
         status, html, _, err = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
 
-        if not html:
-            return {
-                "status": "inconclusive",
-                "findings": [],
-                "recommendations": [],
-                "error": f"could not reach {base}: {err}",
-            }
+    # 2. Extract Brand Name Claim for Corroboration
+    brand_name = None
+    if html:
+        title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
+        if title_match:
+            brand_name = title_match.group(1).split("|")[0].replace(" - ", "|").replace(" | ", "|").split("|")[0].strip()
+
+    # 0. Custom forensic parameter: single authority probe
+    if probe_url:
+        t0 = time.monotonic()
+        status, ext_html, headers, err = safe_fetch(probe_url, timeout=5.0, max_bytes=1024 * 1024, method="GET")
+        latency_ms = round((time.monotonic() - t0) * 1000, 2)
+        ext_title = ""
+        og_site_name = ""
+        brand_in_title = False
+        brand_in_og = False
+        brand_in_body = False
+        if ext_html:
+            t_match = re.search(r"<title>(.*?)</title>", ext_html, re.IGNORECASE)
+            if t_match:
+                ext_title = t_match.group(1).strip()
+            og_match = re.search(r'<meta[^>]*property=["\']og:site_name["\'][^>]*content=["\']([^"\']+)["\']', ext_html, re.IGNORECASE)
+            if og_match:
+                og_site_name = og_match.group(1).strip()
+            if brand_name:
+                b_low = brand_name.lower()
+                brand_in_title = b_low in ext_title.lower()
+                brand_in_og = b_low in og_site_name.lower()
+                brand_in_body = b_low in ext_html.lower()
+
+        filtered_headers = {k: v for k, v in (headers or {}).items() if k.lower() in ("content-type", "server", "last-modified", "x-robots-tag")}
+        return {
+            "status": "ok" if status == 200 else ("error" if status in (404, 410, 500, 502, 503) else "inconclusive"),
+            "target_authority_url": probe_url,
+            "brand_claimed": brand_name,
+            "http_status": status,
+            "latency_ms": latency_ms,
+            "error": err,
+            "title": ext_title,
+            "og_site_name": og_site_name,
+            "brand_corroborated": brand_in_title or brand_in_og or brand_in_body,
+            "evidence": {
+                "brand_in_title": brand_in_title,
+                "brand_in_og": brand_in_og,
+                "brand_in_body": brand_in_body,
+            },
+            "headers": filtered_headers,
+        }
 
     if not html:
         return {
@@ -242,12 +330,6 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
         }
 
     sameas_urls = extract_sameas_links(html)
-
-    # 2. Extract Brand Name Claim for Corroboration
-    brand_name = None
-    title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
-    if title_match:
-        brand_name = title_match.group(1).split("|")[0].replace(" - ", "|").replace(" | ", "|").split("|")[0].strip()
 
     # 3. Check declared identity nodes (sameAs)
     if not sameas_urls:
@@ -406,6 +488,35 @@ def audit(base, domain, inv=None, state_file=None, candidate_backlinks=None):
                 "verification": "Verify community URLs resolve with HTTP 200.",
             }
         )
+
+    if sameas_only:
+        high_citation_platforms = (
+            "reddit.com",
+            "wikipedia.org",
+            "youtube.com",
+            "linkedin.com",
+            "github.com",
+            "trustpilot.com",
+            "g2.com",
+            "capterra.com",
+        )
+        found_third_party_nodes = [
+            link for link in sameas_urls
+            if isinstance(link, str) and any(p in link.lower() for p in high_citation_platforms)
+        ]
+        return {
+            "status": "ok",
+            "site": base,
+            "brand_name": brand_name,
+            "sameas_urls": sameas_urls,
+            "sameas_count": len(sameas_urls),
+            "tier1_anchors": [u for u in sameas_urls if any(td in u.lower() for td in ["wikidata.org", "wikipedia.org", "crunchbase.com"])],
+            "mirror_domains": mirror_domains,
+            "unlinked_social": unlinked_social,
+            "high_citation_nodes": found_third_party_nodes,
+            "findings": findings,
+            "recommendations": recommendations,
+        }
 
     checked = []
     broken = []
@@ -758,6 +869,22 @@ def main():
         dest="candidate_backlinks",
         help="Path to candidate backlinks JSON/CSV or raw JSON string for bounded authority verification",
     )
+    parser.add_argument(
+        "--probe-url",
+        dest="probe_url",
+        help="Probe an arbitrary authority link under safe_fetch and evaluate brand claim substantiation",
+    )
+    parser.add_argument(
+        "--verify-backlink",
+        dest="verify_backlink",
+        help="Probe a specific candidate backlink and verify inbound hyperlink pointing to target",
+    )
+    parser.add_argument(
+        "--sameas-only",
+        dest="sameas_only",
+        action="store_true",
+        help="Extract and audit declared Schema.org sameAs links offline without network probes",
+    )
     parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
     s = args.site.strip()
@@ -775,7 +902,16 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
-    res = audit(base, p.netloc, inv=inv, state_file=args.state, candidate_backlinks=args.candidate_backlinks)
+    res = audit(
+        base,
+        p.netloc,
+        inv=inv,
+        state_file=args.state,
+        candidate_backlinks=args.candidate_backlinks,
+        probe_url=args.probe_url,
+        verify_backlink=args.verify_backlink,
+        sameas_only=args.sameas_only,
+    )
     print(json.dumps(res, indent=2))
 
 

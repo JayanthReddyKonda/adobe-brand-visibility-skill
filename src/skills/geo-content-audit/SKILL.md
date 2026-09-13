@@ -17,6 +17,9 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Offline GEO & Citability Sensor (Standard)** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, page_improvement_plans}` | Primary Offline Inspection |
+| **Target Route Citability Inspection** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --inventory inv.json --url https://example.com/features` | `{status, findings, recommendations, page_improvement_plans}` | Single-Route Citability Audit |
+| **Passage Improvement Plan Extraction** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --inventory inv.json --page-plan-only https://example.com/features` | `{status, url, page_improvement_plan}` | Extract 120-180 Word Plan Only |
+| **Direct Text/Document Citability Analysis** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --analyze-text "Passage text or file path"` | `{status, word_count, citability_score, causal_mechanisms_score, ...}` | Direct Raw Text Analysis |
 | **State-Augmented GEO Audit** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, page_improvement_plans}` | Multi-Turn Stateful Evaluation |
 | **Direct Standalone GEO Probe** | `python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --format json` | `{status, findings, recommendations, page_improvement_plans}` | Standalone Direct Probe |
 
@@ -49,8 +52,11 @@ Audits website content against empirical Generative Engine Optimization (GEO) an
 
 ## Inputs
 
-- `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
+- `--site <url>` (string, optional if `--inventory` or `--analyze-text` provided): Target website URL or domain (e.g., `https://example.com`).
 - `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--url <route>` (string, optional): Target URL route to scope citability evaluation.
+- `--page-plan-only <url>` (string, optional): Extract and output strictly the passage improvement plan for the specified URL.
+- `--analyze-text <string_or_file>` (string, optional): Directly analyze raw text string or markdown file against Princeton KDD 2024 / AutoGEO vectors.
 - `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
 - `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
 

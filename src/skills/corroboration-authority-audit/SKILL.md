@@ -17,6 +17,9 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Offline Authority Prober (Standard)** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json` | `{status, evidence_classes, findings, recommendations}` | Primary Offline Inspection |
+| **Offline sameAs Audit Only** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --sameas-only` | `{status, sameas_urls, tier1_anchors, unlinked_social, ...}` | Fast Offline sameAs Extraction |
+| **Target Authority URL Probe** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --probe-url https://www.wikidata.org/wiki/Q12345` | `{status, target_authority_url, brand_corroborated, latency_ms}` | Single External Authority Probe |
+| **Single Backlink Verification** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --verify-backlink https://external-review.com/post` | `{status, source_url, inbound_links_found, matching_links}` | Single Backlink Inbound Probe |
 | **Candidate Inbound Backlink Verification** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks backlinks.json --format json` | `{status, evidence_classes, findings, recommendations}` | Targeted Backlink Audit |
 | **State-Augmented Authority Audit** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, evidence_classes, findings, recommendations}` | Multi-Turn Stateful Evaluation |
 | **Direct Standalone Authority Probe** | `python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json` | `{status, evidence_classes, findings, recommendations}` | Standalone Direct Probe |
@@ -51,8 +54,11 @@ Verifies external identity-link authority, knowledge graph nodes, and entity cor
 
 - `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
 - `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
-- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
+- `--sameas-only` (flag, optional): Extract and analyze declared Schema.org sameAs links offline without external network probes.
+- `--probe-url <url>` (string, optional): Probe an arbitrary authority link under safe_fetch and evaluate brand claim substantiation.
+- `--verify-backlink <url>` (string, optional): Probe a specific candidate backlink and verify inbound hyperlink pointing to target domain.
 - `--candidate-backlinks <path_or_json>` (string, optional): Path to JSON/CSV file or raw JSON string of candidate inbound backlink URLs to verify.
+- `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
 - `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
 
 ---

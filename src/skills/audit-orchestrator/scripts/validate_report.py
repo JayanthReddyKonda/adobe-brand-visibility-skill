@@ -68,9 +68,8 @@ def validate_type(instance, schema, path="root"):
                 return f"{path}: '{instance}' is not a valid URI (missing scheme or host)"
 
     # P1-89: Disallow NaN and Infinity numeric values
-    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
-        if math.isnan(instance) or math.isinf(instance):
-            return f"{path}: Disallowed NaN or Infinity numeric value"
+    if isinstance(instance, (int, float)) and not isinstance(instance, bool) and (math.isnan(instance) or math.isinf(instance)):
+        return f"{path}: Disallowed NaN or Infinity numeric value"
 
     if "minimum" in schema and isinstance(instance, (int, float)) and instance < schema["minimum"]:
         return f"{path}: Value {instance} is less than minimum {schema['minimum']}"

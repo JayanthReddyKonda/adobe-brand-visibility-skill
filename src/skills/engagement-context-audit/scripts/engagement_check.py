@@ -175,7 +175,7 @@ class SemanticIntentEngine:
         yaml_files = glob.glob(os.path.join(self.references_dir, "*.json"))
         for f in yaml_files:
             try:
-                with open(f, "r") as fp:
+                with open(f, "r", encoding="utf-8") as fp:
                     data = json.load(fp)
                     if "intent_family" in data:
                         self.intents[data["intent_family"]] = data
@@ -1038,31 +1038,30 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
 
     # 7. Value-Driven CTA Copy Check (CRO & SXO best practices)
     weak_ctas = [txt for txt in dom.cta_texts if WEAK_CTA_PATTERNS.match(txt.strip())]
-    if weak_ctas and total_body_words >= 100:
-        if not any(f.get("cause_id") == "CTA_REACHABILITY_FRICTION" for f in findings):
-            findings.append(
-                {
-                    "category": "conversion-continuity",
-                    "title": f"Generic conversion action copy on {page_type or 'landing page'} ('{weak_ctas[0]}')",
-                    "severity": "medium",
-                    "confidence": "high",
-                    "root_cause": f"CTA_REACHABILITY_FRICTION: Primary interactive conversion trigger relies on generic action copy ('{weak_ctas[0]}') without specific outcome value nouns.",
-                    "cause_family": "EXPERIENCE.CONTINUITY",
-                    "id": "CTA_REACHABILITY_FRICTION",
-                    "cause_id": "CTA_REACHABILITY_FRICTION",
-                    "url": url,
-                    "scope": url,
-                    "impact": "AI referral visitors arriving with specific purchase intent experience context scent loss, depressing conversion rates.",
-                    "evidence": f"Found generic CTA trigger ('{weak_ctas[0]}') on {url}.",
-                    "suggested_action": {
-                        "summary": f"Replace generic '{weak_ctas[0]}' CTA with specific outcome copy.",
-                        "technical_fix": "Update CTA button markup to state the delivered value (e.g. 'Start Free Trial', 'Explore Product Catalog', 'View Documentation').",
-                        "creative_fix": "Align CTA verbs with the exact recommendation made by AI search engines.",
-                        "priority": "medium",
-                        "verification": "Confirm CTA text contains descriptive benefit nouns.",
-                    },
-                }
-            )
+    if weak_ctas and total_body_words >= 100 and not any(f.get("cause_id") == "CTA_REACHABILITY_FRICTION" for f in findings):
+        findings.append(
+            {
+                "category": "conversion-continuity",
+                "title": f"Generic conversion action copy on {page_type or 'landing page'} ('{weak_ctas[0]}')",
+                "severity": "medium",
+                "confidence": "high",
+                "root_cause": f"CTA_REACHABILITY_FRICTION: Primary interactive conversion trigger relies on generic action copy ('{weak_ctas[0]}') without specific outcome value nouns.",
+                "cause_family": "EXPERIENCE.CONTINUITY",
+                "id": "CTA_REACHABILITY_FRICTION",
+                "cause_id": "CTA_REACHABILITY_FRICTION",
+                "url": url,
+                "scope": url,
+                "impact": "AI referral visitors arriving with specific purchase intent experience context scent loss, depressing conversion rates.",
+                "evidence": f"Found generic CTA trigger ('{weak_ctas[0]}') on {url}.",
+                "suggested_action": {
+                    "summary": f"Replace generic '{weak_ctas[0]}' CTA with specific outcome copy.",
+                    "technical_fix": "Update CTA button markup to state the delivered value (e.g. 'Start Free Trial', 'Explore Product Catalog', 'View Documentation').",
+                    "creative_fix": "Align CTA verbs with the exact recommendation made by AI search engines.",
+                    "priority": "medium",
+                    "verification": "Confirm CTA text contains descriptive benefit nouns.",
+                },
+            }
+        )
 
     # Deep Post-Citation Engagement Sensors
     viewport_data = compute_viewport_answer_anchoring(dom, " ".join(dom.body_text), page_type, facts)
@@ -1194,35 +1193,34 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
                 h for h in internal_links
                 if not h.startswith(f"/{current_locale}/") and h != f"/{current_locale}" and not h.startswith(f"/{current_locale}?")
             ]
-            if len(leaked_links) / len(internal_links) > 0.7:
-                if not any(f.get("cause_id") == "COMMERCIAL_HANDOFF_DISCONTINUITY" for f in findings):
-                    findings.append(
-                        {
-                            "category": "conversion-continuity",
-                            "title": f"Multilingual navigation links drop /{current_locale}/ locale prefix on {url}",
-                            "severity": "medium",
-                            "confidence": "high",
-                            "root_cause": (
-                                f"COMMERCIAL_HANDOFF_DISCONTINUITY: Arriving visitors at localized route ({url}, locale: '{current_locale}') "
-                                f"encounter {len(leaked_links)}/{len(internal_links)} internal navigation links that omit the /{current_locale}/ prefix. "
-                                "High-intent citation traffic arriving from AI search in a specific language experiences context drop-off when navigation resets to the default language."
-                            ),
-                            "cause_family": "EXPERIENCE.CONTINUITY",
-                            "id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
-                            "cause_id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
-                            "url": url,
-                            "scope": url,
-                            "impact": "Visitors arriving from international AI citations lose language orientation upon clicking internal navigation.",
-                            "evidence": f"Found {len(leaked_links)} unlocalized link(s) on {url} (e.g. '{leaked_links[0]}').",
-                            "suggested_action": {
-                                "summary": f"Preserve the /{current_locale}/ prefix across all internal navigation and CTA links on {url}.",
-                                "technical_fix": f"Update URL generation helper or router to prepend /{current_locale} to internal href attributes.",
-                                "creative_fix": f"Ensure language consistency across product catalog and checkout flows for the '{current_locale}' locale.",
-                                "priority": "medium",
-                                "verification": f"Verify internal navigation links on {url} maintain the /{current_locale}/ prefix.",
-                            },
-                        }
-                    )
+            if (len(leaked_links) / len(internal_links) > 0.7) and not any(f.get("cause_id") == "COMMERCIAL_HANDOFF_DISCONTINUITY" for f in findings):
+                findings.append(
+                    {
+                        "category": "conversion-continuity",
+                        "title": f"Multilingual navigation links drop /{current_locale}/ locale prefix on {url}",
+                        "severity": "medium",
+                        "confidence": "high",
+                        "root_cause": (
+                            f"COMMERCIAL_HANDOFF_DISCONTINUITY: Arriving visitors at localized route ({url}, locale: '{current_locale}') "
+                            f"encounter {len(leaked_links)}/{len(internal_links)} internal navigation links that omit the /{current_locale}/ prefix. "
+                            "High-intent citation traffic arriving from AI search in a specific language experiences context drop-off when navigation resets to the default language."
+                        ),
+                        "cause_family": "EXPERIENCE.CONTINUITY",
+                        "id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+                        "cause_id": "COMMERCIAL_HANDOFF_DISCONTINUITY",
+                        "url": url,
+                        "scope": url,
+                        "impact": "Visitors arriving from international AI citations lose language orientation upon clicking internal navigation.",
+                        "evidence": f"Found {len(leaked_links)} unlocalized link(s) on {url} (e.g. '{leaked_links[0]}').",
+                        "suggested_action": {
+                            "summary": f"Preserve the /{current_locale}/ prefix across all internal navigation and CTA links on {url}.",
+                            "technical_fix": f"Update URL generation helper or router to prepend /{current_locale} to internal href attributes.",
+                            "creative_fix": f"Ensure language consistency across product catalog and checkout flows for the '{current_locale}' locale.",
+                            "priority": "medium",
+                            "verification": f"Verify internal navigation links on {url} maintain the /{current_locale}/ prefix.",
+                        },
+                    }
+                )
 
     return (
         findings,
@@ -1240,13 +1238,24 @@ def audit_page_engagement(html_content, url, page_type="other", state=None, page
     )
 
 
-def audit(base, domain, inv=None, state_file=None, analytics=None):
-    if state_file and os.path.exists(state_file):
+def audit(
+    base,
+    domain,
+    inv=None,
+    state_file=None,
+    analytics=None,
+    *,
+    target_url=None,
+    referrer_query=None,
+    viewport_only=False,
+):
+    state = {}
+    if state_file and isinstance(state_file, (str, bytes, os.PathLike)) and os.path.exists(state_file):
         try:
-            with open(state_file, "r") as f:
-                json.load(f)
+            with open(state_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
         except Exception:
-            pass
+            state = {}
     findings = []
     recommendations = []
     observations = []
@@ -1256,7 +1265,9 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
 
     html_pages = []
     if inv is not None:
-        for p in inv.get("pages", []):
+        for p in (inv.get("pages") or []):
+            if not isinstance(p, dict):
+                continue
             u = p.get("url") or ""
             raw_html = p.get("html") or ""
             if not u or not raw_html:
@@ -1274,6 +1285,70 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
         _status, html, _, _ = safe_fetch(base + "/", timeout=10, max_bytes=2 * 1024 * 1024)
         if html:
             html_pages.append({"url": base + "/", "html": html, "page_type": "homepage"})
+
+    # Custom forensic filter: scope to single target URL
+    if target_url:
+        matched = [
+            p for p in html_pages
+            if p.get("url") == target_url
+            or urlparse(p.get("url", "")).path.rstrip("/") == urlparse(target_url).path.rstrip("/")
+        ]
+        if matched:
+            html_pages = matched
+        else:
+            return {
+                "status": "inconclusive",
+                "error": f"URL '{target_url}' not found in inventory HTML pages",
+                "available_urls": [p.get("url") for p in html_pages[:10]],
+            }
+
+    # Custom forensic parameter: evaluate intent-to-landing scent for a simulated AI referral query
+    if referrer_query:
+        query_stopwords = {
+            "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "with",
+            "by", "about", "against", "between", "into", "through", "during", "before",
+            "after", "above", "below", "from", "up", "down", "is", "are", "was", "were",
+            "be", "been", "being", "have", "has", "had", "do", "does", "did", "what",
+            "who", "how", "why", "where", "when", "which", "can", "could", "should",
+            "would", "of", "it", "its", "this", "that",
+        }
+        tokens = [
+            w.lower()
+            for w in re.findall(r"\b\w+\b", referrer_query)
+            if len(w) > 2 and w.lower() not in query_stopwords
+        ]
+        evaluations = []
+        for p in html_pages:
+            p_url = p.get("url", "")
+            p_html = p.get("html", "")
+            dom = EngagementDOMParser()
+            try:
+                dom.feed(p_html)
+            except Exception:
+                pass
+            h1_val = dom.h1_list[0] if dom.h1_list else ""
+            hero_snippet = " ".join(dom.paragraphs[:3]) if dom.paragraphs else " ".join(dom.body_text[:100])
+            combined_eval_text = f"{p.get('title', '')} {h1_val} {hero_snippet}".lower()
+            matched = [t for t in tokens if t in combined_eval_text]
+            missing = [t for t in tokens if t not in combined_eval_text]
+            score = round(len(matched) / max(len(tokens), 1), 2)
+            evaluations.append({
+                "url": p_url,
+                "h1": h1_val,
+                "title": p.get("title", ""),
+                "scent_score": score,
+                "matched_terms": matched,
+                "missing_terms": missing,
+                "verdict": "strong_scent" if score >= 0.7 else ("moderate_scent" if score >= 0.4 else "intent_mismatch"),
+                "hero_snippet": hero_snippet[:200] + ("..." if len(hero_snippet) > 200 else ""),
+            })
+        return {
+            "status": "ok",
+            "referrer_query": referrer_query,
+            "query_tokens": tokens,
+            "pages_evaluated": len(evaluations),
+            "evaluations": evaluations,
+        }
 
     site_type = infer_site_type(html_pages)[0]
 
@@ -1368,6 +1443,7 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
 
         findings.extend(p_findings)
         recommendations.extend(p_recs)
+        p_data["url"] = p.get("url", "")
         page_metrics.append(p_data)
 
     # 6. AI Buying Agent Readiness: Machine-Readable Pricing Manifest (/pricing.md)
@@ -1407,7 +1483,9 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
         )
 
     # Check J9: 404 Recovery Affordances Check
-    for p in (inv.get("pages", []) if inv else []):
+    for p in ((inv.get("pages") or []) if isinstance(inv, dict) else []):
+        if not isinstance(p, dict):
+            continue
         if p.get("status") == 404 or "/404" in str(p.get("url", "")):
             p_html = p.get("html", "")
             err_links = []
@@ -1520,7 +1598,51 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
         ),
     }
 
-    return {
+    if viewport_only:
+        viewport_records = []
+        for pm in page_metrics:
+            viewport_records.append({
+                "url": pm.get("url", ""),
+                "h1_present": pm.get("h1", False),
+                "viewport_anchored": pm.get("viewport_anchored", False),
+                "cta_reachability_score": pm.get("cta_reachability_score", 0.0),
+                "information_scent_score": pm.get("information_scent_score", 0.0),
+                "ari_readability_score": pm.get("ari_readability_score", 0.0),
+            })
+        viewport_findings = [
+            f
+            for f in findings
+            if f.get("id") in (
+                "UNCORROBORATED_LEAD_PROPOSITION",
+                "EXCESSIVE_HERO_READING_FRICTION",
+                "MISSING_VIEWPORT_ANSWER_ANCHOR",
+                "UNREACHABLE_COMMERCIAL_CTA",
+                "LOW_INFORMATION_SCENT",
+            )
+        ]
+        return {
+            "status": "ok",
+            "mode": "viewport_only",
+            "viewport_records": viewport_records,
+            "findings": viewport_findings,
+            "recommendations": [
+                r
+                for r in recommendations
+                if any(k in r.get("summary", "").lower() for k in ("viewport", "cta", "h1", "hero"))
+            ],
+            "summary": {
+                "total_pages": len(viewport_records),
+                "viewport_anchored_count": sum(1 for r in viewport_records if r["viewport_anchored"]),
+                "average_cta_reachability": round(
+                    sum(r["cta_reachability_score"] for r in viewport_records) / max(len(viewport_records), 1), 2
+                ),
+                "average_information_scent": round(
+                    sum(r["information_scent_score"] for r in viewport_records) / max(len(viewport_records), 1), 2
+                ),
+            },
+        }
+
+    result_payload = {
         "status": "ok",
         "engagement_mode": mode,
         "analytics_summary": analytics_summary,
@@ -1553,6 +1675,19 @@ def audit(base, domain, inv=None, state_file=None, analytics=None):
         "limitations": limitations,
     }
 
+    if state_file and isinstance(state_file, (str, bytes, os.PathLike)):
+        try:
+            state["engagement_summary"] = engagement_continuity_summary
+            import tempfile as _tf
+            _fd, _tmp = _tf.mkstemp(dir=os.path.dirname(os.path.abspath(state_file)))
+            with os.fdopen(_fd, "w", encoding="utf-8") as f:
+                json.dump(state, f)
+            os.replace(_tmp, state_file)
+        except Exception:
+            pass
+
+    return result_payload
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1567,6 +1702,9 @@ def main():
     )
     parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
     parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--url", help="Target URL route to scope engagement and continuity evaluation")
+    parser.add_argument("--referrer-query", dest="referrer_query", help="Simulate AI search citation referral query and test intent-to-landing scent")
+    parser.add_argument("--viewport-only", dest="viewport_only", action="store_true", help="Inspect strictly above-the-fold viewport elements and CTA reachability")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument(
         "--analytics",
@@ -1589,7 +1727,16 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
-    res = audit(base, p.netloc, inv=inv, state_file=args.state, analytics=args.analytics)
+    res = audit(
+        base,
+        p.netloc,
+        inv=inv,
+        state_file=args.state,
+        analytics=args.analytics,
+        target_url=args.url,
+        referrer_query=args.referrer_query,
+        viewport_only=args.viewport_only,
+    )
     print(json.dumps(res, indent=2))
 
 

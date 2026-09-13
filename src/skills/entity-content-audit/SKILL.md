@@ -17,6 +17,9 @@ allowed-tools:
 | Component / Task | Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
 | **Offline Entity & Schema Sensor (Standard)** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Primary Offline Inspection |
+| **Target Route Entity Inspection** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --url https://example.com/pricing` | `{status, target_url, declared_schemas, answerability_index}` | Single-Route Entity Deep-Dive |
+| **Schema Type Filtering** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --schema-type Product` | `{status, schema_type_filter, matching_entities_count, ...}` | Filter by Schema.org Type |
+| **Fast Answerability Index Only** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --answerability-only` | `{status, site_average_score, page_answerability_evaluations}` | Answerability Index Rapid Extraction |
 | **State-Augmented Entity Audit** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --state state.json --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Multi-Turn Stateful Evaluation |
 | **Direct Standalone Entity Probe** | `python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json` | `{status, findings, recommendations, entity_snapshot, coverage}` | Standalone Direct Probe |
 
@@ -50,6 +53,9 @@ Evaluates machine-explicit entity identity, Schema.org structured data, and comm
 
 - `--site <url>` (string, required): Target website URL or domain (e.g., `https://example.com`).
 - `--inventory <path>` (string, optional): Path to pre-acquired canonical site inventory JSON payload (`inv.json`).
+- `--url <route>` (string, optional): Target URL route to isolate Schema.org JSON-LD extraction and Answerability Index inspection.
+- `--schema-type <type>` (string, optional): Filter entities by specific Schema.org type (e.g. `Product`, `Organization`, `Service`).
+- `--answerability-only` (flag, optional): Fast extraction of the 7-attribute commercial Answerability Index across routes.
 - `--state <path>` (string, optional): Path to global stateful knowledge graph JSON file.
 - `--format <json|markdown>` (enum, optional, default: `json`): Machine-readable output serialization format.
 

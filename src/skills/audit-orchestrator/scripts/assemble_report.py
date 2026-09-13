@@ -17,16 +17,16 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 try:
-    from .plan import LABELS, plan, infer_finding_difficulty, calculate_priority_index  # type: ignore
+    from .plan import LABELS, calculate_priority_index, infer_finding_difficulty, plan  # type: ignore
     from .validate_report import validate_report_dict  # type: ignore
 except (ImportError, ValueError):
     try:
-        from plan import LABELS, plan, infer_finding_difficulty, calculate_priority_index  # type: ignore
+        from plan import LABELS, calculate_priority_index, infer_finding_difficulty, plan  # type: ignore
         from validate_report import validate_report_dict  # type: ignore
     except ImportError:
         if str(SCRIPT_DIR) not in sys.path:
             sys.path.insert(0, str(SCRIPT_DIR))
-        from plan import LABELS, plan, infer_finding_difficulty, calculate_priority_index  # type: ignore
+        from plan import LABELS, calculate_priority_index, infer_finding_difficulty, plan  # type: ignore
         from validate_report import validate_report_dict  # type: ignore
 
 try:
@@ -144,14 +144,14 @@ def sort_tasks(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     done: set[str] = set()
     output: List[Dict[str, Any]] = []
     for item in items:
-        for dep in item.get("depends_on", []):
+        for dep in (item.get("depends_on") or []):
             if dep not in pending:
                 raise ValueError("Unknown prerequisite: " + dep)
             if queues.get(pending[dep].get("queue", "confirmed"), 0) > queues.get(item.get("queue", "confirmed"), 0):
                 raise ValueError("Unresolved cross-queue prerequisite; move dependent to investigation")
 
     while pending:
-        available = [i for i in pending.values() if set(i.get("depends_on", [])) <= done]
+        available = [i for i in pending.values() if set(i.get("depends_on") or []) <= done]
         if not available:
             raise ValueError("Dependency cycle")
         first = min(available, key=key)
@@ -167,6 +167,8 @@ def validate_report(report: Dict[str, Any]) -> bool:
     valid, errors = validate_report_dict(report, str(schema_path))
     if not valid:
         raise ValueError("; ".join(errors))
+
+
 def resolve_dag_node(cid: str, cat: str) -> str:
     """Resolve exact Causal DAG layer (RETRIEVAL, RENDERING, ENTITY, FACTS, CORROBORATION, GEO_CITABILITY, ENGAGEMENT)."""
     cid_u = str(cid or "").upper()
@@ -305,7 +307,7 @@ def assemble(
 ) -> Dict[str, Any]:
     """Assemble final synthesized report from candidate findings and collected inventory."""
     artifacts = {a["artifact"]: a for a in records if isinstance(a, dict) and a.get("artifact")}
-    artifacts.update({a["artifact"]: a for a in (browser or {}).get("captures", []) if isinstance(a, dict) and a.get("artifact")})
+    artifacts.update({a["artifact"]: a for a in ((browser or {}).get("captures") or []) if isinstance(a, dict) and a.get("artifact")})
     catalogue = {c["check_id"]: c for c in checks}
     observations: List[Dict[str, Any]] = []
     dropped: List[Dict[str, Any]] = []
@@ -751,4 +753,3 @@ assemble_report = assemble
 
 if __name__ == "__main__":
     main()
-
