@@ -13,20 +13,20 @@ allowed-tools:
 
 # Audit Orchestrator (Entrypoint Skill)
 
-| Component | Execution Command | Output Contract | Role / Mode |
+| Component | Streamlined Execution Command | Output Contract | Role / Mode |
 |---|---|---|---|
-| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py --site <url> --output inv.json --format json` | Canonical Site Inventory JSON (`inv.json`) | Acquisition |
-| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Mode** |
-| **Selective Specialist Telemetry** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --telemetry --skills discoverability,entity,geo` | Filtered Sensor Telemetry Payload | Scoped Multi-Skill Telemetry |
-| **Agent Cognitive Review Synthesizer** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --inventory inv.json --review review.json --output report.json` | Causal-Gated & Scored Draft-07 JSON Report | **Primary Synthesis Mode** |
-| **Dynamic Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py --site <url> --inventory inv.json` | Tailored Knowledge Base & Remediation Briefing | Context Compilation |
-| **Scoped Archetype & Topic Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py --inventory inv.json --archetype saas --topic retrieval` | Scoped Reference Briefing & Cheatsheets | Targeted Archetype/Topic Context |
-| **Remediation Priority Ranker** | `python3 skills/audit-orchestrator/scripts/plan.py --severity <1-4> --difficulty <1-5>` or `python3 skills/audit-orchestrator/scripts/plan.py --report report.json` | Task Priority Index & Queue Disposition | Remediation Planning |
-| **Global Findings Ordering & Plan** | `python3 skills/audit-orchestrator/scripts/plan.py --rank-findings findings.json` | Ranked findings with DAG sorting, priority_rank, priority_index | Causal Findings Ordering |
-| **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py --site <url> --inventory inv.json --format json` | Specialist Domain Measurements | Targeted Deep Inspection |
-| **Unified Audit Engine (Collect/Finalize/Validate)** | `python3 skills/audit-orchestrator/scripts/audit.py collect <url> --out output/audit` | `bundle.json` + Baseline `audit-report.json` | Modular Pipeline |
-| **Headless CI Runner (Automated Testing ONLY)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --format json --baseline-only` | Baseline Draft-07 Validated Report JSON | **CI/CD Only (No Agent Shortcut)** |
-| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py < report.json` | Exit Code 0 (pass) or non-zero (fail) (exit code 2 on failure) | Verification Gate |
+| **Web Scraper (Single-Pass Acquisition)** | `python3 skills/web-scraper/scripts/acquire_inventory.py <url> -o inv.json` | Canonical Site Inventory JSON (`inv.json`) | Bounded Acquisition |
+| **Telemetry Aggregator (Empirical Grid)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py -i inv.json -t -o telemetry.json` | Aggregated Sensor Telemetry & Inventory Metrics | **Primary AI Agent Telemetry Mode** |
+| **Selective Specialist Telemetry** | `python3 skills/audit-orchestrator/scripts/orchestrator.py -i inv.json -t --skills discoverability,entity,geo -o telemetry.json` | Filtered Sensor Telemetry Payload | Scoped Multi-Skill Telemetry |
+| **Agent Cognitive Review Synthesizer** | `python3 skills/audit-orchestrator/scripts/orchestrator.py -i inv.json -r review.json --deliverable -o report.json` | Clean Scored Draft-07 JSON Client Deliverable | **Primary Deliverable Synthesis Mode** |
+| **Dynamic Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py -i inv.json -o briefing.md` | Tailored Knowledge Base & Remediation Briefing | Markdown Context Compilation |
+| **Structured Context Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py -i inv.json -o briefing.json` | Structured Signals & Rules Reference (JSON) | Structured Context Compilation |
+| **Scoped Archetype & Topic Bundler** | `python3 skills/audit-orchestrator/scripts/bundle_context.py -i inv.json --archetype saas --topic retrieval -o briefing.md` | Scoped Reference Briefing & Cheatsheets | Targeted Archetype/Topic Context |
+| **Remediation Priority Roadmap (JSON)** | `python3 skills/audit-orchestrator/scripts/plan.py -i report.json --top 5 -o plan.json` | Ranked JSON Roadmap with Priority Index | Remediation Planning (JSON) |
+| **Remediation Priority Roadmap (Markdown)**| `python3 skills/audit-orchestrator/scripts/plan.py -i report.json --top 5 -o plan.md` | Ranked Markdown Implementation Roadmap | Remediation Planning (Markdown) |
+| **Specialist Sensor Inspection** | `python3 skills/<skill>/scripts/<check>.py -i inv.json -o sensor.json` | Specialist Domain Measurements | Targeted Deep Inspection |
+| **Headless CI Runner (Automated Testing ONLY)** | `python3 skills/audit-orchestrator/scripts/orchestrator.py --site <url> --baseline-only` | Baseline Draft-07 Validated Report JSON | **CI/CD Only (No Agent Shortcut)** |
+| **Draft-07 Schema Validation Gate** | `python3 skills/audit-orchestrator/scripts/validate_report.py report.json` | Exit Code 0 (pass) or non-zero (fail) | Verification Gate |
 
 > [!IMPORTANT]
 > **ANTI-SHORTCUT DIRECTIVE: AGENT REASONING SUPREMACY & SENSOR-BRAIN CONTRACT**
@@ -355,7 +355,8 @@ Act as the **Cognitive Reasoning Engine** to synthesize a high-signal, unbloated
     # Option C: Finalize via unified multi-sensor runner
     python3 skills/audit-orchestrator/scripts/audit.py finalize --bundle output/audit/bundle.json --review review.json --out report.json
     ```
-    All options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, and causal gating. Adding `--clean` emits only the high-signal findings, scores, and proactive actions required for engineering and executive execution.
+
+    All options execute the unified report synthesis engine (`assemble_report.py::assemble()`), populating multi-dimensional readiness, composite scores, letter grades (A-F), dimension statuses, business archetype, and causal gating. Adding `--clean` emits only the high-signal findings, summary, and proactive actions required for engineering and executive execution, omitting ambiguous heuristic scores and pipeline debug traces (pass `--include-scores` if heuristic scoring is explicitly required).
 
 
 

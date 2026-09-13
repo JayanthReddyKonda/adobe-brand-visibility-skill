@@ -2875,7 +2875,18 @@ class WebAuditEngine:
             )
             return self._build_evidence_aggregate()
 
-        # 2. Probe AI discovery manifests
+        # 2. Always fetch and process seed page first to guarantee primary inventory acquisition
+        seed_page = self._fetch_and_process_page(self.site_url, depth=0)
+        if seed_page:
+            self.pages.append(seed_page)
+            self.observations.extend(seed_page.observations)
+            self.all_facts.extend(seed_page.facts)
+            self.all_claims.extend(seed_page.claims)
+            for link in seed_page.links:
+                if link.is_internal and LinkProcessor.is_crawlable_html_url(link.href):
+                    self.frontier.push(link.href, depth=1, source_url=self.site_url)
+
+        # 3. Probe AI discovery manifests
         try:
             llms_res = self.fetcher.fetch(urljoin(base_origin, "/llms.txt"), timeout=3.0)
             if llms_res.status == 200:
@@ -2919,7 +2930,7 @@ class WebAuditEngine:
         except Exception:
             pass
 
-        # 3. Discover XML sitemaps
+        # 4. Discover XML sitemaps
         sitemap_discovery = SitemapDiscovery(
             fetch_func=lambda u: self.fetcher.fetch(u, timeout=5.0).body_bytes.decode("utf-8", errors="replace"),
             max_sitemaps=6,
@@ -2928,14 +2939,13 @@ class WebAuditEngine:
         sitemap_seed_list = declared_sitemaps or [urljoin(base_origin, "/sitemap.xml")]
         sitemap_urls = sitemap_discovery.discover(sitemap_seed_list)
 
-        # 4. Initialize frontier
-        self.frontier.push(self.site_url, depth=0)
+        # 5. Populate frontier with sitemap URLs
         for sm_url in sitemap_urls:
             norm_sm = LinkProcessor.normalize_url(sm_url.loc)
             if norm_sm and LinkProcessor.is_same_origin(base_origin, norm_sm) and LinkProcessor.is_crawlable_html_url(norm_sm):
                 self.frontier.push(norm_sm, depth=1, is_sitemap_declared=True)
 
-        # 5. Core crawl loop
+        # 6. Core crawl loop
         while not self.frontier.is_empty() and self.budget.can_fetch_page():
             item = self.frontier.pop()
             if not item:

@@ -109,9 +109,22 @@ Execute the deterministic extraction script using the shared inventory and `--fo
 python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format json
 ```
 
-Direct standalone execution:
+Specialist forensic options:
 ```bash
-python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --format json
+# Isolate RFC 9309 crawler permission matrix only
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --matrix-only
+
+# Isolate specific diagnostic subsystem (access, rendering, canonical, sitemaps)
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --subsystem access
+
+# Test specific bot permissions (e.g. OAI-SearchBot, Claude-SearchBot, PerplexityBot)
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --bot PerplexityBot
+
+# Inspect specific target URL route
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --url https://example.com/pricing
+
+# Emit readable markdown summary to file
+python3 skills/discoverability-audit/scripts/discoverability_check.py --site https://example.com --inventory inv.json --format markdown -o output.md
 ```
 
 ---

@@ -902,8 +902,8 @@ def main():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
-    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (optional if --inventory is provided)")
+    parser.add_argument("--inventory", "-i", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument(
         "--candidate-backlinks",
@@ -926,13 +926,20 @@ def main():
         action="store_true",
         help="Extract and audit declared Schema.org sameAs links offline without network probes",
     )
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
+    parser.add_argument(
+        "--authority-threshold",
+        dest="authority_threshold",
+        type=float,
+        default=50.0,
+        help="Minimum domain authority scoring threshold (default: 50.0)",
+    )
+    parser.add_argument("--format", choices=["json", "markdown"], default=None, help="Output serialization format (default: auto-inferred or json)")
+    parser.add_argument("--output", "-o", help="Destination path to write output JSON/Markdown (optional, defaults to stdout)")
     args = parser.parse_args()
-    s = args.site.strip()
-    if not s.startswith("http"):
-        s = "https://" + s
-    p = urlparse(s)
-    base = f"{p.scheme}://{p.netloc}"
+
+    if args.format is None:
+        args.format = "markdown" if args.output and args.output.lower().endswith((".md", ".markdown")) else "json"
+
     inv = None
     if args.inventory:
         if os.path.exists(args.inventory):
@@ -943,6 +950,18 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
+
+    site_str = args.site
+    if not site_str and isinstance(inv, dict):
+        site_str = inv.get("base_url") or inv.get("site")
+    if not site_str:
+        parser.error("Either --site / -s or a valid --inventory / -i JSON containing site information is required.")
+
+    s = site_str.strip()
+    if not s.startswith("http"):
+        s = "https://" + s
+    p = urlparse(s)
+    base = f"{p.scheme}://{p.netloc}"
     res = audit(
         base,
         p.netloc,
@@ -953,10 +972,13 @@ def main():
         verify_backlink=args.verify_backlink,
         sameas_only=args.sameas_only,
     )
-    if args.format == "markdown":
-        print(format_markdown_summary(res, domain=p.netloc))
+    formatted = format_markdown_summary(res, domain=p.netloc) if args.format == "markdown" else json.dumps(res, indent=2)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(formatted)
+            f.write("\n")
     else:
-        print(json.dumps(res, indent=2))
+        print(formatted)
 
 
 if __name__ == "__main__":

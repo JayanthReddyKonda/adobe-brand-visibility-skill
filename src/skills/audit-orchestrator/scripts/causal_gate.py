@@ -973,7 +973,7 @@ def main():
     parser.add_argument("--telemetry", help="Path to telemetry JSON file")
     parser.add_argument("--findings", help="Path to findings JSON file (applies causal suppression)")
     parser.add_argument("--inventory", help="Path to site inventory JSON file")
-    parser.add_argument("--output", help="Path to write output JSON (optional, defaults to stdout)")
+    parser.add_argument("--output", "-o", help="Path to write output JSON (optional, defaults to stdout)")
     args = parser.parse_args()
 
     inv = {}

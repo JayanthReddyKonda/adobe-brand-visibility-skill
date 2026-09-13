@@ -1591,33 +1591,31 @@ def main():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=False, default="", help="Target website URL or domain (e.g. https://example.com)")
-    parser.add_argument("--inventory", required=False, help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (optional if --inventory is provided)")
+    parser.add_argument("--inventory", "-i", required=False, help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
     parser.add_argument("--url", help="Target URL route to scope citability evaluation")
     parser.add_argument("--page-plan-only", dest="page_plan_only", help="Extract and output only the passage improvement plan for the specified URL")
     parser.add_argument("--analyze-text", dest="analyze_text", help="Analyze raw text string or markdown file directly against Princeton KDD 2024 / AutoGEO vectors")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
+    parser.add_argument("--format", choices=["json", "markdown"], default=None, help="Output serialization format (default: auto-inferred or json)")
+    parser.add_argument("--output", "-o", help="Destination path to write output JSON/Markdown (optional, defaults to stdout)")
     args = parser.parse_args()
+
+    if args.format is None:
+        args.format = "markdown" if args.output and args.output.lower().endswith((".md", ".markdown")) else "json"
 
     if args.analyze_text:
         res = audit("", "", None, state_file=args.state, analyze_text=args.analyze_text)
-        if args.format == "markdown":
-            print(format_markdown_summary(res))
+        formatted = format_markdown_summary(res) if args.format == "markdown" else json.dumps(res, indent=2)
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(formatted)
+                f.write("\n")
         else:
-            print(json.dumps(res, indent=2))
+            print(formatted)
         return
 
-    if not args.site and not args.inventory:
-        parser.error("Either --site or --inventory (or --analyze-text) must be provided.")
-
-    s = (args.site or "").strip()
-    if s and not s.startswith("http"):
-        s = "https://" + s
-    p = urlparse(s) if s else None
-    base = f"{p.scheme}://{p.netloc}" if p and p.netloc else ""
-    domain = p.netloc if p and p.netloc else ""
-
+    inv = None
     if args.inventory:
         if os.path.exists(args.inventory):
             try:
@@ -1627,7 +1625,22 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
-    else:
+
+    site_str = args.site
+    if not site_str and isinstance(inv, dict):
+        site_str = inv.get("base_url") or inv.get("site")
+
+    if not site_str and not inv:
+        parser.error("Either --site / -s or a valid --inventory / -i JSON (or --analyze-text) must be provided.")
+
+    s = (site_str or "").strip()
+    if s and not s.startswith("http"):
+        s = "https://" + s
+    p = urlparse(s) if s else None
+    base = f"{p.scheme}://{p.netloc}" if p and p.netloc else ""
+    domain = p.netloc if p and p.netloc else ""
+
+    if not inv:
         status, html, _, _ = safe_fetch(base)
         if status == 200 and html:
             inv = {
@@ -1648,10 +1661,13 @@ def main():
         page_plan_only=args.page_plan_only,
         analyze_text=args.analyze_text,
     )
-    if args.format == "markdown":
-        print(format_markdown_summary(res, domain=domain))
+    formatted = format_markdown_summary(res, domain=domain) if args.format == "markdown" else json.dumps(res, indent=2)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(formatted)
+            f.write("\n")
     else:
-        print(json.dumps(res, indent=2))
+        print(formatted)
 
 
 if __name__ == "__main__":

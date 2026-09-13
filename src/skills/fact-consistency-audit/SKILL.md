@@ -120,9 +120,25 @@ Execute the fact ledger and consistency script with `--format json`:
 python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format json
 ```
 
-Direct standalone execution:
+Specialist forensic options:
 ```bash
-python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --format json
+# Filter findings strictly to verified contradictions and direct conflicts
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --conflict-only
+
+# Filter fact checks by specific attribute category (pricing, contact, legal, specs)
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --attribute pricing
+
+# Search first-party fact ledger for specific product, plan, or term
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --query "pricing"
+
+# Perform head-to-head comparison of extracted facts between two routes
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --compare-urls https://example.com/ https://example.com/pricing
+
+# Cross-reference observed AI assistant responses against first-party facts
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --responses observations.json
+
+# Emit readable markdown summary to file
+python3 skills/fact-consistency-audit/scripts/fact_consistency_check.py --site https://example.com --inventory inv.json --format markdown -o output.md
 ```
 
 ---

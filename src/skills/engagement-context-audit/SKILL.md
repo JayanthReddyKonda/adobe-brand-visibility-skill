@@ -121,14 +121,22 @@ Execute the engagement and intent continuity script with `--format json`:
 python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format json
 ```
 
-With optional first-party analytics ingestion:
+Specialist forensic options:
 ```bash
-python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --analytics analytics.json --format json
-```
+# Simulate AI search referral query to evaluate intent scent and landing alignment
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --referrer-query "best enterprise security software"
 
-Direct standalone execution:
-```bash
-python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --format json
+# Inspect strictly above-the-fold viewport elements (top 600px / 150w) and CTA reachability
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --viewport-only
+
+# Scope continuity evaluation to specific target route
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --url https://example.com/landing
+
+# Correlate heuristic UX friction with first-party route analytics
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --analytics analytics.json --format json
+
+# Emit readable markdown summary
+python3 skills/engagement-context-audit/scripts/engagement_check.py --site https://example.com --inventory inv.json --format markdown
 ```
 
 ---

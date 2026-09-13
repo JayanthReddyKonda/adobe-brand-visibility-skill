@@ -187,6 +187,49 @@ class TestOrchestratorScript(unittest.TestCase):
         cids = [f.get("cause_id") or f.get("id") for f in findings]
         self.assertIn("FIRST_PARTY_FACT_CONFLICT", cids)
 
+    def test_orchestrator_clean_mode_execution(self):
+        """Verify orchestrator --clean flag emits high-signal report omitting ambiguous scores."""
+        res = run_skill_script(
+            "audit-orchestrator",
+            "orchestrator.py",
+            ["--site", "https://example.com", "--inventory", self.healthy_inv_path, "--format", "json", "--clean"],
+        )
+        self.assertEqual(res.returncode, 0, f"Orchestrator failed: {res.stderr}")
+        report = res.json
+        self.assertNotIn("readiness", report)
+        self.assertIn("site", report)
+        self.assertIn("summary", report)
+        self.assertIn("findings", report)
+        self.assertIn("proactive_actions", report)
+        val_res = run_validator(report)
+        self.assertEqual(val_res.returncode, 0, f"Schema validation failed on clean report: {val_res.stderr}")
+
+        # Test --include-scores flag
+        res_scores = run_skill_script(
+            "audit-orchestrator",
+            "orchestrator.py",
+            ["--site", "https://example.com", "--inventory", self.healthy_inv_path, "--format", "json", "--clean", "--include-scores"],
+        )
+        self.assertEqual(res_scores.returncode, 0)
+        report_scores = res_scores.json
+        self.assertIn("readiness", report_scores)
+
+    def test_orchestrator_deliverable_and_site_inference(self):
+        """Verify streamlined orchestrator invocation with site auto-inferred from inventory and --deliverable flag."""
+        res = run_skill_script(
+            "audit-orchestrator",
+            "orchestrator.py",
+            ["-i", self.healthy_inv_path, "--deliverable"],
+        )
+        self.assertEqual(res.returncode, 0, f"Orchestrator streamlined execution failed: {res.stderr}")
+        report = res.json
+        self.assertIn("readiness", report)
+        self.assertEqual(report.get("site"), "https://example.com")
+        self.assertIn("findings", report)
+        self.assertIn("proactive_actions", report)
+        val_res = run_validator(report)
+        self.assertEqual(val_res.returncode, 0, f"Schema validation failed on deliverable report: {val_res.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()

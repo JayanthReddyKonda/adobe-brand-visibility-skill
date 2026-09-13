@@ -119,9 +119,19 @@ Execute the deterministic GEO evaluation script using the shared inventory and `
 python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
-Direct standalone execution:
+Specialist forensic options:
 ```bash
-python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --format json
+# Extract deterministic 120-180 word passage improvement plan for specific URL
+python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --page-plan-only https://example.com/features
+
+# Scope citability evaluation to specific route
+python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --url https://example.com/pricing
+
+# Score raw text or draft copywriting against Princeton KDD 2024 / AutoGEO vectors
+python3 skills/geo-content-audit/scripts/geo_content_check.py --analyze-text "According to our 2025 benchmark, throughput increased by 42% because our pipeline bypasses serialization overhead."
+
+# Emit readable markdown summary
+python3 skills/geo-content-audit/scripts/geo_content_check.py --site https://example.com --inventory inv.json --format markdown
 ```
 
 ---

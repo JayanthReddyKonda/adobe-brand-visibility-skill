@@ -137,14 +137,20 @@ def main() -> None:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
+    parser.add_argument("site_pos", nargs="?", default=None, metavar="SITE", help="Target website URL or domain")
+    parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (e.g. https://example.com)")
     parser.add_argument("--output", "-o", help="Destination path to write acquired inventory JSON (e.g. inv.json)")
-    parser.add_argument("--max-pages", "-p", type=int, default=15, help="Maximum pages to acquire (default: 15)")
-    parser.add_argument("--timeout", "-t", type=float, default=30.0, help="Acquisition timeout in seconds (default: 30.0)")
+    parser.add_argument("--max-pages", "-m", "-p", type=int, default=15, help="Maximum pages to acquire (default: 15)")
+    parser.add_argument("--timeout", "-t", type=float, default=45.0, help="Acquisition timeout in seconds (default: 45.0)")
+    parser.add_argument("--concurrency", "-c", type=int, default=1, help="Max concurrent acquisition workers (default: 1)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output serialization format (default: json)")
     args = parser.parse_args()
 
-    s = args.site.strip()
+    raw_site = args.site or args.site_pos
+    if not raw_site:
+        parser.error("Target website URL is required (provide positionally or via --site / -s)")
+
+    s = raw_site.strip()
     if not s.startswith(("http://", "https://")):
         base_url = f"https://{s.split('/')[0]}"
     else:

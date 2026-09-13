@@ -120,14 +120,25 @@ Execute the authority link verification script with `--format json`:
 python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format json
 ```
 
-With candidate backlinks verification:
+Specialist forensic options:
 ```bash
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
-```
+# Set minimum authority threshold for filtering backlink authority
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --authority-threshold 60.0
 
-Direct standalone execution:
-```bash
-python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --format json
+# Extract declared sameAs identity links offline without network probes
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --sameas-only
+
+# Probe specific external authority anchor under SSRF protection
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --probe-url https://www.wikidata.org/wiki/Q12345 --site https://example.com
+
+# Verify bounded inbound backlink from authoritative publication
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --verify-backlink https://techcrunch.com/article --site https://example.com
+
+# Pass candidate backlinks file
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --candidate-backlinks candidate_backlinks.json --format json
+
+# Emit readable markdown summary to file
+python3 skills/corroboration-authority-audit/scripts/corroboration_check.py --site https://example.com --inventory inv.json --format markdown -o output.md
 ```
 
 ---

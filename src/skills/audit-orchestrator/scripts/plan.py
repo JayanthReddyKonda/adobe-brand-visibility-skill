@@ -61,12 +61,20 @@ def main():
     parser = argparse.ArgumentParser(description="Remediation planning and priority index calculator.")
     parser.add_argument("--finding", help="Path to finding JSON file or inline JSON string")
     parser.add_argument("--rule", help="Path to rule/check JSON file or inline JSON string (optional)")
-    parser.add_argument("--report", help="Path to report JSON file to rank all findings")
+    parser.add_argument("--report", "--input", "-i", dest="report", help="Path to report JSON file to rank all findings")
     parser.add_argument("--rank-findings", dest="rank_findings", help="Path to findings JSON file or inline JSON string to rank with causal DAG order and justifications")
     parser.add_argument("--severity", type=int, choices=[1, 2, 3, 4], help="Severity level (1=low, 2=medium, 3=high, 4=critical)")
     parser.add_argument("--difficulty", type=int, choices=[1, 2, 3, 4, 5], help="Difficulty level (1=easiest, 5=hardest)")
-    parser.add_argument("--output", help="Path to write output JSON (optional, defaults to stdout)")
+    parser.add_argument("--format", choices=["json", "markdown"], default=None, help="Output format (default: auto-inferred from output or json)")
+    parser.add_argument("--output", "-o", help="Path to write output JSON/Markdown (optional, defaults to stdout)")
+    parser.add_argument("--top", "-n", type=int, default=None, help="Limit output to top N ranked findings (optional)")
     args = parser.parse_args()
+
+    if args.format is None:
+        if args.output and args.output.lower().endswith((".md", ".markdown")):
+            args.format = "markdown"
+        else:
+            args.format = "json"
 
     formatted_output = ""
 
@@ -101,7 +109,15 @@ def main():
                 "queue": f.get("queue", "confirmed"),
             })
         ranked.sort(key=lambda x: x["priority_index"], reverse=True)
-        formatted_output = json.dumps({"total_ranked": len(ranked), "roadmap": ranked}, indent=2)
+        if args.top is not None and args.top > 0:
+            ranked = ranked[:args.top]
+        if args.format == "markdown":
+            lines = [f"# Priority Remediation Roadmap ({len(ranked)} items)\n"]
+            for r_idx, r in enumerate(ranked, 1):
+                lines.append(f"{r_idx}. **[{str(r.get('severity', 'medium')).upper()}] {r.get('id', 'F')}: {r.get('title', '')}** (Priority Index: {r.get('priority_index')}, Difficulty: {r.get('difficulty')}/5)")
+            formatted_output = "\n".join(lines) + "\n"
+        else:
+            formatted_output = json.dumps({"total_ranked": len(ranked), "roadmap": ranked}, indent=2)
 
     elif args.rank_findings:
         try:
@@ -157,6 +173,8 @@ def main():
             f["priority_rank"] = idx
             f["priority_justification"] = generate_priority_justification(f, idx)
             ranked.append(f)
+        if args.top is not None and args.top > 0:
+            ranked = ranked[:args.top]
 
         formatted_output = json.dumps({"status": "ok", "total_ranked": len(ranked), "roadmap": ranked}, indent=2)
 

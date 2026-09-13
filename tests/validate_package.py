@@ -160,6 +160,10 @@ class TestPackageHygiene(unittest.TestCase):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+        print("Usage: python3 tests/validate_package.py [path/to/brand-ai-readiness-audit.zip]")
+        sys.exit(0)
+
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     zip_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
         repo_root, "brand-ai-readiness-audit.zip"

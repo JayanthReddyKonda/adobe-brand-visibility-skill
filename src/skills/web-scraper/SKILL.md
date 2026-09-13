@@ -126,7 +126,12 @@ Read the specialist reference files using your native file reading capabilities 
 
 ### Step 2: Execute Single-Pass Acquisition
 
-Execute the deterministic scraper against the target site:
+Execute the canonical single-pass acquisition script used by `audit-orchestrator`:
+```bash
+python3 skills/web-scraper/scripts/acquire_inventory.py --site https://example.com -o inv.json --max-pages 15 --timeout 30 --concurrency 2
+```
+
+Or execute the autonomous scraper CLI with custom frontier settings:
 ```bash
 python3 skills/web-scraper/scripts/run_scraper.py --site https://example.com --output inv.json --format json
 ```

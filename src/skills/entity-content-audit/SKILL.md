@@ -119,9 +119,19 @@ Execute the deterministic entity and answerability script with `--format json`:
 python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format json
 ```
 
-Direct standalone execution:
+Specialist forensic options:
 ```bash
-python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --format json
+# Filter entities matching specific Schema.org type (e.g. Product, Organization, Service, TechArticle)
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --schema-type Product
+
+# Isolate 7-attribute Answerability Index evaluations across crawled routes
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --answerability-only
+
+# Target specific route for deep JSON-LD inspection
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --url https://example.com/products/sku-1
+
+# Emit readable markdown summary to file
+python3 skills/entity-content-audit/scripts/entity_content_check.py --site https://example.com --inventory inv.json --format markdown -o output.md
 ```
 
 ---

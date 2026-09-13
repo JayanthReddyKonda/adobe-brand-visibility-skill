@@ -17,6 +17,13 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILLS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 REFERENCES_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "references"))
 
+
+def configure_skills_dir(custom_skills_dir: str) -> None:
+    """Configure custom skills directory and its references."""
+    global SKILLS_DIR
+    SKILLS_DIR = os.path.abspath(custom_skills_dir)
+
+
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
@@ -443,15 +450,27 @@ def main():
     parser = argparse.ArgumentParser(
         description="Bundle and compile relevant knowledge base context for a given target site."
     )
-    parser.add_argument("--site", default="https://example.com", help="Target site URL or domain")
-    parser.add_argument("--inventory", help="Path to pre-crawled inv.json site inventory (optional)")
-    parser.add_argument("--telemetry", help="Path to telemetry.json payload (optional)")
+    parser.add_argument("--site", "-s", default=None, help="Target site URL or domain (optional if inventory or telemetry is provided)")
+    parser.add_argument("--inventory", "-i", help="Path to pre-crawled inv.json site inventory (optional)")
+    parser.add_argument("--telemetry", "-t", help="Path to telemetry.json payload (optional)")
     parser.add_argument("--archetype", choices=["ecommerce", "saas", "publisher", "local_business", "corporate"], help="Explicitly force business archetype context")
     parser.add_argument("--topic", help="Scope context bundle to specific technical topic (e.g. retrieval, rendering, entity, facts, corroboration, geo, engagement)")
-    parser.add_argument("--output", help="Path to write compiled briefing (optional, defaults to stdout)")
-    parser.add_argument("--format", choices=["markdown", "json"], default="markdown", help="Output format")
+    parser.add_argument("--skills-dir", help="Path to skills directory (defaults to ../.. relative to script)")
+    parser.add_argument("--output", "-o", help="Path to write compiled briefing (optional, defaults to stdout)")
+    parser.add_argument("--format", choices=["markdown", "json"], default=None, help="Output format (default: auto-inferred from output or markdown)")
+    parser.add_argument("--json", dest="json_mode", action="store_true", help="Output briefing as JSON (convenience alias for --format json)")
 
     args = parser.parse_args()
+    if args.json_mode:
+        args.format = "json"
+    elif args.format is None:
+        if args.output and args.output.lower().endswith(".json"):
+            args.format = "json"
+        else:
+            args.format = "markdown"
+
+    if args.skills_dir:
+        configure_skills_dir(args.skills_dir)
 
     data_payload: Optional[Dict[str, Any]] = None
     source_file = args.telemetry or args.inventory
@@ -462,13 +481,20 @@ def main():
         except Exception as e:
             sys.stderr.write(f"Warning: Failed to load context source from {source_file}: {e}\n")
 
-    bundle_text = build_bundle(args.site, data_payload, archetype=args.archetype, topic=args.topic)
+    # Auto-extract site from data payload if omitted
+    site = args.site
+    if not site and isinstance(data_payload, dict):
+        site = data_payload.get("base_url") or data_payload.get("site")
+    if not site:
+        site = "https://example.com"
+
+    bundle_text = build_bundle(site, data_payload, archetype=args.archetype, topic=args.topic)
 
     if args.format == "json":
         signals = detect_signals(data_payload)
         ref_status = verify_reference_integrity()
         out = json.dumps({
-            "site": args.site,
+            "site": site,
             "signals": signals,
             "reference_integrity": ref_status,
             "briefing": bundle_text,

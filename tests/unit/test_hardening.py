@@ -1120,6 +1120,69 @@ class TestFrescopaHardeningAndArchetype(unittest.TestCase):
         valid, errors = validate_report_dict(report)
         self.assertTrue(valid, f"Validation failed with errors: {errors}")
 
+    def test_sanitize_clean_report_omits_ambiguous_scores(self):
+        """Clean production deliverable must omit ambiguous readiness scores by default and validate against Draft-07."""
+        from orchestrator import sanitize_clean_report, synthesize_audit_report
+        from validate_report import validate_report_dict
+
+        inv = {
+            "site": "https://example.com",
+            "pages": [{"url": "https://example.com/", "status": 200, "word_count": 150}],
+        }
+        report = synthesize_audit_report("https://example.com", inv, {})
+        self.assertIn("readiness", report)
+
+        # Default clean deliverable omits ambiguous heuristic scores
+        clean = sanitize_clean_report(report)
+        self.assertNotIn("readiness", clean)
+        self.assertIn("site", clean)
+        self.assertIn("summary", clean)
+        self.assertIn("findings", clean)
+        self.assertIn("proactive_actions", clean)
+        valid, errors = validate_report_dict(clean)
+        self.assertTrue(valid, f"Clean report failed Draft-07 validation: {errors}")
+
+        # When explicitly requested via include_scores=True, readiness is preserved
+        clean_with_scores = sanitize_clean_report(report, include_scores=True)
+        self.assertIn("readiness", clean_with_scores)
+        valid_scores, errors_scores = validate_report_dict(clean_with_scores)
+        self.assertTrue(valid_scores, f"Clean report with scores failed validation: {errors_scores}")
+
+
+class TestStreamlinedInvocation(unittest.TestCase):
+    """Verifies that all tools and sensors support streamlined calling with minimal flags."""
+
+    def test_plan_format_auto_inference(self):
+        """Plan tool should infer format from output filename extension without --format."""
+        import subprocess
+        plan_script = os.path.join(SKILLS_DIR, "audit-orchestrator", "scripts", "plan.py")
+        temp_dir = os.path.abspath(os.path.join(PROJECT_ROOT, "build"))
+        os.makedirs(temp_dir, exist_ok=True)
+        mock_report = os.path.join(temp_dir, "mock_plan_report.json")
+        out_json = os.path.join(temp_dir, "test_inferred_plan.json")
+        out_md = os.path.join(temp_dir, "test_inferred_plan.md")
+        try:
+            with open(mock_report, "w", encoding="utf-8") as f:
+                json.dump({"findings": [{"id": "F-001", "title": "Test Finding", "severity": "high"}]}, f)
+
+            # 1. Output ending in .json -> inferred json format
+            res = subprocess.run([sys.executable, plan_script, "-i", mock_report, "-o", out_json], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            with open(out_json, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertIn("roadmap", data)
+
+            # 2. Output ending in .md -> inferred markdown format
+            res_md = subprocess.run([sys.executable, plan_script, "-i", mock_report, "-o", out_md], capture_output=True, text=True)
+            self.assertEqual(res_md.returncode, 0, res_md.stderr)
+            with open(out_md, "r", encoding="utf-8") as f:
+                md_text = f.read()
+            self.assertTrue(md_text.startswith("# Priority Remediation Roadmap"))
+        finally:
+            for p in (mock_report, out_json, out_md):
+                if os.path.exists(p):
+                    os.remove(p)
+
 
 if __name__ == "__main__":
     unittest.main()

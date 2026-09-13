@@ -87,6 +87,25 @@ for skill_name in [
     if os.path.exists(p) and p not in sys.path:
         sys.path.insert(0, p)
 
+
+def configure_skills_dir(custom_skills_dir: str) -> None:
+    """Ensure custom skills directory and its peer skill script directories are in sys.path."""
+    global SKILLS_DIR
+    SKILLS_DIR = os.path.abspath(custom_skills_dir)
+    for skill_name in [
+        "web-scraper",
+        "discoverability-audit",
+        "entity-content-audit",
+        "fact-consistency-audit",
+        "corroboration-authority-audit",
+        "geo-content-audit",
+        "engagement-context-audit",
+    ]:
+        p = os.path.join(SKILLS_DIR, skill_name, "scripts")
+        if os.path.exists(p) and p not in sys.path:
+            sys.path.insert(0, p)
+
+
 try:
     from acquire_inventory import build_inventory
 except ImportError:
@@ -1236,12 +1255,12 @@ def synthesize_audit_report(
                 "priority": "critical",
                 "verification": f"Probe {base}/ with honest audit user-agent and confirm HTTP 200 is returned with initial HTML.",
                 "is_proactive": False,
-                "priority_index": 20,
+                "priority_index": 25,
                 "difficulty": 1,
             },
-            "actual_band": "S3",
+            "actual_band": "S4",
             "difficulty": 1,
-            "priority_index": 20,
+            "priority_index": 25,
             "priority_rank": 1,
             "dag_node": "RETRIEVAL",
             "priority_justification": "Rank #1: Upstream barrier that completely blocks AI search engines from crawling, indexing, or extracting text across this route.",
@@ -2146,20 +2165,29 @@ def audit(
     return report
 
 
-def sanitize_clean_report(report: Dict[str, Any]) -> Dict[str, Any]:
-    """Strip internal runtime pipeline debug data, leaving only core findings, scores, and proactive actions."""
-    clean = {
+def sanitize_clean_report(report: Dict[str, Any], include_scores: bool = False) -> Dict[str, Any]:
+    """Strip internal pipeline debug traces and ambiguous heuristic scores, leaving pure actionable signal."""
+    clean: Dict[str, Any] = {
         "$schema": report.get("$schema", "http://json-schema.org/draft-07/schema#"),
         "schema_version": report.get("schema_version", "1.0.0"),
         "site": report.get("site"),
         "audited_at": report.get("audited_at"),
         "audit_status": report.get("audit_status", "complete"),
-        "archetype": report.get("archetype"),
         "summary": report.get("summary"),
-        "readiness": report.get("readiness"),
         "findings": [],
         "proactive_actions": [],
     }
+    if report.get("archetype"):
+        clean["archetype"] = report.get("archetype")
+
+    if include_scores and report.get("readiness"):
+        raw_readiness = report.get("readiness")
+        if isinstance(raw_readiness, dict):
+            clean["readiness"] = {
+                "composite_score": raw_readiness.get("composite_score"),
+                "grade": raw_readiness.get("grade"),
+                "dimensions": raw_readiness.get("dimensions"),
+            }
     for idx, f in enumerate(report.get("findings", []), start=1):
         clean_f = {
             "id": f.get("id") or f"F-{idx:03d}",
@@ -2206,18 +2234,18 @@ def main():
     parser = argparse.ArgumentParser(
         description="Master Orchestrator for Brand AI-Readiness & Visibility Audit."
     )
-    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
-    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (optional)")
+    parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (optional if --inventory is provided)")
+    parser.add_argument("--inventory", "-i", help="Path to pre-crawled site inventory JSON (optional)")
     parser.add_argument("--candidate-backlinks", help="Path to candidate backlinks JSON (optional)")
     parser.add_argument("--analytics", help="Path to first-party analytics JSON (optional)")
     parser.add_argument(
         "--responses", "--observations", dest="responses", help="Path to observed AI assistant outputs JSON to cross-check with fact ledger (optional)"
     )
-    parser.add_argument("--review", help="Path to agent review JSON containing refined candidate findings and proactive actions (optional)")
+    parser.add_argument("--review", "-r", help="Path to agent review JSON containing refined candidate findings and proactive actions (optional)")
     parser.add_argument("--skills", help="Comma-separated list of specialist skills to execute (e.g. discoverability,entity,geo)")
-    parser.add_argument("--output", help="Path to write final JSON report (optional, defaults to stdout)")
+    parser.add_argument("--output", "-o", help="Path to write final JSON report (optional, defaults to stdout)")
     parser.add_argument("--format", choices=["json"], default="json", help="Output format (default: json)")
-    parser.add_argument("--telemetry", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
+    parser.add_argument("--telemetry", "-t", action="store_true", help="Output raw aggregated sensor telemetry for AI cognitive orchestration")
     parser.add_argument(
         "--baseline-only",
         action="store_true",
@@ -2226,16 +2254,52 @@ def main():
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="Emit clean, high-signal report containing core findings, scores, and remediations (omits internal pipeline debug traces)",
+        help="Emit clean, high-signal report containing core findings, summary, and remediations (omits internal pipeline debug traces and scores)",
+    )
+    parser.add_argument(
+        "--include-scores",
+        action="store_true",
+        help="Include readiness scores in clean report",
+    )
+    parser.add_argument(
+        "--deliverable",
+        action="store_true",
+        help="Emit clean client deliverable with readiness scores (combines --clean and --include-scores in one flag)",
+    )
+    parser.add_argument(
+        "--skills-dir",
+        help="Explicit path to skills directory (defaults to ../.. relative to script)",
     )
 
     args = parser.parse_args()
+    if args.deliverable:
+        args.clean = True
+        args.include_scores = True
+
+    if args.skills_dir:
+        configure_skills_dir(args.skills_dir)
     skills_list = [s.strip() for s in args.skills.split(",") if s.strip()] if args.skills else None
+
+    # Infer target site from inventory if omitted
+    site = args.site
+    if not site and args.inventory and os.path.exists(args.inventory):
+        try:
+            with open(args.inventory, "r", encoding="utf-8") as f:
+                _inv_head = json.load(f)
+            if isinstance(_inv_head, dict):
+                site = _inv_head.get("base_url") or _inv_head.get("site")
+        except Exception:
+            pass
+    if not site:
+        parser.error("Either --site / -s or a valid --inventory / -i JSON containing site information is required.")
+
+    is_clean = args.clean
+    include_scores = args.include_scores
 
     try:
         if args.telemetry:
             payload = get_telemetry_payload(
-                site=args.site,
+                site=site,
                 inventory=args.inventory,
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
@@ -2244,13 +2308,13 @@ def main():
             )
             formatted_output = json.dumps(payload, indent=2)
         else:
-            if not args.baseline_only and not args.review:
+            if not args.baseline_only and not args.review and not args.clean:
                 sys.stderr.write(
                     "Notice: Emitting automated baseline report. For AI Agent cognitive reasoning workflows, "
                     "use '--telemetry' to extract empirical measurements for agent synthesis.\n"
                 )
             report = audit(
-                site=args.site,
+                site=site,
                 inventory=args.inventory,
                 analytics=args.analytics,
                 candidate_backlinks=args.candidate_backlinks,
@@ -2258,8 +2322,8 @@ def main():
                 review=args.review,
                 skills=skills_list,
             )
-            if args.clean:
-                report = sanitize_clean_report(report)
+            if is_clean:
+                report = sanitize_clean_report(report, include_scores=include_scores)
             formatted_output = json.dumps(report, indent=2)
     except Exception as e:
         sys.stderr.write(f"Orchestration Error: {e}\n")

@@ -9,7 +9,8 @@
     "audited_at",
     "audit_status",
     "summary",
-    "findings"
+    "findings",
+    "proactive_actions"
   ],
   "properties": {
     "$schema": {
@@ -348,6 +349,7 @@
           "technical_fix": {
             "type": [
               "string",
+              "object",
               "null"
             ]
           },
@@ -461,8 +463,11 @@
       "description": "Detected business archetype and confidence"
     },
     "readiness": {
-      "type": "object",
-      "description": "Deterministic readiness score, grade, and dimension breakdown",
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Optional heuristic readiness score, grade, and dimension breakdown",
       "properties": {
         "composite_score": {
           "type": "number",
@@ -487,12 +492,13 @@
         },
         "dimension_status": {
           "type": "object",
-          "description": "Epistemic certainty status per dimension (e.g. observed, provisional, heuristic_only)"
+          "description": "Epistemic certainty status per dimension"
         },
         "score_scope": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": true
     }
   },
   "additionalProperties": false

@@ -1410,15 +1410,24 @@ def main():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--site", required=True, help="Target website URL or domain (e.g. https://example.com)")
-    parser.add_argument("--inventory", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
+    parser.add_argument("--site", "-s", default=None, help="Target website URL or domain (optional if --inventory is provided)")
+    parser.add_argument("--inventory", "-i", help="Path to pre-crawled site inventory JSON (inv.json) for offline execution")
     parser.add_argument("--state", help="Path to global state JSON (optional multi-turn evaluation)")
     parser.add_argument("--url", help="Target specific route or URL for forensic discoverability inspection")
     parser.add_argument("--bot", help="Test RFC 9309 crawler permissions for a specific AI bot (e.g. OAI-SearchBot, Claude-SearchBot)")
-    parser.add_argument("--subsystem", choices=["access", "rendering", "canonical", "sitemaps"], help="Isolate a specific diagnostic subsystem")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json", help="Output serialization format (default: json)")
+    parser.add_argument("--subsystem", choices=["access", "rendering", "render", "canonical", "sitemaps"], help="Isolate a specific diagnostic subsystem")
+    parser.add_argument("--matrix-only", dest="matrix_only", action="store_true", help="Isolate crawler matrix analysis (evaluates RFC 9309 crawler permissions)")
+    parser.add_argument("--format", choices=["json", "markdown"], default=None, help="Output serialization format (default: auto-inferred or json)")
+    parser.add_argument("--output", "-o", help="Destination path to write output JSON/Markdown (optional, defaults to stdout)")
     args = parser.parse_args()
-    base, domain = parse_domain(args.site)
+    if args.matrix_only:
+        args.subsystem = "access"
+    elif args.subsystem == "render":
+        args.subsystem = "rendering"
+
+    if args.format is None:
+        args.format = "markdown" if args.output and args.output.lower().endswith((".md", ".markdown")) else "json"
+
     inv = None
     if args.inventory:
         if os.path.exists(args.inventory):
@@ -1429,11 +1438,22 @@ def main():
                 inv = {"pages": [], "error": f"Failed to parse inventory: {e}", "status": "inconclusive"}
         else:
             inv = {"pages": [], "error": "Inventory file not found", "status": "inconclusive"}
+
+    site_str = args.site
+    if not site_str and isinstance(inv, dict):
+        site_str = inv.get("base_url") or inv.get("site")
+    if not site_str:
+        parser.error("Either --site / -s or a valid --inventory / -i JSON containing site information is required.")
+
+    base, domain = parse_domain(site_str)
     res = audit(base, domain, inv=inv, state_file=args.state, target_url=args.url, target_bot=args.bot, subsystem=args.subsystem)
-    if args.format == "markdown":
-        print(format_markdown_summary(res, domain=domain))
+    formatted = format_markdown_summary(res, domain=domain) if args.format == "markdown" else json.dumps(res, indent=2)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(formatted)
+            f.write("\n")
     else:
-        print(json.dumps(res, indent=2))
+        print(formatted)
 
 
 if __name__ == "__main__":
